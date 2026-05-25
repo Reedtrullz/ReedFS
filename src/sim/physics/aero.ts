@@ -44,7 +44,7 @@ export function computeAero(state: AircraftState, inputs: ControlInputs, spec: A
   // --- Thrust ---
   const n1Avg = (state.engines[0].n1 + state.engines[1].n1) / 200;
   const rhoRatio = atmo.density / 1.225;
-  const staticThrust = spec.maxThrust * lbfToN(Math.max(n1Avg, 0));
+  const staticThrust = lbfToN(spec.maxThrust) * Math.max(n1Avg, 0);
   const ramFactor = 1 + 0.15 * mach;
   const thrust = staticThrust * Math.pow(rhoRatio, 0.7) * ramFactor * spec.engineCount;
 

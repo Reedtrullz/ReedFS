@@ -20,16 +20,27 @@ export function App() {
   const status = useSimStore((s) => s.status);
   const setInput = useSimStore((s) => s.setInput);
 
-  // Keyboard controls
+  const keysRef = useRef(new Set<string>());
+
+  // Keyboard controls — tracks pressed keys for simultaneous input
   useEffect(() => {
+    const updateFromKeys = () => {
+      const k = keysRef.current;
+      setInput({
+        elevator: (k.has('w') ? -0.4 : 0) + (k.has('s') ? 0.4 : 0),
+        aileron: (k.has('a') ? -0.5 : 0) + (k.has('d') ? 0.5 : 0),
+        rudder: (k.has('q') ? -0.5 : 0) + (k.has('e') ? 0.5 : 0),
+      });
+    };
+
     const onKey = (e: KeyboardEvent) => {
-      switch (e.key.toLowerCase()) {
-        case 'w': setInput({ elevator: -0.4 }); break;
-        case 's': setInput({ elevator: 0.4 }); break;
-        case 'a': setInput({ aileron: -0.5 }); break;
-        case 'd': setInput({ aileron: 0.5 }); break;
-        case 'q': setInput({ rudder: -0.5 }); break;
-        case 'e': setInput({ rudder: 0.5 }); break;
+      const key = e.key.toLowerCase();
+      if (['w', 's', 'a', 'd', 'q', 'e'].includes(key)) {
+        keysRef.current.add(key);
+        updateFromKeys();
+        return;
+      }
+      switch (key) {
         case 'arrowup': setInput({ throttle1: 1, throttle2: 1 }); break;
         case 'arrowdown': setInput({ throttle1: 0, throttle2: 0 }); break;
         case 'g': {
@@ -45,10 +56,19 @@ export function App() {
         }
       }
     };
-    const onKeyUp = () => setInput({ elevator: 0, aileron: 0, rudder: 0 });
+
+    const onKeyUp = (e: KeyboardEvent) => {
+      const key = e.key.toLowerCase();
+      keysRef.current.delete(key);
+      updateFromKeys();
+    };
+
     window.addEventListener('keydown', onKey);
     window.addEventListener('keyup', onKeyUp);
-    return () => { window.removeEventListener('keydown', onKey); window.removeEventListener('keyup', onKeyUp); };
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('keyup', onKeyUp);
+    };
   }, [setInput]);
 
   const handleTakeoff = () => {
