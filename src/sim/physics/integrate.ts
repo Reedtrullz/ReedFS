@@ -1,6 +1,7 @@
 import type { AircraftState, AircraftSpec, ControlInputs } from '../types';
 import { computeAero } from './aero';
 import { updateEngines } from '../systems/engine';
+import { updateFuel } from '../systems/fuel';
 import { geodeticToEcef, ecefToGeodetic, ecefToEnu, enuToEcef } from './geodesy';
 import { ftToM, mToFt } from './units';
 
@@ -87,10 +88,8 @@ export function integrate(
   // ── Engine system ──
   updateEngines(state, inputs, spec, dt);
 
-  // ── Fuel burn ──
-  const fuelUsed = (state.fuel.fuelFlowTotal / 3600) * dt;
-  state.fuel.totalFuel = Math.max(0, state.fuel.totalFuel - fuelUsed);
-  state.grossWeight = spec.emptyWeight + state.fuel.totalFuel;
+  // ── Fuel system ──
+  updateFuel(state, spec, dt);
 
   // ── Config ──
   state.config.flapSetting = inputs.flapLever;
