@@ -7,6 +7,7 @@ import { createBoeing737Model } from './AircraftModel';
 import { computeSunPosition, sunLightIntensity } from '../sim/sun';
 import { quatToEuler } from '../sim/physics/quaternion';
 import { createAircraftModelQuaternion } from './aircraftOrientation';
+import { applyAircraftModelAnimations } from './aircraftModelAnimation';
 import { isCesiumResourceDestroyed } from './cesiumLifecycle';
 
 export interface ThreeLayerProps {
@@ -54,21 +55,10 @@ export function ThreeLayer({ viewerRef }: ThreeLayerProps) {
       // Clone template (shares geometry buffers, only creates wrapper objects)
       const model = modelTemplate.clone(true) as THREE.Group;
       model.quaternion.copy(createAircraftModelQuaternion(attitude));
+      applyAircraftModelAnimations(model, aircraft);
 
       const pos = Cesium.Cartesian3.fromDegrees(lon, lat, alt * 0.3048);
       proxyRef.current = ttc.add(model, pos);
-
-      // Fan spin animation (N1-driven)
-      if (proxyRef.current) {
-        const children = proxyRef.current.children;
-        const engCount = 2;
-        for (let i = 0; i < engCount; i++) {
-          const idx = children.length - engCount + i;
-          if (children[idx]) {
-            children[idx].rotation.z += aircraft.engines[i].n1 * 0.05;
-          }
-        }
-      }
 
       // Update lighting from sun position
       const sun = computeSunPosition(lat, lon, aircraft.timeOfDay ?? 12);
@@ -81,16 +71,6 @@ export function ThreeLayer({ viewerRef }: ThreeLayerProps) {
         2000 * Math.sin(sun.elevation),
         2000 * Math.cos(sun.azimuth) * Math.cos(sun.elevation),
       );
-
-      // Gear compression animation
-      const onGround = aircraft.position.alt < 100 && aircraft.config.gearDown;
-      if (proxyRef.current) {
-        proxyRef.current.children.forEach((child) => {
-          if (child.name.includes('Gear')) {
-            child.scale.y = onGround ? 0.7 : 1.0;
-          }
-        });
-      }
 
       ttc.update();
     };

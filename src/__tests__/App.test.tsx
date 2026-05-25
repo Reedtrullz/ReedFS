@@ -82,6 +82,8 @@ const mockFlyTo = vi.fn();
 const mockDestroy = vi.fn();
 const mockPostRenderAdd = vi.fn();
 const mockPostRenderRemove = vi.fn();
+const mockPreRenderAdd = vi.fn();
+const mockPreRenderRemove = vi.fn();
 
 vi.mock('cesium', () => ({
   Ion: { defaultAccessToken: '' },
@@ -92,6 +94,10 @@ vi.mock('cesium', () => ({
       postRender: {
         addEventListener: mockPostRenderAdd,
         removeEventListener: mockPostRenderRemove,
+      },
+      preRender: {
+        addEventListener: mockPreRenderAdd,
+        removeEventListener: mockPreRenderRemove,
       },
       screenSpaceCameraController: { enableInputs: true },
       globe: { enableLighting: true },

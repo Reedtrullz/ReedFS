@@ -18,7 +18,7 @@ import { RfsPFD } from './instruments/RfsPFD';
 import { RfsMCP } from './instruments/RfsMCP';
 import { ContrailLayer } from './viewport/ContrailLayer';
 import { shouldAutoFollowCamera, type CameraMode } from './viewport/cameraMode';
-import { followCameraHeading } from './viewport/cameraFollow';
+import { chaseCameraOffset } from './viewport/cameraFollow';
 import { createKseaKpdxFlight } from './sim/flightPlanLoader';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { FPSMonitor } from './components/FPSMonitor';
@@ -41,6 +41,7 @@ export function App() {
   const keysRef = useRef(new Set<string>());
   const [camMode, setCamMode] = useState<CameraMode>('chase');
   const [metarData, setMetarData] = useState<MetarData | null>(null);
+  const [viewerGeneration, setViewerGeneration] = useState(0);
 
   // Keyboard controls — tracks pressed keys for simultaneous input
   useEffect(() => {
@@ -117,39 +118,44 @@ export function App() {
   }, [status]);
 
   useEffect(() => {
-    let raf: number;
-    const update = () => {
-      const viewer = viewerRef.current;
-      if (!viewer) { raf = requestAnimationFrame(update); return; }
-      if (!shouldAutoFollowCamera(status, camMode)) {
-        raf = requestAnimationFrame(update);
-        return;
-      }
-      const a = useSimStore.getState().aircraft;
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+
+    const updateCamera = () => {
+      const { status: currentStatus, aircraft: a } = useSimStore.getState();
+      if (!shouldAutoFollowCamera(currentStatus, camMode)) return;
+
+      viewer.camera.cancelFlight();
       const altM = a.position.alt * 0.3048;
       if (camMode === 'cockpit') {
+        const offset = chaseCameraOffset(a.attitude, 5, 0);
         viewer.camera.lookAt(
           Cesium.Cartesian3.fromDegrees(a.position.lon, a.position.lat, altM + 2),
-          new Cesium.HeadingPitchRange(a.attitude.psi, 0, 5),
+          new Cesium.Cartesian3(offset.east, offset.north, offset.up),
         );
       } else {
+        const offset = chaseCameraOffset(
+          a.attitude,
+          camMode === 'tower' ? 1500 : 300,
+          Cesium.Math.toRadians(camMode === 'tower' ? 5 : 15),
+        );
         viewer.camera.lookAt(
           Cesium.Cartesian3.fromDegrees(a.position.lon, a.position.lat, altM),
-          new Cesium.HeadingPitchRange(
-            followCameraHeading(a.attitude.psi), // behind aircraft; Cesium HPR heading is view direction
-            Cesium.Math.toRadians(camMode === 'tower' ? -5 : -15),
-            camMode === 'tower' ? 1500 : 300,
-          ),
+          new Cesium.Cartesian3(offset.east, offset.north, offset.up),
         );
       }
-      raf = requestAnimationFrame(update);
     };
-    raf = requestAnimationFrame(update);
-    return () => cancelAnimationFrame(raf);
-  }, [camMode, status]);
+
+    updateCamera();
+    viewer.scene.preRender.addEventListener(updateCamera);
+    return () => {
+      viewer.scene.preRender.removeEventListener(updateCamera);
+    };
+  }, [camMode, viewerGeneration]);
 
   const handleViewerReady = useCallback((viewer: Cesium.Viewer) => {
     viewerRef.current = viewer;
+    setViewerGeneration((generation) => generation + 1);
     viewer.camera.flyTo({
       destination: Cesium.Cartesian3.fromDegrees(-122.31, 47.45, 5000),
       orientation: { heading: Cesium.Math.toRadians(0), pitch: Cesium.Math.toRadians(-30), roll: 0 },
