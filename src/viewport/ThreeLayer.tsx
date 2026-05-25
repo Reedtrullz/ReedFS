@@ -3,6 +3,7 @@ import * as Cesium from 'cesium';
 import * as THREE from 'three';
 import ThreeToCesium from 'three-to-cesium';
 import { useSimStore } from '../store/simStore';
+import { createBoeing737Model } from './AircraftModel';
 
 export interface ThreeLayerProps {
   viewerRef: RefObject<Cesium.Viewer | null>;
@@ -41,45 +42,16 @@ export function ThreeLayer({ viewerRef }: ThreeLayerProps) {
         ttc.remove(proxyRef.current);
       }
 
-      // Build crude 737 proxy
-      const body = new THREE.Mesh(
-        new THREE.BoxGeometry(10, 3, 30),
-        new THREE.MeshStandardMaterial({ color: 0xdddddd }),
-      );
-      const wing = new THREE.Mesh(
-        new THREE.BoxGeometry(35, 1, 8),
-        new THREE.MeshStandardMaterial({ color: 0xcccccc }),
-      );
-      const tailV = new THREE.Mesh(
-        new THREE.BoxGeometry(14, 8, 2),
-        new THREE.MeshStandardMaterial({ color: 0xffffff }),
-      );
-      tailV.position.set(0, 4, -13);
-      const tailH = new THREE.Mesh(
-        new THREE.BoxGeometry(18, 1, 4),
-        new THREE.MeshStandardMaterial({ color: 0xffffff }),
-      );
-      tailH.position.set(0, 0, -13);
-
-      const group = new THREE.Group();
-      group.add(body);
-      group.add(wing);
-      group.add(tailV);
-      group.add(tailH);
-
-      // Orient: Three.js default is Y-up, Cesium is Z-up. The three-to-cesium
-      // library handles this rotation internally. We set the group rotation
-      // to match the aircraft attitude.
-      // In the Cesium local frame (ENU): heading rotates around Z-up.
-      // pitch rotates around Y, roll around X.
-      group.rotation.set(
-        theta,               // pitch — nose up/down around local Y
-        0,                   // placeholder — heading applied below
-        -phi,                // roll — negative because phi is +right-wing-down
+      // Build 737 proxy
+      const model = createBoeing737Model();
+      model.rotation.set(
+        theta,
+        0,
+        -phi,
       );
 
       const pos = Cesium.Cartesian3.fromDegrees(lon, lat, alt * 0.3048);
-      proxyRef.current = ttc.add(group, pos);
+      proxyRef.current = ttc.add(model, pos);
 
       ttc.update();
     };
