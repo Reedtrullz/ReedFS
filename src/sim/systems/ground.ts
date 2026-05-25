@@ -7,6 +7,7 @@ const GROUND_EPSILON_FT = 0.5;
 const ROLLING_FRICTION_ACCEL_MPS2 = 0.35;
 const MAX_BRAKE_ACCEL_MPS2 = 6.0;
 const STOP_EPSILON_MPS = 0.05;
+const BREAKAWAY_THROTTLE = 0.05;
 const MIN_GROUND_PITCH_RAD = 0;
 const MAX_GROUND_PITCH_RAD = 0.35;
 const MAX_GROUND_ROLL_RAD = 0.2;
@@ -20,14 +21,20 @@ function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value));
 }
 
+function hasBreakawayThrustCommand(inputs: ControlInputs): boolean {
+  return Math.max(inputs.throttle1, inputs.throttle2) > BREAKAWAY_THROTTLE;
+}
+
 function applyLongitudinalGroundDecel(state: AircraftState, inputs: ControlInputs, dt: number): void {
   const speed = state.velocity.u;
-  if (Math.abs(speed) <= STOP_EPSILON_MPS) {
+  const brake = clamp01(inputs.brake);
+  const breakawayThrust = hasBreakawayThrustCommand(inputs);
+
+  if (Math.abs(speed) <= STOP_EPSILON_MPS && !breakawayThrust) {
     state.velocity.u = 0;
     return;
   }
 
-  const brake = clamp01(inputs.brake);
   const decel = (ROLLING_FRICTION_ACCEL_MPS2 + brake * MAX_BRAKE_ACCEL_MPS2) * Math.max(0, dt);
 
   if (speed > 0) {

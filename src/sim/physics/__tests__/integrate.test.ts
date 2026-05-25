@@ -141,6 +141,22 @@ describe('integrate', () => {
     expect(s.config.gearDown).toBe(true);
   });
 
+  it('full-throttle takeoff roll accelerates at 120 Hz', () => {
+    const s = runTakeoffRollAtHz(120, 20);
+
+    expect(s.position.alt).toBeGreaterThanOrEqual(KSEA_RUNWAY_ALT_FT - 0.01);
+    expect(s.velocity.u).toBeGreaterThan(25);
+    expect(s.config.gearDown).toBe(true);
+  });
+
+  it('full-throttle takeoff roll accelerates at 144 Hz', () => {
+    const s = runTakeoffRollAtHz(144, 20);
+
+    expect(s.position.alt).toBeGreaterThanOrEqual(KSEA_RUNWAY_ALT_FT - 0.01);
+    expect(s.velocity.u).toBeGreaterThan(25);
+    expect(s.config.gearDown).toBe(true);
+  });
+
   it('brake input decelerates the aircraft during ground roll', () => {
     const s = createInitialState(B737_800_SPEC);
     s.position.alt = KSEA_RUNWAY_ALT_FT;

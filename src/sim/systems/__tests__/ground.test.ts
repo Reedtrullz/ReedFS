@@ -66,4 +66,35 @@ describe('applyGroundContact', () => {
 
     expect(state.attitude.theta).toBeGreaterThanOrEqual(0);
   });
+
+  it('does not snap tiny forward speed to zero when takeoff thrust is commanded', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.position.alt = KSEA_RUNWAY_ALT_FT;
+    state.velocity.u = 0.03;
+    state.config.gearDown = true;
+
+    const takeoff: ControlInputs = {
+      ...idle,
+      throttle1: 1,
+      throttle2: 1,
+      flapLever: 5,
+      gearLever: 'DOWN',
+      brake: 0,
+    };
+
+    applyGroundContact(state, takeoff, 1 / 120);
+
+    expect(state.velocity.u).toBeGreaterThan(0);
+  });
+
+  it('still snaps an idle nearly-stopped aircraft to zero', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.position.alt = KSEA_RUNWAY_ALT_FT;
+    state.velocity.u = 0.03;
+    state.config.gearDown = true;
+
+    applyGroundContact(state, idle, 1 / 120);
+
+    expect(state.velocity.u).toBe(0);
+  });
 });
