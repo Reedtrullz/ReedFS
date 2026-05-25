@@ -1,22 +1,40 @@
 import type { ControlInputs } from '../sim/types';
 
+const AXIS_DEADZONE = 0.08;
+const TRIGGER_DEADZONE = 0.05;
+
+function activeAxis(value: number | undefined): number {
+  const v = value ?? 0;
+  return Math.abs(v) < AXIS_DEADZONE ? 0 : v;
+}
+
+function activeTrigger(value: number | undefined): number {
+  const v = value ?? 0;
+  return v < TRIGGER_DEADZONE ? 0 : Math.max(0, Math.min(1, v));
+}
+
 export function readGamepad(): Partial<ControlInputs> | null {
   const gamepads = navigator.getGamepads();
   const gp = gamepads[0];
   if (!gp) return null;
 
-  const leftX = gp.axes[0] ?? 0;
-  const leftY = gp.axes[1] ?? 0;
-  const rightX = gp.axes[2] ?? 0;
+  const leftX = activeAxis(gp.axes[0]);
+  const leftY = activeAxis(gp.axes[1]);
+  const rightX = activeAxis(gp.axes[2]);
+  const rightTrigger = activeTrigger(gp.buttons[7]?.value);
+  const leftTrigger = activeTrigger(gp.buttons[6]?.value);
 
-  const elevator = leftY * 0.7;
-  const aileron = leftX * 0.7;
-  const rudder = rightX * 0.5;
+  const inputs: Partial<ControlInputs> = {};
 
-  let throttle1 = 0.5;
-  if (gp.buttons[7]?.value) throttle1 = 0.5 + gp.buttons[7].value * 0.5;
-  if (gp.buttons[6]?.value) throttle1 = 0.5 - gp.buttons[6].value * 0.5;
-  const throttle2 = throttle1;
+  if (leftY !== 0) inputs.elevator = leftY * 0.7;
+  if (leftX !== 0) inputs.aileron = leftX * 0.7;
+  if (rightX !== 0) inputs.rudder = rightX * 0.5;
 
-  return { elevator, aileron, rudder, throttle1, throttle2 };
+  if (rightTrigger > 0 || leftTrigger > 0) {
+    const throttle1 = Math.max(0, Math.min(1, 0.5 + rightTrigger * 0.5 - leftTrigger * 0.5));
+    inputs.throttle1 = throttle1;
+    inputs.throttle2 = throttle1;
+  }
+
+  return Object.keys(inputs).length > 0 ? inputs : null;
 }
