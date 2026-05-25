@@ -16,9 +16,10 @@ jobs:
         with:
           node-version: 22
       - run: npm install --legacy-peer-deps
-      - run: npx tsc --noEmit
-      - run: npx vitest run
-      - run: npx vite build
+      - run: npm run lint:ci
+      - run: npm run typecheck
+      - run: npm run test
+      - run: npm run build
 
   publish:
     needs: test
