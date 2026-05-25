@@ -1,7 +1,16 @@
 FROM node:22-alpine AS builder
+
+# Clone RFMS for shared/ types (needed by RFS @shared imports)
+RUN apk add --no-cache git
+WORKDIR /
+RUN git clone --depth 1 https://github.com/Reedtrullz/RFMC.git RFMS
+
+# Build RFS
 WORKDIR /app
+# Install deps first (file:../RFMS/shared resolves to /RFMS/shared)
 COPY package*.json ./
 RUN npm install --legacy-peer-deps
+# Copy source and build
 COPY . .
 RUN npm run build
 
