@@ -1,5 +1,7 @@
 // ── 6-DOF State Vector ──
 
+import type { Quaternion } from './physics/quaternion';
+
 export interface GeoPosition {
   lat: number; // decimal degrees
   lon: number;
@@ -106,6 +108,7 @@ export interface AircraftState {
   position: GeoPosition;
   velocity: BodyVelocity;
   attitude: Attitude;
+  quaternion: Quaternion;
   angularVel: AngularVelocity;
   config: AircraftConfig;
   engines: [EngineState, EngineState];
@@ -165,6 +168,7 @@ export function createInitialState(spec: AircraftSpec): AircraftState {
     position: { lat: 47.45, lon: -122.31, alt: 432 },
     velocity: { u: 0, v: 0, w: 0 },
     attitude: { phi: 0, theta: 0, psi: Math.PI }, // facing south (180°)
+    quaternion: { q0: 1, q1: 0, q2: 0, q3: 0 },
     angularVel: { p: 0, q: 0, r: 0 },
     config: { flapSetting: 0, gearDown: true, spoilersArmed: false, spoilersDeployed: false, speedBrake: 0 },
     engines: [
