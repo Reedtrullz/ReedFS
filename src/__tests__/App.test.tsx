@@ -31,6 +31,7 @@ vi.mock('../store/simStore', () => {
     aircraft: {
       position: { lat: 0, lon: 0, alt: 0 },
       attitude: { phi: 0, theta: 0, psi: 0 },
+      quaternion: { q0: 1, q1: 0, q2: 0, q3: 0 },
       velocity: { u: 0, v: 0, w: 0 },
       angularVel: { p: 0, q: 0, r: 0 },
       config: { flapSetting: 0, gearDown: true, spoilersDeployed: false, speedBrake: 0 },

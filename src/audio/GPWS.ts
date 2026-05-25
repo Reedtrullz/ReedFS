@@ -1,4 +1,5 @@
 import type { AircraftState } from '../sim/types';
+import { quatToEuler } from '../sim/physics/quaternion';
 
 function checkMode1(state: AircraftState): string | null {
   const descentRate = -state.velocity.w * 196.85;
@@ -36,7 +37,7 @@ function checkMode3(state: AircraftState): string | null {
 }
 
 function checkMode6(state: AircraftState): string | null {
-  const bankDeg = Math.abs((state.attitude.phi * 180) / Math.PI);
+  const bankDeg = Math.abs((quatToEuler(state.quaternion).phi * 180) / Math.PI);
   if (bankDeg > 35) return 'BANK ANGLE';
   return null;
 }

@@ -1,11 +1,13 @@
 import { useSimStore } from '../store/simStore';
 import { computeDerived } from '../sim/physics/derived';
+import { quatToEuler } from '../sim/physics/quaternion';
 
 export function RfsPFD() {
   const a = useSimStore((s) => s.aircraft);
   const d = computeDerived(a);
-  const pitch = (a.attitude.theta * 180) / Math.PI;
-  const hdg = ((a.attitude.psi * 180) / Math.PI + 360) % 360;
+  const euler = quatToEuler(a.quaternion);
+  const pitch = (euler.theta * 180) / Math.PI;
+  const hdg = ((euler.psi * 180) / Math.PI + 360) % 360;
 
   const tapeH = 280;
   const tapeW = 56;

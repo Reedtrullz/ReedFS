@@ -5,6 +5,7 @@ import ThreeToCesium from 'three-to-cesium';
 import { useSimStore } from '../store/simStore';
 import { createBoeing737Model } from './AircraftModel';
 import { computeSunPosition, sunLightIntensity } from '../sim/sun';
+import { quatToEuler } from '../sim/physics/quaternion';
 
 export interface ThreeLayerProps {
   viewerRef: RefObject<Cesium.Viewer | null>;
@@ -39,7 +40,7 @@ export function ThreeLayer({ viewerRef }: ThreeLayerProps) {
     const sync = () => {
       const aircraft = useSimStore.getState().aircraft;
       const { lat, lon, alt } = aircraft.position;
-      const { phi, theta } = aircraft.attitude;
+      const { phi, theta } = quatToEuler(aircraft.quaternion);
 
       // Remove old proxy
       if (proxyRef.current) {

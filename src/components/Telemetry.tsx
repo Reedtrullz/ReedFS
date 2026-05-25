@@ -1,13 +1,15 @@
 import { useSimStore } from '../store/simStore';
 import { computeDerived } from '../sim/physics/derived';
+import { quatToEuler } from '../sim/physics/quaternion';
 
 export function Telemetry() {
   const aircraft = useSimStore((s) => s.aircraft);
   const status = useSimStore((s) => s.status);
   const d = computeDerived(aircraft);
-  const hdgDeg = (aircraft.attitude.psi * 180) / Math.PI;
-  const pitchDeg = (aircraft.attitude.theta * 180) / Math.PI;
-  const rollDeg = (aircraft.attitude.phi * 180) / Math.PI;
+  const euler = quatToEuler(aircraft.quaternion);
+  const hdgDeg = (euler.psi * 180) / Math.PI;
+  const pitchDeg = (euler.theta * 180) / Math.PI;
+  const rollDeg = (euler.phi * 180) / Math.PI;
 
   const row = (label: string, value: string) => (
     <div><span style={{ opacity: 0.5 }}>{label}:</span> {value}</div>

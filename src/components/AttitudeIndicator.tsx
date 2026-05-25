@@ -1,8 +1,10 @@
 import { useSimStore } from '../store/simStore';
+import { quatToEuler } from '../sim/physics/quaternion';
 
 export function AttitudeIndicator() {
-  const phi = useSimStore((s) => s.aircraft.attitude.phi);
-  const theta = useSimStore((s) => s.aircraft.attitude.theta);
+  const euler = useSimStore((s) => quatToEuler(s.aircraft.quaternion));
+  const phi = euler.phi;
+  const theta = euler.theta;
 
   const size = 140;
   const center = size / 2;
