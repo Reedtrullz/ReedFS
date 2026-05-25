@@ -1,5 +1,10 @@
-name: CI
-on: [push, pull_request]
+name: CI/CD
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -14,3 +19,71 @@ jobs:
       - run: npx tsc --noEmit
       - run: npx vitest run
       - run: npx vite build
+
+  publish:
+    needs: test
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Clone RFMS (shared types dependency)
+        run: git clone --depth 1 https://github.com/Reedtrullz/RFMC.git ../RFMS
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --legacy-peer-deps
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/reedtrullz/rfs:latest
+
+  deploy:
+    needs: publish
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1
+        with:
+          host: 198.23.137.16
+          username: deploy
+          key: ${{ secrets.VPS_DEPLOY_KEY }}
+          script: |
+            docker pull ghcr.io/reedtrullz/rfs:latest
+            docker rm -f rfs_canary 2>/dev/null || true
+
+            # Start canary on port 3004
+            docker run -d --name rfs_canary \
+              -p 127.0.0.1:3004:80 \
+              ghcr.io/reedtrullz/rfs:latest
+
+            sleep 5
+
+            # Health check
+            if curl -f -s http://localhost:3004/ > /dev/null; then
+              echo "Canary healthy, promoting..."
+              docker rm -f rfs 2>/dev/null || true
+              docker run -d --name rfs --restart unless-stopped \
+                -p 127.0.0.1:3001:80 \
+                --memory 256m --cpus 1.0 \
+                --log-driver json-file --log-opt max-size=10m --log-opt max-file=3 \
+                ghcr.io/reedtrullz/rfs:latest
+              docker rm -f rfs_canary
+              echo "Deployed successfully to https://fly.reidar.tech"
+            else
+              echo "Canary health check failed!"
+              docker logs --tail=50 rfs_canary
+              docker rm -f rfs_canary
+              exit 1
+            fi
