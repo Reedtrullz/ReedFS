@@ -18,6 +18,7 @@ import { RfsPFD } from './instruments/RfsPFD';
 import { RfsMCP } from './instruments/RfsMCP';
 import { ContrailLayer } from './viewport/ContrailLayer';
 import { shouldAutoFollowCamera, type CameraMode } from './viewport/cameraMode';
+import { followCameraHeading } from './viewport/cameraFollow';
 import { createKseaKpdxFlight } from './sim/flightPlanLoader';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { FPSMonitor } from './components/FPSMonitor';
@@ -135,7 +136,7 @@ export function App() {
         viewer.camera.lookAt(
           Cesium.Cartesian3.fromDegrees(a.position.lon, a.position.lat, altM),
           new Cesium.HeadingPitchRange(
-            a.attitude.psi - Math.PI, // behind
+            followCameraHeading(a.attitude.psi), // behind aircraft; Cesium HPR heading is view direction
             Cesium.Math.toRadians(camMode === 'tower' ? -5 : -15),
             camMode === 'tower' ? 1500 : 300,
           ),

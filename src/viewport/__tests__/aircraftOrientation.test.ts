@@ -14,25 +14,25 @@ function expectVectorClose(actual: Vector3, expected: Vector3): void {
 }
 
 describe('createAircraftModelQuaternion', () => {
-  it('maps the model fuselage forward axis to ENU north at zero heading', () => {
+  it('maps ENU-model fuselage forward axis to ENU north at zero heading', () => {
     const attitude = { phi: 0, theta: 0, psi: 0 };
 
-    expectVectorClose(axisAfterRotation(attitude, new Vector3(0, 0, -1)), new Vector3(0, 1, 0));
+    expectVectorClose(axisAfterRotation(attitude, new Vector3(0, 1, 0)), new Vector3(0, 1, 0));
     expectVectorClose(axisAfterRotation(attitude, new Vector3(1, 0, 0)), new Vector3(1, 0, 0));
-    expectVectorClose(axisAfterRotation(attitude, new Vector3(0, 1, 0)), new Vector3(0, 0, 1));
+    expectVectorClose(axisAfterRotation(attitude, new Vector3(0, 0, 1)), new Vector3(0, 0, 1));
   });
 
-  it('maps the model fuselage forward axis to ENU south at KSEA runway heading', () => {
+  it('maps ENU-model fuselage forward axis to ENU south at KSEA runway heading', () => {
     const attitude = { phi: 0, theta: 0, psi: Math.PI };
 
-    expectVectorClose(axisAfterRotation(attitude, new Vector3(0, 0, -1)), new Vector3(0, -1, 0));
+    expectVectorClose(axisAfterRotation(attitude, new Vector3(0, 1, 0)), new Vector3(0, -1, 0));
     expectVectorClose(axisAfterRotation(attitude, new Vector3(1, 0, 0)), new Vector3(-1, 0, 0));
-    expectVectorClose(axisAfterRotation(attitude, new Vector3(0, 1, 0)), new Vector3(0, 0, 1));
+    expectVectorClose(axisAfterRotation(attitude, new Vector3(0, 0, 1)), new Vector3(0, 0, 1));
   });
 
   it('uses pitch as a moderate nose-up component, not as vertical rocket alignment', () => {
     const attitude = { phi: 0, theta: 15 * Math.PI / 180, psi: Math.PI };
-    const forward = axisAfterRotation(attitude, new Vector3(0, 0, -1));
+    const forward = axisAfterRotation(attitude, new Vector3(0, 1, 0));
 
     expect(forward.z).toBeCloseTo(Math.sin(15 * Math.PI / 180), 6);
     expect(forward.z).toBeLessThan(0.3);
