@@ -27,4 +27,17 @@ describe('computeDerived', () => {
     const d = computeDerived(s);
     expect(d.vs).toBeGreaterThan(1000); // climbing at 10m/s ≈ 1968 fpm
   });
+
+  it('computes ground speed from attitude-aware NED velocity', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.velocity.u = 100;
+    s.velocity.v = 0;
+    s.velocity.w = 0;
+    s.attitude.theta = Math.PI / 6; // 30° nose up means part of forward velocity is vertical
+
+    const d = computeDerived(s);
+
+    expect(d.gs).toBeCloseTo(100 * Math.cos(Math.PI / 6) * 1.94384, 0);
+    expect(d.vs).toBeGreaterThan(9000);
+  });
 });
