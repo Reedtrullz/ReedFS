@@ -17,16 +17,24 @@ function activeTrigger(value: number | undefined): number {
   return v < TRIGGER_DEADZONE ? 0 : Math.max(0, Math.min(1, v));
 }
 
-function clearPreviouslyEmittedFields(): Partial<ControlInputs> | null {
-  if (previouslyEmittedFields.size === 0) return null;
+function finalizePayload(activeInputs: Partial<ControlInputs>): Partial<ControlInputs> | null {
+  const activeFields = new Set(Object.keys(activeInputs) as GamepadControlField[]);
+  const payload: Partial<ControlInputs> = { ...activeInputs };
+  let hasAnyField = activeFields.size > 0;
 
-  const cleared: Partial<ControlInputs> = {};
   for (const field of previouslyEmittedFields) {
-    cleared[field] = 0;
+    if (!activeFields.has(field)) {
+      payload[field] = 0;
+      hasAnyField = true;
+    }
   }
 
-  previouslyEmittedFields.clear();
-  return cleared;
+  if (!hasAnyField) {
+    return null;
+  }
+
+  previouslyEmittedFields = activeFields;
+  return payload;
 }
 
 export function __resetGamepadStateForTests(): void {
@@ -35,13 +43,13 @@ export function __resetGamepadStateForTests(): void {
 
 export function readGamepad(): Partial<ControlInputs> | null {
   const nav = typeof globalThis.navigator === 'undefined' ? undefined : globalThis.navigator;
-  if (!nav || typeof nav.getGamepads !== 'function') return clearPreviouslyEmittedFields();
+  if (!nav || typeof nav.getGamepads !== 'function') return finalizePayload({});
 
   const gamepads = nav.getGamepads();
-  if (!gamepads) return clearPreviouslyEmittedFields();
+  if (!gamepads) return finalizePayload({});
 
   const gp = Array.from(gamepads).find((pad): pad is Gamepad => pad != null);
-  if (!gp) return clearPreviouslyEmittedFields();
+  if (!gp) return finalizePayload({});
 
   const leftX = activeAxis(gp.axes?.[0]);
   const leftY = activeAxis(gp.axes?.[1]);
@@ -61,11 +69,5 @@ export function readGamepad(): Partial<ControlInputs> | null {
     inputs.throttle2 = throttle1;
   }
 
-  const fields = Object.keys(inputs) as GamepadControlField[];
-  if (fields.length > 0) {
-    previouslyEmittedFields = new Set(fields);
-    return inputs;
-  }
-
-  return clearPreviouslyEmittedFields();
+  return finalizePayload(inputs);
 }

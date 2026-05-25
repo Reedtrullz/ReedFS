@@ -104,6 +104,31 @@ describe('readGamepad', () => {
     expect(result?.aileron).toBeCloseTo(0.175, 8);
   });
 
+  it('clears fields that become neutral while other controls remain active', () => {
+    setGamepads([
+      {
+        axes: [0.25, 0, 0],
+        buttons: Array.from({ length: 8 }, () => button(0)),
+      },
+    ]);
+
+    const first = readGamepad();
+    expect(first?.aileron).toBeCloseTo(0.175, 8);
+
+    setGamepads([
+      {
+        axes: [0, 0, 0.4],
+        buttons: Array.from({ length: 8 }, () => button(0)),
+      },
+    ]);
+
+    const second = readGamepad();
+    expect(second).toEqual({
+      rudder: 0.2,
+      aileron: 0,
+    });
+  });
+
   it('returns null for malformed partial gamepad object without throwing', () => {
     setGamepads([{}]);
 
