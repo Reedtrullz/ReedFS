@@ -1,0 +1,133 @@
+- name: Deploy RFS to VPS
+  hosts: vps
+  gather_facts: false
+  vars:
+    repo_url: 'https://github.com/Reedtrullz/ReedFS.git'
+    app_dir: '/home/deploy/rfs'
+    container_name: 'rfs'
+    host_port: '3001'
+    container_port: '80'
+    public_domain: 'fly.reidar.tech'
+
+  tasks:
+    - name: Ensure app directory exists
+      file:
+        path: '{{ app_dir }}'
+        state: directory
+        owner: deploy
+        group: deploy
+        mode: '0755'
+
+    - name: Clone or pull repository
+      git:
+        repo: '{{ repo_url }}'
+        dest: '{{ app_dir }}'
+        version: master
+        force: true
+      register: git_result
+
+    - name: Build Docker image
+      community.docker.docker_image:
+        name: '{{ container_name }}'
+        source: build
+        build:
+          path: '{{ app_dir }}'
+        force_source: true
+      register: build_result
+
+    - name: Stop any stale canary container
+      community.docker.docker_container:
+        name: '{{ container_name }}_canary'
+        state: absent
+
+    - name: Start canary container for health check
+      community.docker.docker_container:
+        name: '{{ container_name }}_canary'
+        image: '{{ container_name }}'
+        state: started
+        ports:
+          - '127.0.0.1:3002:{{ container_port }}'
+      register: canary_start
+
+    - name: Wait for canary health check
+      block:
+        - name: Wait for nginx to start
+          wait_for:
+            timeout: 10
+
+        - name: Check canary HTTP response
+          uri:
+            url: 'http://localhost:3002/'
+            return_content: true
+            timeout: 5
+          register: canary_health
+          until: canary_health is succeeded
+          retries: 10
+          delay: 3
+      rescue:
+        - name: Show canary logs on failure
+          shell: docker logs --tail=50 {{ container_name }}_canary
+          register: canary_logs
+          ignore_errors: true
+
+        - name: Cleanup canary
+          community.docker.docker_container:
+            name: '{{ container_name }}_canary'
+            state: absent
+
+        - name: Fail deployment
+          fail:
+            msg: 'Deployment aborted: New image failed health check. Logs: {{ canary_logs.stdout }}'
+
+    - name: Promote canary to production
+      block:
+        - name: Stop existing production container
+          community.docker.docker_container:
+            name: '{{ container_name }}'
+            state: absent
+
+        - name: Start production container
+          community.docker.docker_container:
+            name: '{{ container_name }}'
+            image: '{{ container_name }}'
+            state: started
+            restart_policy: unless-stopped
+            ports:
+              - '127.0.0.1:{{ host_port }}:{{ container_port }}'
+            memory: '256m'
+            cpus: 1.0
+            log_driver: 'json-file'
+            log_options:
+              max-size: '10m'
+              max-file: '3'
+
+        - name: Remove canary container
+          community.docker.docker_container:
+            name: '{{ container_name }}_canary'
+            state: absent
+
+    - name: Ensure Caddy serves fly.reidar.tech
+      become: true
+      blockinfile:
+        path: /etc/caddy/Caddyfile
+        block: |
+          fly.reidar.tech {
+            reverse_proxy localhost:{{ host_port }}
+          }
+        marker: '# {mark} ANSIBLE MANAGED - RFS'
+        create: false
+
+    - name: Reload Caddy
+      become: true
+      systemd:
+        name: caddy
+        state: reloaded
+
+    - name: Verify container is running
+      community.docker.docker_container_info:
+        name: '{{ container_name }}'
+      register: container_info
+
+    - name: Report deployment status
+      debug:
+        msg: 'RFS deployed: {{ container_info.container.State.Status }} -> https://{{ public_domain }}'
