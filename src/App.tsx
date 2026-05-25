@@ -56,6 +56,8 @@ export function App() {
 
       const partial = applyDiscreteKeyInput(key, useSimStore.getState().inputs);
       if (partial) {
+        const repeatSensitive = key === 'g' || key === 'f';
+        if (repeatSensitive && e.repeat) return;
         e.preventDefault();
         setInput(partial);
       }
@@ -72,6 +74,8 @@ export function App() {
     return () => {
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('keyup', onKeyUp);
+      keysRef.current.clear();
+      setInput({ elevator: 0, aileron: 0, rudder: 0, brake: 0 });
     };
   }, [setInput]);
 
