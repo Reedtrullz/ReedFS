@@ -3,10 +3,11 @@ import { useEffect, useRef, useState } from 'react';
 export function FPSMonitor() {
   const [fps, setFps] = useState(0);
   const frames = useRef(0);
-  const lastTime = useRef(performance.now());
+  const lastTime = useRef(0);
 
   useEffect(() => {
     let raf: number;
+    lastTime.current = performance.now();
     const update = () => {
       frames.current++;
       const now = performance.now();
