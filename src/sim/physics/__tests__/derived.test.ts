@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { computeDerived } from '../derived';
 import { createInitialState, B737_800_SPEC } from '../../types';
+import type { WindInfo } from '../../weather';
 
 describe('computeDerived', () => {
   it('at rest, all zero', () => {
@@ -39,5 +40,16 @@ describe('computeDerived', () => {
 
     expect(d.gs).toBeCloseTo(100 * Math.cos(Math.PI / 6) * 1.94384, 0);
     expect(d.vs).toBeGreaterThan(9000);
+  });
+
+  it('computes airspeed from wind-relative velocity while ground speed remains ground-relative', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.velocity.u = 100;
+    const wind: WindInfo = { dir: 180, speed: 20 };
+
+    const d = computeDerived(s, wind);
+
+    expect(d.tas).toBeCloseTo((100 + 20 * 0.514444) * 1.94384, 0);
+    expect(d.gs).toBeCloseTo(100 * 1.94384, 0);
   });
 });

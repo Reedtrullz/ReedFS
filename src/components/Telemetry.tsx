@@ -4,8 +4,9 @@ import { quatToEuler } from '../sim/physics/quaternion';
 
 export function Telemetry() {
   const aircraft = useSimStore((s) => s.aircraft);
+  const wind = useSimStore((s) => s.wind);
   const status = useSimStore((s) => s.status);
-  const d = computeDerived(aircraft);
+  const d = computeDerived(aircraft, wind);
   const euler = quatToEuler(aircraft.quaternion);
   const hdgDeg = (euler.psi * 180) / Math.PI;
   const pitchDeg = (euler.theta * 180) / Math.PI;

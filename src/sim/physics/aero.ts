@@ -1,8 +1,10 @@
 import type { AircraftState, AircraftSpec, ControlInputs } from '../types';
 import { isaAtAltitude } from './atmosphere';
 import { lbfToN } from './units';
+import { computeAirRelativeVelocity } from '../systems/environment';
 import type { AeroModel } from '../systems/AeroModel';
 import { B737_AERO } from '../systems/AeroModel';
+import type { WindInfo } from '../weather';
 
 const G = 9.80665;
 const MAX_ELEVATOR_DEFLECTION_RAD = 0.3;
@@ -12,8 +14,14 @@ export interface AeroResult {
   rollMoment: number; pitchMoment: number; yawMoment: number;
 }
 
-export function computeAero(state: AircraftState, inputs: ControlInputs, spec: AircraftSpec, aeroModel: AeroModel = B737_AERO): AeroResult {
-  const { u, v, w } = state.velocity;
+export function computeAero(
+  state: AircraftState,
+  inputs: ControlInputs,
+  spec: AircraftSpec,
+  aeroModel: AeroModel = B737_AERO,
+  wind: WindInfo | null = null,
+): AeroResult {
+  const { u, v, w } = computeAirRelativeVelocity(state, wind);
   const tasMs = Math.sqrt(u * u + v * v + w * w);
   const atmo = isaAtAltitude(state.position.alt);
   const rho = atmo.density;

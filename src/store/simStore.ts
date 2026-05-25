@@ -5,7 +5,6 @@ import { integrate } from '../sim/physics/integrate';
 import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
 import type { FlightPlan } from '@shared/types/fmc';
 import type { WindInfo } from '../sim/weather';
-import { applyWind } from '../sim/systems/environment';
 
 export type SimStatus = 'stopped' | 'running' | 'paused';
 
@@ -53,10 +52,7 @@ export const useSimStore = create<SimStore>((set, get) => ({
     if (status !== 'running') return;
     const dt = lastFrameTime > 0 ? Math.min((timestamp - lastFrameTime) / 1000, 0.05) : 1 / 60;
     const state = structuredClone(aircraft);
-    if (wind) {
-      applyWind(state, wind);
-    }
-    integrate(state, inputs, spec, dt, apState, flightPlan);
+    integrate(state, inputs, spec, dt, apState, flightPlan, wind);
     set({ aircraft: state, lastFrameTime: timestamp });
   },
 

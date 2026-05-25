@@ -1,29 +1,27 @@
-import type { AircraftState } from '../types';
+import { nedToBody, type NedVelocity } from '../physics/frames';
+import type { AircraftState, BodyVelocity } from '../types';
 import type { WindInfo } from '../weather';
 
-export function applyWind(state: AircraftState, wind: WindInfo): void {
-  if (wind.speed < 0.5) return;
+export function windToNed(wind: WindInfo): NedVelocity {
+  if (wind.speed < 0.5) return { north: 0, east: 0, down: 0 };
 
   const windDirRad = (wind.dir * Math.PI) / 180;
   const windMs = wind.speed * 0.514444;
-  const windN = -windMs * Math.cos(windDirRad);
-  const windE = -windMs * Math.sin(windDirRad);
 
-  const { phi, theta, psi } = state.attitude;
-  const sphi = Math.sin(phi),
-    cphi = Math.cos(phi);
-  const stht = Math.sin(theta),
-    ctht = Math.cos(theta);
-  const spsi = Math.sin(psi),
-    cpsi = Math.cos(psi);
+  return {
+    north: -windMs * Math.cos(windDirRad),
+    east: -windMs * Math.sin(windDirRad),
+    down: 0,
+  };
+}
 
-  const windBodyU = windN * (ctht * cpsi) + windE * (ctht * spsi);
-  const windBodyV =
-    windN * (sphi * stht * cpsi - cphi * spsi) + windE * (sphi * stht * spsi + cphi * cpsi);
-  const windBodyW =
-    windN * (cphi * stht * cpsi + sphi * spsi) + windE * (cphi * stht * spsi - sphi * cpsi);
+export function computeAirRelativeVelocity(state: AircraftState, wind: WindInfo | null): BodyVelocity {
+  if (!wind || wind.speed < 0.5) return { ...state.velocity };
 
-  state.velocity.u -= windBodyU;
-  state.velocity.v -= windBodyV;
-  state.velocity.w -= windBodyW;
+  const windBody = nedToBody(windToNed(wind), state.attitude);
+  return {
+    u: state.velocity.u - windBody.u,
+    v: state.velocity.v - windBody.v,
+    w: state.velocity.w - windBody.w,
+  };
 }

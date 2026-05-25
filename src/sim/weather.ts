@@ -8,7 +8,7 @@ export interface MetarData {
 }
 
 export interface WindInfo {
-  dir: number; // degrees true
+  dir: number; // degrees true wind is FROM (METAR convention)
   speed: number; // knots
 }
 

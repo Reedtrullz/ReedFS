@@ -12,6 +12,7 @@ import { ftToM, mToFt } from './units';
 import { quatDerivative, quatNormalize, quatToEuler } from './quaternion';
 import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
 import type { FlightPlan } from '@shared/types/fmc';
+import type { WindInfo } from '../weather';
 
 const G = 9.80665;
 
@@ -22,6 +23,7 @@ export function integrate(
   dt: number,
   apState?: AutopilotState | null,
   flightPlan?: FlightPlan | null,
+  wind?: WindInfo | null,
 ): void {
   // ── Systems (must run before aero so engine/fuel state is current) ──
   updateEngines(state, inputs, spec, dt);
@@ -29,7 +31,7 @@ export function integrate(
   updateElectrical(state, dt);
   updateHydraulic(state, dt);
 
-  const aero = computeAero(state, inputs, spec);
+  const aero = computeAero(state, inputs, spec, undefined, wind ?? null);
   const mass = state.grossWeight;
   const { p, q, r } = state.angularVel;
 

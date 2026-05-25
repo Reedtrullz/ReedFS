@@ -4,7 +4,8 @@ import { quatToEuler } from '../sim/physics/quaternion';
 
 export function RfsPFD() {
   const a = useSimStore((s) => s.aircraft);
-  const d = computeDerived(a);
+  const wind = useSimStore((s) => s.wind);
+  const d = computeDerived(a, wind);
   const euler = quatToEuler(a.quaternion);
   const pitch = (euler.theta * 180) / Math.PI;
   const hdg = ((euler.psi * 180) / Math.PI + 360) % 360;

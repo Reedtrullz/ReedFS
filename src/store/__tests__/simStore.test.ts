@@ -73,4 +73,13 @@ describe('useSimStore', () => {
   it('apState starts null', () => expect(useSimStore.getState().apState).toBeNull());
   it('setApState stores autopilot state', () => { useSimStore.getState().setApState(minimalApState()); expect(useSimStore.getState().apState).toBeTruthy(); });
   it('reset clears apState', () => { useSimStore.getState().setApState(minimalApState()); useSimStore.getState().reset(); expect(useSimStore.getState().apState).toBeNull(); });
+
+  it('wind does not directly overwrite ground velocity during a tick', () => {
+    useSimStore.getState().setWind({ dir: 180, speed: 20 });
+    useSimStore.getState().start();
+
+    useSimStore.getState().tick(1000);
+
+    expect(Math.abs(useSimStore.getState().aircraft.velocity.u)).toBeLessThan(1);
+  });
 });

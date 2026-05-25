@@ -1,10 +1,13 @@
 import type { AircraftState, DerivedState } from '../types';
+import { computeAirRelativeVelocity } from '../systems/environment';
+import type { WindInfo } from '../weather';
 import { isaAtAltitude } from './atmosphere';
 import { bodyToNed } from './frames';
 import { msToKt } from './units';
 
-export function computeDerived(state: AircraftState): DerivedState {
-  const { u, v, w } = state.velocity;
+export function computeDerived(state: AircraftState, wind: WindInfo | null = null): DerivedState {
+  const airVelocity = computeAirRelativeVelocity(state, wind);
+  const { u, v, w } = airVelocity;
   const tasMs = Math.sqrt(u * u + v * v + w * w);
   const atmo = isaAtAltitude(state.position.alt);
   const rhoRatio = atmo.density / 1.225;
