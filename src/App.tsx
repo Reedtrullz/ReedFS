@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import * as Cesium from 'cesium';
 import { initCesium } from './config/cesium';
 import { CesiumViewport } from './viewport/CesiumViewport';
@@ -19,7 +19,6 @@ import { ContrailLayer } from './viewport/ContrailLayer';
 import { createKseaKpdxFlight } from './sim/flightPlanLoader';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { FPSMonitor } from './components/FPSMonitor';
-import { useState } from 'react';
 
 initCesium();
 
@@ -36,6 +35,8 @@ export function App() {
   const setInput = useSimStore((s) => s.setInput);
 
   const keysRef = useRef(new Set<string>());
+  const [camMode, setCamMode] = useState<'chase' | 'cockpit' | 'tower'>('chase');
+  const [metarData, setMetarData] = useState<MetarData | null>(null);
 
   // Keyboard controls — tracks pressed keys for simultaneous input
   useEffect(() => {
@@ -110,10 +111,6 @@ export function App() {
     });
   }, []);
 
-  // Camera mode
-  const [camMode, setCamMode] = useState<'chase' | 'cockpit' | 'tower'>('chase');
-  const [metarData, setMetarData] = useState<MetarData | null>(null);
-
   // Chase camera — follows aircraft when sim is running
   useEffect(() => {
     const viewer = viewerRef.current;
@@ -150,6 +147,14 @@ export function App() {
     return () => cancelAnimationFrame(raf);
   }, []);
 
+  const handleViewerReady = useCallback((viewer: Cesium.Viewer) => {
+    viewerRef.current = viewer;
+    viewer.camera.flyTo({
+      destination: Cesium.Cartesian3.fromDegrees(-122.31, 47.45, 5000),
+      orientation: { heading: Cesium.Math.toRadians(0), pitch: Cesium.Math.toRadians(-30), roll: 0 },
+    });
+  }, []);
+
   const handleTakeoff = () => {
     setInput({ throttle1: 1, throttle2: 1, elevator: -0.3, gearLever: 'UP', flapLever: 5 });
     start();
@@ -158,15 +163,7 @@ export function App() {
   return (
     <ErrorBoundary>
     <div style={{ width: '100%', height: '100%' }}>
-      <CesiumViewport
-        onReady={(viewer) => {
-          viewerRef.current = viewer;
-          viewer.camera.flyTo({
-            destination: Cesium.Cartesian3.fromDegrees(-122.31, 47.45, 5000),
-            orientation: { heading: Cesium.Math.toRadians(0), pitch: Cesium.Math.toRadians(-30), roll: 0 },
-          });
-        }}
-      />
+      <CesiumViewport onReady={handleViewerReady} />
       <ThreeLayer viewerRef={viewerRef} />
       <AirportLayer viewerRef={viewerRef} />
       <CloudLayer viewerRef={viewerRef} metar={metarData} />
