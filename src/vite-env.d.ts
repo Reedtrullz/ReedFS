@@ -10,7 +10,8 @@ declare module 'three-to-cesium' {
   }
 
   interface ThreeToCesiumInstance {
-    add(object: THREE.Object3D, position: Cesium.Cartesian3): void;
+    add(object: THREE.Object3D, position?: Cesium.Cartesian3): THREE.Group;
+    remove(object: THREE.Object3D): void;
     update(): void;
     destroy(): void;
     threeScene: THREE.Scene;
