@@ -222,6 +222,7 @@ describe('integrate', () => {
 
   it('keyboard pitch-up command lifts off within three seconds after rotate cue', () => {
     const s = runTakeoffRollAtHz(120, 20);
+    s.flightPhase = 'TAKEOFF';
     const keyboardPitchUp: ControlInputs = {
       ...takeoffRollInputs(),
       ...computeHeldKeyInputs(new Set(['w'])),
@@ -233,6 +234,34 @@ describe('integrate', () => {
 
     expect(s.position.alt).toBeGreaterThan(KSEA_RUNWAY_ALT_FT + 5);
     expect(s.attitude.theta).toBeGreaterThan(0);
+  });
+
+  it('early climb remains recoverable after releasing rotate and raising gear', () => {
+    const s = runTakeoffRollAtHz(120, 20);
+    s.flightPhase = 'TAKEOFF';
+    const keyboardPitchUp: ControlInputs = {
+      ...takeoffRollInputs(),
+      ...computeHeldKeyInputs(new Set(['w'])),
+    };
+
+    for (let i = 0; i < 3 * 120; i++) {
+      integrate(s, keyboardPitchUp, B737_800_SPEC, 1 / 120);
+    }
+
+    const climbRelease: ControlInputs = {
+      ...takeoffRollInputs(),
+      elevator: 0,
+      gearLever: 'UP',
+    };
+
+    for (let i = 0; i < 5 * 120; i++) {
+      integrate(s, climbRelease, B737_800_SPEC, 1 / 120);
+    }
+
+    expect(s.flightPhase).toBe('CLIMB');
+    expect(s.config.gearDown).toBe(false);
+    expect(s.position.alt).toBeGreaterThan(KSEA_RUNWAY_ALT_FT + 100);
+    expect(s.attitude.theta).toBeGreaterThan(-5 * Math.PI / 180);
   });
 
   it('roll input produces negative roll rate', () => {

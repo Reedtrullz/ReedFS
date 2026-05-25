@@ -5,17 +5,47 @@ import { updateFuel } from '../systems/fuel';
 import { updateElectrical } from '../systems/electrical';
 import { updateHydraulic } from '../systems/hydraulic';
 import { updateAutopilot } from '../systems/autopilot';
-import { applyGroundContact } from '../systems/ground';
+import { applyGroundContact, KSEA_RUNWAY_ALT_FT } from '../systems/ground';
 import { computeLNAV } from '../systems/navigation';
 import { computeVNAV } from '../systems/vnav';
 import { geodeticToEcef, ecefToGeodetic, ecefToEnu, enuToEcef } from './geodesy';
 import { ftToM, mToFt } from './units';
-import { quatDerivative, quatNormalize, quatToEuler } from './quaternion';
+import { eulerToQuat, quatDerivative, quatNormalize, quatToEuler } from './quaternion';
 import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
 import type { FlightPlan } from '@shared/types/fmc';
 import type { WindInfo } from '../weather';
 
 const G = 9.80665;
+const TAKEOFF_ASSIST_MIN_HEIGHT_FT = 50;
+const EARLY_CLIMB_MIN_PITCH_RAD = 5 * Math.PI / 180;
+const EARLY_CLIMB_MAX_PITCH_RAD = 15 * Math.PI / 180;
+const MANUAL_ELEVATOR_EPSILON = 0.05;
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+function applyPlayableTakeoffAssist(state: AircraftState, inputs: ControlInputs): void {
+  const heightAboveRunwayFt = state.position.alt - KSEA_RUNWAY_ALT_FT;
+
+  if (state.flightPhase === 'TAKEOFF' && heightAboveRunwayFt >= TAKEOFF_ASSIST_MIN_HEIGHT_FT && !state.config.gearDown) {
+    state.flightPhase = 'CLIMB';
+  }
+
+  const earlyClimb = state.flightPhase === 'TAKEOFF' || state.flightPhase === 'CLIMB';
+  if (!earlyClimb || heightAboveRunwayFt < TAKEOFF_ASSIST_MIN_HEIGHT_FT || Math.abs(inputs.elevator) > MANUAL_ELEVATOR_EPSILON) {
+    return;
+  }
+
+  const theta = clamp(state.attitude.theta, EARLY_CLIMB_MIN_PITCH_RAD, EARLY_CLIMB_MAX_PITCH_RAD);
+  if (theta === state.attitude.theta && Math.abs(state.angularVel.q) < 0.01) {
+    return;
+  }
+
+  state.attitude.theta = theta;
+  state.angularVel.q = 0;
+  state.quaternion = eulerToQuat(state.attitude.phi, theta, state.attitude.psi);
+}
 
 export function integrate(
   state: AircraftState,
@@ -115,6 +145,7 @@ export function integrate(
   state.config.gearDown = groundContact.weightOnWheels ? true : inputs.gearLever === 'DOWN';
   state.config.spoilersDeployed = inputs.spoilers > 0.5;
   state.config.speedBrake = inputs.spoilers;
+  applyPlayableTakeoffAssist(state, inputs);
 
   // ── Autopilot (overwrites inputs for next frame) ──
   if (apState && apState.truth.autopilotStatus !== 'OFF') {
