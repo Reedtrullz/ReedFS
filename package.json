@@ -6,7 +6,11 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "typecheck": "tsc -b",
+    "test": "vitest run",
     "lint": "eslint .",
+    "lint:ci": "eslint . --max-warnings=0",
+    "check": "npm run lint:ci && npm run typecheck && npm run test && npm run build",
     "preview": "vite preview"
   },
   "dependencies": {
