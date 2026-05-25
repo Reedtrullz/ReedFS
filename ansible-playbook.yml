@@ -46,7 +46,7 @@
         image: '{{ container_name }}'
         state: started
         ports:
-          - '127.0.0.1:3002:{{ container_port }}'
+          - '127.0.0.1:3004:{{ container_port }}'
       register: canary_start
 
     - name: Wait for canary health check
@@ -57,7 +57,7 @@
 
         - name: Check canary HTTP response
           uri:
-            url: 'http://localhost:3002/'
+            url: 'http://localhost:3004/'
             return_content: true
             timeout: 5
           register: canary_health
