@@ -106,10 +106,16 @@ vi.mock('three', () => {
     ConeGeometry: vi.fn(function () {
       return {};
     }),
+    SphereGeometry: vi.fn(function () {
+      return {};
+    }),
     PlaneGeometry: vi.fn(function () {
       return {};
     }),
     MeshStandardMaterial: vi.fn(function () {
+      return {};
+    }),
+    MeshBasicMaterial: vi.fn(function () {
       return {};
     }),
     Mesh: vi.fn(function () {

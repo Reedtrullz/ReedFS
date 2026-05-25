@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import ThreeToCesium from 'three-to-cesium';
 import { useSimStore } from '../store/simStore';
 import { createBoeing737Model } from './AircraftModel';
+import { computeSunPosition, sunLightIntensity } from '../sim/sun';
 
 export interface ThreeLayerProps {
   viewerRef: RefObject<Cesium.Viewer | null>;
@@ -63,6 +64,18 @@ export function ThreeLayer({ viewerRef }: ThreeLayerProps) {
           }
         }
       }
+
+      // Update lighting from sun position
+      const sun = computeSunPosition(lat, lon, 12); // noon default
+      const light = sunLightIntensity(sun.elevation);
+      ambient.intensity = light.ambient;
+      ambient.color.set(light.color);
+      dirLight.intensity = light.directional;
+      dirLight.position.set(
+        2000 * Math.sin(sun.azimuth) * Math.cos(sun.elevation),
+        2000 * Math.sin(sun.elevation),
+        2000 * Math.cos(sun.azimuth) * Math.cos(sun.elevation),
+      );
 
       ttc.update();
     };

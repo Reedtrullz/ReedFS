@@ -11,6 +11,8 @@ import { useAudioLoop } from './hooks/useAudioLoop';
 import { useSimStore } from './store/simStore';
 import { readGamepad } from './input/GamepadManager';
 import { fetchMetar, parseMetarWind } from './sim/weather';
+import type { MetarData } from './sim/weather';
+import { CloudLayer } from './viewport/CloudLayer';
 import { useState } from 'react';
 
 initCesium();
@@ -97,12 +99,14 @@ export function App() {
     fetchMetar('KSEA').then((metar) => {
       if (metar) {
         useSimStore.getState().setWind(parseMetarWind(metar));
+        setMetarData(metar);
       }
     });
   }, []);
 
   // Camera mode
   const [camMode, setCamMode] = useState<'chase' | 'cockpit' | 'tower'>('chase');
+  const [metarData, setMetarData] = useState<MetarData | null>(null);
 
   // Chase camera — follows aircraft when sim is running
   useEffect(() => {
@@ -158,6 +162,7 @@ export function App() {
       />
       <ThreeLayer viewerRef={viewerRef} />
       <AirportLayer viewerRef={viewerRef} />
+      <CloudLayer viewerRef={viewerRef} metar={metarData} />
       <Telemetry />
       <AttitudeIndicator />
       <div
