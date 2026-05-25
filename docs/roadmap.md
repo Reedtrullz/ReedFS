@@ -2,6 +2,13 @@
 
 This roadmap lists the enhancements that are still necessary after the foundation stabilization pass. It is ordered by dependency and risk: fix the aircraft/ground interaction first, then guidance, then performance architecture and rendering cleanup.
 
+Latest comprehensive gameplay/cockpit/realism audit and detailed implementation plan:
+
+- `docs/reviews/2026-05-26-comprehensive-gameplay-review.md`
+- `docs/plans/2026-05-26-rfs-comprehensive-usability-realism-plan.md`
+
+The 2026-05-26 review reorders near-term work slightly: product loop, cockpit, UI feedback, input feel, and visual model quality are now treated as core usability work rather than late polish, because browser dogfood showed they are part of why the simulator still feels arcadey and unfinished.
+
 ## Completed baseline
 
 Foundation stabilization is complete:
