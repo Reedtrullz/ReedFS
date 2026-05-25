@@ -70,6 +70,14 @@ export interface ElectricalState {
   batteryVolts: number;
 }
 
+// ── Hydraulic System ──
+
+export interface HydraulicState {
+  systemAPsi: number;
+  systemBPsi: number;
+  standbyPsi: number;
+}
+
 // ── Fuel System ──
 
 export interface FuelState {
@@ -103,6 +111,7 @@ export interface AircraftState {
   engines: [EngineState, EngineState];
   fuel: FuelState;
   electrical: ElectricalState;
+  hydraulic: HydraulicState;
   grossWeight: number;
   cg: number; // % MAC
   simTime: number; // ms
@@ -163,6 +172,7 @@ export function createInitialState(spec: AircraftSpec): AircraftState {
     ],
     fuel: { totalFuel: spec.maxFuel, fuelFlowTotal: 0, centerTank: spec.fuelCapacity.center, leftTank: spec.fuelCapacity.left, rightTank: spec.fuelCapacity.right },
     electrical: { gen1Online: false, gen2Online: false, acBusPowered: false, batteryVolts: 28 },
+    hydraulic: { systemAPsi: 0, systemBPsi: 0, standbyPsi: 0 },
     grossWeight: spec.emptyWeight + spec.maxFuel,
     cg: 25,
     simTime: 0,

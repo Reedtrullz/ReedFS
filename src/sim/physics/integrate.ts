@@ -3,6 +3,7 @@ import { computeAero } from './aero';
 import { updateEngines } from '../systems/engine';
 import { updateFuel } from '../systems/fuel';
 import { updateElectrical } from '../systems/electrical';
+import { updateHydraulic } from '../systems/hydraulic';
 import { geodeticToEcef, ecefToGeodetic, ecefToEnu, enuToEcef } from './geodesy';
 import { ftToM, mToFt } from './units';
 
@@ -94,6 +95,9 @@ export function integrate(
 
   // ── Electrical system ──
   updateElectrical(state, dt);
+
+  // ── Hydraulic system ──
+  updateHydraulic(state, dt);
 
   // ── Config ──
   state.config.flapSetting = inputs.flapLever;
