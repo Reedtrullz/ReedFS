@@ -1,0 +1,58 @@
+import { describe, expect, it } from 'vitest';
+import { createInitialState, B737_800_SPEC } from '../../types';
+import type { ControlInputs } from '../../types';
+import { applyGroundContact, KSEA_RUNWAY_ALT_FT } from '../ground';
+
+const idle: ControlInputs = {
+  elevator: 0,
+  aileron: 0,
+  rudder: 0,
+  throttle1: 0,
+  throttle2: 0,
+  flapLever: 0,
+  gearLever: 'DOWN',
+  spoilers: 0,
+  brake: 0,
+};
+
+describe('applyGroundContact', () => {
+  it('clamps a gear-down aircraft to the KSEA runway instead of letting it sink', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.position.alt = KSEA_RUNWAY_ALT_FT - 25;
+    state.velocity.w = 7;
+    state.config.gearDown = true;
+
+    const contact = applyGroundContact(state, idle, 1 / 60);
+
+    expect(contact.weightOnWheels).toBe(true);
+    expect(contact.groundAltFt).toBe(KSEA_RUNWAY_ALT_FT);
+    expect(state.position.alt).toBe(KSEA_RUNWAY_ALT_FT);
+    expect(state.velocity.w).toBe(0);
+  });
+
+  it('does not clamp an aircraft that is clearly above the runway', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.position.alt = KSEA_RUNWAY_ALT_FT + 500;
+    state.velocity.w = 5;
+    state.config.gearDown = true;
+
+    const contact = applyGroundContact(state, idle, 1 / 60);
+
+    expect(contact.weightOnWheels).toBe(false);
+    expect(state.position.alt).toBe(KSEA_RUNWAY_ALT_FT + 500);
+    expect(state.velocity.w).toBe(5);
+  });
+
+  it('applies rolling and brake deceleration on the runway without reversing direction', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.position.alt = KSEA_RUNWAY_ALT_FT;
+    state.velocity.u = 20;
+    state.config.gearDown = true;
+    const braking: ControlInputs = { ...idle, brake: 1 };
+
+    applyGroundContact(state, braking, 1);
+
+    expect(state.velocity.u).toBeGreaterThanOrEqual(0);
+    expect(state.velocity.u).toBeLessThan(20);
+  });
+});
