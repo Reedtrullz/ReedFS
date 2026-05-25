@@ -1,7 +1,24 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import cesium from 'vite-plugin-cesium';
+import path from 'path';
 
-// https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
-})
+  plugins: [react(), cesium()],
+  resolve: {
+    alias: {
+      '@shared': path.resolve(__dirname, '../RFMS/shared/src'),
+      '@': path.resolve(__dirname, 'src'),
+    },
+  },
+  server: {
+    headers: {
+      // Required for SharedArrayBuffer (Phase 1+ Worker)
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+    },
+  },
+  build: {
+    target: 'esnext',
+  },
+});
