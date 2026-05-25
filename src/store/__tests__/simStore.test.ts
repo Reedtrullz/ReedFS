@@ -62,6 +62,25 @@ function minimalApState(): AutopilotState {
   };
 }
 
+function startTakeoffRollFromStore(): void {
+  useSimStore.getState().setInput({
+    throttle1: 1,
+    throttle2: 1,
+    flapLever: 5,
+    gearLever: 'DOWN',
+    brake: 0,
+    elevator: 0,
+  });
+  useSimStore.getState().start();
+}
+
+function tickAtHz(hz: number, seconds: number): void {
+  const startMs = 1000;
+  for (let frame = 0; frame < seconds * hz; frame++) {
+    useSimStore.getState().tick(startMs + frame * (1000 / hz));
+  }
+}
+
 describe('useSimStore', () => {
   beforeEach(() => useSimStore.getState().reset());
 
@@ -95,6 +114,20 @@ describe('useSimStore', () => {
     expect(state.position.alt).toBeGreaterThanOrEqual(KSEA_RUNWAY_ALT_FT - 0.01);
     expect(state.velocity.u).toBeGreaterThan(5);
     expect(state.config.gearDown).toBe(true);
+  });
+
+  it('reset then repeated takeoff roll accelerates at 120 Hz', () => {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      useSimStore.getState().reset();
+      startTakeoffRollFromStore();
+
+      tickAtHz(120, 20);
+
+      const state = useSimStore.getState().aircraft;
+      expect(state.position.alt).toBeGreaterThanOrEqual(KSEA_RUNWAY_ALT_FT - 0.01);
+      expect(state.velocity.u).toBeGreaterThan(25);
+      expect(state.config.gearDown).toBe(true);
+    }
   });
 
   it('wind does not directly overwrite ground velocity during a tick', () => {
