@@ -31,33 +31,30 @@ export function ThreeLayer({ viewerRef }: ThreeLayerProps) {
     ttc.threeScene.add(ambient);
     ttc.threeScene.add(dirLight);
 
+    // Create model template ONCE — clone per frame instead of rebuilding geometry
+    const modelTemplate = createBoeing737Model();
+
     // Per-frame sync: update proxy position from sim state
     const sync = () => {
       const aircraft = useSimStore.getState().aircraft;
       const { lat, lon, alt } = aircraft.position;
-      const { phi, theta, psi } = aircraft.attitude;
+      const { phi, theta } = aircraft.attitude;
 
       // Remove old proxy
       if (proxyRef.current) {
         ttc.remove(proxyRef.current);
       }
 
-      // Build 737 proxy
-      const model = createBoeing737Model();
-      model.rotation.set(
-        theta,
-        0,
-        -phi,
-      );
+      // Clone template (shares geometry buffers, only creates wrapper objects)
+      const model = modelTemplate.clone(true) as THREE.Group;
+      model.rotation.set(theta, 0, -phi);
 
       const pos = Cesium.Cartesian3.fromDegrees(lon, lat, alt * 0.3048);
       proxyRef.current = ttc.add(model, pos);
 
       // Fan spin animation (N1-driven)
       if (proxyRef.current) {
-        // Engine nacelles are the CylinderGeometry meshes — they're at index 8 and 9
         const children = proxyRef.current.children;
-        // The engines are the last two children added (index 8 and 9 in createBoeing737Model)
         const engCount = 2;
         for (let i = 0; i < engCount; i++) {
           const idx = children.length - engCount + i;

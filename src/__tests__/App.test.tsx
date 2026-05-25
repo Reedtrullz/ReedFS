@@ -100,6 +100,12 @@ vi.mock('three', () => {
     BoxGeometry: vi.fn(function () {
       return {};
     }),
+    CylinderGeometry: vi.fn(function () {
+      return {};
+    }),
+    ConeGeometry: vi.fn(function () {
+      return {};
+    }),
     PlaneGeometry: vi.fn(function () {
       return {};
     }),
