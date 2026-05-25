@@ -9,6 +9,7 @@ import { useSimLoop } from './hooks/useSimLoop';
 import { useAudioLoop } from './hooks/useAudioLoop';
 import { useSimStore } from './store/simStore';
 import { readGamepad } from './input/GamepadManager';
+import { applyDiscreteKeyInput, computeHeldKeyInputs } from './input/keyboardControls';
 import { fetchMetar, parseMetarWind } from './sim/weather';
 import type { MetarData } from './sim/weather';
 import { CloudLayer } from './viewport/CloudLayer';
@@ -41,35 +42,22 @@ export function App() {
   // Keyboard controls — tracks pressed keys for simultaneous input
   useEffect(() => {
     const updateFromKeys = () => {
-      const k = keysRef.current;
-      setInput({
-        elevator: (k.has('w') ? -0.4 : 0) + (k.has('s') ? 0.4 : 0),
-        aileron: (k.has('a') ? -0.5 : 0) + (k.has('d') ? 0.5 : 0),
-        rudder: (k.has('q') ? -0.5 : 0) + (k.has('e') ? 0.5 : 0),
-      });
+      setInput(computeHeldKeyInputs(keysRef.current));
     };
 
     const onKey = (e: KeyboardEvent) => {
       const key = e.key.toLowerCase();
-      if (['w', 's', 'a', 'd', 'q', 'e'].includes(key)) {
+      if (['w', 's', 'a', 'd', 'q', 'e', ' '].includes(key)) {
+        if (key === ' ') e.preventDefault();
         keysRef.current.add(key);
         updateFromKeys();
         return;
       }
-      switch (key) {
-        case 'arrowup': setInput({ throttle1: 1, throttle2: 1 }); break;
-        case 'arrowdown': setInput({ throttle1: 0, throttle2: 0 }); break;
-        case 'g': {
-          const gear = useSimStore.getState().inputs.gearLever;
-          setInput({ gearLever: gear === 'UP' ? 'DOWN' : 'UP' });
-          break;
-        }
-        case 'f': {
-          const flaps = useSimStore.getState().inputs.flapLever;
-          const next = flaps >= 40 ? 0 : flaps < 5 ? 5 : flaps + 5;
-          setInput({ flapLever: next });
-          break;
-        }
+
+      const partial = applyDiscreteKeyInput(key, useSimStore.getState().inputs);
+      if (partial) {
+        e.preventDefault();
+        setInput(partial);
       }
     };
 
