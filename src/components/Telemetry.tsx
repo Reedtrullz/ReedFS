@@ -1,12 +1,14 @@
 import { useSimStore } from '../store/simStore';
 import { computeDerived } from '../sim/physics/derived';
 import { quatToEuler } from '../sim/physics/quaternion';
+import { takeoffCueText } from '../sim/takeoffCue';
 
 export function Telemetry() {
   const aircraft = useSimStore((s) => s.aircraft);
   const wind = useSimStore((s) => s.wind);
   const status = useSimStore((s) => s.status);
   const d = computeDerived(aircraft, wind);
+  const takeoffCue = takeoffCueText(aircraft, d.ias);
   const euler = quatToEuler(aircraft.quaternion);
   const hdgDeg = (euler.psi * 180) / Math.PI;
   const pitchDeg = (euler.theta * 180) / Math.PI;
@@ -25,6 +27,7 @@ export function Telemetry() {
       pointerEvents: 'none',
     }}>
       <div style={{ fontWeight: 'bold', marginBottom: 4 }}>SIM: {status.toUpperCase()}</div>
+      {takeoffCue && <div style={{ fontWeight: 'bold', color: '#ff0', marginBottom: 4 }}>{takeoffCue}</div>}
       {row('ALT', `${aircraft.position.alt.toFixed(0)} ft`)}
       {row('IAS', `${d.ias.toFixed(0)} kt`)}
       {row('TAS', `${d.tas.toFixed(0)} kt`)}
