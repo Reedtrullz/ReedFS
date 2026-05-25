@@ -1,7 +1,8 @@
-import type { AircraftState, ControlInputs } from '../types';
+import type { AircraftState, ControlInputs, GroundContactType, GroundState } from '../types';
 import { eulerToQuat } from '../physics/quaternion';
 
 export const KSEA_RUNWAY_ALT_FT = 432;
+const G = 9.80665;
 
 const GROUND_EPSILON_FT = 0.5;
 const ROLLING_FRICTION_ACCEL_MPS2 = 0.35;
@@ -12,10 +13,7 @@ const MIN_GROUND_PITCH_RAD = 0;
 const MAX_GROUND_PITCH_RAD = 0.35;
 const MAX_GROUND_ROLL_RAD = 0.2;
 
-export interface GroundContactResult {
-  weightOnWheels: boolean;
-  groundAltFt: number;
-}
+export type GroundContactResult = GroundState;
 
 function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value));
@@ -23,6 +21,30 @@ function clamp01(value: number): number {
 
 function hasBreakawayThrustCommand(inputs: ControlInputs): boolean {
   return Math.max(inputs.throttle1, inputs.throttle2) > BREAKAWAY_THROTTLE;
+}
+
+function grossWeightForceN(state: AircraftState): number {
+  return Math.max(0, state.grossWeight) * G;
+}
+
+function setGroundState(
+  state: AircraftState,
+  groundAltFt: number,
+  contact: GroundContactType,
+  weightOnWheels: boolean,
+  normalForceN: number,
+): GroundState {
+  const aglFt = Math.max(0, state.position.alt - groundAltFt);
+  const ground: GroundState = {
+    aglFt,
+    groundAltFt,
+    weightOnWheels,
+    normalForceN,
+    onRunway: contact !== 'none',
+    contact,
+  };
+  state.ground = ground;
+  return ground;
 }
 
 function applyLongitudinalGroundDecel(state: AircraftState, inputs: ControlInputs, dt: number): void {
@@ -68,8 +90,15 @@ export function applyGroundContact(
   const gearAvailableForContact = state.config.gearDown || inputs.gearLever === 'DOWN';
   const atOrBelowGround = state.position.alt <= groundAltFt + GROUND_EPSILON_FT;
 
-  if (!gearAvailableForContact || !atOrBelowGround) {
-    return { weightOnWheels: false, groundAltFt };
+  if (!atOrBelowGround) {
+    return setGroundState(state, groundAltFt, 'none', false, 0);
+  }
+
+  if (!gearAvailableForContact) {
+    const contact: GroundContactType = state.velocity.w > 5 ? 'crashed' : 'belly';
+    state.position.alt = groundAltFt;
+    state.velocity.w = 0;
+    return setGroundState(state, groundAltFt, contact, false, grossWeightForceN(state));
   }
 
   state.position.alt = groundAltFt;
@@ -79,5 +108,5 @@ export function applyGroundContact(
   stabilizeGroundAttitude(state);
   applyLongitudinalGroundDecel(state, inputs, dt);
 
-  return { weightOnWheels: true, groundAltFt };
+  return setGroundState(state, groundAltFt, 'gear', true, grossWeightForceN(state));
 }

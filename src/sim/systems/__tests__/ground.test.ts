@@ -16,6 +16,17 @@ const idle: ControlInputs = {
 };
 
 describe('applyGroundContact', () => {
+  it('initial state starts on the runway with explicit gear contact state', () => {
+    const state = createInitialState(B737_800_SPEC);
+
+    expect(state.ground.weightOnWheels).toBe(true);
+    expect(state.ground.aglFt).toBe(0);
+    expect(state.ground.groundAltFt).toBe(KSEA_RUNWAY_ALT_FT);
+    expect(state.ground.contact).toBe('gear');
+    expect(state.ground.onRunway).toBe(true);
+    expect(state.ground.normalForceN).toBeGreaterThan(0);
+  });
+
   it('clamps a gear-down aircraft to the KSEA runway instead of letting it sink', () => {
     const state = createInitialState(B737_800_SPEC);
     state.position.alt = KSEA_RUNWAY_ALT_FT - 25;
@@ -26,21 +37,46 @@ describe('applyGroundContact', () => {
 
     expect(contact.weightOnWheels).toBe(true);
     expect(contact.groundAltFt).toBe(KSEA_RUNWAY_ALT_FT);
+    expect(contact.aglFt).toBe(0);
+    expect(contact.contact).toBe('gear');
+    expect(contact.onRunway).toBe(true);
+    expect(contact.normalForceN).toBeGreaterThan(0);
+    expect(state.ground).toEqual(contact);
     expect(state.position.alt).toBe(KSEA_RUNWAY_ALT_FT);
     expect(state.velocity.w).toBe(0);
   });
 
   it('does not clamp an aircraft that is clearly above the runway', () => {
     const state = createInitialState(B737_800_SPEC);
-    state.position.alt = KSEA_RUNWAY_ALT_FT + 500;
+    state.position.alt = KSEA_RUNWAY_ALT_FT + 1000;
     state.velocity.w = 5;
     state.config.gearDown = true;
 
     const contact = applyGroundContact(state, idle, 1 / 60);
 
     expect(contact.weightOnWheels).toBe(false);
-    expect(state.position.alt).toBe(KSEA_RUNWAY_ALT_FT + 500);
+    expect(contact.aglFt).toBe(1000);
+    expect(contact.contact).toBe('none');
+    expect(contact.normalForceN).toBe(0);
+    expect(state.ground).toEqual(contact);
+    expect(state.position.alt).toBe(KSEA_RUNWAY_ALT_FT + 1000);
     expect(state.velocity.w).toBe(5);
+  });
+
+  it('records belly or crash contact for gear-up aircraft below the runway instead of silent sink-through', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.position.alt = KSEA_RUNWAY_ALT_FT - 5;
+    state.velocity.w = 2;
+    state.config.gearDown = false;
+    const gearUp: ControlInputs = { ...idle, gearLever: 'UP' };
+
+    const contact = applyGroundContact(state, gearUp, 1 / 60);
+
+    expect(contact.weightOnWheels).toBe(false);
+    expect(contact.onRunway).toBe(true);
+    expect(['belly', 'crashed']).toContain(contact.contact);
+    expect(state.ground).toEqual(contact);
+    expect(state.position.alt).toBe(KSEA_RUNWAY_ALT_FT);
   });
 
   it('applies rolling and brake deceleration on the runway without reversing direction', () => {

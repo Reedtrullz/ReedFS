@@ -39,6 +39,19 @@ export interface DerivedState {
   beta: number;    // sideslip angle, radians
 }
 
+// ── Ground Contact State ──
+
+export type GroundContactType = 'none' | 'gear' | 'belly' | 'crashed';
+
+export interface GroundState {
+  aglFt: number;
+  groundAltFt: number;
+  weightOnWheels: boolean;
+  normalForceN: number;
+  onRunway: boolean;
+  contact: GroundContactType;
+}
+
 // ── Control Inputs ──
 
 export interface ControlInputs {
@@ -118,6 +131,7 @@ export interface AircraftState {
   hydraulic: HydraulicState;
   grossWeight: number;
   cg: number; // % MAC
+  ground: GroundState;
   simTime: number; // ms
   timeOfDay: number; // hours (0-24)
   flightPhase: FlightPhase;
@@ -166,9 +180,11 @@ export const B737_800_SPEC: AircraftSpec = {
 
 export function createInitialState(spec: AircraftSpec): AircraftState {
   const attitude: Attitude = { phi: 0, theta: 0, psi: Math.PI };
+  const initialAltFt = 432;
+  const grossWeight = spec.emptyWeight + spec.maxFuel;
 
   return {
-    position: { lat: 47.45, lon: -122.31, alt: 432 },
+    position: { lat: 47.45, lon: -122.31, alt: initialAltFt },
     velocity: { u: 0, v: 0, w: 0 },
     attitude, // facing south (180°)
     quaternion: eulerToQuat(attitude.phi, attitude.theta, attitude.psi),
@@ -181,8 +197,16 @@ export function createInitialState(spec: AircraftSpec): AircraftState {
     fuel: { totalFuel: spec.maxFuel, fuelFlowTotal: 0, centerTank: spec.fuelCapacity.center, leftTank: spec.fuelCapacity.left, rightTank: spec.fuelCapacity.right },
     electrical: { gen1Online: false, gen2Online: false, acBusPowered: false, batteryVolts: 28 },
     hydraulic: { systemAPsi: 0, systemBPsi: 0, standbyPsi: 0 },
-    grossWeight: spec.emptyWeight + spec.maxFuel,
+    grossWeight,
     cg: 25,
+    ground: {
+      aglFt: 0,
+      groundAltFt: initialAltFt,
+      weightOnWheels: true,
+      normalForceN: grossWeight * 9.80665,
+      onRunway: true,
+      contact: 'gear',
+    },
     simTime: 0,
     timeOfDay: 12,
     flightPhase: 'PARKED',

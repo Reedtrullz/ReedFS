@@ -2,19 +2,21 @@ import { describe, expect, it } from 'vitest';
 import { createBoeing737Model } from '../AircraftModel';
 import { createAircraftModelQuaternion } from '../aircraftOrientation';
 import { applyAircraftModelAnimations } from '../aircraftModelAnimation';
-import type { AircraftState } from '../../sim/types';
+import { B737_800_SPEC, createInitialState, type AircraftState } from '../../sim/types';
 
-function aircraftForAnimation(overrides: Partial<AircraftState> = {}): Pick<AircraftState, 'engines' | 'simTime' | 'position' | 'config'> {
+function aircraftForAnimation(overrides: Partial<AircraftState> = {}): Pick<AircraftState, 'engines' | 'simTime' | 'ground' | 'config'> {
+  const aircraft = createInitialState(B737_800_SPEC);
+  aircraft.engines[0].n1 = 1;
+  aircraft.engines[1].n1 = 0.8;
+  aircraft.simTime = 3;
+
   return {
-    engines: [
-      { n1: 1, egt: 0, fuelFlow: 0 },
-      { n1: 0.8, egt: 0, fuelFlow: 0 },
-    ],
-    simTime: 3,
-    position: { lat: 47.45, lon: -122.31, alt: 0 },
-    config: { flaps: 5, gearDown: true, speedbrake: 0 },
+    engines: aircraft.engines,
+    simTime: aircraft.simTime,
+    ground: aircraft.ground,
+    config: aircraft.config,
     ...overrides,
-  } as Pick<AircraftState, 'engines' | 'simTime' | 'position' | 'config'>;
+  };
 }
 
 describe('aircraft model animations', () => {
@@ -45,9 +47,23 @@ describe('aircraft model animations', () => {
   it('leaves gear uncompressed when airborne or retracted', () => {
     const model = createBoeing737Model();
 
-    applyAircraftModelAnimations(model, aircraftForAnimation({
-      position: { lat: 47.45, lon: -122.31, alt: 1000 },
-    }));
+    const airborne = createInitialState(B737_800_SPEC);
+    airborne.ground = {
+      ...airborne.ground,
+      aglFt: 1000,
+      weightOnWheels: false,
+      normalForceN: 0,
+      onRunway: false,
+      contact: 'none',
+    };
+
+    applyAircraftModelAnimations(model, aircraftForAnimation({ ground: airborne.ground }));
+
+    expect(model.getObjectByName('noseGear')?.scale.z).toBeCloseTo(1, 9);
+
+    const retracted = createInitialState(B737_800_SPEC);
+    retracted.config.gearDown = false;
+    applyAircraftModelAnimations(model, aircraftForAnimation({ config: retracted.config }));
 
     expect(model.getObjectByName('noseGear')?.scale.z).toBeCloseTo(1, 9);
   });

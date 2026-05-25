@@ -3,7 +3,7 @@ import type { AircraftState } from '../sim/types';
 
 const ENGINE_SPIN_RATE_RAD_PER_SECOND = 40;
 
-export function applyAircraftModelAnimations(model: THREE.Object3D, aircraft: Pick<AircraftState, 'engines' | 'simTime' | 'position' | 'config'>): void {
+export function applyAircraftModelAnimations(model: THREE.Object3D, aircraft: Pick<AircraftState, 'engines' | 'simTime' | 'ground' | 'config'>): void {
   applyEngineFanSpin(model, aircraft);
   applyGearCompression(model, aircraft);
 }
@@ -18,8 +18,8 @@ function applyEngineFanSpin(model: THREE.Object3D, aircraft: Pick<AircraftState,
   });
 }
 
-function applyGearCompression(model: THREE.Object3D, aircraft: Pick<AircraftState, 'position' | 'config'>): void {
-  const onGround = aircraft.position.alt < 100 && aircraft.config.gearDown;
+function applyGearCompression(model: THREE.Object3D, aircraft: Pick<AircraftState, 'ground' | 'config'>): void {
+  const onGround = aircraft.ground.weightOnWheels && aircraft.config.gearDown;
   model.traverse((child) => {
     if (!child.name.includes('Gear')) return;
     child.scale.z = onGround ? 0.7 : 1.0;
