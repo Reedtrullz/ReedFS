@@ -15,6 +15,12 @@ export function integrate(
   spec: AircraftSpec,
   dt: number,
 ): void {
+  // ── Systems (must run before aero so engine/fuel state is current) ──
+  updateEngines(state, inputs, spec, dt);
+  updateFuel(state, spec, dt);
+  updateElectrical(state, dt);
+  updateHydraulic(state, dt);
+
   const aero = computeAero(state, inputs, spec);
   const mass = state.grossWeight;
   const { phi, theta } = state.attitude;
@@ -86,18 +92,6 @@ export function integrate(
   state.position.lat = geo.lat;
   state.position.lon = geo.lon;
   state.position.alt = geo.alt * mToFt(1);
-
-  // ── Engine system ──
-  updateEngines(state, inputs, spec, dt);
-
-  // ── Fuel system ──
-  updateFuel(state, spec, dt);
-
-  // ── Electrical system ──
-  updateElectrical(state, dt);
-
-  // ── Hydraulic system ──
-  updateHydraulic(state, dt);
 
   // ── Config ──
   state.config.flapSetting = inputs.flapLever;
