@@ -2,6 +2,7 @@ import type { AircraftState, AircraftSpec, ControlInputs } from '../types';
 import { computeAero } from './aero';
 import { updateEngines } from '../systems/engine';
 import { updateFuel } from '../systems/fuel';
+import { updateElectrical } from '../systems/electrical';
 import { geodeticToEcef, ecefToGeodetic, ecefToEnu, enuToEcef } from './geodesy';
 import { ftToM, mToFt } from './units';
 
@@ -90,6 +91,9 @@ export function integrate(
 
   // ── Fuel system ──
   updateFuel(state, spec, dt);
+
+  // ── Electrical system ──
+  updateElectrical(state, dt);
 
   // ── Config ──
   state.config.flapSetting = inputs.flapLever;

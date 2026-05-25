@@ -61,6 +61,15 @@ export interface EngineState {
   running: boolean;
 }
 
+// ── Electrical System ──
+
+export interface ElectricalState {
+  gen1Online: boolean;
+  gen2Online: boolean;
+  acBusPowered: boolean;
+  batteryVolts: number;
+}
+
 // ── Fuel System ──
 
 export interface FuelState {
@@ -93,6 +102,7 @@ export interface AircraftState {
   config: AircraftConfig;
   engines: [EngineState, EngineState];
   fuel: FuelState;
+  electrical: ElectricalState;
   grossWeight: number;
   cg: number; // % MAC
   simTime: number; // ms
@@ -152,6 +162,7 @@ export function createInitialState(spec: AircraftSpec): AircraftState {
       { n1: 0, n2: 0, egt: 20, fuelFlow: 0, thrust: 0, running: false },
     ],
     fuel: { totalFuel: spec.maxFuel, fuelFlowTotal: 0, centerTank: spec.fuelCapacity.center, leftTank: spec.fuelCapacity.left, rightTank: spec.fuelCapacity.right },
+    electrical: { gen1Online: false, gen2Online: false, acBusPowered: false, batteryVolts: 28 },
     grossWeight: spec.emptyWeight + spec.maxFuel,
     cg: 25,
     simTime: 0,
