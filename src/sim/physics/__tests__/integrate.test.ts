@@ -18,6 +18,15 @@ describe('integrate', () => {
     expect(s.velocity.u).toBe(0);
   });
 
+  it('preserves initial heading after first quaternion-derived tick', () => {
+    const s = createInitialState(B737_800_SPEC);
+    expect(s.attitude.psi).toBeCloseTo(Math.PI);
+
+    integrate(s, idle, B737_800_SPEC, 1 / 60);
+
+    expect(s.attitude.psi).toBeCloseTo(Math.PI, 6);
+  });
+
   it('TOGA accelerates and climbs', () => {
     const s = createInitialState(B737_800_SPEC);
     s.velocity.u = 30;

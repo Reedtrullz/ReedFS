@@ -1,6 +1,6 @@
 // ── 6-DOF State Vector ──
 
-import type { Quaternion } from './physics/quaternion';
+import { eulerToQuat, type Quaternion } from './physics/quaternion';
 import b737Data from './data/b737.json';
 
 export interface GeoPosition {
@@ -165,11 +165,13 @@ export const B737_800_SPEC: AircraftSpec = {
 };
 
 export function createInitialState(spec: AircraftSpec): AircraftState {
+  const attitude: Attitude = { phi: 0, theta: 0, psi: Math.PI };
+
   return {
     position: { lat: 47.45, lon: -122.31, alt: 432 },
     velocity: { u: 0, v: 0, w: 0 },
-    attitude: { phi: 0, theta: 0, psi: Math.PI }, // facing south (180°)
-    quaternion: { q0: 1, q1: 0, q2: 0, q3: 0 },
+    attitude, // facing south (180°)
+    quaternion: eulerToQuat(attitude.phi, attitude.theta, attitude.psi),
     angularVel: { p: 0, q: 0, r: 0 },
     config: { flapSetting: 0, gearDown: true, spoilersArmed: false, spoilersDeployed: false, speedBrake: 0 },
     engines: [

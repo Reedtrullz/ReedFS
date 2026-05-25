@@ -47,13 +47,13 @@ export function quatMultiply(a: Quaternion, b: Quaternion): Quaternion {
   };
 }
 
-/** Quaternion derivative: dq/dt = 0.5 * ω ⊗ q where ω = (0, p, q, r) */
+/** Quaternion derivative: dq/dt = 0.5 * q ⊗ ω where ω = (0, p, q, r) in body axes */
 export function quatDerivative(
   q: Quaternion,
   omega: { p: number; q: number; r: number },
 ): Quaternion {
   const omegaQ: Quaternion = { q0: 0, q1: omega.p, q2: omega.q, q3: omega.r };
-  const result = quatMultiply(omegaQ, q);
+  const result = quatMultiply(q, omegaQ);
   return {
     q0: result.q0 * 0.5,
     q1: result.q1 * 0.5,

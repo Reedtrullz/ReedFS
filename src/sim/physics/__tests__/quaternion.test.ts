@@ -43,6 +43,19 @@ describe('quatDerivative', () => {
     expect(qdot.q2).toBeCloseTo(0);
     expect(qdot.q3).toBeCloseTo(0);
   });
+
+  it('applies positive body pitch rate with a 180 degree heading', () => {
+    const q = eulerToQuat(0, 0, Math.PI);
+    const qdot = quatDerivative(q, { p: 0, q: 2, r: 0 });
+    const next = quatNormalize({
+      q0: q.q0 + qdot.q0 * 0.01,
+      q1: q.q1 + qdot.q1 * 0.01,
+      q2: q.q2 + qdot.q2 * 0.01,
+      q3: q.q3 + qdot.q3 * 0.01,
+    });
+
+    expect(quatToEuler(next).theta).toBeGreaterThan(0);
+  });
 });
 
 describe('quatNormalize', () => {
