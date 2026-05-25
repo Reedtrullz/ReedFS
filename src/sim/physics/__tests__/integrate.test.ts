@@ -13,6 +13,27 @@ const idle: ControlInputs = {
   flapLever: 0, gearLever: 'DOWN', spoilers: 0, brake: 0,
 };
 
+function takeoffRollInputs(): ControlInputs {
+  return {
+    ...idle,
+    throttle1: 1,
+    throttle2: 1,
+    flapLever: 5,
+    gearLever: 'DOWN',
+    brake: 0,
+    elevator: 0,
+  };
+}
+
+function runTakeoffRollAtHz(hz: number, seconds: number): ReturnType<typeof createInitialState> {
+  const s = createInitialState(B737_800_SPEC);
+  const inputs = takeoffRollInputs();
+  for (let frame = 0; frame < seconds * hz; frame++) {
+    integrate(s, inputs, B737_800_SPEC, 1 / hz);
+  }
+  return s;
+}
+
 function setAttitude(s: ReturnType<typeof createInitialState>, attitude: Attitude): void {
   s.attitude = attitude;
   s.quaternion = eulerToQuat(attitude.phi, attitude.theta, attitude.psi);
