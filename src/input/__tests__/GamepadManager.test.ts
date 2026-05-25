@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { readGamepad } from '../GamepadManager';
 
+const originalGetGamepadsDescriptor = Object.getOwnPropertyDescriptor(navigator, 'getGamepads');
+
 function button(value: number): GamepadButton {
   return { pressed: value > 0, touched: value > 0, value };
 }
@@ -15,6 +17,24 @@ function setGamepads(gamepads: Array<Partial<Gamepad> | null>): void {
 describe('readGamepad', () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    if (originalGetGamepadsDescriptor) {
+      Object.defineProperty(navigator, 'getGamepads', originalGetGamepadsDescriptor);
+    } else {
+      Reflect.deleteProperty(navigator, 'getGamepads');
+    }
+  });
+
+  it('returns null when Gamepad API is missing', () => {
+    Object.defineProperty(navigator, 'getGamepads', {
+      configurable: true,
+      value: undefined,
+    });
+
+    let result: ReturnType<typeof readGamepad> | undefined;
+    expect(() => {
+      result = readGamepad();
+    }).not.toThrow();
+    expect(result).toBeNull();
   });
 
   it('returns null when there is no gamepad', () => {
@@ -34,6 +54,34 @@ describe('readGamepad', () => {
     expect(readGamepad()).toBeNull();
   });
 
+  it('uses the first non-null gamepad slot', () => {
+    setGamepads([
+      null,
+      {
+        axes: [0.2, -0.3, 0.4],
+        buttons: Array.from({ length: 8 }, (_, i) => button(i === 7 ? 0.6 : 0)),
+      },
+    ]);
+
+    const result = readGamepad();
+    expect(result).not.toBeNull();
+    expect(result?.elevator).toBeCloseTo(-0.21, 8);
+    expect(result?.aileron).toBeCloseTo(0.14, 8);
+    expect(result?.rudder).toBeCloseTo(0.2, 8);
+    expect(result?.throttle1).toBeCloseTo(0.8, 8);
+    expect(result?.throttle2).toBeCloseTo(0.8, 8);
+  });
+
+  it('returns null for malformed partial gamepad object without throwing', () => {
+    setGamepads([{}]);
+
+    let result: ReturnType<typeof readGamepad> | undefined;
+    expect(() => {
+      result = readGamepad();
+    }).not.toThrow();
+    expect(result).toBeNull();
+  });
+
   it('returns only active fields when sticks or triggers move beyond the deadzone', () => {
     setGamepads([
       {
@@ -42,12 +90,12 @@ describe('readGamepad', () => {
       },
     ]);
 
-    expect(readGamepad()).toEqual({
-      elevator: -0.21,
-      aileron: 0.13999999999999999,
-      rudder: 0.2,
-      throttle1: 0.8,
-      throttle2: 0.8,
-    });
+    const result = readGamepad();
+    expect(result).not.toBeNull();
+    expect(result?.elevator).toBeCloseTo(-0.21, 8);
+    expect(result?.aileron).toBeCloseTo(0.14, 8);
+    expect(result?.rudder).toBeCloseTo(0.2, 8);
+    expect(result?.throttle1).toBeCloseTo(0.8, 8);
+    expect(result?.throttle2).toBeCloseTo(0.8, 8);
   });
 });

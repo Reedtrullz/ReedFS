@@ -14,15 +14,20 @@ function activeTrigger(value: number | undefined): number {
 }
 
 export function readGamepad(): Partial<ControlInputs> | null {
-  const gamepads = navigator.getGamepads();
-  const gp = gamepads[0];
+  const nav = typeof globalThis.navigator === 'undefined' ? undefined : globalThis.navigator;
+  if (!nav || typeof nav.getGamepads !== 'function') return null;
+
+  const gamepads = nav.getGamepads();
+  if (!gamepads) return null;
+
+  const gp = Array.from(gamepads).find((pad): pad is Gamepad => pad != null);
   if (!gp) return null;
 
-  const leftX = activeAxis(gp.axes[0]);
-  const leftY = activeAxis(gp.axes[1]);
-  const rightX = activeAxis(gp.axes[2]);
-  const rightTrigger = activeTrigger(gp.buttons[7]?.value);
-  const leftTrigger = activeTrigger(gp.buttons[6]?.value);
+  const leftX = activeAxis(gp.axes?.[0]);
+  const leftY = activeAxis(gp.axes?.[1]);
+  const rightX = activeAxis(gp.axes?.[2]);
+  const rightTrigger = activeTrigger(gp.buttons?.[7]?.value);
+  const leftTrigger = activeTrigger(gp.buttons?.[6]?.value);
 
   const inputs: Partial<ControlInputs> = {};
 
