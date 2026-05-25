@@ -155,7 +155,7 @@ export function App() {
     });
   }, []);
 
-  const handleTakeoff = () => {
+  const handleStartRoll = () => {
     setInput({
       throttle1: 1,
       throttle2: 1,
@@ -195,7 +195,7 @@ export function App() {
       <div style={{ position: 'fixed', bottom: 20, left: 20, zIndex: 100, display: 'flex', gap: 8 }}>
         {status === 'stopped' || status === 'paused' ? (
           <>
-            <button onClick={handleTakeoff} style={btnStyle}>TAKEOFF</button>
+            <button onClick={handleStartRoll} style={btnStyle}>START ROLL</button>
             {status === 'paused' && <button onClick={resume} style={btnStyle}>RESUME</button>}
           </>
         ) : (

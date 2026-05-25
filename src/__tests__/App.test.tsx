@@ -191,10 +191,10 @@ describe('App', () => {
     expect(ThreeToCesium).toHaveBeenCalledTimes(1);
   });
 
-  it('starts takeoff roll with gear down and neutral elevator', () => {
+  it('starts takeoff roll from the START ROLL button with gear down and neutral elevator', () => {
     render(<App />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'TAKEOFF' }));
+    fireEvent.click(screen.getByRole('button', { name: 'START ROLL' }));
 
     expect(mockSetInput).toHaveBeenCalledWith(expect.objectContaining({
       throttle1: 1,
