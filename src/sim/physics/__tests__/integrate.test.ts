@@ -6,33 +6,13 @@ import type { WindInfo } from '../../weather';
 import { eulerToQuat } from '../quaternion';
 import { KSEA_RUNWAY_ALT_FT } from '../../systems/ground';
 import { computeHeldKeyInputs } from '../../../input/keyboardControls';
+import { runFixedStepScenario, takeoffRollInputs } from '../../__tests__/scenarioHelpers';
 
 const idle: ControlInputs = {
   elevator: 0, aileron: 0, rudder: 0,
   throttle1: 0, throttle2: 0,
   flapLever: 0, gearLever: 'DOWN', spoilers: 0, brake: 0,
 };
-
-function takeoffRollInputs(): ControlInputs {
-  return {
-    ...idle,
-    throttle1: 1,
-    throttle2: 1,
-    flapLever: 5,
-    gearLever: 'DOWN',
-    brake: 0,
-    elevator: 0,
-  };
-}
-
-function runTakeoffRollAtHz(hz: number, seconds: number): ReturnType<typeof createInitialState> {
-  const s = createInitialState(B737_800_SPEC);
-  const inputs = takeoffRollInputs();
-  for (let frame = 0; frame < seconds * hz; frame++) {
-    integrate(s, inputs, B737_800_SPEC, 1 / hz);
-  }
-  return s;
-}
 
 function setAttitude(s: ReturnType<typeof createInitialState>, attitude: Attitude): void {
   s.attitude = attitude;
@@ -124,13 +104,7 @@ describe('integrate', () => {
 
   it('keeps full-throttle takeoff roll on the runway before rotation speed', () => {
     const s = createInitialState(B737_800_SPEC);
-    const takeoffRoll: ControlInputs = {
-      ...idle,
-      throttle1: 1,
-      throttle2: 1,
-      flapLever: 5,
-      gearLever: 'DOWN',
-    };
+    const takeoffRoll = takeoffRollInputs();
 
     for (let i = 0; i < 5 * 60; i++) {
       integrate(s, takeoffRoll, B737_800_SPEC, 1 / 60);
@@ -142,7 +116,7 @@ describe('integrate', () => {
   });
 
   it('full-throttle takeoff roll accelerates at 120 Hz', () => {
-    const s = runTakeoffRollAtHz(120, 20);
+    const s = runFixedStepScenario({ hz: 120, seconds: 20 });
 
     expect(s.position.alt).toBeGreaterThanOrEqual(KSEA_RUNWAY_ALT_FT - 0.01);
     expect(s.velocity.u).toBeGreaterThan(25);
@@ -150,7 +124,7 @@ describe('integrate', () => {
   });
 
   it('full-throttle takeoff roll accelerates at 144 Hz', () => {
-    const s = runTakeoffRollAtHz(144, 20);
+    const s = runFixedStepScenario({ hz: 144, seconds: 20 });
 
     expect(s.position.alt).toBeGreaterThanOrEqual(KSEA_RUNWAY_ALT_FT - 0.01);
     expect(s.velocity.u).toBeGreaterThan(25);
@@ -221,7 +195,7 @@ describe('integrate', () => {
   });
 
   it('keyboard pitch-up command lifts off within three seconds after rotate cue', () => {
-    const s = runTakeoffRollAtHz(120, 30);
+    const s = runFixedStepScenario({ hz: 120, seconds: 30 });
     s.flightPhase = 'TAKEOFF';
     const keyboardPitchUp: ControlInputs = {
       ...takeoffRollInputs(),
@@ -237,7 +211,7 @@ describe('integrate', () => {
   });
 
   it('held rotate does not over-rotate into a rocket attitude', () => {
-    const s = runTakeoffRollAtHz(120, 30);
+    const s = runFixedStepScenario({ hz: 120, seconds: 30 });
     s.flightPhase = 'TAKEOFF';
     const keyboardPitchUp: ControlInputs = {
       ...takeoffRollInputs(),
@@ -253,7 +227,7 @@ describe('integrate', () => {
   });
 
   it('early climb remains recoverable after releasing rotate and raising gear', () => {
-    const s = runTakeoffRollAtHz(120, 30);
+    const s = runFixedStepScenario({ hz: 120, seconds: 30 });
     s.flightPhase = 'TAKEOFF';
     const keyboardPitchUp: ControlInputs = {
       ...takeoffRollInputs(),
