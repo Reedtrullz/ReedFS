@@ -9,6 +9,7 @@ import { computeLNAV } from '../systems/navigation';
 import { computeVNAV } from '../systems/vnav';
 import { geodeticToEcef, ecefToGeodetic, ecefToEnu, enuToEcef } from './geodesy';
 import { ftToM, mToFt } from './units';
+import { quatDerivative, quatNormalize, quatToEuler } from './quaternion';
 import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
 import type { FlightPlan } from '@shared/types/fmc';
 
@@ -45,17 +46,20 @@ export function integrate(
   state.angularVel.q += qDot * dt;
   state.angularVel.r += rDot * dt;
 
-  // ── Euler angle rates ──
-  const phiDot = p + q * sinPhi * Math.tan(theta) + r * cosPhi * Math.tan(theta);
-  const thetaDot = q * cosPhi - r * sinPhi;
-  const psiDot = (q * sinPhi + r * cosPhi) / Math.max(0.001, cosTheta);
+  // ── Quaternion derivative (replaces Euler angle rates — no gimbal lock) ──
+  const qdot = quatDerivative(state.quaternion, state.angularVel);
+  state.quaternion.q0 += qdot.q0 * dt;
+  state.quaternion.q1 += qdot.q1 * dt;
+  state.quaternion.q2 += qdot.q2 * dt;
+  state.quaternion.q3 += qdot.q3 * dt;
+  const norm = quatNormalize(state.quaternion);
+  state.quaternion = norm;
 
-  state.attitude.phi += phiDot * dt;
-  state.attitude.theta += thetaDot * dt;
-  state.attitude.psi += psiDot * dt;
-
-  while (state.attitude.psi < 0) state.attitude.psi += 2 * Math.PI;
-  while (state.attitude.psi >= 2 * Math.PI) state.attitude.psi -= 2 * Math.PI;
+  // Compute Euler angles from quaternion (for backward compat with display/body-NED rotation)
+  const euler = quatToEuler(norm);
+  state.attitude.phi = euler.phi;
+  state.attitude.theta = euler.theta;
+  state.attitude.psi = euler.psi;
 
   // Recompute trig for updated attitude
   const sphi = Math.sin(state.attitude.phi), cphi = Math.cos(state.attitude.phi);
