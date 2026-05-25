@@ -1,6 +1,8 @@
 import type { AircraftState, AircraftSpec, ControlInputs } from '../types';
 import { isaAtAltitude } from './atmosphere';
 import { lbfToN } from './units';
+import type { AeroModel } from '../systems/AeroModel';
+import { B737_AERO } from '../systems/AeroModel';
 
 const G = 9.80665;
 
@@ -9,7 +11,7 @@ export interface AeroResult {
   rollMoment: number; pitchMoment: number; yawMoment: number;
 }
 
-export function computeAero(state: AircraftState, inputs: ControlInputs, spec: AircraftSpec): AeroResult {
+export function computeAero(state: AircraftState, inputs: ControlInputs, spec: AircraftSpec, aeroModel: AeroModel = B737_AERO): AeroResult {
   const { u, v, w } = state.velocity;
   const tasMs = Math.sqrt(u * u + v * v + w * w);
   const atmo = isaAtAltitude(state.position.alt);
@@ -22,14 +24,14 @@ export function computeAero(state: AircraftState, inputs: ControlInputs, spec: A
   const mach = tasMs / atmo.speedOfSound;
 
   // --- Lift ---
-  const cl0 = 0.65, clAlpha = 5.73;
-  const clFlap = flapClIncrement(state.config.flapSetting);
+  const cl0 = aeroModel.cl0, clAlpha = aeroModel.clAlpha;
+  const clFlap = flapClIncrement(aeroModel, state.config.flapSetting);
   const clMach = mach > 0.6 ? 1 + 0.3 * (mach - 0.6) : 1;
   const cl = (cl0 + clAlpha * aoa + clFlap) * clMach;
 
   // --- Drag ---
-  const cd0 = 0.018 + (state.config.flapSetting > 0 ? 0.015 : 0) + (state.config.gearDown ? 0.025 : 0) + state.config.speedBrake * 0.04;
-  const ar = b * b / S, e = 0.8, k = 1 / (Math.PI * ar * e);
+  const cd0 = aeroModel.cd0 + (state.config.flapSetting > 0 ? aeroModel.cdFlap : 0) + (state.config.gearDown ? aeroModel.cdGear : 0) + state.config.speedBrake * aeroModel.cdSpeedBrake;
+  const ar = b * b / S, e = aeroModel.oswaldEfficiency, k = 1 / (Math.PI * ar * e);
   const cd = cd0 + k * cl * cl;
 
   // --- Side force ---
@@ -50,21 +52,25 @@ export function computeAero(state: AircraftState, inputs: ControlInputs, spec: A
 
   // --- Moments ---
   const qHat = state.angularVel.q * c / (2 * Math.max(tasMs, 1));
-  const cm = -0.05 + (-0.8) * aoa + (-1.2) * inputs.elevator * 0.3 + (-12) * qHat - 0.02 * state.config.flapSetting;
+  const cm = aeroModel.cm0 + aeroModel.cmAlpha * aoa + aeroModel.cmElevator * inputs.elevator * 0.3 + aeroModel.cmq * qHat - aeroModel.cmFlap * state.config.flapSetting;
   const pitchMoment = q * S * c * cm;
 
   const pHat = state.angularVel.p * b / (2 * Math.max(tasMs, 1));
-  const clMoment = (-0.08) * beta + 0.06 * inputs.aileron + (-0.4) * pHat;
+  const clMoment = aeroModel.clBeta * beta + aeroModel.clAileron * inputs.aileron + aeroModel.clp * pHat;
   const rollMoment = q * S * b * clMoment;
 
   const rHat = state.angularVel.r * b / (2 * Math.max(tasMs, 1));
-  const cn = 0.12 * beta + (-0.07) * inputs.rudder + (-0.15) * rHat;
+  const cn = aeroModel.cnBeta * beta + aeroModel.cnRudder * inputs.rudder + aeroModel.cnr * rHat;
   const yawMoment = q * S * b * cn;
 
   return { thrust, drag, lift, side, weight, rollMoment, pitchMoment, yawMoment };
 }
 
-function flapClIncrement(d: number): number {
-  if (d <= 0) return 0; if (d <= 5) return 0.4; if (d <= 10) return 0.7;
-  if (d <= 15) return 1.0; if (d <= 25) return 1.3; return 1.6;
+function flapClIncrement(aeroModel: AeroModel, d: number): number {
+  for (let i = aeroModel.flapDetents.length - 1; i >= 0; i--) {
+    if (d >= aeroModel.flapDetents[i]) {
+      return aeroModel.flapClIncrements[i];
+    }
+  }
+  return 0;
 }
