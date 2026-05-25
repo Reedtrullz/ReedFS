@@ -211,8 +211,10 @@ describe('App', () => {
     render(<App />);
 
     expect(screen.getByText('Controls')).toBeTruthy();
-    expect(screen.getByText(/W\/S pitch/i)).toBeTruthy();
+    expect(screen.getByText(/W rotate\/nose up/i)).toBeTruthy();
+    expect(screen.getByText(/S nose down/i)).toBeTruthy();
     expect(screen.getByText(/ArrowUp\/ArrowDown throttle/i)).toBeTruthy();
     expect(screen.getByText(/Space brake/i)).toBeTruthy();
+    expect(screen.getByText(/G gear after positive rate/i)).toBeTruthy();
   });
 });

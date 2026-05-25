@@ -19,9 +19,11 @@ export function ControlsHelp() {
       }}
     >
       <div style={{ fontWeight: 'bold', marginBottom: 4 }}>Controls</div>
-      <div>W/S pitch · A/D roll · Q/E rudder</div>
+      <div>W rotate/nose up · S nose down</div>
+      <div>A/D roll · Q/E rudder</div>
       <div>ArrowUp/ArrowDown throttle</div>
-      <div>Space brake · F flaps · G gear</div>
+      <div>Space brake · F flaps</div>
+      <div>G gear after positive rate</div>
       <div>CAM cycles chase/cockpit/tower</div>
     </div>
   );
