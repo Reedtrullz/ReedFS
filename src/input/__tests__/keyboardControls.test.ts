@@ -33,6 +33,13 @@ describe('keyboardControls', () => {
     });
   });
 
+  it('clamps throttle at full power when incrementing near max', () => {
+    expect(applyDiscreteKeyInput('arrowup', { ...inputs, throttle1: 0.98, throttle2: 0.98 })).toEqual({
+      throttle1: 1,
+      throttle2: 1,
+    });
+  });
+
   it('decrements throttle without going below idle', () => {
     expect(applyDiscreteKeyInput('arrowdown', { ...inputs, throttle1: 0.02, throttle2: 0.02 })).toEqual({
       throttle1: 0,
@@ -43,6 +50,7 @@ describe('keyboardControls', () => {
   it('toggles gear and cycles flaps', () => {
     expect(applyDiscreteKeyInput('g', inputs)).toEqual({ gearLever: 'UP' });
     expect(applyDiscreteKeyInput('f', { ...inputs, flapLever: 0 })).toEqual({ flapLever: 5 });
+    expect(applyDiscreteKeyInput('f', { ...inputs, flapLever: 5 })).toEqual({ flapLever: 10 });
     expect(applyDiscreteKeyInput('f', { ...inputs, flapLever: 40 })).toEqual({ flapLever: 0 });
   });
 });
