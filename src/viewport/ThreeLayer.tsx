@@ -53,6 +53,20 @@ export function ThreeLayer({ viewerRef }: ThreeLayerProps) {
       const pos = Cesium.Cartesian3.fromDegrees(lon, lat, alt * 0.3048);
       proxyRef.current = ttc.add(model, pos);
 
+      // Fan spin animation (N1-driven)
+      if (proxyRef.current) {
+        // Engine nacelles are the CylinderGeometry meshes — they're at index 8 and 9
+        const children = proxyRef.current.children;
+        // The engines are the last two children added (index 8 and 9 in createBoeing737Model)
+        const engCount = 2;
+        for (let i = 0; i < engCount; i++) {
+          const idx = children.length - engCount + i;
+          if (children[idx]) {
+            children[idx].rotation.z += aircraft.engines[i].n1 * 0.05;
+          }
+        }
+      }
+
       ttc.update();
     };
 
