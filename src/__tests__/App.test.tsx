@@ -23,11 +23,11 @@ vi.mock('cesium', () => ({
 }));
 
 vi.mock('three', () => ({
-  BoxGeometry: vi.fn(),
-  MeshStandardMaterial: vi.fn(),
-  Mesh: vi.fn(() => ({})),
-  AmbientLight: vi.fn(),
-  DirectionalLight: vi.fn(() => ({ position: { set: vi.fn() } })),
+  BoxGeometry: vi.fn(function() {}),
+  MeshStandardMaterial: vi.fn(function() {}),
+  Mesh: vi.fn(function() {}),
+  AmbientLight: vi.fn(function() {}),
+  DirectionalLight: vi.fn(function() { this.position = { set: vi.fn() }; }),
 }));
 
 vi.mock('three-to-cesium', () => ({

@@ -24,7 +24,7 @@ export function App() {
           });
         }}
       />
-      <ThreeLayer viewer={viewerRef.current} />
+      <ThreeLayer viewerRef={viewerRef} />
       <div
         style={{
           position: 'fixed',

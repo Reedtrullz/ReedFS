@@ -1,17 +1,18 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type RefObject } from 'react';
 import * as Cesium from 'cesium';
 import * as THREE from 'three';
 import ThreeToCesium from 'three-to-cesium';
 
 export interface ThreeLayerProps {
-  viewer: Cesium.Viewer | null;
+  viewerRef: RefObject<Cesium.Viewer | null>;
 }
 
-export function ThreeLayer({ viewer }: ThreeLayerProps) {
+export function ThreeLayer({ viewerRef }: ThreeLayerProps) {
   const ttcRef = useRef<ReturnType<typeof ThreeToCesium> | null>(null);
   const cubeRef = useRef<THREE.Mesh | null>(null);
 
   useEffect(() => {
+    const viewer = viewerRef.current;
     if (!viewer) return;
     if (ttcRef.current) return;
 
@@ -47,7 +48,7 @@ export function ThreeLayer({ viewer }: ThreeLayerProps) {
       ttc.destroy();
       ttcRef.current = null;
     };
-  }, [viewer]);
+  }, [viewerRef]);
 
   return null;
 }
