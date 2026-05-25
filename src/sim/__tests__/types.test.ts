@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createInitialState, B737_800_SPEC } from '../types';
+import { quatToEuler } from '../physics/quaternion';
 
 describe('createInitialState', () => {
   it('returns parked at KSEA with full fuel', () => {
@@ -23,5 +24,14 @@ describe('createInitialState', () => {
     expect(s.angularVel.p).toBe(0);
     expect(s.angularVel.q).toBe(0);
     expect(s.angularVel.r).toBe(0);
+  });
+
+  it('initial quaternion matches the initial Euler attitude', () => {
+    const s = createInitialState(B737_800_SPEC);
+    const euler = quatToEuler(s.quaternion);
+
+    expect(euler.phi).toBeCloseTo(s.attitude.phi, 8);
+    expect(euler.theta).toBeCloseTo(s.attitude.theta, 8);
+    expect(euler.psi).toBeCloseTo(s.attitude.psi, 8);
   });
 });

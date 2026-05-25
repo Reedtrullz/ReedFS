@@ -10,7 +10,7 @@ const G = 9.80665;
 const MAX_ELEVATOR_DEFLECTION_RAD = 0.3;
 
 export interface AeroResult {
-  thrust: number; drag: number; lift: number; side: number; weight: number;
+  thrust: number; drag: number; dragBodyX: number; lift: number; side: number; weight: number;
   rollMoment: number; pitchMoment: number; yawMoment: number;
 }
 
@@ -49,6 +49,7 @@ export function computeAero(
 
   const lift = q * S * cl;
   const drag = q * S * cd;
+  const dragBodyX = tasMs > 1 ? -drag * (u / tasMs) : 0;
   const side = q * S * cy;
   const weight = state.grossWeight * G;
 
@@ -73,7 +74,7 @@ export function computeAero(
   const cn = aeroModel.cnBeta * beta + aeroModel.cnRudder * inputs.rudder + aeroModel.cnr * rHat;
   const yawMoment = q * S * b * cn;
 
-  return { thrust, drag, lift, side, weight, rollMoment, pitchMoment, yawMoment };
+  return { thrust, drag, dragBodyX, lift, side, weight, rollMoment, pitchMoment, yawMoment };
 }
 
 function flapClIncrement(aeroModel: AeroModel, d: number): number {

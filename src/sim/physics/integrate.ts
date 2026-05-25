@@ -70,7 +70,7 @@ export function integrate(
   const gy = G * ctht * sphi;
   const gz = G * ctht * cphi;
 
-  const udot = aero.thrust / mass - aero.drag / mass + gx - q * state.velocity.w + r * state.velocity.v;
+  const udot = aero.thrust / mass + aero.dragBodyX / mass + gx - q * state.velocity.w + r * state.velocity.v;
   const vdot = aero.side / mass + gy - r * state.velocity.u + p * state.velocity.w;
   const wdot = -aero.lift / mass + gz - p * state.velocity.v + q * state.velocity.u;
 

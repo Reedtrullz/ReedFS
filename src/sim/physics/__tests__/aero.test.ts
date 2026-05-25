@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { computeAero } from '../aero';
 import { createInitialState, B737_800_SPEC } from '../../types';
 import type { ControlInputs } from '../../types';
+import type { WindInfo } from '../../weather';
 
 const cruise: ControlInputs = {
   elevator: -0.1, aileron: 0, rudder: 0,
@@ -63,5 +64,19 @@ describe('computeAero', () => {
     const a = computeAero(s, { ...cruise, elevator: -1, throttle1: 0, throttle2: 0 }, B737_800_SPEC);
 
     expect(a.pitchMoment).toBeGreaterThan(0);
+  });
+
+  it('orients drag opposite the signed air-relative longitudinal velocity', () => {
+    const s = createInitialState(B737_800_SPEC); // initial heading south
+    const headwind: WindInfo = { dir: 180, speed: 20 };
+    const tailwind: WindInfo = { dir: 0, speed: 20 };
+
+    const headwindAero = computeAero(s, { ...cruise, throttle1: 0, throttle2: 0 }, B737_800_SPEC, undefined, headwind);
+    const tailwindAero = computeAero(s, { ...cruise, throttle1: 0, throttle2: 0 }, B737_800_SPEC, undefined, tailwind);
+
+    expect(headwindAero.drag).toBeGreaterThan(0);
+    expect(headwindAero.dragBodyX).toBeLessThan(0);
+    expect(tailwindAero.drag).toBeGreaterThan(0);
+    expect(tailwindAero.dragBodyX).toBeGreaterThan(0);
   });
 });

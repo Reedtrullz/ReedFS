@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { integrate } from '../integrate';
 import { createInitialState, B737_800_SPEC } from '../../types';
-import type { ControlInputs } from '../../types';
+import type { Attitude, ControlInputs } from '../../types';
+import type { WindInfo } from '../../weather';
+import { eulerToQuat } from '../quaternion';
 
 const idle: ControlInputs = {
   elevator: 0, aileron: 0, rudder: 0,
@@ -9,8 +11,13 @@ const idle: ControlInputs = {
   flapLever: 0, gearLever: 'DOWN', spoilers: 0, brake: 0,
 };
 
+function setAttitude(s: ReturnType<typeof createInitialState>, attitude: Attitude): void {
+  s.attitude = attitude;
+  s.quaternion = eulerToQuat(attitude.phi, attitude.theta, attitude.psi);
+}
+
 describe('integrate', () => {
-  it('at rest, nothing changes', () => {
+  it('at rest keeps horizontal velocity initially', () => {
     const s = createInitialState(B737_800_SPEC);
     const altBefore = s.position.alt;
     integrate(s, idle, B737_800_SPEC, 1 / 60);
@@ -38,6 +45,41 @@ describe('integrate', () => {
     integrate(s, idle, B737_800_SPEC, 0.1);
 
     expect(s.velocity.w).toBeGreaterThan(0); // body/NED down is positive
+  });
+
+  it('projects nose-up gravity backward in body axes', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.position.alt = 10000;
+    s.config.gearDown = false;
+    setAttitude(s, { phi: 0, theta: Math.PI / 6, psi: Math.PI });
+
+    integrate(s, idle, B737_800_SPEC, 0.1);
+
+    expect(s.velocity.u).toBeLessThan(-0.4);
+    expect(s.velocity.w).toBeGreaterThan(0.8);
+  });
+
+  it('projects right-wing-down gravity to positive body-y', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.position.alt = 10000;
+    s.config.gearDown = false;
+    setAttitude(s, { phi: Math.PI / 6, theta: 0, psi: Math.PI });
+
+    integrate(s, idle, B737_800_SPEC, 0.1);
+
+    expect(s.velocity.v).toBeGreaterThan(0.4);
+    expect(s.velocity.w).toBeGreaterThan(0.8);
+  });
+
+  it('tailwind reverse relative flow accelerates forward instead of backward', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.position.alt = 10000;
+    s.config.gearDown = false;
+    const tailwind: WindInfo = { dir: 0, speed: 20 }; // initial heading south; wind from north is a tailwind
+
+    integrate(s, idle, B737_800_SPEC, 0.1, null, null, tailwind);
+
+    expect(s.velocity.u).toBeGreaterThan(0);
   });
 
   it('TOGA accelerates and pitches up', () => {
