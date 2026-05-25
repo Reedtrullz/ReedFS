@@ -1,4 +1,5 @@
 import { useSimStore } from '../store/simStore';
+import type { AutopilotState, LateralMode, ThrustMode, VerticalMode } from '@shared/autopilot/autopilotTypes';
 
 const btnStyle: React.CSSProperties = {
   background: '#333',
@@ -26,7 +27,7 @@ export function RfsMCP() {
     const current = useSimStore.getState().apState;
     if (!current) {
       // Create default AP state
-      const def = {
+      const def: AutopilotState = {
         boeing: {
           courseL: 0,
           courseR: 0,
@@ -75,10 +76,10 @@ export function RfsMCP() {
           speedMachMode: 'SPD' as const,
         },
         truth: {
-          lateralActive: 'OFF' as any,
-          verticalActive: 'OFF' as any,
-          thrustActive: 'OFF' as any,
-          autopilotStatus: 'OFF' as any,
+          lateralActive: 'OFF',
+          verticalActive: 'OFF',
+          thrustActive: 'OFF',
+          autopilotStatus: 'OFF',
           lastModeChangeTimestamps: { thrust: 0, lateral: 0, vertical: 0 },
         },
       };
@@ -90,15 +91,18 @@ export function RfsMCP() {
     next.truth.autopilotStatus = 'CMD_A';
 
     if (mode === 'HDG_SEL' || mode === 'LNAV') {
-      next.truth.lateralActive = mode as any;
+      const lateral: LateralMode = mode;
+      next.truth.lateralActive = lateral;
     } else if (mode === 'ALT_HOLD' || mode === 'VS') {
-      next.truth.verticalActive = mode as any;
+      const vertical: VerticalMode = mode;
+      next.truth.verticalActive = vertical;
     } else if (mode === 'SPEED' || mode === 'N1') {
-      next.truth.thrustActive = mode as any;
+      const thrust: ThrustMode = mode;
+      next.truth.thrustActive = thrust;
     } else if (mode === 'OFF') {
-      next.truth.lateralActive = 'OFF' as any;
-      next.truth.verticalActive = 'OFF' as any;
-      next.truth.thrustActive = 'OFF' as any;
+      next.truth.lateralActive = 'OFF';
+      next.truth.verticalActive = 'OFF';
+      next.truth.thrustActive = 'OFF';
     }
 
     useSimStore.getState().setApState(next);

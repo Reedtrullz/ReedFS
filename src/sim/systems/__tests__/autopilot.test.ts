@@ -2,11 +2,11 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { updateAutopilot, resetAutopilotPID } from '../autopilot';
 import { createInitialState, B737_800_SPEC } from '../../types';
 import type { ControlInputs } from '../../types';
-import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
+import type { AutopilotState, LateralMode, ThrustMode, VerticalMode } from '@shared/autopilot/autopilotTypes';
 
 beforeEach(() => resetAutopilotPID());
 
-function makeAp(lateral: string, vertical: string, thrust: string): AutopilotState {
+function makeAp(lateral: LateralMode, vertical: VerticalMode, thrust: ThrustMode): AutopilotState {
   return {
     boeing: { courseL:0,courseR:0,speed:null,mach:null,heading:0,altitude:0,verticalSpeed:null,
       fdLeft:false,fdRight:false,autothrottleArm:false,
@@ -16,7 +16,7 @@ function makeAp(lateral: string, vertical: string, thrust: string): AutopilotSta
       verticalSpeed:null,fpa:null,fd1:false,fd2:false,athr:false,ap1:false,ap2:false,
       loc:false,appr:false,exped:false,hdgTrkMode:'HDG_VS',metricAltitude:false,speedMachMode:'SPD' },
     truth: {
-      lateralActive: lateral as any, verticalActive: vertical as any, thrustActive: thrust as any,
+      lateralActive: lateral, verticalActive: vertical, thrustActive: thrust,
       autopilotStatus: 'CMD_A',
       lastModeChangeTimestamps: { thrust:0, lateral:0, vertical:0 },
     },

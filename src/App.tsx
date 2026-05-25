@@ -19,6 +19,7 @@ import { ContrailLayer } from './viewport/ContrailLayer';
 import { createKseaKpdxFlight } from './sim/flightPlanLoader';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { FPSMonitor } from './components/FPSMonitor';
+import type { LateralMode, ThrustMode, VerticalMode } from '@shared/autopilot/autopilotTypes';
 
 initCesium();
 
@@ -210,10 +211,13 @@ export function App() {
             const ap = useSimStore.getState().apState;
             if (ap) {
               const next = structuredClone(ap);
-              next.truth.lateralActive = 'LNAV' as any;
-              next.truth.verticalActive = 'VNAV' as any;
-              next.truth.thrustActive = 'SPEED' as any;
-              next.truth.autopilotStatus = 'CMD_A' as any;
+              const lateral: LateralMode = 'LNAV';
+              const vertical: VerticalMode = 'VNAV';
+              const thrust: ThrustMode = 'SPEED';
+              next.truth.lateralActive = lateral;
+              next.truth.verticalActive = vertical;
+              next.truth.thrustActive = thrust;
+              next.truth.autopilotStatus = 'CMD_A';
               useSimStore.getState().setApState(next);
             }
           }}
