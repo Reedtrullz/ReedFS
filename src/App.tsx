@@ -71,6 +71,35 @@ export function App() {
     };
   }, [setInput]);
 
+  // Chase camera — follows aircraft when sim is running
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+    // Enable camera controls when paused/stopped, disable when flying
+    viewer.scene.screenSpaceCameraController.enableInputs = (status !== 'running');
+  }, [status]);
+
+  useEffect(() => {
+    let raf: number;
+    const update = () => {
+      const viewer = viewerRef.current;
+      if (!viewer) { raf = requestAnimationFrame(update); return; }
+      const a = useSimStore.getState().aircraft;
+      const altM = a.position.alt * 0.3048;
+      viewer.camera.lookAt(
+        Cesium.Cartesian3.fromDegrees(a.position.lon, a.position.lat, altM),
+        new Cesium.HeadingPitchRange(
+          a.attitude.psi - Math.PI, // behind the aircraft
+          Cesium.Math.toRadians(-15), // slightly above
+          300, // 300m behind
+        ),
+      );
+      raf = requestAnimationFrame(update);
+    };
+    raf = requestAnimationFrame(update);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
   const handleTakeoff = () => {
     setInput({ throttle1: 1, throttle2: 1, elevator: -0.3, gearLever: 'UP', flapLever: 5 });
     start();
@@ -100,7 +129,7 @@ export function App() {
           pointerEvents: 'none',
         }}
       >
-        RFS — Phase 0
+        RFS — Phase 1.5
       </div>
       <div style={{ position: 'fixed', bottom: 20, left: 20, zIndex: 100, display: 'flex', gap: 8 }}>
         {status === 'stopped' || status === 'paused' ? (

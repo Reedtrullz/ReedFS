@@ -33,6 +33,7 @@ export function CesiumViewport({ onReady }: CesiumViewportProps) {
     });
 
     viewerRef.current = viewer;
+    viewer.scene.screenSpaceCameraController.enableInputs = false;
     onReady?.(viewer);
 
     return () => {

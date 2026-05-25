@@ -55,6 +55,7 @@ vi.mock('cesium', () => ({
         addEventListener: mockPostRenderAdd,
         removeEventListener: mockPostRenderRemove,
       },
+      screenSpaceCameraController: { enableInputs: true },
     };
   },
   Cartesian3: { fromDegrees: vi.fn(() => ({ x: 0, y: 0, z: 0 })) },
@@ -85,6 +86,6 @@ import { App } from '../App';
 describe('App', () => {
   it('renders RFS label', () => {
     render(<App />);
-    expect(screen.getByText('RFS — Phase 0')).toBeTruthy();
+    expect(screen.getByText('RFS — Phase 1.5')).toBeTruthy();
   });
 });
