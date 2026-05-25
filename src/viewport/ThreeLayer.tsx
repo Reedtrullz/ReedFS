@@ -6,6 +6,7 @@ import { useSimStore } from '../store/simStore';
 import { createBoeing737Model } from './AircraftModel';
 import { computeSunPosition, sunLightIntensity } from '../sim/sun';
 import { quatToEuler } from '../sim/physics/quaternion';
+import { createAircraftModelQuaternion } from './aircraftOrientation';
 import { isCesiumResourceDestroyed } from './cesiumLifecycle';
 
 export interface ThreeLayerProps {
@@ -43,7 +44,7 @@ export function ThreeLayer({ viewerRef }: ThreeLayerProps) {
     const sync = () => {
       const aircraft = useSimStore.getState().aircraft;
       const { lat, lon, alt } = aircraft.position;
-      const { phi, theta } = quatToEuler(aircraft.quaternion);
+      const attitude = quatToEuler(aircraft.quaternion);
 
       // Remove old proxy
       if (proxyRef.current) {
@@ -52,7 +53,7 @@ export function ThreeLayer({ viewerRef }: ThreeLayerProps) {
 
       // Clone template (shares geometry buffers, only creates wrapper objects)
       const model = modelTemplate.clone(true) as THREE.Group;
-      model.rotation.set(theta, 0, -phi);
+      model.quaternion.copy(createAircraftModelQuaternion(attitude));
 
       const pos = Cesium.Cartesian3.fromDegrees(lon, lat, alt * 0.3048);
       proxyRef.current = ttc.add(model, pos);

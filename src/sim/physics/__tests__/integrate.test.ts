@@ -221,7 +221,7 @@ describe('integrate', () => {
   });
 
   it('keyboard pitch-up command lifts off within three seconds after rotate cue', () => {
-    const s = runTakeoffRollAtHz(120, 20);
+    const s = runTakeoffRollAtHz(120, 30);
     s.flightPhase = 'TAKEOFF';
     const keyboardPitchUp: ControlInputs = {
       ...takeoffRollInputs(),
@@ -236,8 +236,24 @@ describe('integrate', () => {
     expect(s.attitude.theta).toBeGreaterThan(0);
   });
 
+  it('held rotate does not over-rotate into a rocket attitude', () => {
+    const s = runTakeoffRollAtHz(120, 30);
+    s.flightPhase = 'TAKEOFF';
+    const keyboardPitchUp: ControlInputs = {
+      ...takeoffRollInputs(),
+      ...computeHeldKeyInputs(new Set(['w'])),
+    };
+
+    for (let i = 0; i < 3 * 120; i++) {
+      integrate(s, keyboardPitchUp, B737_800_SPEC, 1 / 120);
+    }
+
+    expect(s.position.alt).toBeGreaterThan(KSEA_RUNWAY_ALT_FT + 50);
+    expect(s.attitude.theta).toBeLessThanOrEqual(16 * Math.PI / 180);
+  });
+
   it('early climb remains recoverable after releasing rotate and raising gear', () => {
-    const s = runTakeoffRollAtHz(120, 20);
+    const s = runTakeoffRollAtHz(120, 30);
     s.flightPhase = 'TAKEOFF';
     const keyboardPitchUp: ControlInputs = {
       ...takeoffRollInputs(),

@@ -25,6 +25,11 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
+function syncPitchToQuaternion(state: AircraftState, theta: number): void {
+  state.attitude.theta = theta;
+  state.quaternion = eulerToQuat(state.attitude.phi, theta, state.attitude.psi);
+}
+
 function applyPlayableTakeoffAssist(state: AircraftState, inputs: ControlInputs): void {
   const heightAboveRunwayFt = state.position.alt - KSEA_RUNWAY_ALT_FT;
 
@@ -33,7 +38,17 @@ function applyPlayableTakeoffAssist(state: AircraftState, inputs: ControlInputs)
   }
 
   const earlyClimb = state.flightPhase === 'TAKEOFF' || state.flightPhase === 'CLIMB';
-  if (!earlyClimb || heightAboveRunwayFt < TAKEOFF_ASSIST_MIN_HEIGHT_FT || Math.abs(inputs.elevator) > MANUAL_ELEVATOR_EPSILON) {
+  if (!earlyClimb || heightAboveRunwayFt < 0) {
+    return;
+  }
+
+  if (state.attitude.theta > EARLY_CLIMB_MAX_PITCH_RAD) {
+    syncPitchToQuaternion(state, EARLY_CLIMB_MAX_PITCH_RAD);
+    state.angularVel.q = Math.min(0, state.angularVel.q);
+    return;
+  }
+
+  if (heightAboveRunwayFt < TAKEOFF_ASSIST_MIN_HEIGHT_FT || Math.abs(inputs.elevator) > MANUAL_ELEVATOR_EPSILON) {
     return;
   }
 
@@ -42,9 +57,8 @@ function applyPlayableTakeoffAssist(state: AircraftState, inputs: ControlInputs)
     return;
   }
 
-  state.attitude.theta = theta;
+  syncPitchToQuaternion(state, theta);
   state.angularVel.q = 0;
-  state.quaternion = eulerToQuat(state.attitude.phi, theta, state.attitude.psi);
 }
 
 export function integrate(

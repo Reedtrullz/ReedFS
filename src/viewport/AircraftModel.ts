@@ -17,14 +17,14 @@ export function createBoeing737Model(): THREE.Group {
   const noseGeo = new THREE.ConeGeometry(3.8, 8, 16);
   const nose = new THREE.Mesh(noseGeo, bodyMat);
   nose.rotation.x = -Math.PI / 2;
-  nose.position.set(0, 0, 24);
+  nose.position.set(0, 0, -24);
   group.add(nose);
 
   // Tail cone
   const tailConeGeo = new THREE.ConeGeometry(3.8, 6, 16);
   const tailCone = new THREE.Mesh(tailConeGeo, bodyMat);
   tailCone.rotation.x = Math.PI / 2;
-  tailCone.position.set(0, 0, -23);
+  tailCone.position.set(0, 0, 23);
   group.add(tailCone);
 
   // Main wings
@@ -36,13 +36,13 @@ export function createBoeing737Model(): THREE.Group {
   // Vertical stabilizer
   const vstabGeo = new THREE.BoxGeometry(12, 0.4, 2);
   const vstab = new THREE.Mesh(vstabGeo, bodyMat);
-  vstab.position.set(0, 5, -18);
+  vstab.position.set(0, 5, 18);
   group.add(vstab);
 
   // Horizontal stabilizer
   const hstabGeo = new THREE.BoxGeometry(16, 0.3, 4);
   const hstab = new THREE.Mesh(hstabGeo, bodyMat);
-  hstab.position.set(0, 0.5, -18);
+  hstab.position.set(0, 0.5, 18);
   group.add(hstab);
 
   // Engine nacelles
@@ -50,7 +50,7 @@ export function createBoeing737Model(): THREE.Group {
   [ -6, 6 ].forEach((x) => {
     const eng = new THREE.Mesh(engGeo, engMat);
     eng.rotation.x = Math.PI / 2;
-    eng.position.set(x, -3, -2);
+    eng.position.set(x, -3, 2);
     group.add(eng);
   });
 
@@ -59,51 +59,51 @@ export function createBoeing737Model(): THREE.Group {
     new THREE.SphereGeometry(0.5, 8, 8),
     new THREE.MeshBasicMaterial({ color: 0xff0000 }),
   );
-  leftNav.position.set(-18, -1.5, -1);
+  leftNav.position.set(-18, -1.5, 1);
   group.add(leftNav);
 
   const rightNav = new THREE.Mesh(
     new THREE.SphereGeometry(0.5, 8, 8),
     new THREE.MeshBasicMaterial({ color: 0x00ff00 }),
   );
-  rightNav.position.set(18, -1.5, -1);
+  rightNav.position.set(18, -1.5, 1);
   group.add(rightNav);
 
   const tailNav = new THREE.Mesh(
     new THREE.SphereGeometry(0.5, 8, 8),
     new THREE.MeshBasicMaterial({ color: 0xffffff }),
   );
-  tailNav.position.set(0, 5, -21);
+  tailNav.position.set(0, 5, 21);
   group.add(tailNav);
 
   const beacon = new THREE.Mesh(
     new THREE.SphereGeometry(0.6, 8, 8),
     new THREE.MeshBasicMaterial({ color: 0xff0000 }),
   );
-  beacon.position.set(0, 4, -5);
+  beacon.position.set(0, 4, 5);
   group.add(beacon);
 
   const landLight = new THREE.Mesh(
     new THREE.SphereGeometry(0.4, 8, 8),
     new THREE.MeshBasicMaterial({ color: 0xffffcc }),
   );
-  landLight.position.set(0, -2, 20);
+  landLight.position.set(0, -2, -20);
   group.add(landLight);
 
   // Landing gear (simplified boxes)
   const gearMat = new THREE.MeshStandardMaterial({ color: 0x666666 });
   const noseGear = new THREE.Mesh(new THREE.BoxGeometry(1, 3, 1), gearMat);
-  noseGear.position.set(0, -4, 18);
+  noseGear.position.set(0, -4, -18);
   noseGear.name = 'noseGear';
   group.add(noseGear);
 
   const leftMain = new THREE.Mesh(new THREE.BoxGeometry(1, 3, 1), gearMat);
-  leftMain.position.set(-4, -4, -2);
+  leftMain.position.set(-4, -4, 2);
   leftMain.name = 'leftMainGear';
   group.add(leftMain);
 
   const rightMain = new THREE.Mesh(new THREE.BoxGeometry(1, 3, 1), gearMat);
-  rightMain.position.set(4, -4, -2);
+  rightMain.position.set(4, -4, 2);
   rightMain.name = 'rightMainGear';
   group.add(rightMain);
 
