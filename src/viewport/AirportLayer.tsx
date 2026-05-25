@@ -2,6 +2,7 @@ import { useEffect, useRef, type RefObject } from 'react';
 import * as Cesium from 'cesium';
 import * as THREE from 'three';
 import ThreeToCesium from 'three-to-cesium';
+import { isCesiumResourceDestroyed } from './cesiumLifecycle';
 
 interface Runway {
   name: string;
@@ -29,6 +30,8 @@ export function AirportLayer({ viewerRef }: AirportLayerProps) {
   useEffect(() => {
     const viewer = viewerRef.current;
     if (!viewer) return;
+    const scene = viewer.scene;
+    if (!scene) return;
     if (ttcRef.current) return;
 
     const ttc = ThreeToCesium(viewer, {
@@ -83,11 +86,18 @@ export function AirportLayer({ viewerRef }: AirportLayerProps) {
 
     // Per-frame render sync
     const sync = () => ttc.update();
-    viewer.scene.postRender.addEventListener(sync);
+    const postRender = scene.postRender;
+    postRender.addEventListener(sync);
 
     return () => {
-      viewer.scene.postRender.removeEventListener(sync);
-      ttc.destroy();
+      if (!isCesiumResourceDestroyed(viewer)) {
+        postRender.removeEventListener(sync);
+      }
+      try {
+        ttc.destroy();
+      } catch {
+        // Cesium may have already torn down the container during React cleanup.
+      }
       ttcRef.current = null;
     };
   }, [viewerRef]);

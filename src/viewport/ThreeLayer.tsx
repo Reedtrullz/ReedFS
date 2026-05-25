@@ -6,6 +6,7 @@ import { useSimStore } from '../store/simStore';
 import { createBoeing737Model } from './AircraftModel';
 import { computeSunPosition, sunLightIntensity } from '../sim/sun';
 import { quatToEuler } from '../sim/physics/quaternion';
+import { isCesiumResourceDestroyed } from './cesiumLifecycle';
 
 export interface ThreeLayerProps {
   viewerRef: RefObject<Cesium.Viewer | null>;
@@ -18,6 +19,8 @@ export function ThreeLayer({ viewerRef }: ThreeLayerProps) {
   useEffect(() => {
     const viewer = viewerRef.current;
     if (!viewer) return;
+    const scene = viewer.scene;
+    if (!scene) return;
     if (ttcRef.current) return;
 
     const ttc = ThreeToCesium(viewer, {
@@ -91,11 +94,18 @@ export function ThreeLayer({ viewerRef }: ThreeLayerProps) {
       ttc.update();
     };
 
-    viewer.scene.postRender.addEventListener(sync);
+    const postRender = scene.postRender;
+    postRender.addEventListener(sync);
 
     return () => {
-      viewer.scene.postRender.removeEventListener(sync);
-      ttc.destroy();
+      if (!isCesiumResourceDestroyed(viewer)) {
+        postRender.removeEventListener(sync);
+      }
+      try {
+        ttc.destroy();
+      } catch {
+        // Cesium may have already torn down the container during React cleanup.
+      }
       ttcRef.current = null;
     };
   }, [viewerRef]);

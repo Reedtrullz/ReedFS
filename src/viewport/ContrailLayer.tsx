@@ -1,14 +1,18 @@
 import { useEffect, type RefObject } from 'react';
 import * as Cesium from 'cesium';
 import { useSimStore } from '../store/simStore';
+import { isCesiumResourceDestroyed } from './cesiumLifecycle';
 
 export function ContrailLayer({ viewerRef }: { viewerRef: RefObject<Cesium.Viewer | null> }) {
   useEffect(() => {
     const viewer = viewerRef.current;
     if (!viewer) return;
+    const scene = viewer.scene;
+    if (!scene) return;
+    const primitives = scene.primitives;
 
     const image = createContrailImage();
-    const system = viewer.scene.primitives.add(
+    const system = primitives.add(
       new Cesium.ParticleSystem({
         image,
         startScale: 0.3,
@@ -41,7 +45,9 @@ export function ContrailLayer({ viewerRef }: { viewerRef: RefObject<Cesium.Viewe
 
     return () => {
       cancelAnimationFrame(raf);
-      viewer.scene.primitives.remove(system);
+      if (!isCesiumResourceDestroyed(viewer)) {
+        primitives.remove(system);
+      }
     };
   }, [viewerRef]);
 
