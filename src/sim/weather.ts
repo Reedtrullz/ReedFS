@@ -46,10 +46,14 @@ export function parseMetarWind(m: MetarData): WindInfo {
 }
 
 export async function fetchMetar(icao: string): Promise<MetarData | null> {
+  const metarApiBase = import.meta.env.VITE_METAR_API_URL;
+  if (!metarApiBase) return null;
+
   try {
-    const resp = await fetch(
-      `https://aviationweather.gov/api/data/metar?ids=${icao}&format=json`,
-    );
+    const url = new URL(metarApiBase);
+    url.searchParams.set('ids', icao);
+    url.searchParams.set('format', 'json');
+    const resp = await fetch(url.toString());
     if (!resp.ok) return null;
     const data: unknown = await resp.json();
     if (!Array.isArray(data) || data.length === 0) return null;

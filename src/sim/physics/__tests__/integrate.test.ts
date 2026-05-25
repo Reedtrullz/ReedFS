@@ -5,6 +5,7 @@ import type { Attitude, ControlInputs } from '../../types';
 import type { WindInfo } from '../../weather';
 import { eulerToQuat } from '../quaternion';
 import { KSEA_RUNWAY_ALT_FT } from '../../systems/ground';
+import { computeHeldKeyInputs } from '../../../input/keyboardControls';
 
 const idle: ControlInputs = {
   elevator: 0, aileron: 0, rudder: 0,
@@ -157,6 +158,28 @@ describe('integrate', () => {
     const toga: ControlInputs = { ...idle, throttle1: 1, throttle2: 1, elevator: -1, gearLever: 'UP' };
     for (let i = 0; i < 60; i++) integrate(s, toga, B737_800_SPEC, 1/60);
     expect(s.velocity.u).toBeGreaterThan(30);
+    expect(s.attitude.theta).toBeGreaterThan(0);
+  });
+
+  it('keyboard pitch-up command rotates once takeoff speed builds', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.position.alt = KSEA_RUNWAY_ALT_FT;
+    s.config.gearDown = true;
+    s.config.flapSetting = 5;
+    s.velocity.u = 90;
+    s.engines[0].n1 = 100;
+    s.engines[1].n1 = 100;
+    const keyboardPitchUp: ControlInputs = {
+      ...idle,
+      ...computeHeldKeyInputs(new Set(['w'])),
+      throttle1: 1,
+      throttle2: 1,
+      flapLever: 5,
+      gearLever: 'DOWN',
+    };
+
+    for (let i = 0; i < 90; i++) integrate(s, keyboardPitchUp, B737_800_SPEC, 1 / 60);
+
     expect(s.attitude.theta).toBeGreaterThan(0);
   });
 

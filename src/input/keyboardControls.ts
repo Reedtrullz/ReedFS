@@ -1,6 +1,7 @@
 import type { ControlInputs } from '../sim/types';
 
 const THROTTLE_STEP = 0.05;
+const ELEVATOR_KEY_DEFLECTION = 0.65;
 
 function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value));
@@ -12,7 +13,7 @@ function nextFlapDetent(flaps: number): number {
 
 export function computeHeldKeyInputs(keys: ReadonlySet<string>): Partial<ControlInputs> {
   return {
-    elevator: (keys.has('w') ? -0.4 : 0) + (keys.has('s') ? 0.4 : 0),
+    elevator: (keys.has('w') ? -ELEVATOR_KEY_DEFLECTION : 0) + (keys.has('s') ? ELEVATOR_KEY_DEFLECTION : 0),
     aileron: (keys.has('a') ? -0.5 : 0) + (keys.has('d') ? 0.5 : 0),
     rudder: (keys.has('q') ? -0.5 : 0) + (keys.has('e') ? 0.5 : 0),
     brake: keys.has(' ') ? 1 : 0,

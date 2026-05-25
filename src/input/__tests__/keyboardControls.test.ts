@@ -19,7 +19,7 @@ describe('keyboardControls', () => {
     const keys = new Set(['w', 'd', 'q', ' ']);
 
     expect(computeHeldKeyInputs(keys)).toEqual({
-      elevator: -0.4,
+      elevator: -0.65,
       aileron: 0.5,
       rudder: -0.5,
       brake: 1,
