@@ -4,6 +4,7 @@ import { createInitialState, B737_800_SPEC } from '../../types';
 import type { Attitude, ControlInputs } from '../../types';
 import type { WindInfo } from '../../weather';
 import { eulerToQuat } from '../quaternion';
+import { KSEA_RUNWAY_ALT_FT } from '../../systems/ground';
 
 const idle: ControlInputs = {
   elevator: 0, aileron: 0, rudder: 0,
@@ -80,6 +81,42 @@ describe('integrate', () => {
     integrate(s, idle, B737_800_SPEC, 0.1, null, null, tailwind);
 
     expect(s.velocity.u).toBeGreaterThan(0);
+  });
+
+  it('keeps a stopped gear-down aircraft on the runway instead of sinking below terrain', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.position.alt = KSEA_RUNWAY_ALT_FT;
+    s.velocity.u = 0;
+    s.velocity.v = 0;
+    s.velocity.w = 0;
+    s.config.gearDown = true;
+
+    for (let i = 0; i < 120; i++) {
+      integrate(s, idle, B737_800_SPEC, 1 / 60);
+    }
+
+    expect(s.position.alt).toBeGreaterThanOrEqual(KSEA_RUNWAY_ALT_FT - 0.01);
+    expect(s.velocity.w).toBeGreaterThanOrEqual(0);
+    expect(s.velocity.w).toBeLessThan(0.1);
+  });
+
+  it('keeps full-throttle takeoff roll on the runway before rotation speed', () => {
+    const s = createInitialState(B737_800_SPEC);
+    const takeoffRoll: ControlInputs = {
+      ...idle,
+      throttle1: 1,
+      throttle2: 1,
+      flapLever: 5,
+      gearLever: 'DOWN',
+    };
+
+    for (let i = 0; i < 5 * 60; i++) {
+      integrate(s, takeoffRoll, B737_800_SPEC, 1 / 60);
+    }
+
+    expect(s.position.alt).toBeGreaterThanOrEqual(KSEA_RUNWAY_ALT_FT - 0.01);
+    expect(s.velocity.u).toBeGreaterThan(5);
+    expect(s.config.gearDown).toBe(true);
   });
 
   it('TOGA accelerates and pitches up', () => {

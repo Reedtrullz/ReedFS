@@ -5,6 +5,7 @@ import { updateFuel } from '../systems/fuel';
 import { updateElectrical } from '../systems/electrical';
 import { updateHydraulic } from '../systems/hydraulic';
 import { updateAutopilot } from '../systems/autopilot';
+import { applyGroundContact } from '../systems/ground';
 import { computeLNAV } from '../systems/navigation';
 import { computeVNAV } from '../systems/vnav';
 import { geodeticToEcef, ecefToGeodetic, ecefToEnu, enuToEcef } from './geodesy';
@@ -103,9 +104,15 @@ export function integrate(
   state.position.lon = geo.lon;
   state.position.alt = geo.alt * mToFt(1);
 
+  // ── Ground contact constraint ──
+  // First playable slice: a flat KSEA runway contact solver. This is intentionally
+  // applied after position integration as a post-solve constraint so the existing
+  // free-flight equations and sign conventions remain unchanged.
+  const groundContact = applyGroundContact(state, inputs, dt);
+
   // ── Config ──
   state.config.flapSetting = inputs.flapLever;
-  state.config.gearDown = inputs.gearLever === 'DOWN';
+  state.config.gearDown = groundContact.weightOnWheels ? true : inputs.gearLever === 'DOWN';
   state.config.spoilersDeployed = inputs.spoilers > 0.5;
   state.config.speedBrake = inputs.spoilers;
 
