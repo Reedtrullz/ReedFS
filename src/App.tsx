@@ -5,6 +5,7 @@ import { CesiumViewport } from './viewport/CesiumViewport';
 import { ThreeLayer } from './viewport/ThreeLayer';
 import { Telemetry } from './components/Telemetry';
 import { AttitudeIndicator } from './components/AttitudeIndicator';
+import { ControlsHelp } from './components/ControlsHelp';
 import { useSimLoop } from './hooks/useSimLoop';
 import { useAudioLoop } from './hooks/useAudioLoop';
 import { useSimStore } from './store/simStore';
@@ -172,6 +173,7 @@ export function App() {
       <CloudLayer viewerRef={viewerRef} metar={metarData} />
       <ContrailLayer viewerRef={viewerRef} />
       <Telemetry />
+      <ControlsHelp />
       <AttitudeIndicator />
       <RfsPFD />
       <RfsMCP />

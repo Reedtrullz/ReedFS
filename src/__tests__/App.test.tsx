@@ -206,4 +206,13 @@ describe('App', () => {
     }));
     expect(mockStart).toHaveBeenCalledTimes(1);
   });
+
+  it('shows keyboard controls help', () => {
+    render(<App />);
+
+    expect(screen.getByText('Controls')).toBeTruthy();
+    expect(screen.getByText(/W\/S pitch/i)).toBeTruthy();
+    expect(screen.getByText(/ArrowUp\/ArrowDown throttle/i)).toBeTruthy();
+    expect(screen.getByText(/Space brake/i)).toBeTruthy();
+  });
 });
