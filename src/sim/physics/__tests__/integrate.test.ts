@@ -119,6 +119,19 @@ describe('integrate', () => {
     expect(s.config.gearDown).toBe(true);
   });
 
+  it('brake input decelerates the aircraft during ground roll', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.position.alt = KSEA_RUNWAY_ALT_FT;
+    s.velocity.u = 35;
+    s.config.gearDown = true;
+    const braking: ControlInputs = { ...idle, brake: 1, gearLever: 'DOWN' };
+
+    integrate(s, braking, B737_800_SPEC, 1);
+
+    expect(s.velocity.u).toBeGreaterThanOrEqual(0);
+    expect(s.velocity.u).toBeLessThan(35);
+  });
+
   it('TOGA accelerates and pitches up', () => {
     const s = createInitialState(B737_800_SPEC);
     s.velocity.u = 30;
