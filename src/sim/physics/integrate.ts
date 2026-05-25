@@ -1,5 +1,6 @@
 import type { AircraftState, AircraftSpec, ControlInputs } from '../types';
 import { computeAero } from './aero';
+import { updateEngines } from '../systems/engine';
 import { geodeticToEcef, ecefToGeodetic, ecefToEnu, enuToEcef } from './geodesy';
 import { ftToM, mToFt } from './units';
 
@@ -83,16 +84,12 @@ export function integrate(
   state.position.lon = geo.lon;
   state.position.alt = geo.alt * mToFt(1);
 
-  // ── Engine spool ──
-  const n1Tc = 1.5;
-  state.engines[0].n1 += (inputs.throttle1 * 100 - state.engines[0].n1) * (dt / n1Tc);
-  state.engines[1].n1 += (inputs.throttle2 * 100 - state.engines[1].n1) * (dt / n1Tc);
-  state.engines[0].running = state.engines[0].n1 > 0.5;
-  state.engines[1].running = state.engines[1].n1 > 0.5;
+  // ── Engine system ──
+  updateEngines(state, inputs, spec, dt);
 
   // ── Fuel burn ──
-  const ff = (state.engines[0].n1 + state.engines[1].n1) * 0.15;
-  state.fuel.totalFuel = Math.max(0, state.fuel.totalFuel - (ff / 3600) * dt);
+  const fuelUsed = (state.fuel.fuelFlowTotal / 3600) * dt;
+  state.fuel.totalFuel = Math.max(0, state.fuel.totalFuel - fuelUsed);
   state.grossWeight = spec.emptyWeight + state.fuel.totalFuel;
 
   // ── Config ──
