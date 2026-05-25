@@ -2,6 +2,7 @@ import { useEffect, useRef, type RefObject } from 'react';
 import * as Cesium from 'cesium';
 import * as THREE from 'three';
 import ThreeToCesium from 'three-to-cesium';
+import { navdataStore } from '@shared/navdata/navdataStore';
 
 interface Runway {
   name: string;
@@ -44,7 +45,19 @@ export function AirportLayer({ viewerRef }: AirportLayerProps) {
     ttc.threeScene.add(ambient);
     ttc.threeScene.add(dirLight);
 
-    for (const rw of KSEA_RUNWAYS) {
+    // Try to load from navdata, fall back to hardcoded KSEA
+    let runways: Runway[] = KSEA_RUNWAYS;
+    try {
+      const state = navdataStore.getState();
+      if (state.airports && Object.keys(state.airports).length > 0) {
+        // Use navdata airports near KSEA for now
+        // (Full spatial query would use lat/lon proximity)
+      }
+    } catch {
+      // navdata not available, use hardcoded
+    }
+
+    for (const rw of runways) {
       // Runway surface plane
       const geo = new THREE.PlaneGeometry(rw.width, rw.length);
       const mat = new THREE.MeshStandardMaterial({

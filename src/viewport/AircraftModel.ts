@@ -47,12 +47,48 @@ export function createBoeing737Model(): THREE.Group {
 
   // Engine nacelles
   const engGeo = new THREE.CylinderGeometry(2.2, 2.4, 8, 16);
-  [-6, 6].forEach((x) => {
+  [ -6, 6 ].forEach((x) => {
     const eng = new THREE.Mesh(engGeo, engMat);
     eng.rotation.x = Math.PI / 2;
     eng.position.set(x, -3, -2);
     group.add(eng);
   });
+
+  // Navigation lights (emissive spheres)
+  const leftNav = new THREE.Mesh(
+    new THREE.SphereGeometry(0.5, 8, 8),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  );
+  leftNav.position.set(-18, -1.5, -1);
+  group.add(leftNav);
+
+  const rightNav = new THREE.Mesh(
+    new THREE.SphereGeometry(0.5, 8, 8),
+    new THREE.MeshBasicMaterial({ color: 0x00ff00 }),
+  );
+  rightNav.position.set(18, -1.5, -1);
+  group.add(rightNav);
+
+  const tailNav = new THREE.Mesh(
+    new THREE.SphereGeometry(0.5, 8, 8),
+    new THREE.MeshBasicMaterial({ color: 0xffffff }),
+  );
+  tailNav.position.set(0, 5, -21);
+  group.add(tailNav);
+
+  const beacon = new THREE.Mesh(
+    new THREE.SphereGeometry(0.6, 8, 8),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  );
+  beacon.position.set(0, 4, -5);
+  group.add(beacon);
+
+  const landLight = new THREE.Mesh(
+    new THREE.SphereGeometry(0.4, 8, 8),
+    new THREE.MeshBasicMaterial({ color: 0xffffcc }),
+  );
+  landLight.position.set(0, -2, 20);
+  group.add(landLight);
 
   return group;
 }
