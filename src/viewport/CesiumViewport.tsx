@@ -36,6 +36,12 @@ export function CesiumViewport({ onReady }: CesiumViewportProps) {
       viewer.scene.primitives.add(buildings);
     });
 
+    // Scene enhancements
+    (viewer.scene.globe as any).terrainExaggeration = 1.5;
+    viewer.scene.globe.enableLighting = true;
+    (viewer.scene.globe as any).showWaterEffect = true;
+    if (viewer.scene.skyAtmosphere) viewer.scene.skyAtmosphere.show = true;
+
     viewerRef.current = viewer;
     onReady?.(viewer);
 

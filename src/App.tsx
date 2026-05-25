@@ -15,6 +15,8 @@ import type { MetarData } from './sim/weather';
 import { CloudLayer } from './viewport/CloudLayer';
 import { RfsPFD } from './instruments/RfsPFD';
 import { RfsMCP } from './instruments/RfsMCP';
+import { ContrailLayer } from './viewport/ContrailLayer';
+import { createKseaKpdxFlight } from './sim/flightPlanLoader';
 import { useState } from 'react';
 
 initCesium();
@@ -165,6 +167,7 @@ export function App() {
       <ThreeLayer viewerRef={viewerRef} />
       <AirportLayer viewerRef={viewerRef} />
       <CloudLayer viewerRef={viewerRef} metar={metarData} />
+      <ContrailLayer viewerRef={viewerRef} />
       <Telemetry />
       <AttitudeIndicator />
       <RfsPFD />
@@ -180,7 +183,7 @@ export function App() {
           pointerEvents: 'none',
         }}
       >
-        RFS — Phase 5
+        RFS — Phase 6
       </div>
       <div style={{ position: 'fixed', bottom: 20, left: 20, zIndex: 100, display: 'flex', gap: 8 }}>
         {status === 'stopped' || status === 'paused' ? (
@@ -199,6 +202,24 @@ export function App() {
           style={btnStyle}
         >
           CAM: {camMode.toUpperCase()}
+        </button>
+        <button
+          onClick={() => {
+            const fp = createKseaKpdxFlight();
+            useSimStore.getState().setFlightPlan(fp);
+            const ap = useSimStore.getState().apState;
+            if (ap) {
+              const next = structuredClone(ap);
+              next.truth.lateralActive = 'LNAV' as any;
+              next.truth.verticalActive = 'VNAV' as any;
+              next.truth.thrustActive = 'SPEED' as any;
+              next.truth.autopilotStatus = 'CMD_A' as any;
+              useSimStore.getState().setApState(next);
+            }
+          }}
+          style={btnStyle}
+        >
+          LOAD PLAN
         </button>
       </div>
     </div>

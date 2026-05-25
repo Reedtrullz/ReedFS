@@ -115,6 +115,7 @@ export interface AircraftState {
   grossWeight: number;
   cg: number; // % MAC
   simTime: number; // ms
+  timeOfDay: number; // hours (0-24)
   flightPhase: FlightPhase;
 }
 
@@ -176,6 +177,7 @@ export function createInitialState(spec: AircraftSpec): AircraftState {
     grossWeight: spec.emptyWeight + spec.maxFuel,
     cg: 25,
     simTime: 0,
+    timeOfDay: 12,
     flightPhase: 'PARKED',
   };
 }

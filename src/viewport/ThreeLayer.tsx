@@ -66,7 +66,7 @@ export function ThreeLayer({ viewerRef }: ThreeLayerProps) {
       }
 
       // Update lighting from sun position
-      const sun = computeSunPosition(lat, lon, 12); // noon default
+      const sun = computeSunPosition(lat, lon, aircraft.timeOfDay ?? 12);
       const light = sunLightIntensity(sun.elevation);
       ambient.intensity = light.ambient;
       ambient.color.set(light.color);

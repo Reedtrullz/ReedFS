@@ -82,11 +82,20 @@ vi.mock('cesium', () => ({
         removeEventListener: mockPostRenderRemove,
       },
       screenSpaceCameraController: { enableInputs: true },
+      globe: { enableLighting: true },
+      skyAtmosphere: { show: true },
+      primitives: { add: vi.fn(() => ({})), remove: vi.fn() },
     };
   },
   Cartesian3: { fromDegrees: vi.fn(() => ({ x: 0, y: 0, z: 0 })) },
   Math: { toRadians: (d: number) => (d * Math.PI) / 180 },
   Terrain: { fromWorldTerrain: vi.fn(() => ({})) },
+  Transforms: { eastNorthUpToFixedFrame: vi.fn(() => ({})) },
+  CircleEmitter: class {},
+  ParticleSystem: class {
+    emissionRate = 0;
+    modelMatrix = {};
+  },
   createOsmBuildingsAsync: vi.fn(() => Promise.resolve({})),
 }));
 
@@ -154,6 +163,6 @@ import { App } from '../App';
 describe('App', () => {
   it('renders RFS label', () => {
     render(<App />);
-    expect(screen.getByText('RFS — Phase 5')).toBeTruthy();
+    expect(screen.getByText('RFS — Phase 6')).toBeTruthy();
   });
 });

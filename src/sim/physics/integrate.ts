@@ -132,4 +132,6 @@ export function integrate(
 
   // ── Clock ──
   state.simTime += dt * 1000;
+  // Time of day: 1 hour per 30 real seconds at 1x simulation
+  state.timeOfDay = (state.timeOfDay + dt / 30) % 24;
 }
