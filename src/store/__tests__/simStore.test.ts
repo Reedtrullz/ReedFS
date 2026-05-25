@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useSimStore } from '../simStore';
 import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
+import { KSEA_RUNWAY_ALT_FT } from '../../sim/systems/ground';
 
 function minimalApState(): AutopilotState {
   return {
@@ -73,6 +74,28 @@ describe('useSimStore', () => {
   it('apState starts null', () => expect(useSimStore.getState().apState).toBeNull());
   it('setApState stores autopilot state', () => { useSimStore.getState().setApState(minimalApState()); expect(useSimStore.getState().apState).toBeTruthy(); });
   it('reset clears apState', () => { useSimStore.getState().setApState(minimalApState()); useSimStore.getState().reset(); expect(useSimStore.getState().apState).toBeNull(); });
+
+  it('takeoff roll stays at or above runway elevation through store ticks', () => {
+    const store = useSimStore.getState();
+    store.setInput({
+      throttle1: 1,
+      throttle2: 1,
+      flapLever: 5,
+      gearLever: 'DOWN',
+      brake: 0,
+      elevator: 0,
+    });
+    store.start();
+
+    for (let frame = 0; frame < 5 * 60; frame++) {
+      useSimStore.getState().tick(frame * (1000 / 60));
+    }
+
+    const state = useSimStore.getState().aircraft;
+    expect(state.position.alt).toBeGreaterThanOrEqual(KSEA_RUNWAY_ALT_FT - 0.01);
+    expect(state.velocity.u).toBeGreaterThan(5);
+    expect(state.config.gearDown).toBe(true);
+  });
 
   it('wind does not directly overwrite ground velocity during a tick', () => {
     useSimStore.getState().setWind({ dir: 180, speed: 20 });
