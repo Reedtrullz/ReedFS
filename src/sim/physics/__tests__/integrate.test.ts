@@ -132,6 +132,25 @@ describe('integrate', () => {
     expect(s.velocity.u).toBeLessThan(35);
   });
 
+  it('ignores gear-up command while weight-on-wheels but allows it after liftoff', () => {
+    const onRunway = createInitialState(B737_800_SPEC);
+    onRunway.position.alt = KSEA_RUNWAY_ALT_FT;
+    onRunway.config.gearDown = true;
+    const gearUp: ControlInputs = { ...idle, gearLever: 'UP' };
+
+    integrate(onRunway, gearUp, B737_800_SPEC, 1 / 60);
+
+    expect(onRunway.config.gearDown).toBe(true);
+
+    const airborne = createInitialState(B737_800_SPEC);
+    airborne.position.alt = KSEA_RUNWAY_ALT_FT + 1000;
+    airborne.config.gearDown = true;
+
+    integrate(airborne, gearUp, B737_800_SPEC, 1 / 60);
+
+    expect(airborne.config.gearDown).toBe(false);
+  });
+
   it('TOGA accelerates and pitches up', () => {
     const s = createInitialState(B737_800_SPEC);
     s.velocity.u = 30;
