@@ -156,7 +156,14 @@ export function App() {
   }, []);
 
   const handleTakeoff = () => {
-    setInput({ throttle1: 1, throttle2: 1, elevator: -0.3, gearLever: 'UP', flapLever: 5 });
+    setInput({
+      throttle1: 1,
+      throttle2: 1,
+      elevator: 0,
+      brake: 0,
+      gearLever: 'DOWN',
+      flapLever: 5,
+    });
     start();
   };
 

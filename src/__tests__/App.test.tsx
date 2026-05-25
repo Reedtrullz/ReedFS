@@ -26,6 +26,14 @@ class MockOscillatorNode {
 }
 vi.stubGlobal('OscillatorNode', MockOscillatorNode);
 
+const { mockSetInput, mockStart, mockPause, mockResume, mockReset } = vi.hoisted(() => ({
+  mockSetInput: vi.fn(),
+  mockStart: vi.fn(),
+  mockPause: vi.fn(),
+  mockResume: vi.fn(),
+  mockReset: vi.fn(),
+}));
+
 vi.mock('../store/simStore', () => {
   const state = {
     aircraft: {
@@ -45,11 +53,11 @@ vi.mock('../store/simStore', () => {
     status: 'stopped' as const,
     inputs: { elevator: 0, aileron: 0, rudder: 0, throttle1: 0, throttle2: 0, flapLever: 0, gearLever: 'DOWN' as const, spoilers: 0, brake: 0 },
     tick: vi.fn(),
-    start: vi.fn(),
-    pause: vi.fn(),
-    resume: vi.fn(),
-    reset: vi.fn(),
-    setInput: vi.fn(),
+    start: mockStart,
+    pause: mockPause,
+    resume: mockResume,
+    reset: mockReset,
+    setInput: mockSetInput,
   };
   type MockSimStoreState = typeof state;
   const mock = Object.assign(
@@ -159,7 +167,7 @@ vi.mock('three-to-cesium', () => ({
   })),
 }));
 
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import ThreeToCesium from 'three-to-cesium';
 import { App } from '../App';
 
@@ -181,5 +189,21 @@ describe('App', () => {
     render(<App />);
 
     expect(ThreeToCesium).toHaveBeenCalledTimes(1);
+  });
+
+  it('starts takeoff roll with gear down and neutral elevator', () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'TAKEOFF' }));
+
+    expect(mockSetInput).toHaveBeenCalledWith(expect.objectContaining({
+      throttle1: 1,
+      throttle2: 1,
+      flapLever: 5,
+      gearLever: 'DOWN',
+      elevator: 0,
+      brake: 0,
+    }));
+    expect(mockStart).toHaveBeenCalledTimes(1);
   });
 });
