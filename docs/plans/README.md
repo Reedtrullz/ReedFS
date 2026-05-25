@@ -8,6 +8,7 @@ Current source-of-truth documents:
 - `../physics-invariants.md` — active physics contracts and regression checklist.
 - `../roadmap.md` — prioritized necessary enhancements.
 - `../reviews/2026-05-26-comprehensive-gameplay-review.md` — latest comprehensive gameplay/realism/visual/cockpit audit.
+- `../reviews/templates/playability-dogfood-checklist.md` — browser dogfood checklist/report template for future playable claims.
 - `2026-05-26-rfs-comprehensive-usability-realism-plan.md` — latest comprehensive implementation plan for usability, realism, aircraft visuals, cockpit, UI, and guidance.
 - `2026-05-25-rfs-foundation-stabilization.md` — completed stabilization record.
 
