@@ -325,6 +325,19 @@ Browser verification after the first fix:
 - Within 20 seconds, IAS/GS should continue increasing and not remain zero.
 - RESET + TAKEOFF should repeat deterministically.
 
+## Implementation follow-up
+
+Implemented locally on 2026-05-25:
+
+- High-FPS ground-roll deadlock fixed: takeoff thrust now breaks away from the ground stop epsilon while idle/brake stop behavior remains covered.
+- Added 120/144 Hz takeoff-roll regression coverage plus store-level reset -> second roll coverage.
+- Button copy changed from `TAKEOFF` to `START ROLL`, with explicit `W rotate/nose up` and `G gear after positive rate` guidance.
+- Added takeoff cue text: `TAKEOFF ROLL`, `ROTATE — hold W`, and `POSITIVE RATE — gear up`; cue clears after gear-up.
+- Added `startTakeoffRoll()` store action so the player flow explicitly enters `flightPhase = 'TAKEOFF'`.
+- Keyboard rotate authority and early-climb assist added so a 3-second W hold after the rotate cue produces positive climb and the aircraft stays recoverable after gear-up/release instead of diving below terrain.
+- Browser dogfood passed locally at ~120 FPS: reset -> START ROLL -> accelerate above 30 kt in ~10s -> ROTATE cue -> W rotate -> positive climb -> gear up -> stable early climb -> reset -> START ROLL repeat.
+- Local quality gate passed: `npm run check` with 32 test files and 156 tests passing.
+
 ## Bottom line
 
-The current codebase is closer than the old review, but it is still not playable because the first ground solver slice is too shallow and accidentally frame-rate dependent. Fix the frame-rate deadlock first, then make TAKEOFF a real player flow with visible runway, phase cues, and recoverable camera/control behavior. Do not spend time tuning autopilot or cosmetic details until the player can reliably go from reset -> takeoff roll -> rotate -> positive climb -> reset/retry.
+The P0 player loop is now locally usable for the first time: reset -> START ROLL -> accelerate -> rotate -> positive climb -> gear-up -> reset/retry works at high refresh rates. Remaining playability work should focus on runway/visual references, camera/cockpit quality, richer crash/terrain handling, and a less arcade-like but still stable flight model. Do not claim deployed until CI succeeds and `https://fly.reidar.tech/` is verified.
