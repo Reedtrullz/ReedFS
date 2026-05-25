@@ -67,7 +67,7 @@ vi.mock('three', () => ({
   MeshStandardMaterial: vi.fn(function() {}),
   Mesh: vi.fn(function() {}),
   AmbientLight: vi.fn(function() {}),
-  DirectionalLight: vi.fn(() => ({ position: { set: vi.fn() } })),
+  DirectionalLight: vi.fn(function() { return { position: { set: vi.fn() } }; }),
 }));
 
 vi.mock('three-to-cesium', () => ({
