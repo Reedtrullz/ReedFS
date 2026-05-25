@@ -1,7 +1,7 @@
 import type { ControlInputs } from '../sim/types';
 
 const THROTTLE_STEP = 0.05;
-const ELEVATOR_KEY_DEFLECTION = 0.65;
+const ELEVATOR_KEY_DEFLECTION = 0.5;
 
 function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value));
