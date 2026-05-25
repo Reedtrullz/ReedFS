@@ -5,7 +5,7 @@
     repo_url: 'https://github.com/Reedtrullz/ReedFS.git'
     app_dir: '/home/deploy/rfs'
     container_name: 'rfs'
-    host_port: '3001'
+    host_port: '3005'
     container_port: '80'
     public_domain: 'fly.reidar.tech'
 

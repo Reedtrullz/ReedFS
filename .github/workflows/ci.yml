@@ -75,7 +75,7 @@ jobs:
               echo "Canary healthy, promoting..."
               docker rm -f rfs 2>/dev/null || true
               docker run -d --name rfs --restart unless-stopped \
-                -p 127.0.0.1:3001:80 \
+                -p 127.0.0.1:3005:80 \
                 --memory 256m --cpus 1.0 \
                 --log-driver json-file --log-opt max-size=10m --log-opt max-file=3 \
                 ghcr.io/reedtrullz/rfs:latest
