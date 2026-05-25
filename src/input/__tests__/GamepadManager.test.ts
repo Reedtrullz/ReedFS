@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { readGamepad } from '../GamepadManager';
+import { __resetGamepadStateForTests, readGamepad } from '../GamepadManager';
 
 const originalGetGamepadsDescriptor = Object.getOwnPropertyDescriptor(navigator, 'getGamepads');
 
@@ -22,6 +22,7 @@ describe('readGamepad', () => {
     } else {
       Reflect.deleteProperty(navigator, 'getGamepads');
     }
+    __resetGamepadStateForTests();
   });
 
   it('returns null when Gamepad API is missing', () => {
@@ -54,22 +55,53 @@ describe('readGamepad', () => {
     expect(readGamepad()).toBeNull();
   });
 
-  it('uses the first non-null gamepad slot', () => {
+  it('emits a one-shot clear payload after active inputs return to neutral', () => {
     setGamepads([
-      null,
       {
         axes: [0.2, -0.3, 0.4],
         buttons: Array.from({ length: 8 }, (_, i) => button(i === 7 ? 0.6 : 0)),
       },
     ]);
 
+    const active = readGamepad();
+    expect(active).not.toBeNull();
+    expect(active?.elevator).toBeCloseTo(-0.21, 8);
+    expect(active?.aileron).toBeCloseTo(0.14, 8);
+    expect(active?.rudder).toBeCloseTo(0.2, 8);
+    expect(active?.throttle1).toBeCloseTo(0.8, 8);
+    expect(active?.throttle2).toBeCloseTo(0.8, 8);
+
+    setGamepads([
+      {
+        axes: [0, 0, 0],
+        buttons: Array.from({ length: 8 }, () => button(0)),
+      },
+    ]);
+
+    const cleared = readGamepad();
+    expect(cleared).toEqual({
+      elevator: 0,
+      aileron: 0,
+      rudder: 0,
+      throttle1: 0,
+      throttle2: 0,
+    });
+
+    expect(readGamepad()).toBeNull();
+  });
+
+  it('uses the first non-null gamepad slot', () => {
+    setGamepads([
+      null,
+      {
+        axes: [0.25, 0, 0],
+        buttons: Array.from({ length: 8 }, () => button(0)),
+      },
+    ]);
+
     const result = readGamepad();
-    expect(result).not.toBeNull();
-    expect(result?.elevator).toBeCloseTo(-0.21, 8);
-    expect(result?.aileron).toBeCloseTo(0.14, 8);
-    expect(result?.rudder).toBeCloseTo(0.2, 8);
-    expect(result?.throttle1).toBeCloseTo(0.8, 8);
-    expect(result?.throttle2).toBeCloseTo(0.8, 8);
+    expect(result).toEqual({ aileron: expect.any(Number) });
+    expect(result?.aileron).toBeCloseTo(0.175, 8);
   });
 
   it('returns null for malformed partial gamepad object without throwing', () => {
