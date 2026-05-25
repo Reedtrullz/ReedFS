@@ -2,6 +2,9 @@
 
 > **For Hermes:** Use subagent-driven-development skill to implement this plan task-by-task.
 
+> **Status note (2026-05-25):** Historical implementation plan. Use `../architecture.md` for the current implementation, `../physics-invariants.md` for active flight-model contracts, and `../roadmap.md` for prioritized next work. Do not assume older React version, worker, wind, or phase-status wording below reflects the current app.
+
+
 **Goal:** Add a 6-DOF rigid-body flight model, aircraft systems (engine, fuel), Zustand simulation store, and a telemetry HUD. Sim runs on the main thread via requestAnimationFrame at 60Hz. Phase 1.5 will move physics to a Web Worker.
 
 **Architecture:** Physics modules are pure functions in `src/sim/physics/`. Systems are pure transforms in `src/sim/systems/`. Zustand `useSimStore` holds `AircraftState` and `ControlInputs`. A `useSimLoop` hook drives `integrate()` on each RAF tick. A `Telemetry` HUD overlays live state. RFMS `@shared` types are used for `AutopilotState` and `FlightPlan` — these are read by the autopilot system in Phase 2.

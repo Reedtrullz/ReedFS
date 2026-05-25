@@ -2,6 +2,9 @@
 
 > **For Hermes:** Use subagent-driven-development skill to implement this plan task-by-task.
 
+> **Status note (2026-05-25):** Historical implementation plan. Use `../architecture.md` for the current implementation, `../physics-invariants.md` for active flight-model contracts, and `../roadmap.md` for prioritized next work. Do not assume older React version, worker, wind, or phase-status wording below reflects the current app.
+
+
 **Goal:** Fix the per-frame mesh recreation bottleneck, move physics to a Web Worker for 120Hz simulation, add weather visualization (cloud layers from METAR), dynamic time-of-day lighting, aircraft navigation lights, and load airports from RFMS navdata instead of hardcoded KSEA.
 
 **Architecture:** The physics engine moves to a `Worker` thread at 120Hz with `SharedArrayBuffer` state transfer. The `ThreeLayer` component updates aircraft mesh position/rotation in-place instead of destroying/recreating every frame. Weather visualization renders cloud billboards at METAR-reported altitudes. Sun position computed from lat/lon/time, driving ambient + directional light color/intensity. Aircraft lights are emissive meshes on the 737 model. Airport data loads from RFMS `navdataStore` instead of hardcoded constants.

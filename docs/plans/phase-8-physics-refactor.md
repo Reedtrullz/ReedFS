@@ -2,11 +2,13 @@
 
 > **For Hermes:** Use subagent-driven-development skill to implement this plan task-by-task.
 
+> **Status note (2026-05-25):** Quaternion attitude integration and the swappable aero model foundation are partially implemented and stabilized. The current derivative convention is `dq/dt = 0.5 * q ⊗ ω` for body-axis angular rates. Some larger data-driven FDM/display cleanup work remains in `../roadmap.md`.
+
 **Goal:** Replace Euler angles with quaternions in the state vector (eliminates gimbal lock at ±90° pitch), move Boeing 737-800 aerodynamic coefficients to a JSON data file (enables aircraft swapping), and refactor `integrate.ts` to use swappable module interfaces matching the mscsim pattern.
 
-**Architecture:** The `Attitude` interface changes from `{phi, theta, psi}` to `{q0, q1, q2, q3}` — a unit quaternion representing body-frame orientation relative to NED. Euler angle rates (φ̇, θ̇, ψ̇) are replaced with quaternion derivative (q̇ = 0.5 * ω ⊗ q). Aerodynamic coefficients move from hardcoded `cl0=0.65, clAlpha=5.73` to `src/sim/data/b737.json`. The `computeAero()` function accepts an `AeroModel` interface that can be swapped per aircraft. All display code (Telemetry, PFD, AttitudeIndicator, ThreeLayer) converts quaternion → Euler angles for human-readable output only at the display boundary.
+**Architecture:** The `Attitude` interface changes from `{phi, theta, psi}` to `{q0, q1, q2, q3}` — a unit quaternion representing body-frame orientation relative to NED. Euler angle rates (φ̇, θ̇, ψ̇) are replaced with quaternion derivative (q̇ = 0.5 * q ⊗ ω). Aerodynamic coefficients move from hardcoded `cl0=0.65, clAlpha=5.73` to `src/sim/data/b737.json`. The `computeAero()` function accepts an `AeroModel` interface that can be swapped per aircraft. All display code (Telemetry, PFD, AttitudeIndicator, ThreeLayer) converts quaternion → Euler angles for human-readable output only at the display boundary.
 
-**Tech Stack:** Same — React 18, TypeScript strict, Vite, Zustand.
+**Tech Stack:** Same — React 19, TypeScript strict, Vite 8, Zustand.
 
 **Impact analysis:** This touches `types.ts`, `integrate.ts`, `aero.ts`, `derived.ts`, and 4+ display components. Every file that reads `state.attitude.phi/theta/psi` must change. **This is a high-risk refactor.** Tasks are ordered to minimize breakage: types first → physics → aero → display.
 
@@ -48,7 +50,7 @@ describe('eulerToQuat round-trip', () => {
     const q = eulerToQuat(0, 0, 0);
     const omega = { p: 1, q: 0, r: 0 }; // pure roll
     const qdot = quatDerivative(q, omega);
-    // dq/dt = 0.5 * omega ⊗ q
+    // dq/dt = 0.5 * q ⊗ omega
     expect(qdot.q0).toBeCloseTo(0);
     expect(qdot.q1).toBeCloseTo(0.5); // half roll rate
   });
@@ -106,10 +108,10 @@ export function quatMultiply(a: Quaternion, b: Quaternion): Quaternion {
   };
 }
 
-/** Quaternion derivative: dq/dt = 0.5 * ω ⊗ q where ω = (0, p, q, r) */
+/** Quaternion derivative: dq/dt = 0.5 * q ⊗ ω where ω = (0, p, q, r) */
 export function quatDerivative(q: Quaternion, omega: { p: number; q: number; r: number }): Quaternion {
   const omegaQ: Quaternion = { q0: 0, q1: omega.p, q2: omega.q, q3: omega.r };
-  const result = quatMultiply(omegaQ, q);
+  const result = quatMultiply(q, omegaQ);
   return { q0: result.q0 * 0.5, q1: result.q1 * 0.5, q2: result.q2 * 0.5, q3: result.q3 * 0.5 };
 }
 

@@ -2,6 +2,8 @@
 
 > **For Hermes:** Use subagent-driven-development skill. This is a multi-phase plan — execute one phase at a time, task-by-task within each phase.
 
+> **Status note (2026-05-25):** This is the original target architecture plan, not the current implementation record. The current implementation is documented in `../architecture.md`. In particular, physics currently still runs on the main thread; the worker/SharedArrayBuffer design below remains a future enhancement. The active stack is React 19 + Vite 8.
+
 **Goal:** Build a professional-grade web-based flight simulator that combines the RFMS avionics suite (FMC/CDU, PFD, ND, MCP) with real-time 6-DOF physics, global 3D terrain, atmospheric rendering, aircraft systems, and immersive audio.
 
 **Architecture:** CesiumJS globe + Three.js aircraft layer synchronized via `three-to-cesium`. Physics engine runs in a dedicated Web Worker at 120Hz with SharedArrayBuffer for zero-copy state transfer. Zustand stores bridge the worker state to React UI. RFMS `shared/` layer provides FMC logic, flight plan management, and autopilot types. Input layer abstracts keyboard, gamepad, and MSFS bridge into unified ControlInputs.
@@ -778,8 +780,11 @@ AudioContext
 
 ---
 
-## Immediate Execution: Phase 0 + Phase 1 Start
+## Current execution guidance
 
-I recommend executing Phase 0 first (scaffold + Cesium rendering), then Phase 1 task-by-task. The `three-to-cesium` package handles the hardest integration problem (camera sync between Cesium and Three.js).
+This document is retained as the original long-range concept plan. Do not restart Phase 0 from here. For current work:
 
-Shall I begin executing Phase 0, or would you like to adjust the architecture first?
+1. Use `../architecture.md` to understand the implementation that exists now.
+2. Use `../physics-invariants.md` before touching flight-model code.
+3. Use `../roadmap.md` to choose the next enhancement phase.
+4. Write a focused plan in `docs/plans/` before implementing large migrations.

@@ -184,7 +184,7 @@ export function App() {
           pointerEvents: 'none',
         }}
       >
-        RFS — Phase 7
+        RFS — Flight Test Build
       </div>
       <div style={{ position: 'fixed', bottom: 20, left: 20, zIndex: 100, display: 'flex', gap: 8 }}>
         {status === 'stopped' || status === 'paused' ? (

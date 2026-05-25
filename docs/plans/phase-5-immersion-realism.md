@@ -2,6 +2,9 @@
 
 > **For Hermes:** Use subagent-driven-development skill to implement this plan task-by-task.
 
+> **Status note (2026-05-25):** Historical implementation plan. Use `../architecture.md` for the current implementation, `../physics-invariants.md` for active flight-model contracts, and `../roadmap.md` for prioritized next work. Do not assume older React version, worker, wind, or phase-status wording below reflects the current app.
+
+
 **Goal:** Move physics to a Web Worker for butter-smooth 120Hz simulation, bridge RFMS cockpit instruments (PFD/ND/MCP) to live RFS sim state, add particle effects (contrails, exhaust), animate landing gear compression and control surfaces, enable Cesium 3D buildings, and complete GPWS with all 7 modes.
 
 **Architecture:** Physics runs in a dedicated Worker at 120Hz using `SharedArrayBuffer` for zero-copy state transfer. Cockpit instruments reuse RFMS React components (`PFD`, `ND`, `BoeingMCP`) — their Zustand selectors are remapped to read from `useSimStore` instead of `useFMCStore`. Particles use Cesium `ParticleSystem` for contrails and Three.js sprites for engine exhaust. Gear animation deforms the 3D model's gear meshes based on `gearDown` and ground contact. Cesium OSM Buildings provide 3D city scenery.

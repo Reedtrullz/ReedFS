@@ -2,6 +2,9 @@
 
 > **For Hermes:** Use subagent-driven-development skill to implement this plan task-by-task.
 
+> **Status note (2026-05-25):** Historical implementation plan. Use `../architecture.md` for the current implementation, `../physics-invariants.md` for active flight-model contracts, and `../roadmap.md` for prioritized next work. Do not assume older React version, worker, wind, or phase-status wording below reflects the current app.
+
+
 **Goal:** Scaffold the RFS project with Vite, React, TypeScript, CesiumJS, Three.js, Zustand, and Vitest. Verify by rendering a Cesium globe with a Three.js overlay via `three-to-cesium`.
 
 **Architecture:** Standalone Vite + React + TypeScript project. CesiumJS renders the 3D globe (terrain + imagery via Cesium Ion free tier). Three.js renders aircraft/effects via `three-to-cesium` camera sync. RFMS `shared/` layer is a file: dependency for FMC types. Vitest for unit tests with jsdom environment.

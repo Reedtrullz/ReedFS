@@ -2,6 +2,9 @@
 
 > **For Hermes:** Use subagent-driven-development skill to implement this plan task-by-task.
 
+> **Status note (2026-05-25):** Historical implementation plan. Use `../architecture.md` for the current implementation, `../physics-invariants.md` for active flight-model contracts, and `../roadmap.md` for prioritized next work. Do not assume older React version, worker, wind, or phase-status wording below reflects the current app.
+
+
 **Goal:** Wire the Three.js aircraft proxy to follow live sim state, implement chase/orbit cameras, add KSEA runway rendering, fix the two bugs from the Phase 1 audit (thrust dimension, key-up zeroing).
 
 **Architecture:** The `ThreeLayer` component subscribes to `useSimStore` and updates the aircraft mesh position/orientation each frame. Camera modes (chase, orbit, cockpit) implemented in a `CameraController`. KSEA runways rendered as textured quads on the Cesium globe via `three-to-cesium`.

@@ -2,6 +2,9 @@
 
 > **For Hermes:** Use subagent-driven-development skill to implement this plan task-by-task.
 
+> **Status note (2026-05-25):** Historical implementation plan. Use `../architecture.md` for the current implementation, `../physics-invariants.md` for active flight-model contracts, and `../roadmap.md` for prioritized next work. Do not assume older React version, worker, wind, or phase-status wording below reflects the current app.
+
+
 **Goal:** Activate all dormant systems (autopilot ↔ physics, audio engine, METAR wind, GPWS), add gamepad support, and implement camera modes. Make the sim feel like a complete flight experience.
 
 **Architecture:** The autopilot PID is wired into `integrate()` as the final system step — it reads the current state and overwrites `ControlInputs` that were set by the pilot. A new `useAudioLoop` hook drives engine sounds from N1. Wind from METAR is applied as body-frame velocity components before the aero computation. GPWS monitors altitude/terrain/configuration and posts alerts to the audio engine. Camera modes toggle between chase, cockpit, and tower views.

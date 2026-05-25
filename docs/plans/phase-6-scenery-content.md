@@ -2,6 +2,9 @@
 
 > **For Hermes:** Use subagent-driven-development skill to implement this plan task-by-task.
 
+> **Status note (2026-05-25):** Historical implementation plan. Use `../architecture.md` for the current implementation, `../physics-invariants.md` for active flight-model contracts, and `../roadmap.md` for prioritized next work. Do not assume older React version, worker, wind, or phase-status wording below reflects the current app.
+
+
 **Goal:** Complete the flight sim experience: Web Worker physics for buttery-smooth 120Hz simulation, contrail particle effects, time-of-day progression during flight, multi-airport spawning with navdata, SimBrief flight plan loading with live LNAV/VNAV following, Cesium scene enhancements (terrain exaggeration, water), smooth camera transitions, and a proper speed/altitude tape PFD.
 
 **Architecture:** Physics moves to a Worker with `SharedArrayBuffer` — the last major architectural piece. Contrail particles use Cesium `ParticleSystem`. Time-of-day increments in the physics tick and drives sun position dynamically. Airport data loads from RFMS `NAV_FIXES` with runway geometry. Flight plans parse SimBrief XML/JSON into `FlightPlan` type, stored in simStore, fed to LNAV/VNAV. Camera interpolates between modes over 1 second. PFD renders tapes using SVG.

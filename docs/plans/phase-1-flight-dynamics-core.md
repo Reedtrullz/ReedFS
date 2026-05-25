@@ -2,6 +2,9 @@
 
 > **For Hermes:** Use subagent-driven-development skill to implement this plan task-by-task.
 
+> **Status note (2026-05-25):** Historical implementation plan. Use `../architecture.md` for the current implementation, `../physics-invariants.md` for active flight-model contracts, and `../roadmap.md` for prioritized next work. Do not assume older React version, worker, wind, or phase-status wording below reflects the current app.
+
+
 **Goal:** Scaffold the RFS project with a point-mass flight physics engine, Zustand aircraft state stores, and a 60Hz simulation loop.
 
 **Architecture:** New standalone Vite + React + TypeScript project in `RFS/`. References RFMS `shared/` types via file: dependency for avionics compatibility (AutopilotState, FlightPlan, etc.). Owns its own sim-core (physics engine, aircraft systems) and will grow a Three.js viewport in Phase 2. The simulation runs in the main thread via `requestAnimationFrame` for Phase 1; Web Worker offload considered for Phase 2+ when 3D rendering competes for frame budget.

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="RFS icon">
+  <rect width="512" height="512" rx="96" fill="#020617"/>
+  <circle cx="256" cy="256" r="210" fill="none" stroke="#0f766e" stroke-width="18" opacity="0.85"/>
+  <path d="M72 288h368l-36 48H286l-46 96h-48l24-96H108l-36-48Z" fill="#22d3ee"/>
+  <path d="M248 80h48l42 208h-76L248 80Z" fill="#e2e8f0"/>
+  <path d="M214 288h84l-28 80h-28l-28-80Z" fill="#94a3b8"/>
+  <path d="M146 196h220l-30 46H176l-30-46Z" fill="#38bdf8" opacity="0.9"/>
+  <text x="256" y="468" text-anchor="middle" font-family="Menlo, Consolas, monospace" font-size="58" font-weight="700" fill="#d1fae5">RFS</text>
+</svg>

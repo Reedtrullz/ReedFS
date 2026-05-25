@@ -2,6 +2,9 @@
 
 > **For Hermes:** Use subagent-driven-development skill to implement this plan task-by-task.
 
+> **Status note (2026-05-25):** Historical implementation plan. Use `../architecture.md` for the current implementation, `../physics-invariants.md` for active flight-model contracts, and `../roadmap.md` for prioritized next work. Do not assume older React version, worker, wind, or phase-status wording below reflects the current app.
+
+
 **Goal:** Integrate aircraft systems (engine, fuel, hydraulic, electrical), autopilot PID bridge to RFMS avionics, LNAV/VNAV route following, glTF 3D model, METAR weather, and Web Audio engine sounds into a cohesive flight simulator.
 
 **Architecture:** Systems are pure transform functions in `src/sim/systems/` that run in order within `integrate()`. The autopilot bridge (`src/sim/systems/autopilot.ts`) imports `AutopilotState` and `FlightPlan` from RFMS `@shared` and translates lateral/vertical/thrust modes into PID-driven `ControlInputs`. LNAV computes cross-track error from the flight plan waypoints; VNAV computes required vertical speed from altitude constraints. Audio uses the Web Audio API directly (no libraries). Weather fetches METAR from aviationweather.gov. A glTF 737 model replaces the box proxy.

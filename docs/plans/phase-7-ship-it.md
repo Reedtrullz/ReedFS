@@ -2,6 +2,8 @@
 
 > **For Hermes:** Use subagent-driven-development skill to implement this plan task-by-task.
 
+> **Status note (2026-05-25):** Treat this as a historical/future plan, not a complete description of the current app. Deployment, Docker/GHCR, error boundary, FPS monitor, and manifest basics exist. The physics worker, service-worker PWA setup, bundle splitting, and deeper production polish remain roadmap items. Current architecture is in `../architecture.md`; prioritized follow-up work is in `../roadmap.md`.
+
 **Goal:** Make RFS production-ready: Web Worker physics for buttery-smooth 120Hz simulation, production build optimization with code splitting and lazy loading, PWA manifest + service worker for offline capability, VPS deployment via Ansible + Docker, error boundaries, loading screen, FPS monitor, and comprehensive README.
 
 **Architecture:** Physics moves to a dedicated Worker with `SharedArrayBuffer` — eliminates all main-thread physics jank. Vite build splits Cesium into a separate chunk and lazy-loads the globe. PWA uses `vite-plugin-pwa` matching RFMS conventions. Deployment follows the user's existing Ansible + GHCR pattern from Frontpage/Heimdahl. Error boundaries catch React rendering errors gracefully. Loading screen shows progress while Cesium initializes.
