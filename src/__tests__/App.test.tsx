@@ -1,5 +1,31 @@
 import { describe, it, expect, vi } from 'vitest';
 
+// Mock Web Audio API (not available in jsdom)
+class MockAudioContext {
+  createGain = vi.fn(() => ({ gain: { value: 0 }, connect: vi.fn(), disconnect: vi.fn() }));
+  createOscillator = vi.fn(() => ({
+    type: '',
+    frequency: { value: 0 },
+    connect: vi.fn(),
+    start: vi.fn(),
+    stop: vi.fn(),
+  }));
+  destination = {};
+  state = 'running';
+  close = vi.fn();
+  resume = vi.fn();
+}
+(globalThis as any).AudioContext = MockAudioContext;
+(globalThis as any).speechSynthesis = undefined;
+class MockOscillatorNode {
+  type = '';
+  frequency = { value: 0 };
+  connect = vi.fn();
+  start = vi.fn();
+  stop = vi.fn();
+}
+(globalThis as any).OscillatorNode = MockOscillatorNode;
+
 vi.mock('../store/simStore', () => {
   const state = {
     aircraft: {
@@ -115,6 +141,6 @@ import { App } from '../App';
 describe('App', () => {
   it('renders RFS label', () => {
     render(<App />);
-    expect(screen.getByText('RFS — Phase 1.5')).toBeTruthy();
+    expect(screen.getByText('RFS — Phase 3')).toBeTruthy();
   });
 });

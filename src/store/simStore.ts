@@ -4,6 +4,8 @@ import { createInitialState, B737_800_SPEC } from '../sim/types';
 import { integrate } from '../sim/physics/integrate';
 import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
 import type { FlightPlan } from '@shared/types/fmc';
+import type { WindInfo } from '../sim/weather';
+import { applyWind } from '../sim/systems/environment';
 
 export type SimStatus = 'stopped' | 'running' | 'paused';
 
@@ -15,6 +17,7 @@ export interface SimStore {
   lastFrameTime: number;
   apState: AutopilotState | null;
   flightPlan: FlightPlan | null;
+  wind: WindInfo | null;
   setInput: (partial: Partial<ControlInputs>) => void;
   tick: (timestamp: number) => void;
   start: () => void;
@@ -23,6 +26,7 @@ export interface SimStore {
   reset: () => void;
   setApState: (ap: AutopilotState | null) => void;
   setFlightPlan: (fp: FlightPlan | null) => void;
+  setWind: (w: WindInfo | null) => void;
 }
 
 const defaultInputs: ControlInputs = {
@@ -40,14 +44,18 @@ export const useSimStore = create<SimStore>((set, get) => ({
   lastFrameTime: 0,
   apState: null,
   flightPlan: null,
+  wind: null,
 
   setInput: (partial) => set((s) => ({ inputs: { ...s.inputs, ...partial } })),
 
   tick: (timestamp: number) => {
-    const { status, lastFrameTime, aircraft, inputs, spec, apState, flightPlan } = get();
+    const { status, lastFrameTime, aircraft, inputs, spec, apState, flightPlan, wind } = get();
     if (status !== 'running') return;
     const dt = lastFrameTime > 0 ? Math.min((timestamp - lastFrameTime) / 1000, 0.05) : 1 / 60;
     const state = structuredClone(aircraft);
+    if (wind) {
+      applyWind(state, wind);
+    }
     integrate(state, inputs, spec, dt, apState, flightPlan);
     set({ aircraft: state, lastFrameTime: timestamp });
   },
@@ -66,4 +74,5 @@ export const useSimStore = create<SimStore>((set, get) => ({
 
   setApState: (ap) => set({ apState: ap }),
   setFlightPlan: (fp) => set({ flightPlan: fp }),
+  setWind: (w) => set({ wind: w }),
 }));

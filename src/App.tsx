@@ -7,13 +7,18 @@ import { AirportLayer } from './viewport/AirportLayer';
 import { Telemetry } from './components/Telemetry';
 import { AttitudeIndicator } from './components/AttitudeIndicator';
 import { useSimLoop } from './hooks/useSimLoop';
+import { useAudioLoop } from './hooks/useAudioLoop';
 import { useSimStore } from './store/simStore';
+import { readGamepad } from './input/GamepadManager';
+import { fetchMetar, parseMetarWind } from './sim/weather';
+import { useState } from 'react';
 
 initCesium();
 
 export function App() {
   const viewerRef = useRef<Cesium.Viewer | null>(null);
   useSimLoop();
+  useAudioLoop();
 
   const start = useSimStore((s) => s.start);
   const pause = useSimStore((s) => s.pause);
@@ -73,6 +78,32 @@ export function App() {
     };
   }, [setInput]);
 
+  // Gamepad polling
+  useEffect(() => {
+    let raf: number;
+    const poll = () => {
+      const gpInputs = readGamepad();
+      if (gpInputs) {
+        useSimStore.getState().setInput(gpInputs);
+      }
+      raf = requestAnimationFrame(poll);
+    };
+    raf = requestAnimationFrame(poll);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  // Fetch METAR weather on mount
+  useEffect(() => {
+    fetchMetar('KSEA').then((metar) => {
+      if (metar) {
+        useSimStore.getState().setWind(parseMetarWind(metar));
+      }
+    });
+  }, []);
+
+  // Camera mode
+  const [camMode, setCamMode] = useState<'chase' | 'cockpit' | 'tower'>('chase');
+
   // Chase camera — follows aircraft when sim is running
   useEffect(() => {
     const viewer = viewerRef.current;
@@ -88,14 +119,21 @@ export function App() {
       if (!viewer) { raf = requestAnimationFrame(update); return; }
       const a = useSimStore.getState().aircraft;
       const altM = a.position.alt * 0.3048;
-      viewer.camera.lookAt(
-        Cesium.Cartesian3.fromDegrees(a.position.lon, a.position.lat, altM),
-        new Cesium.HeadingPitchRange(
-          a.attitude.psi - Math.PI, // behind the aircraft
-          Cesium.Math.toRadians(-15), // slightly above
-          300, // 300m behind
-        ),
-      );
+      if (camMode === 'cockpit') {
+        viewer.camera.lookAt(
+          Cesium.Cartesian3.fromDegrees(a.position.lon, a.position.lat, altM + 2),
+          new Cesium.HeadingPitchRange(a.attitude.psi, 0, 5),
+        );
+      } else {
+        viewer.camera.lookAt(
+          Cesium.Cartesian3.fromDegrees(a.position.lon, a.position.lat, altM),
+          new Cesium.HeadingPitchRange(
+            a.attitude.psi - Math.PI, // behind
+            Cesium.Math.toRadians(camMode === 'tower' ? -5 : -15),
+            camMode === 'tower' ? 1500 : 300,
+          ),
+        );
+      }
       raf = requestAnimationFrame(update);
     };
     raf = requestAnimationFrame(update);
@@ -133,7 +171,7 @@ export function App() {
           pointerEvents: 'none',
         }}
       >
-        RFS — Phase 1.5
+        RFS — Phase 3
       </div>
       <div style={{ position: 'fixed', bottom: 20, left: 20, zIndex: 100, display: 'flex', gap: 8 }}>
         {status === 'stopped' || status === 'paused' ? (
@@ -145,6 +183,14 @@ export function App() {
           <button onClick={pause} style={btnStyle}>PAUSE</button>
         )}
         <button onClick={reset} style={btnStyle}>RESET</button>
+        <button
+          onClick={() =>
+            setCamMode((m) => (m === 'chase' ? 'cockpit' : m === 'cockpit' ? 'tower' : 'chase'))
+          }
+          style={btnStyle}
+        >
+          CAM: {camMode.toUpperCase()}
+        </button>
       </div>
     </div>
   );
