@@ -55,4 +55,15 @@ describe('applyGroundContact', () => {
     expect(state.velocity.u).toBeGreaterThanOrEqual(0);
     expect(state.velocity.u).toBeLessThan(20);
   });
+
+  it('prevents runaway nose-down attitude while still on runway contact', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.position.alt = KSEA_RUNWAY_ALT_FT;
+    state.config.gearDown = true;
+    state.attitude.theta = -1.2;
+
+    applyGroundContact(state, idle, 1 / 60);
+
+    expect(state.attitude.theta).toBeGreaterThanOrEqual(0);
+  });
 });

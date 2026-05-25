@@ -162,8 +162,10 @@ describe('integrate', () => {
 
   it('roll input produces negative roll rate', () => {
     const s = createInitialState(B737_800_SPEC);
+    s.position.alt = KSEA_RUNWAY_ALT_FT + 1000;
+    s.config.gearDown = false;
     s.velocity.u = 128.6;
-    const bank: ControlInputs = { ...idle, throttle1: 0.6, throttle2: 0.6, aileron: -1 };
+    const bank: ControlInputs = { ...idle, throttle1: 0.6, throttle2: 0.6, aileron: -1, gearLever: 'UP' };
     for (let i = 0; i < 30; i++) integrate(s, bank, B737_800_SPEC, 1/60);
     expect(s.angularVel.p).toBeLessThan(0);
   });

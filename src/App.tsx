@@ -43,15 +43,17 @@ export function App() {
 
   // Keyboard controls — tracks pressed keys for simultaneous input
   useEffect(() => {
+    const keys = keysRef.current;
+
     const updateFromKeys = () => {
-      setInput(computeHeldKeyInputs(keysRef.current));
+      setInput(computeHeldKeyInputs(keys));
     };
 
     const onKey = (e: KeyboardEvent) => {
       const key = e.key.toLowerCase();
       if (['w', 's', 'a', 'd', 'q', 'e', ' '].includes(key)) {
         if (key === ' ') e.preventDefault();
-        keysRef.current.add(key);
+        keys.add(key);
         updateFromKeys();
         return;
       }
@@ -67,7 +69,7 @@ export function App() {
 
     const onKeyUp = (e: KeyboardEvent) => {
       const key = e.key.toLowerCase();
-      keysRef.current.delete(key);
+      keys.delete(key);
       updateFromKeys();
     };
 
@@ -76,7 +78,7 @@ export function App() {
     return () => {
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('keyup', onKeyUp);
-      keysRef.current.clear();
+      keys.clear();
       setInput({ elevator: 0, aileron: 0, rudder: 0, brake: 0 });
     };
   }, [setInput]);
