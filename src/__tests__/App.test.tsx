@@ -63,13 +63,42 @@ vi.mock('cesium', () => ({
   Terrain: { fromWorldTerrain: vi.fn(() => ({})) },
 }));
 
-vi.mock('three', () => ({
-  BoxGeometry: vi.fn(function() {}),
-  MeshStandardMaterial: vi.fn(function() {}),
-  Mesh: vi.fn(function() {}),
-  AmbientLight: vi.fn(function() {}),
-  DirectionalLight: vi.fn(function() { return { position: { set: vi.fn() } }; }),
-}));
+vi.mock('three', () => {
+  const vec = function () {
+    return { x: 0, y: 0, z: 0, set: vi.fn() };
+  };
+  const rot = function () {
+    return { x: 0, y: 0, z: 0, set: vi.fn() };
+  };
+  return {
+    BoxGeometry: vi.fn(function () {
+      return {};
+    }),
+    PlaneGeometry: vi.fn(function () {
+      return {};
+    }),
+    MeshStandardMaterial: vi.fn(function () {
+      return {};
+    }),
+    Mesh: vi.fn(function () {
+      return { rotation: rot(), position: vec() };
+    }),
+    Group: vi.fn(function () {
+      return {
+        add: vi.fn(),
+        rotation: rot(),
+        position: vec(),
+      };
+    }),
+    AmbientLight: vi.fn(function () {
+      return {};
+    }),
+    DirectionalLight: vi.fn(function () {
+      return { position: vec() };
+    }),
+    DoubleSide: 2,
+  };
+});
 
 vi.mock('three-to-cesium', () => ({
   default: vi.fn(() => ({
