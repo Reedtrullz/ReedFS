@@ -90,5 +90,22 @@ export function createBoeing737Model(): THREE.Group {
   landLight.position.set(0, -2, 20);
   group.add(landLight);
 
+  // Landing gear (simplified boxes)
+  const gearMat = new THREE.MeshStandardMaterial({ color: 0x666666 });
+  const noseGear = new THREE.Mesh(new THREE.BoxGeometry(1, 3, 1), gearMat);
+  noseGear.position.set(0, -4, 18);
+  noseGear.name = 'noseGear';
+  group.add(noseGear);
+
+  const leftMain = new THREE.Mesh(new THREE.BoxGeometry(1, 3, 1), gearMat);
+  leftMain.position.set(-4, -4, -2);
+  leftMain.name = 'leftMainGear';
+  group.add(leftMain);
+
+  const rightMain = new THREE.Mesh(new THREE.BoxGeometry(1, 3, 1), gearMat);
+  rightMain.position.set(4, -4, -2);
+  rightMain.name = 'rightMainGear';
+  group.add(rightMain);
+
   return group;
 }

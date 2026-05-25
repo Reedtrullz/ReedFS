@@ -87,6 +87,7 @@ vi.mock('cesium', () => ({
   Cartesian3: { fromDegrees: vi.fn(() => ({ x: 0, y: 0, z: 0 })) },
   Math: { toRadians: (d: number) => (d * Math.PI) / 180 },
   Terrain: { fromWorldTerrain: vi.fn(() => ({})) },
+  createOsmBuildingsAsync: vi.fn(() => Promise.resolve({})),
 }));
 
 vi.mock('three', () => {
@@ -153,6 +154,6 @@ import { App } from '../App';
 describe('App', () => {
   it('renders RFS label', () => {
     render(<App />);
-    expect(screen.getByText('RFS — Phase 3')).toBeTruthy();
+    expect(screen.getByText('RFS — Phase 5')).toBeTruthy();
   });
 });

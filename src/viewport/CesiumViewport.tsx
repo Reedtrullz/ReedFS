@@ -17,7 +17,6 @@ export function CesiumViewport({ onReady }: CesiumViewportProps) {
 
     const viewer = new Cesium.Viewer(containerRef.current, {
       useDefaultRenderLoop: true,
-      // Minimal UI — we build our own
       animation: false,
       timeline: false,
       baseLayerPicker: false,
@@ -28,12 +27,16 @@ export function CesiumViewport({ onReady }: CesiumViewportProps) {
       sceneModePicker: false,
       selectionIndicator: false,
       navigationHelpButton: false,
-      // Terrain + imagery from Cesium Ion
       terrain: Cesium.Terrain.fromWorldTerrain(),
+    });
+    viewer.scene.screenSpaceCameraController.enableInputs = false;
+
+    // Enable Cesium OSM 3D buildings
+    Cesium.createOsmBuildingsAsync().then((buildings) => {
+      viewer.scene.primitives.add(buildings);
     });
 
     viewerRef.current = viewer;
-    viewer.scene.screenSpaceCameraController.enableInputs = false;
     onReady?.(viewer);
 
     return () => {

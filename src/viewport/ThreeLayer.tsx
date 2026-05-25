@@ -77,6 +77,16 @@ export function ThreeLayer({ viewerRef }: ThreeLayerProps) {
         2000 * Math.cos(sun.azimuth) * Math.cos(sun.elevation),
       );
 
+      // Gear compression animation
+      const onGround = aircraft.position.alt < 100 && aircraft.config.gearDown;
+      if (proxyRef.current) {
+        proxyRef.current.children.forEach((child) => {
+          if (child.name.includes('Gear')) {
+            child.scale.y = onGround ? 0.7 : 1.0;
+          }
+        });
+      }
+
       ttc.update();
     };
 

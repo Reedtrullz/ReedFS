@@ -22,8 +22,27 @@ function checkMode5(state: AircraftState): string | null {
   return null;
 }
 
+function checkMode2(state: AircraftState): string | null {
+  const alt = state.position.alt;
+  const descentRate = -state.velocity.w * 196.85;
+  if (alt < 1500 && descentRate > 3000) return 'TERRAIN';
+  if (alt < 800 && descentRate > 2000) return 'PULL UP';
+  return null;
+}
+
+function checkMode3(state: AircraftState): string | null {
+  if (state.flightPhase === 'TAKEOFF' && state.position.alt < 100) return "DON'T SINK";
+  return null;
+}
+
+function checkMode6(state: AircraftState): string | null {
+  const bankDeg = Math.abs((state.attitude.phi * 180) / Math.PI);
+  if (bankDeg > 35) return 'BANK ANGLE';
+  return null;
+}
+
 export function checkGPWS(state: AircraftState): string | null {
-  return checkMode1(state) ?? checkMode4(state) ?? checkMode5(state);
+  return checkMode1(state) ?? checkMode2(state) ?? checkMode3(state) ?? checkMode4(state) ?? checkMode5(state) ?? checkMode6(state);
 }
 
 let lastAlert = '';

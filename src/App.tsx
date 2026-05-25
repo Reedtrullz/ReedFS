@@ -13,6 +13,8 @@ import { readGamepad } from './input/GamepadManager';
 import { fetchMetar, parseMetarWind } from './sim/weather';
 import type { MetarData } from './sim/weather';
 import { CloudLayer } from './viewport/CloudLayer';
+import { RfsPFD } from './instruments/RfsPFD';
+import { RfsMCP } from './instruments/RfsMCP';
 import { useState } from 'react';
 
 initCesium();
@@ -165,6 +167,8 @@ export function App() {
       <CloudLayer viewerRef={viewerRef} metar={metarData} />
       <Telemetry />
       <AttitudeIndicator />
+      <RfsPFD />
+      <RfsMCP />
       <div
         style={{
           position: 'fixed',
@@ -176,7 +180,7 @@ export function App() {
           pointerEvents: 'none',
         }}
       >
-        RFS — Phase 3
+        RFS — Phase 5
       </div>
       <div style={{ position: 'fixed', bottom: 20, left: 20, zIndex: 100, display: 'flex', gap: 8 }}>
         {status === 'stopped' || status === 'paused' ? (
