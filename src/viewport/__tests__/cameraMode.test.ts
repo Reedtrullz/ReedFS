@@ -6,6 +6,8 @@ describe('shouldAutoFollowCamera', () => {
     expect(shouldAutoFollowCamera('running', 'chase')).toBe(true);
     expect(shouldAutoFollowCamera('running', 'cockpit')).toBe(true);
     expect(shouldAutoFollowCamera('paused', 'chase')).toBe(false);
+    expect(shouldAutoFollowCamera('stopped', 'chase')).toBe(false);
+    expect(shouldAutoFollowCamera('paused', 'cockpit')).toBe(false);
     expect(shouldAutoFollowCamera('stopped', 'cockpit')).toBe(false);
   });
 
