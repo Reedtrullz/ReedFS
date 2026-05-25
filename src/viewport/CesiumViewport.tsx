@@ -45,7 +45,7 @@ export function CesiumViewport({ onReady }: CesiumViewportProps) {
 
     // Scene enhancements
     const globe = viewer.scene.globe as GlobeWithOptionalEffects;
-    globe.terrainExaggeration = 1.5;
+    globe.terrainExaggeration = 1;
     globe.enableLighting = true;
     globe.showWaterEffect = true;
     if (viewer.scene.skyAtmosphere) viewer.scene.skyAtmosphere.show = true;
