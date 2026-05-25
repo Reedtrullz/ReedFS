@@ -17,6 +17,8 @@ import { RfsPFD } from './instruments/RfsPFD';
 import { RfsMCP } from './instruments/RfsMCP';
 import { ContrailLayer } from './viewport/ContrailLayer';
 import { createKseaKpdxFlight } from './sim/flightPlanLoader';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { FPSMonitor } from './components/FPSMonitor';
 import { useState } from 'react';
 
 initCesium();
@@ -154,6 +156,7 @@ export function App() {
   };
 
   return (
+    <ErrorBoundary>
     <div style={{ width: '100%', height: '100%' }}>
       <CesiumViewport
         onReady={(viewer) => {
@@ -183,7 +186,7 @@ export function App() {
           pointerEvents: 'none',
         }}
       >
-        RFS — Phase 6
+        RFS — Phase 7
       </div>
       <div style={{ position: 'fixed', bottom: 20, left: 20, zIndex: 100, display: 'flex', gap: 8 }}>
         {status === 'stopped' || status === 'paused' ? (
@@ -223,6 +226,8 @@ export function App() {
         </button>
       </div>
     </div>
+    <FPSMonitor />
+    </ErrorBoundary>
   );
 }
 

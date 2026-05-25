@@ -163,6 +163,6 @@ import { App } from '../App';
 describe('App', () => {
   it('renders RFS label', () => {
     render(<App />);
-    expect(screen.getByText('RFS — Phase 6')).toBeTruthy();
+    expect(screen.getByText('RFS — Phase 7')).toBeTruthy();
   });
 });
