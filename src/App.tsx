@@ -1,14 +1,19 @@
+import { useRef } from 'react';
 import * as Cesium from 'cesium';
 import { initCesium } from './config/cesium';
 import { CesiumViewport } from './viewport/CesiumViewport';
+import { ThreeLayer } from './viewport/ThreeLayer';
 
 initCesium();
 
 export function App() {
+  const viewerRef = useRef<Cesium.Viewer | null>(null);
+
   return (
     <div style={{ width: '100%', height: '100%' }}>
       <CesiumViewport
         onReady={(viewer) => {
+          viewerRef.current = viewer;
           viewer.camera.flyTo({
             destination: Cesium.Cartesian3.fromDegrees(-122.31, 47.45, 5000),
             orientation: {
@@ -19,6 +24,7 @@ export function App() {
           });
         }}
       />
+      <ThreeLayer viewer={viewerRef.current} />
       <div
         style={{
           position: 'fixed',
