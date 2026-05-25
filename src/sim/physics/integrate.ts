@@ -4,8 +4,13 @@ import { updateEngines } from '../systems/engine';
 import { updateFuel } from '../systems/fuel';
 import { updateElectrical } from '../systems/electrical';
 import { updateHydraulic } from '../systems/hydraulic';
+import { updateAutopilot } from '../systems/autopilot';
+import { computeLNAV } from '../systems/navigation';
+import { computeVNAV } from '../systems/vnav';
 import { geodeticToEcef, ecefToGeodetic, ecefToEnu, enuToEcef } from './geodesy';
 import { ftToM, mToFt } from './units';
+import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
+import type { FlightPlan } from '@shared/types/fmc';
 
 const G = 9.80665;
 
@@ -14,6 +19,8 @@ export function integrate(
   inputs: ControlInputs,
   spec: AircraftSpec,
   dt: number,
+  apState?: AutopilotState | null,
+  flightPlan?: FlightPlan | null,
 ): void {
   // ── Systems (must run before aero so engine/fuel state is current) ──
   updateEngines(state, inputs, spec, dt);
@@ -98,6 +105,30 @@ export function integrate(
   state.config.gearDown = inputs.gearLever === 'DOWN';
   state.config.spoilersDeployed = inputs.spoilers > 0.5;
   state.config.speedBrake = inputs.spoilers;
+
+  // ── Autopilot (overwrites inputs for next frame) ──
+  if (apState && apState.truth.autopilotStatus !== 'OFF') {
+    let targetHeading = state.attitude.psi;
+    let targetAlt = state.position.alt;
+    const targetSpeed = 250;
+
+    // LNAV: compute desired track from flight plan
+    if (apState.truth.lateralActive === 'LNAV' && flightPlan) {
+      const nav = computeLNAV(state, flightPlan, 0);
+      targetHeading = nav.desiredTrack;
+    }
+
+    // VNAV: compute target altitude from flight plan
+    if (apState.truth.verticalActive === 'VNAV' && flightPlan) {
+      const navDefault = { crossTrackError: 0, alongTrackDist: 0, desiredTrack: targetHeading, activeWaypointIndex: 0, waypointReached: false };
+      const vnav = computeVNAV(state, flightPlan, navDefault);
+      if (vnav.altitudeConstraint) {
+        targetAlt = vnav.targetAlt;
+      }
+    }
+
+    updateAutopilot(state, inputs, apState, targetHeading, targetAlt, targetSpeed, dt);
+  }
 
   // ── Clock ──
   state.simTime += dt * 1000;
