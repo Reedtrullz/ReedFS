@@ -41,4 +41,27 @@ describe('computeAero', () => {
     expect(flap.lift).toBeGreaterThan(clean.lift);
     expect(flap.drag).toBeGreaterThan(clean.drag);
   });
+
+  it('orders elevator pitch moments by nose-up command in takeoff configuration', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.velocity.u = 70; // rotation-speed order of magnitude
+    s.config.flapSetting = 5;
+
+    const noseUp = computeAero(s, { ...cruise, elevator: -0.3, throttle1: 0, throttle2: 0 }, B737_800_SPEC);
+    const neutral = computeAero(s, { ...cruise, elevator: 0, throttle1: 0, throttle2: 0 }, B737_800_SPEC);
+    const noseDown = computeAero(s, { ...cruise, elevator: 0.3, throttle1: 0, throttle2: 0 }, B737_800_SPEC);
+
+    expect(noseUp.pitchMoment).toBeGreaterThan(neutral.pitchMoment);
+    expect(noseDown.pitchMoment).toBeLessThan(neutral.pitchMoment);
+  });
+
+  it('full nose-up elevator produces positive pitch moment in takeoff configuration', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.velocity.u = 70;
+    s.config.flapSetting = 5;
+
+    const a = computeAero(s, { ...cruise, elevator: -1, throttle1: 0, throttle2: 0 }, B737_800_SPEC);
+
+    expect(a.pitchMoment).toBeGreaterThan(0);
+  });
 });

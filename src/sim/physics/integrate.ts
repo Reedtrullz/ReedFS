@@ -63,10 +63,10 @@ export function integrate(
   const stht = Math.sin(state.attitude.theta), ctht = Math.cos(state.attitude.theta);
 
   // ── Body velocity update ──
-  // Gravity in body frame
-  const gx = G * stht;
-  const gy = -G * ctht * sphi;
-  const gz = -G * ctht * cphi;
+  // Body axes: x forward, y right, z down. Gravity is positive down in NED.
+  const gx = -G * stht;
+  const gy = G * ctht * sphi;
+  const gz = G * ctht * cphi;
 
   const udot = aero.thrust / mass - aero.drag / mass + gx - q * state.velocity.w + r * state.velocity.v;
   const vdot = aero.side / mass + gy - r * state.velocity.u + p * state.velocity.w;

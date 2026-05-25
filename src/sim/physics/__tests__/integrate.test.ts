@@ -27,13 +27,26 @@ describe('integrate', () => {
     expect(s.attitude.psi).toBeCloseTo(Math.PI, 6);
   });
 
-  it('TOGA accelerates and climbs', () => {
+  it('accelerates downward in freefall at level attitude', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.position.alt = 10000;
+    s.velocity.u = 0;
+    s.velocity.v = 0;
+    s.velocity.w = 0;
+    s.config.gearDown = false;
+
+    integrate(s, idle, B737_800_SPEC, 0.1);
+
+    expect(s.velocity.w).toBeGreaterThan(0); // body/NED down is positive
+  });
+
+  it('TOGA accelerates and pitches up', () => {
     const s = createInitialState(B737_800_SPEC);
     s.velocity.u = 30;
-    const toga: ControlInputs = { ...idle, throttle1: 1, throttle2: 1, elevator: -0.3, gearLever: 'UP' };
+    const toga: ControlInputs = { ...idle, throttle1: 1, throttle2: 1, elevator: -1, gearLever: 'UP' };
     for (let i = 0; i < 60; i++) integrate(s, toga, B737_800_SPEC, 1/60);
     expect(s.velocity.u).toBeGreaterThan(30);
-    expect(s.position.alt).toBeGreaterThan(440);
+    expect(s.attitude.theta).toBeGreaterThan(0);
   });
 
   it('roll input produces negative roll rate', () => {

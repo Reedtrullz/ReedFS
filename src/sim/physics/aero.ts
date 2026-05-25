@@ -5,6 +5,7 @@ import type { AeroModel } from '../systems/AeroModel';
 import { B737_AERO } from '../systems/AeroModel';
 
 const G = 9.80665;
+const MAX_ELEVATOR_DEFLECTION_RAD = 0.3;
 
 export interface AeroResult {
   thrust: number; drag: number; lift: number; side: number; weight: number;
@@ -52,7 +53,8 @@ export function computeAero(state: AircraftState, inputs: ControlInputs, spec: A
 
   // --- Moments ---
   const qHat = state.angularVel.q * c / (2 * Math.max(tasMs, 1));
-  const cm = aeroModel.cm0 + aeroModel.cmAlpha * aoa + aeroModel.cmElevator * inputs.elevator * 0.3 + aeroModel.cmq * qHat - aeroModel.cmFlap * state.config.flapSetting;
+  const elevatorDeflectionRad = inputs.elevator * MAX_ELEVATOR_DEFLECTION_RAD;
+  const cm = aeroModel.cm0 + aeroModel.cmAlpha * aoa + aeroModel.cmElevator * elevatorDeflectionRad + aeroModel.cmq * qHat - aeroModel.cmFlap * state.config.flapSetting;
   const pitchMoment = q * S * c * cm;
 
   const pHat = state.angularVel.p * b / (2 * Math.max(tasMs, 1));
