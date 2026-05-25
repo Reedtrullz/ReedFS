@@ -33,8 +33,10 @@ export function CesiumViewport({ onReady }: CesiumViewportProps) {
 
     // Enable Cesium OSM 3D buildings
     Cesium.createOsmBuildingsAsync().then((buildings) => {
-      viewer.scene.primitives.add(buildings);
-    });
+      if (viewerRef.current && !viewerRef.current.isDestroyed()) {
+        viewerRef.current.scene.primitives.add(buildings);
+      }
+    }).catch(() => {});
 
     // Scene enhancements
     (viewer.scene.globe as any).terrainExaggeration = 1.5;
