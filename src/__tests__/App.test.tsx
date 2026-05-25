@@ -193,7 +193,7 @@ describe('App', () => {
     expect(ThreeToCesium).toHaveBeenCalledTimes(1);
   });
 
-  it('starts takeoff roll from the START ROLL button with gear down and neutral elevator', () => {
+  it('calls startTakeoffRoll from the START ROLL button', () => {
     render(<App />);
 
     fireEvent.click(screen.getByRole('button', { name: 'START ROLL' }));

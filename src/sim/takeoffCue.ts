@@ -11,6 +11,10 @@ export function takeoffCueText(state: AircraftState, iasKt: number): string | nu
 
   const heightAboveRunwayFt = state.position.alt - KSEA_RUNWAY_ALT_FT;
 
+  if (!state.config.gearDown) {
+    return null;
+  }
+
   if (heightAboveRunwayFt >= POSITIVE_RATE_ALT_FT && state.config.gearDown) {
     return 'POSITIVE RATE — gear up';
   }

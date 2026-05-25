@@ -27,6 +27,13 @@ describe('takeoffCueText', () => {
     expect(takeoffCueText(state, iasKt)).toBe('POSITIVE RATE — gear up');
   });
 
+  it('clears takeoff cue after gear up while airborne', () => {
+    const { state } = stateAtIas(155);
+    state.position.alt += 80;
+    state.config.gearDown = false;
+    expect(takeoffCueText(state, 155)).toBeNull();
+  });
+
   it('returns null outside takeoff phase', () => {
     const state = createInitialState(B737_800_SPEC);
     expect(takeoffCueText(state, 0)).toBeNull();
