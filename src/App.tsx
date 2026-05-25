@@ -146,7 +146,7 @@ export function App() {
     };
     raf = requestAnimationFrame(update);
     return () => cancelAnimationFrame(raf);
-  }, []);
+  }, [camMode]);
 
   const handleViewerReady = useCallback((viewer: Cesium.Viewer) => {
     viewerRef.current = viewer;

@@ -1,4 +1,4 @@
-import type { FlightPlan, FlightPlanWaypoint } from '@shared/types/fmc';
+import type { FlightPlan } from '@shared/types/fmc';
 
 export function createDirectFlight(origin: string, destination: string): FlightPlan {
   return {

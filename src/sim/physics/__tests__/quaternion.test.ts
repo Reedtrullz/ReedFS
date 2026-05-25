@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { eulerToQuat, quatToEuler, quatMultiply, quatDerivative, quatNormalize } from '../quaternion';
+import { eulerToQuat, quatToEuler, quatDerivative, quatNormalize } from '../quaternion';
 
 describe('eulerToQuat', () => {
   it('zero attitude is identity quaternion', () => {

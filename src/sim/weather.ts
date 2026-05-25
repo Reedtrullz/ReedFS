@@ -12,6 +12,35 @@ export interface WindInfo {
   speed: number; // knots
 }
 
+type JsonObject = Record<string, unknown>;
+
+function isJsonObject(value: unknown): value is JsonObject {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function numberOrDefault(value: unknown, fallback: number): number {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return fallback;
+}
+
+function visibilityOrDefault(value: unknown, fallback: number): number {
+  if (value === undefined || value === null || value === '') return fallback;
+  const parsed = parseInt(String(value), 10);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function parseClouds(value: unknown): MetarData['clouds'] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(isJsonObject).map((cloud) => ({
+    cover: typeof cloud.cover === 'string' ? cloud.cover : '',
+    base: numberOrDefault(cloud.base, 0) * 100,
+  }));
+}
+
 export function parseMetarWind(m: MetarData): WindInfo {
   return { dir: m.windDir, speed: m.windSpeed };
 }
@@ -22,19 +51,17 @@ export async function fetchMetar(icao: string): Promise<MetarData | null> {
       `https://aviationweather.gov/api/data/metar?ids=${icao}&format=json`,
     );
     if (!resp.ok) return null;
-    const data = await resp.json();
-    if (!data.length) return null;
+    const data: unknown = await resp.json();
+    if (!Array.isArray(data) || data.length === 0) return null;
     const m = data[0];
+    if (!isJsonObject(m)) return null;
     return {
-      windDir: m.wdir ?? 0,
-      windSpeed: m.wspd ?? 0,
-      temperature: m.tmp ?? 15,
-      visibility: m.visib ? parseInt(String(m.visib)) : 9999,
-      clouds: (m.clouds ?? []).map((c: any) => ({
-        cover: c.cover ?? '',
-        base: (c.base ?? 0) * 100,
-      })),
-      qnh: m.altim ?? 1013.25,
+      windDir: numberOrDefault(m.wdir, 0),
+      windSpeed: numberOrDefault(m.wspd, 0),
+      temperature: numberOrDefault(m.tmp, 15),
+      visibility: visibilityOrDefault(m.visib, 9999),
+      clouds: parseClouds(m.clouds),
+      qnh: numberOrDefault(m.altim, 1013.25),
     };
   } catch {
     return null;

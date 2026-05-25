@@ -7,6 +7,11 @@ export interface CesiumViewportProps {
   onReady?: (viewer: Cesium.Viewer) => void;
 }
 
+type GlobeWithOptionalEffects = Cesium.Globe & {
+  terrainExaggeration?: number;
+  showWaterEffect?: boolean;
+};
+
 export function CesiumViewport({ onReady }: CesiumViewportProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<Cesium.Viewer | null>(null);
@@ -39,9 +44,10 @@ export function CesiumViewport({ onReady }: CesiumViewportProps) {
     }).catch(() => {});
 
     // Scene enhancements
-    (viewer.scene.globe as any).terrainExaggeration = 1.5;
-    viewer.scene.globe.enableLighting = true;
-    (viewer.scene.globe as any).showWaterEffect = true;
+    const globe = viewer.scene.globe as GlobeWithOptionalEffects;
+    globe.terrainExaggeration = 1.5;
+    globe.enableLighting = true;
+    globe.showWaterEffect = true;
     if (viewer.scene.skyAtmosphere) viewer.scene.skyAtmosphere.show = true;
 
     viewerRef.current = viewer;

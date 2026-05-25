@@ -31,10 +31,7 @@ export function integrate(
 
   const aero = computeAero(state, inputs, spec);
   const mass = state.grossWeight;
-  const { phi, theta } = state.attitude;
   const { p, q, r } = state.angularVel;
-  const sinPhi = Math.sin(phi), cosPhi = Math.cos(phi);
-  const sinTheta = Math.sin(theta), cosTheta = Math.cos(theta);
 
   // ── Angular acceleration (Euler's equations) ──
   const ixx = spec.ixx, iyy = spec.iyy, izz = spec.izz, ixz = spec.ixz;

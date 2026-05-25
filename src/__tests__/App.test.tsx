@@ -15,8 +15,8 @@ class MockAudioContext {
   close = vi.fn();
   resume = vi.fn();
 }
-(globalThis as any).AudioContext = MockAudioContext;
-(globalThis as any).speechSynthesis = undefined;
+vi.stubGlobal('AudioContext', MockAudioContext);
+vi.stubGlobal('speechSynthesis', undefined);
 class MockOscillatorNode {
   type = '';
   frequency = { value: 0 };
@@ -24,7 +24,7 @@ class MockOscillatorNode {
   start = vi.fn();
   stop = vi.fn();
 }
-(globalThis as any).OscillatorNode = MockOscillatorNode;
+vi.stubGlobal('OscillatorNode', MockOscillatorNode);
 
 vi.mock('../store/simStore', () => {
   const state = {
@@ -51,8 +51,9 @@ vi.mock('../store/simStore', () => {
     reset: vi.fn(),
     setInput: vi.fn(),
   };
+  type MockSimStoreState = typeof state;
   const mock = Object.assign(
-    vi.fn((sel: any) => (sel ? sel(state) : state)),
+    vi.fn((sel?: (storeState: MockSimStoreState) => unknown) => (sel ? sel(state) : state)),
     {
       getState: vi.fn(() => state),
       subscribe: vi.fn(() => vi.fn()),
