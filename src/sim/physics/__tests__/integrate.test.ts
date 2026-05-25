@@ -220,6 +220,21 @@ describe('integrate', () => {
     expect(s.attitude.theta).toBeGreaterThan(0);
   });
 
+  it('keyboard pitch-up command lifts off within three seconds after rotate cue', () => {
+    const s = runTakeoffRollAtHz(120, 20);
+    const keyboardPitchUp: ControlInputs = {
+      ...takeoffRollInputs(),
+      ...computeHeldKeyInputs(new Set(['w'])),
+    };
+
+    for (let i = 0; i < 3 * 120; i++) {
+      integrate(s, keyboardPitchUp, B737_800_SPEC, 1 / 120);
+    }
+
+    expect(s.position.alt).toBeGreaterThan(KSEA_RUNWAY_ALT_FT + 5);
+    expect(s.attitude.theta).toBeGreaterThan(0);
+  });
+
   it('roll input produces negative roll rate', () => {
     const s = createInitialState(B737_800_SPEC);
     s.position.alt = KSEA_RUNWAY_ALT_FT + 1000;
