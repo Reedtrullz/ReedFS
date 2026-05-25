@@ -16,6 +16,7 @@ import { CloudLayer } from './viewport/CloudLayer';
 import { RfsPFD } from './instruments/RfsPFD';
 import { RfsMCP } from './instruments/RfsMCP';
 import { ContrailLayer } from './viewport/ContrailLayer';
+import { shouldAutoFollowCamera, type CameraMode } from './viewport/cameraMode';
 import { createKseaKpdxFlight } from './sim/flightPlanLoader';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { FPSMonitor } from './components/FPSMonitor';
@@ -36,7 +37,7 @@ export function App() {
   const setInput = useSimStore((s) => s.setInput);
 
   const keysRef = useRef(new Set<string>());
-  const [camMode, setCamMode] = useState<'chase' | 'cockpit' | 'tower'>('chase');
+  const [camMode, setCamMode] = useState<CameraMode>('chase');
   const [metarData, setMetarData] = useState<MetarData | null>(null);
 
   // Keyboard controls — tracks pressed keys for simultaneous input
@@ -116,6 +117,10 @@ export function App() {
     const update = () => {
       const viewer = viewerRef.current;
       if (!viewer) { raf = requestAnimationFrame(update); return; }
+      if (!shouldAutoFollowCamera(status, camMode)) {
+        raf = requestAnimationFrame(update);
+        return;
+      }
       const a = useSimStore.getState().aircraft;
       const altM = a.position.alt * 0.3048;
       if (camMode === 'cockpit') {
@@ -137,7 +142,7 @@ export function App() {
     };
     raf = requestAnimationFrame(update);
     return () => cancelAnimationFrame(raf);
-  }, [camMode]);
+  }, [camMode, status]);
 
   const handleViewerReady = useCallback((viewer: Cesium.Viewer) => {
     viewerRef.current = viewer;
