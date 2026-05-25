@@ -20,6 +20,7 @@ export interface SimStore {
   setInput: (partial: Partial<ControlInputs>) => void;
   tick: (timestamp: number) => void;
   start: () => void;
+  startTakeoffRoll: () => void;
   pause: () => void;
   resume: () => void;
   reset: () => void;
@@ -57,6 +58,24 @@ export const useSimStore = create<SimStore>((set, get) => ({
   },
 
   start: () => set({ status: 'running', lastFrameTime: 0 }),
+  startTakeoffRoll: () => set((s) => {
+    const aircraft = structuredClone(s.aircraft);
+    aircraft.flightPhase = 'TAKEOFF';
+    return {
+      aircraft,
+      inputs: {
+        ...s.inputs,
+        throttle1: 1,
+        throttle2: 1,
+        flapLever: 5,
+        gearLever: 'DOWN',
+        brake: 0,
+        elevator: 0,
+      },
+      status: 'running',
+      lastFrameTime: 0,
+    };
+  }),
   pause: () => set({ status: 'paused' }),
   resume: () => set({ status: 'running', lastFrameTime: 0 }),
   reset: () => set({

@@ -86,6 +86,21 @@ describe('useSimStore', () => {
 
   it('starts stopped', () => expect(useSimStore.getState().status).toBe('stopped'));
   it('start → running', () => { useSimStore.getState().start(); expect(useSimStore.getState().status).toBe('running'); });
+  it('startTakeoffRoll sets inputs, running status, and TAKEOFF phase', () => {
+    useSimStore.getState().startTakeoffRoll();
+
+    const state = useSimStore.getState();
+    expect(state.status).toBe('running');
+    expect(state.inputs).toEqual(expect.objectContaining({
+      throttle1: 1,
+      throttle2: 1,
+      flapLever: 5,
+      gearLever: 'DOWN',
+      brake: 0,
+      elevator: 0,
+    }));
+    expect(state.aircraft.flightPhase).toBe('TAKEOFF');
+  });
   it('pause → paused', () => { useSimStore.getState().start(); useSimStore.getState().pause(); expect(useSimStore.getState().status).toBe('paused'); });
   it('setInput partial', () => { useSimStore.getState().setInput({ throttle1: 0.8 }); expect(useSimStore.getState().inputs.throttle1).toBe(0.8); expect(useSimStore.getState().inputs.throttle2).toBe(0); });
   it('tick advances simTime when running', () => { useSimStore.getState().start(); const b = useSimStore.getState().aircraft.simTime; useSimStore.getState().tick(performance.now()); expect(useSimStore.getState().aircraft.simTime).toBeGreaterThanOrEqual(b); });

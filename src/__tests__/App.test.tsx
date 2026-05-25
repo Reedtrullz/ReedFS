@@ -26,9 +26,10 @@ class MockOscillatorNode {
 }
 vi.stubGlobal('OscillatorNode', MockOscillatorNode);
 
-const { mockSetInput, mockStart, mockPause, mockResume, mockReset } = vi.hoisted(() => ({
+const { mockSetInput, mockStart, mockStartTakeoffRoll, mockPause, mockResume, mockReset } = vi.hoisted(() => ({
   mockSetInput: vi.fn(),
   mockStart: vi.fn(),
+  mockStartTakeoffRoll: vi.fn(),
   mockPause: vi.fn(),
   mockResume: vi.fn(),
   mockReset: vi.fn(),
@@ -54,6 +55,7 @@ vi.mock('../store/simStore', () => {
     inputs: { elevator: 0, aileron: 0, rudder: 0, throttle1: 0, throttle2: 0, flapLever: 0, gearLever: 'DOWN' as const, spoilers: 0, brake: 0 },
     tick: vi.fn(),
     start: mockStart,
+    startTakeoffRoll: mockStartTakeoffRoll,
     pause: mockPause,
     resume: mockResume,
     reset: mockReset,
@@ -196,15 +198,7 @@ describe('App', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'START ROLL' }));
 
-    expect(mockSetInput).toHaveBeenCalledWith(expect.objectContaining({
-      throttle1: 1,
-      throttle2: 1,
-      flapLever: 5,
-      gearLever: 'DOWN',
-      elevator: 0,
-      brake: 0,
-    }));
-    expect(mockStart).toHaveBeenCalledTimes(1);
+    expect(mockStartTakeoffRoll).toHaveBeenCalledTimes(1);
   });
 
   it('shows keyboard controls help', () => {

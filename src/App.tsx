@@ -30,7 +30,7 @@ export function App() {
   useSimLoop();
   useAudioLoop();
 
-  const start = useSimStore((s) => s.start);
+  const startTakeoffRoll = useSimStore((s) => s.startTakeoffRoll);
   const pause = useSimStore((s) => s.pause);
   const resume = useSimStore((s) => s.resume);
   const reset = useSimStore((s) => s.reset);
@@ -156,15 +156,7 @@ export function App() {
   }, []);
 
   const handleStartRoll = () => {
-    setInput({
-      throttle1: 1,
-      throttle2: 1,
-      elevator: 0,
-      brake: 0,
-      gearLever: 'DOWN',
-      flapLever: 5,
-    });
-    start();
+    startTakeoffRoll();
   };
 
   return (
