@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 
 // Mock Web Audio API (not available in jsdom)
 class MockAudioContext {
@@ -159,12 +159,27 @@ vi.mock('three-to-cesium', () => ({
   })),
 }));
 
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
+import ThreeToCesium from 'three-to-cesium';
 import { App } from '../App';
 
 describe('App', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
   it('renders RFS label', () => {
     render(<App />);
     expect(screen.getByText('RFS — Flight Test Build')).toBeTruthy();
+  });
+
+  it('uses a single Three/Cesium overlay canvas for the aircraft only', () => {
+    render(<App />);
+
+    expect(ThreeToCesium).toHaveBeenCalledTimes(1);
   });
 });

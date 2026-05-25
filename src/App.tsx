@@ -3,7 +3,6 @@ import * as Cesium from 'cesium';
 import { initCesium } from './config/cesium';
 import { CesiumViewport } from './viewport/CesiumViewport';
 import { ThreeLayer } from './viewport/ThreeLayer';
-import { AirportLayer } from './viewport/AirportLayer';
 import { Telemetry } from './components/Telemetry';
 import { AttitudeIndicator } from './components/AttitudeIndicator';
 import { useSimLoop } from './hooks/useSimLoop';
@@ -166,7 +165,6 @@ export function App() {
     <div style={{ width: '100%', height: '100%' }}>
       <CesiumViewport onReady={handleViewerReady} />
       <ThreeLayer viewerRef={viewerRef} />
-      <AirportLayer viewerRef={viewerRef} />
       <CloudLayer viewerRef={viewerRef} metar={metarData} />
       <ContrailLayer viewerRef={viewerRef} />
       <Telemetry />
