@@ -1,6 +1,7 @@
 // ── 6-DOF State Vector ──
 
 import type { Quaternion } from './physics/quaternion';
+import b737Data from './data/b737.json';
 
 export interface GeoPosition {
   lat: number; // decimal degrees
@@ -183,5 +184,27 @@ export function createInitialState(spec: AircraftSpec): AircraftState {
     simTime: 0,
     timeOfDay: 12,
     flightPhase: 'PARKED',
+  };
+}
+
+export function loadAircraftSpec(): AircraftSpec {
+  const d = b737Data;
+  return {
+    emptyWeight: d.mass.emptyWeight,
+    maxFuel: d.mass.maxFuel,
+    maxTakeoffWeight: d.mass.maxTakeoffWeight,
+    wingArea: d.geometry.wingArea,
+    wingSpan: d.geometry.wingSpan,
+    meanChord: d.geometry.meanChord,
+    maxThrust: d.propulsion.maxThrust,
+    engineCount: d.propulsion.engineCount,
+    vStall: d.performance.stallSpeedClean,
+    maxFlaps: d.performance.maxFlaps,
+    cgLimits: d.mass.cgLimits as [number, number],
+    fuelCapacity: d.mass.fuelCapacity as { center: number; left: number; right: number },
+    ixx: d.inertia.ixx,
+    iyy: d.inertia.iyy,
+    izz: d.inertia.izz,
+    ixz: d.inertia.ixz,
   };
 }
