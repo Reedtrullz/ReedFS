@@ -114,7 +114,7 @@ export interface AircraftConfig {
   spoilersArmed: boolean;
   spoilersDeployed: boolean;
   speedBrake: number; // 0-1
-  stabilizerTrimUnits: number;
+  stabilizerTrimUnits: number; // 0-15, increasing nose-up stabilizer trim
 }
 
 // ── Full Aircraft State ──
@@ -152,6 +152,7 @@ export interface AircraftSpec {
   wingArea: number;       // m²
   wingSpan: number;        // m
   meanChord: number;       // m
+  aerodynamicCenterPercentMac: number; // % MAC, reference point for CG pitch moments
   maxThrust: number;       // lbf per engine, sea level static
   engineCount: number;
   vStall: number;          // knots, clean
@@ -172,6 +173,7 @@ export const B737_800_SPEC: AircraftSpec = {
   wingArea: 124.6,
   wingSpan: 35.8,
   meanChord: 3.96,
+  aerodynamicCenterPercentMac: 25,
   maxThrust: 27300,
   engineCount: 2,
   vStall: 120,
@@ -232,6 +234,7 @@ export function loadAircraftSpec(): AircraftSpec {
     wingArea: d.geometry.wingArea,
     wingSpan: d.geometry.wingSpan,
     meanChord: d.geometry.meanChord,
+    aerodynamicCenterPercentMac: B737_800_SPEC.aerodynamicCenterPercentMac,
     maxThrust: d.propulsion.maxThrust,
     engineCount: d.propulsion.engineCount,
     vStall: d.performance.stallSpeedClean,

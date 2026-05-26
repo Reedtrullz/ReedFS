@@ -1,5 +1,9 @@
 import type { AircraftState, AircraftSpec } from '../types';
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
 export function updateFuel(
   state: AircraftState,
   spec: AircraftSpec,
@@ -21,14 +25,15 @@ export function updateFuel(
   state.zeroFuelWeight = spec.emptyWeight + state.payloadWeight;
   state.grossWeight = state.zeroFuelWeight + state.fuel.totalFuel;
 
-  // CG shift: center tank arm = 22% MAC, wings = 30% MAC, empty aircraft = 25% MAC
-  if (state.fuel.totalFuel > 0 || state.payloadWeight > 0) {
-    const cgCenter = 22, cgWing = 30;
-    const totalMass = state.zeroFuelWeight + state.fuel.totalFuel;
-    state.cg = (
+  // CG shift: center tank arm = 22% MAC, wings = 30% MAC, empty aircraft = zeroFuelCg.
+  const cgCenter = 22, cgWing = 30;
+  const totalMass = state.zeroFuelWeight + state.fuel.totalFuel;
+  if (totalMass > 0) {
+    const calculatedCg = (
       state.zeroFuelWeight * state.zeroFuelCg +
       state.fuel.centerTank * cgCenter +
       (state.fuel.leftTank + state.fuel.rightTank) * cgWing
     ) / totalMass;
+    state.cg = clamp(calculatedCg, spec.cgLimits[0], spec.cgLimits[1]);
   }
 }

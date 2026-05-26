@@ -7,6 +7,12 @@ import type { WindInfo } from '../weather';
 
 const G = 9.80665;
 const MAX_ELEVATOR_DEFLECTION_RAD = 0.3;
+const MIN_STABILIZER_TRIM_UNITS = 0;
+const MAX_STABILIZER_TRIM_UNITS = 15;
+// B737 trim units are a cockpit-scale abstraction here. A full 0→15 sweep is
+// intentionally less powerful than full elevator, but enough to change the
+// hands-off elevator force required for takeoff/climb.
+const STABILIZER_TRIM_CM_PER_UNIT = 0.012;
 // Full keyboard/yoke aft input should rotate the aircraft but not keep adding
 // unlimited nose-up moment after the useful takeoff pitch range. This is force
 // shaping, not a hidden attitude clamp: the integrator still evolves q/theta.
@@ -25,6 +31,26 @@ function effectiveElevatorInput(input: number, pitchRad: number): number {
     1,
   );
   return input * authority;
+}
+
+function finiteOrDefault(value: number, fallback: number): number {
+  return Number.isFinite(value) ? value : fallback;
+}
+
+function stabilizerTrimMomentCoefficient(trimUnits: number): number {
+  const boundedTrimUnits = clamp(finiteOrDefault(trimUnits, 0), MIN_STABILIZER_TRIM_UNITS, MAX_STABILIZER_TRIM_UNITS);
+  return boundedTrimUnits * STABILIZER_TRIM_CM_PER_UNIT;
+}
+
+function cgPitchMomentCoefficient(state: AircraftState, spec: AircraftSpec, cl: number): number {
+  const aerodynamicCenterPercentMac = finiteOrDefault(spec.aerodynamicCenterPercentMac, 25);
+  const cgPercent = clamp(
+    finiteOrDefault(state.cg, aerodynamicCenterPercentMac),
+    spec.cgLimits[0],
+    spec.cgLimits[1],
+  );
+  const cgToAcArmMac = (cgPercent - aerodynamicCenterPercentMac) / 100;
+  return cgToAcArmMac * cl;
 }
 
 function flapPolarForSetting(aeroModel: AeroModel, flapSetting: number): FlapPolar {
@@ -110,7 +136,9 @@ export function computeAero(
   // --- Moments ---
   const qHat = state.angularVel.q * c / (2 * Math.max(tasMs, 1));
   const elevatorDeflectionRad = effectiveElevatorInput(inputs.elevator, state.attitude.theta) * MAX_ELEVATOR_DEFLECTION_RAD;
-  const cm = aeroModel.cm0 + polar.deltaCm + aeroModel.cmAlpha * aoa + aeroModel.cmElevator * elevatorDeflectionRad + aeroModel.cmq * qHat;
+  const cmTrim = stabilizerTrimMomentCoefficient(state.config.stabilizerTrimUnits);
+  const cmCg = cgPitchMomentCoefficient(state, spec, cl);
+  const cm = aeroModel.cm0 + polar.deltaCm + aeroModel.cmAlpha * aoa + aeroModel.cmElevator * elevatorDeflectionRad + cmTrim + cmCg + aeroModel.cmq * qHat;
   const pitchMoment = q * S * c * cm;
 
   const pHat = state.angularVel.p * b / (2 * Math.max(tasMs, 1));

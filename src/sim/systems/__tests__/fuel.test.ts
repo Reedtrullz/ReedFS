@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { updateFuel } from '../fuel';
 import { createInitialState, B737_800_SPEC } from '../../types';
+import { createAircraftStateForScenario, KSEA_TUTORIAL_SCENARIO } from '../../scenarios';
 
 describe('updateFuel', () => {
   it('burns center tank first', () => {
@@ -42,5 +43,24 @@ describe('updateFuel', () => {
     updateFuel(s, B737_800_SPEC, 1);
 
     expect(s.grossWeight).toBeCloseTo(B737_800_SPEC.emptyWeight + s.payloadWeight + s.fuel.totalFuel, 6);
+  });
+
+  it('uses scenario zero-fuel CG when recomputing fuel-weighted CG', () => {
+    const state = createAircraftStateForScenario(B737_800_SPEC, KSEA_TUTORIAL_SCENARIO);
+
+    updateFuel(state, B737_800_SPEC, 0);
+
+    expect(state.zeroFuelCg).not.toBeCloseTo(25, 6);
+    expect(state.cg).toBeCloseTo(KSEA_TUTORIAL_SCENARIO.cgPercent, 6);
+  });
+
+  it('clamps recomputed CG to aircraft limits', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.zeroFuelCg = 99;
+    state.fuel = { totalFuel: 0, fuelFlowTotal: 0, centerTank: 0, leftTank: 0, rightTank: 0 };
+
+    updateFuel(state, B737_800_SPEC, 0);
+
+    expect(state.cg).toBe(B737_800_SPEC.cgLimits[1]);
   });
 });

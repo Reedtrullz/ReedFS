@@ -9,6 +9,7 @@ import { ktToMs } from '../units';
 import { GROUND_CONTACT_EPSILON_FT, KSEA_RUNWAY_ALT_FT } from '../../systems/ground';
 import { computeHeldKeyInputs } from '../../../input/keyboardControls';
 import { runFixedStepScenario, takeoffRollInputs } from '../../__tests__/scenarioHelpers';
+import { createAircraftStateForScenario, KSEA_TUTORIAL_SCENARIO } from '../../scenarios';
 
 const idle: ControlInputs = {
   elevator: 0, aileron: 0, rudder: 0,
@@ -19,6 +20,29 @@ const idle: ControlInputs = {
 function setAttitude(s: ReturnType<typeof createInitialState>, attitude: Attitude): void {
   s.attitude = attitude;
   s.quaternion = eulerToQuat(attitude.phi, attitude.theta, attitude.psi);
+}
+
+function airborneTakeoffConfigState(trimUnits: number): ReturnType<typeof createInitialState> {
+  const state = createInitialState(B737_800_SPEC);
+  const aoaRad = 5 * Math.PI / 180;
+  const speedMs = 75;
+  state.position.alt = KSEA_RUNWAY_ALT_FT + 1000;
+  state.ground = {
+    ...state.ground,
+    aglFt: 1000,
+    weightOnWheels: false,
+    normalForceN: 0,
+    onRunway: false,
+    contact: 'none',
+  };
+  state.velocity.u = speedMs * Math.cos(aoaRad);
+  state.velocity.w = speedMs * Math.sin(aoaRad);
+  state.config.flapSetting = 5;
+  state.config.gearDown = false;
+  state.config.stabilizerTrimUnits = trimUnits;
+  state.cg = 25;
+  state.flightPhase = 'CLIMB';
+  return state;
 }
 
 function runGearDownRotationAfterTakeoffRoll(): ReturnType<typeof createInitialState> {
@@ -49,6 +73,28 @@ describe('integrate', () => {
     integrate(s, idle, B737_800_SPEC, 1 / 60);
 
     expect(s.attitude.psi).toBeCloseTo(Math.PI, 6);
+  });
+
+  it('tutorial takeoff scenario starts with a takeoff-range stabilizer trim setting', () => {
+    const state = createAircraftStateForScenario(B737_800_SPEC, KSEA_TUTORIAL_SCENARIO);
+
+    expect(state.config.flapSetting).toBe(5);
+    expect(state.config.stabilizerTrimUnits).toBeGreaterThanOrEqual(4);
+    expect(state.config.stabilizerTrimUnits).toBeLessThanOrEqual(6);
+  });
+
+  it('takeoff trim creates a stronger hands-off nose-up pitch tendency than zero trim', () => {
+    const untrimmed = airborneTakeoffConfigState(0);
+    const trimmed = airborneTakeoffConfigState(KSEA_TUTORIAL_SCENARIO.stabilizerTrimUnits);
+    const handsOff: ControlInputs = { ...idle, throttle1: 0.7, throttle2: 0.7, flapLever: 5, gearLever: 'UP' };
+
+    for (let i = 0; i < 60; i += 1) {
+      integrate(untrimmed, handsOff, B737_800_SPEC, 1 / 60);
+      integrate(trimmed, handsOff, B737_800_SPEC, 1 / 60);
+    }
+
+    expect(trimmed.angularVel.q).toBeGreaterThan(untrimmed.angularVel.q + 0.005);
+    expect(trimmed.attitude.theta).toBeGreaterThan(untrimmed.attitude.theta);
   });
 
   it('accelerates downward in freefall at level attitude', () => {

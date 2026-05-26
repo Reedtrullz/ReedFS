@@ -18,6 +18,35 @@ function stateAtAoA(aoaDeg: number, speedMs = 90) {
   return s;
 }
 
+function takeoffPitchState(options: { cg: number; trimUnits: number; aoaDeg?: number; speedMs?: number }) {
+  const s = stateAtAoA(options.aoaDeg ?? 5, options.speedMs ?? 75);
+  s.cg = options.cg;
+  s.config.flapSetting = 5;
+  s.config.gearDown = false;
+  s.config.stabilizerTrimUnits = options.trimUnits;
+  return s;
+}
+
+function pitchMomentAt(options: { cg: number; trimUnits: number; elevator: number; aoaDeg?: number; speedMs?: number }): number {
+  return computeAero(
+    takeoffPitchState(options),
+    { ...cruise, elevator: options.elevator, throttle1: 0, throttle2: 0, flapLever: 5, gearLever: 'UP' },
+    B737_800_SPEC,
+  ).pitchMoment;
+}
+
+function elevatorForNeutralPitchMoment(options: { cg: number; trimUnits: number; aoaDeg?: number; speedMs?: number }): number {
+  let low = -1;
+  let high = 1;
+  for (let i = 0; i < 30; i += 1) {
+    const elevator = (low + high) / 2;
+    const pitchMoment = pitchMomentAt({ ...options, elevator });
+    if (pitchMoment > 0) low = elevator;
+    else high = elevator;
+  }
+  return (low + high) / 2;
+}
+
 describe('computeAero', () => {
   it('at rest, thrust and lift near zero', () => {
     const s = createInitialState(B737_800_SPEC);
@@ -135,6 +164,34 @@ describe('computeAero', () => {
     const a = computeAero(s, { ...cruise, elevator: -1, throttle1: 0, throttle2: 0 }, B737_800_SPEC);
 
     expect(a.pitchMoment).toBeGreaterThan(0);
+  });
+
+  it('nose-up stabilizer trim reduces the elevator needed for neutral pitch moment', () => {
+    const noTrimElevator = elevatorForNeutralPitchMoment({ cg: 25, trimUnits: 0 });
+    const takeoffTrimElevator = elevatorForNeutralPitchMoment({ cg: 25, trimUnits: 5 });
+
+    expect(takeoffTrimElevator).toBeGreaterThan(noTrimElevator + 0.08);
+  });
+
+  it('forward CG requires more nose-up elevator than aft CG at the same takeoff trim', () => {
+    const forwardCgElevator = elevatorForNeutralPitchMoment({ cg: 15, trimUnits: 5 });
+    const aftCgElevator = elevatorForNeutralPitchMoment({ cg: 29, trimUnits: 5 });
+
+    expect(forwardCgElevator).toBeLessThan(aftCgElevator - 0.2);
+    expect(forwardCgElevator).toBeLessThan(0);
+  });
+
+  it('aft CG reduces static pitch stability so AoA changes are less self-damping', () => {
+    const forwardLowAoA = pitchMomentAt({ cg: 15, trimUnits: 5, elevator: 0, aoaDeg: 4 });
+    const forwardHighAoA = pitchMomentAt({ cg: 15, trimUnits: 5, elevator: 0, aoaDeg: 8 });
+    const aftLowAoA = pitchMomentAt({ cg: 29, trimUnits: 5, elevator: 0, aoaDeg: 4 });
+    const aftHighAoA = pitchMomentAt({ cg: 29, trimUnits: 5, elevator: 0, aoaDeg: 8 });
+    const forwardSlope = forwardHighAoA - forwardLowAoA;
+    const aftSlope = aftHighAoA - aftLowAoA;
+
+    expect(forwardSlope).toBeLessThan(0);
+    expect(aftSlope).toBeLessThan(0);
+    expect(aftSlope).toBeGreaterThan(forwardSlope + 50_000);
   });
 
   it('orients drag opposite the signed air-relative longitudinal velocity', () => {
