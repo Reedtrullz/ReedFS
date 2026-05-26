@@ -38,10 +38,15 @@ describe('aircraft model animations', () => {
 
     applyAircraftModelAnimations(model, aircraftForAnimation());
 
-    const noseGear = model.getObjectByName('noseGear');
-    expect(noseGear?.scale.z).toBeCloseTo(0.7, 9);
-    expect(noseGear?.scale.x).toBeCloseTo(1, 9);
-    expect(noseGear?.scale.y).toBeCloseTo(1, 9);
+    ['noseGear', 'leftMainGear', 'rightMainGear'].forEach((gearName) => {
+      const gear = model.getObjectByName(gearName);
+      expect(gear?.scale.z).toBeCloseTo(0.7, 9);
+      expect(gear?.scale.x).toBeCloseTo(1, 9);
+      expect(gear?.scale.y).toBeCloseTo(1, 9);
+      gear?.children.forEach((child) => {
+        expect(child.scale.z).toBeCloseTo(1, 9);
+      });
+    });
   });
 
   it('leaves gear uncompressed when airborne or retracted', () => {
