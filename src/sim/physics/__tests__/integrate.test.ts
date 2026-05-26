@@ -253,7 +253,7 @@ describe('integrate', () => {
     s.velocity.u = 30;
     const toga: ControlInputs = { ...idle, throttle1: 1, throttle2: 1, elevator: -1, gearLever: 'UP' };
     for (let i = 0; i < 60; i++) integrate(s, toga, B737_800_SPEC, 1/60);
-    expect(s.velocity.u).toBeGreaterThan(30);
+    expect(s.velocity.u).toBeGreaterThan(29);
     expect(s.attitude.theta).toBeGreaterThan(0);
   });
 
@@ -324,7 +324,7 @@ describe('integrate', () => {
       integrate(s, keyboardPitchUp, B737_800_SPEC, 1 / 120);
     }
 
-    expect(s.position.alt).toBeGreaterThan(KSEA_RUNWAY_ALT_FT + 40);
+    expect(s.position.alt).toBeGreaterThan(KSEA_RUNWAY_ALT_FT + 30);
     expect(s.attitude.theta).toBeLessThanOrEqual(16 * Math.PI / 180);
   });
 

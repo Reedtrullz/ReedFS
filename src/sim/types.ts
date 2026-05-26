@@ -73,7 +73,7 @@ export interface EngineState {
   n2: number;        // % (0-110)
   egt: number;       // °C
   fuelFlow: number;  // kg/hr per engine
-  thrust: number;    // lbf
+  thrust: number;    // N
   running: boolean;
 }
 

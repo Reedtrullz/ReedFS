@@ -1,4 +1,26 @@
 import type { AircraftState, AircraftSpec, ControlInputs } from '../types';
+import { isaAtAltitude } from '../physics/atmosphere';
+import { lbfToN } from '../physics/units';
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+function machFromState(state: AircraftState): number {
+  const speedMs = Math.sqrt(state.velocity.u ** 2 + state.velocity.v ** 2 + state.velocity.w ** 2);
+  return speedMs / isaAtAltitude(state.position.alt).speedOfSound;
+}
+
+export function computeEngineThrustN(n1Percent: number, spec: AircraftSpec, altitudeFt: number, mach: number): number {
+  const atmo = isaAtAltitude(altitudeFt);
+  const rhoRatio = clamp(atmo.density / 1.225, 0, 1.05);
+  const n1 = clamp(n1Percent, 0, 110) / 100;
+  const baseStaticThrustN = lbfToN(spec.maxThrust) * n1 * n1;
+  const densityLapse = Math.pow(rhoRatio, 0.7);
+  const machLapse = clamp(1 - 0.35 * Math.max(0, mach - 0.2) - 0.9 * Math.max(0, mach - 0.75) ** 2, 0.5, 1);
+
+  return baseStaticThrustN * densityLapse * machLapse;
+}
 
 /**
  * Twin-spool turbofan engine model.
@@ -13,6 +35,7 @@ export function updateEngines(
   spec: AircraftSpec,
   dt: number,
 ): void {
+  const mach = machFromState(state);
   // Internal sub-stepping for numerical stability with large dt
   const subSteps = Math.max(1, Math.ceil(dt / 0.1));
   const subDt = dt / subSteps;
@@ -40,11 +63,11 @@ export function updateEngines(
       // EGT: driven by N2 (~350°C idle, ~950°C TOGA)
       eng.egt = eng.n2 > 5 ? 350 + eng.n2 * 5.5 - (eng.n2 > 80 ? (eng.n2 - 80) * 2 : 0) : 20;
 
-      // Fuel flow (kg/hr): SFC-based
-      const thrustLbf = spec.maxThrust * (eng.n1 / 100) * (eng.n1 / 100);
+      // Fuel flow (kg/hr): SFC-based, using the same thrust source exposed to physics.
+      eng.thrust = computeEngineThrustN(eng.n1, spec, state.position.alt, mach);
+      const thrustLbf = eng.thrust / lbfToN(1);
       const sfc = 0.55; // lb fuel per lb thrust per hour (approximate cruise SFC)
       eng.fuelFlow = sfc * thrustLbf * 0.4536; // lb/hr → kg/hr
-      eng.thrust = thrustLbf;
       eng.running = eng.n1 > 0.5;
     }
   }

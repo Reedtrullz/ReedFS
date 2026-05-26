@@ -1,6 +1,5 @@
 import type { AircraftState, AircraftSpec, ControlInputs } from '../types';
 import { isaAtAltitude } from './atmosphere';
-import { lbfToN } from './units';
 import { computeAirRelativeVelocity } from '../systems/environment';
 import type { AeroModel, FlapPolar } from '../systems/AeroModel';
 import { B737_AERO } from '../systems/AeroModel';
@@ -106,11 +105,7 @@ export function computeAero(
   const weight = state.grossWeight * G;
 
   // --- Thrust ---
-  const n1Avg = (state.engines[0].n1 + state.engines[1].n1) / 200;
-  const rhoRatio = atmo.density / 1.225;
-  const staticThrust = lbfToN(spec.maxThrust) * Math.max(n1Avg, 0);
-  const ramFactor = 1 + 0.15 * mach;
-  const thrust = staticThrust * Math.pow(rhoRatio, 0.7) * ramFactor * spec.engineCount;
+  const thrust = state.engines[0].thrust + state.engines[1].thrust;
 
   // --- Moments ---
   const qHat = state.angularVel.q * c / (2 * Math.max(tasMs, 1));

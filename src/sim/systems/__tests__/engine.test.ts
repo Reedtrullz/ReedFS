@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { updateEngines } from '../engine';
+import { computeEngineThrustN, updateEngines } from '../engine';
 import { createInitialState, B737_800_SPEC } from '../../types';
 import type { ControlInputs } from '../../types';
 
@@ -24,6 +24,26 @@ describe('updateEngines', () => {
     s.engines[0].n1 = 90; s.engines[0].running = true;
     updateEngines(s, { ...idle, throttle1: 0.9, throttle2: 0.9 }, B737_800_SPEC, 0);
     expect(s.engines[0].fuelFlow).toBeGreaterThan(100);
+  });
+
+  it('thrust lapses with altitude and high Mach instead of using positive ram boost', () => {
+    const seaLevel = computeEngineThrustN(90, B737_800_SPEC, 0, 0.2);
+    const highAltitude = computeEngineThrustN(90, B737_800_SPEC, 35_000, 0.2);
+    const highMach = computeEngineThrustN(90, B737_800_SPEC, 0, 0.82);
+
+    expect(highAltitude).toBeLessThan(seaLevel * 0.65);
+    expect(highMach).toBeLessThan(seaLevel);
+    expect(highMach).toBeGreaterThan(seaLevel * 0.5);
+  });
+
+  it('stores lagged per-engine thrust in newtons from the shared thrust model', () => {
+    const s = createInitialState(B737_800_SPEC);
+    updateEngines(s, { ...idle, throttle1: 1, throttle2: 1 }, B737_800_SPEC, 1);
+
+    const expected = computeEngineThrustN(s.engines[0].n1, B737_800_SPEC, s.position.alt, 0);
+    expect(s.engines[0].thrust).toBeGreaterThan(0);
+    expect(s.engines[0].thrust).toBeLessThan(computeEngineThrustN(100, B737_800_SPEC, s.position.alt, 0));
+    expect(s.engines[0].thrust).toBeCloseTo(expected, 6);
   });
 
   it('N1 spools down slower than up', () => {

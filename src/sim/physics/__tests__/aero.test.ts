@@ -33,6 +33,7 @@ describe('computeAero', () => {
     s.velocity.w = Math.tan(4 * Math.PI / 180) * s.velocity.u; // representative cruise AoA
     s.position.alt = 35000;
     s.engines[0].n1 = 90; s.engines[1].n1 = 90;
+    s.engines[0].thrust = 45_000; s.engines[1].thrust = 45_000;
     s.engines[0].running = s.engines[1].running = true;
     const a = computeAero(s, cruise, B737_800_SPEC);
     const weightN = s.grossWeight * 9.80665;
@@ -40,6 +41,19 @@ describe('computeAero', () => {
     expect(a.lift).toBeLessThan(weightN * 2.5);
     expect(a.drag).toBeGreaterThan(0);
     expect(a.thrust).toBeGreaterThan(10000);
+  });
+
+  it('uses engine-system thrust as the single thrust source', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.velocity.u = 100;
+    s.engines[0].n1 = 0;
+    s.engines[1].n1 = 0;
+    s.engines[0].thrust = 12_345;
+    s.engines[1].thrust = 23_456;
+
+    const a = computeAero(s, { ...cruise, throttle1: 1, throttle2: 1 }, B737_800_SPEC);
+
+    expect(a.thrust).toBeCloseTo(35_801, 6);
   });
 
   it('flaps increase lift and drag', () => {
