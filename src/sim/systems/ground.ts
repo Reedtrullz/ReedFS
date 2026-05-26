@@ -18,6 +18,8 @@ const MAX_NOSEWHEEL_STEERING_RAD = 45 * Math.PI / 180;
 const STEERING_FADE_START_MPS = 30;
 const STEERING_FADE_END_MPS = 70;
 const LATERAL_SCRUB_DAMPING_PER_SECOND = 0.9;
+const TOUCHDOWN_MIN_SINK_RATE_MPS = 0.25;
+const TOUCHDOWN_ANGULAR_DAMPING = 0.35;
 
 export type GroundContactResult = GroundState;
 
@@ -54,17 +56,24 @@ function setGroundState(
   weightOnWheels: boolean,
   normalForceN: number,
   gearStationsOverride?: GearStationState[],
+  touchdownSinkRateMps?: number,
 ): GroundState {
   const aglFt = Math.max(0, state.position.alt - groundAltFt);
   const gearStations = gearStationsOverride ?? createB737GearStations(
     contact === 'gear' && weightOnWheels ? normalForceN : 0,
     contact === 'gear' && weightOnWheels,
   );
+  const lastTouchdownSinkRateMps = touchdownSinkRateMps !== undefined
+    ? touchdownSinkRateMps
+    : contact === 'gear' && weightOnWheels
+      ? state.ground.lastTouchdownSinkRateMps
+      : 0;
   const ground: GroundState = {
     aglFt,
     groundAltFt,
     weightOnWheels,
     normalForceN,
+    lastTouchdownSinkRateMps,
     onRunway: contact !== 'none',
     contact,
     gearStations,
@@ -118,6 +127,13 @@ function wheelBaseM(gearStations: GearStationState[]): number {
   if (!nose || mains.length === 0) return 18;
   const mainX = mains.reduce((sum, station) => sum + station.positionBodyM.x, 0) / mains.length;
   return Math.max(1, nose.positionBodyM.x - mainX);
+}
+
+function applyTouchdownDamping(state: AircraftState, sinkRateMps: number): void {
+  if (sinkRateMps < TOUCHDOWN_MIN_SINK_RATE_MPS) return;
+  state.angularVel.p *= TOUCHDOWN_ANGULAR_DAMPING;
+  state.angularVel.q *= TOUCHDOWN_ANGULAR_DAMPING;
+  state.angularVel.r *= TOUCHDOWN_ANGULAR_DAMPING;
 }
 
 function applyNosewheelSteering(
@@ -189,6 +205,7 @@ export function applyGroundContact(
   const gearAvailableForContact = state.config.gearDown || inputs.gearLever === 'DOWN';
   const atOrBelowGround = state.position.alt <= groundAltFt + GROUND_CONTACT_EPSILON_FT;
   const runwayDownMps = bodyToNed(state.velocity, state.attitude).down;
+  const touchdownSinkRateMps = !state.ground.weightOnWheels && runwayDownMps > 0 ? runwayDownMps : undefined;
 
   if (!atOrBelowGround) {
     return setGroundState(state, groundAltFt, 'none', false, 0);
@@ -216,9 +233,10 @@ export function applyGroundContact(
   state.config.gearDown = true;
 
   stabilizeGroundAttitude(state);
+  applyTouchdownDamping(state, touchdownSinkRateMps ?? 0);
   loadedGearStations = applyNosewheelSteering(state, inputs, dt, loadedGearStations);
   applyLongitudinalGroundDecel(state, inputs, dt, loadedGearStations);
   constrainRunwayNormalVelocity(state);
 
-  return setGroundState(state, groundAltFt, 'gear', true, gearNormalForceN, loadedGearStations);
+  return setGroundState(state, groundAltFt, 'gear', true, gearNormalForceN, loadedGearStations, touchdownSinkRateMps);
 }

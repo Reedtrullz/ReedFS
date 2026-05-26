@@ -72,6 +72,7 @@ export interface GroundState {
   groundAltFt: number;
   weightOnWheels: boolean;
   normalForceN: number;
+  lastTouchdownSinkRateMps: number;
   onRunway: boolean;
   contact: GroundContactType;
   gearStations: GearStationState[];
@@ -298,6 +299,7 @@ export function createInitialState(spec: AircraftSpec): AircraftState {
       groundAltFt: initialAltFt,
       weightOnWheels: true,
       normalForceN: grossWeight * 9.80665,
+      lastTouchdownSinkRateMps: 0,
       onRunway: true,
       contact: 'gear',
       gearStations: createB737GearStations(grossWeight * 9.80665, true),

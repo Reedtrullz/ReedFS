@@ -206,6 +206,7 @@ export function createAircraftStateForScenario(spec: AircraftSpec, scenario: Fli
     groundAltFt: scenario.runway.elevationFt,
     weightOnWheels: true,
     normalForceN: grossWeight * 9.80665,
+    lastTouchdownSinkRateMps: 0,
     onRunway: true,
     contact: 'gear',
     gearStations: createB737GearStations(grossWeight * 9.80665, true),

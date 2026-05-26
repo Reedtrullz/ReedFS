@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { integrate } from '../integrate';
-import { createInitialState, B737_800_SPEC } from '../../types';
+import { createInitialState, B737_800_SPEC, createB737GearStations } from '../../types';
 import type { Attitude, ControlInputs } from '../../types';
 import type { WindInfo } from '../../weather';
 import { eulerToQuat } from '../quaternion';
@@ -273,6 +273,60 @@ describe('integrate', () => {
 
     expect(s.velocity.u).toBeGreaterThanOrEqual(0);
     expect(s.velocity.u).toBeLessThan(35);
+  });
+
+  it('touches down into a damped rollout and decelerates on brakes', () => {
+    const s = createInitialState(B737_800_SPEC);
+    const approachPitchRad = 2 * Math.PI / 180;
+    const targetSinkRateMps = 1.6;
+    setAttitude(s, { phi: 0, theta: approachPitchRad, psi: Math.PI });
+    s.flightPhase = 'APPROACH';
+    s.position.alt = KSEA_RUNWAY_ALT_FT + 1;
+    s.ground = {
+      ...s.ground,
+      aglFt: 1,
+      weightOnWheels: false,
+      normalForceN: 0,
+      lastTouchdownSinkRateMps: 0,
+      onRunway: false,
+      contact: 'none',
+      gearStations: createB737GearStations(0, false),
+    };
+    s.config.gearDown = true;
+    s.config.flapSetting = 30;
+    s.velocity.u = ktToMs(118);
+    s.velocity.v = 0;
+    s.velocity.w = (targetSinkRateMps + Math.sin(approachPitchRad) * s.velocity.u) / Math.cos(approachPitchRad);
+
+    const rollout: ControlInputs = {
+      ...idle,
+      flapLever: 30,
+      gearLever: 'DOWN',
+      spoilers: 1,
+      brake: 0.7,
+    };
+
+    let touchedDown = false;
+    let touchdownSpeedMps = 0;
+    let touchdownSinkRateMps = 0;
+    for (let i = 0; i < 15 * 120; i += 1) {
+      integrate(s, rollout, B737_800_SPEC, 1 / 120);
+      if (!touchedDown && s.ground.weightOnWheels) {
+        touchedDown = true;
+        touchdownSpeedMps = s.velocity.u;
+        touchdownSinkRateMps = s.ground.lastTouchdownSinkRateMps;
+      }
+    }
+
+    const derived = computeDerived(s);
+    expect(touchedDown).toBe(true);
+    expect(touchdownSinkRateMps).toBeGreaterThan(0.5);
+    expect(touchdownSinkRateMps).toBeLessThan(4);
+    expect(s.ground.weightOnWheels).toBe(true);
+    expect(s.flightPhase).toBe('LANDED');
+    expect(s.position.alt).toBeCloseTo(KSEA_RUNWAY_ALT_FT, 1);
+    expect(s.velocity.u).toBeLessThan(touchdownSpeedMps - 10);
+    expect(Math.abs(derived.vs)).toBeLessThan(300);
   });
 
   it('ignores gear-up command while weight-on-wheels but allows it after liftoff', () => {

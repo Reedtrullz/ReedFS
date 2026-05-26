@@ -157,6 +157,33 @@ describe('applyGroundContact', () => {
     expect(state.velocity.w).toBeGreaterThan(0);
   });
 
+  it('damps touchdown sink rate and angular rates on first gear contact', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.ground = {
+      ...state.ground,
+      weightOnWheels: false,
+      normalForceN: 0,
+      onRunway: false,
+      contact: 'none',
+      gearStations: createB737GearStations(0, false),
+    };
+    state.position.alt = KSEA_RUNWAY_ALT_FT - 1;
+    state.velocity.u = 65;
+    state.velocity.w = 3;
+    state.angularVel.p = 0.4;
+    state.angularVel.q = -0.6;
+    state.angularVel.r = 0.2;
+
+    const contact = applyGroundContact(state, idle, 1 / 120);
+
+    expect(contact.weightOnWheels).toBe(true);
+    expect(contact.lastTouchdownSinkRateMps).toBeCloseTo(3, 6);
+    expect(bodyToNed(state.velocity, state.attitude).down).toBeCloseTo(0, 8);
+    expect(Math.abs(state.angularVel.p)).toBeLessThan(0.4);
+    expect(Math.abs(state.angularVel.q)).toBeLessThan(0.6);
+    expect(Math.abs(state.angularVel.r)).toBeLessThan(0.2);
+  });
+
   it('maps rudder command to nosewheel steering at taxi speed and fades it out at takeoff speed', () => {
     expect(computeNosewheelSteeringAngleRad({ ...idle, rudder: 1 }, 5)).toBeGreaterThan(0.6);
     expect(computeNosewheelSteeringAngleRad({ ...idle, rudder: -1 }, 5)).toBeLessThan(-0.6);

@@ -35,6 +35,16 @@ function updateTakeoffPhase(state: AircraftState): void {
   }
 }
 
+function updateLandingPhase(state: AircraftState): void {
+  if (
+    (state.flightPhase === 'APPROACH' || state.flightPhase === 'DESCENT') &&
+    state.ground.weightOnWheels &&
+    state.ground.contact === 'gear'
+  ) {
+    state.flightPhase = 'LANDED';
+  }
+}
+
 function estimateNormalForceN(state: AircraftState, aero: { lift: number; thrust: number; weight: number }): number {
   const verticalThrustN = aero.thrust * Math.sin(state.attitude.theta);
   return clamp(aero.weight - aero.lift - verticalThrustN, 0, aero.weight);
@@ -161,6 +171,7 @@ export function integrate(
   state.config.spoilersDeployed = controls.spoilers > 0.5;
   state.config.speedBrake = controls.spoilers;
   updateTakeoffPhase(state);
+  updateLandingPhase(state);
 
   // ── Clock ──
   state.simTime += dt * 1000;
