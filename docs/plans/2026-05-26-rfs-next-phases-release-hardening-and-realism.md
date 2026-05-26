@@ -8,6 +8,10 @@
 
 **Tech Stack:** React 19, TypeScript strict, Vite 8, Vitest 4, Zustand 5, CesiumJS, Three.js, three-to-cesium, Web Audio, optional Playwright visual tests, RFMS shared types.
 
+## Current execution status
+
+This plan has now been executed through Task 10.4 in the local repository. The release-hardening dogfood proof is recorded in `docs/reviews/2026-05-26-rfs-release-hardening-playability-review.md`. Current follow-ups moved back to `docs/roadmap.md`: phase-gated route/AP engagement, debug overlay crowding, and save/load resume policy.
+
 ---
 
 ## Current baseline

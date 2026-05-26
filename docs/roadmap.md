@@ -2,12 +2,13 @@
 
 This roadmap lists the enhancements that remain after the foundation stabilization and first gameplay/usability productization pass. It is ordered by dependency and risk: finish gear/tire physics and guidance fidelity, then worker timing, visual regression/release hardening, data quality, and immersion.
 
-Latest comprehensive gameplay/cockpit/realism audit and implementation plan:
+Latest comprehensive gameplay/cockpit/realism audit, implementation plan, and release-hardening dogfood report:
 
 - `docs/reviews/2026-05-26-comprehensive-gameplay-review.md`
 - `docs/plans/2026-05-26-rfs-comprehensive-usability-realism-plan.md`
+- `docs/reviews/2026-05-26-rfs-release-hardening-playability-review.md`
 
-As of the current repository state, phases 0 through 5.5 of the 2026-05-26 plan are implemented and tested. Phase 6 release-hardening tasks remain pending.
+As of the current repository state, the release-hardening/playability sequence through Task 10.4 is implemented and locally dogfooded. The remaining roadmap is now advanced realism, AP/route phase honesty, visual/layout polish, and deploy verification.
 
 ## Completed baseline
 
@@ -24,7 +25,7 @@ The completed baseline now includes:
 - Scenario-level takeoff/climb helpers and envelope tests exist.
 - Ground state, runway-normal contact, normal-force liftoff, and flight-phase decoupling are implemented.
 - Input dynamics, pilot/AP/effective-control separation, stabilizer trim, CG pitch moment, and data-backed aero/engine envelope work are implemented.
-- Aircraft visual contract, persistent renderer, visual animation state, Cesium runway layer, cockpit shell, overlay modes, PFD/FMA, cockpit interaction hooks, scenario/tutorial/checklist/coach flow, guidance state, active-leg route status, LNAV feedback, and conservative VNAV/SPD/VS behavior are implemented.
+- Aircraft visual contract, persistent renderer, visual animation state, Cesium runway layer, cockpit shell, overlay modes, PFD/FMA, cockpit interaction hooks, scenario/tutorial/checklist/coach flow, guidance state, active-leg route status, LNAV feedback, conservative VNAV/SPD/VS behavior, scenario persistence, controls settings, deterministic gusts, versioned B737 data, trim fixtures, and performance-card assertions are implemented.
 
 Completion records:
 
@@ -35,15 +36,12 @@ Completion records:
 
 Why this remains: the current pass establishes runway-normal contact, normal-force liftoff, and phase semantics, but RFS still needs detailed gear/tire/brake behavior before touchdown, rollout, taxi, and crosswind handling can feel like an airliner.
 
-Remaining scope:
+Remaining advanced scope:
 
-- Landing gear station model: nose, left main, right main.
-- Oleo spring-damper compression.
-- Tire friction with rolling, braking, and side loads.
-- Brake input and anti-skid logic.
-- Nosewheel steering and rudder/tiller blending.
-- Ground effect near runway.
-- Touchdown, rollout, taxi, and rejected-takeoff handling.
+- Dynamic oleo spring-damper response beyond static station compression.
+- Tire side-load/cornering stiffness, asymmetric braking, anti-skid, and crosswind ground handling.
+- Rejected-takeoff and more detailed rollout/taxi scenarios.
+- Explicit gear-up belly-contact behavior beyond current guarded/crash contact states.
 
 Suggested implementation files:
 
@@ -68,10 +66,9 @@ Why this follows the current guidance pass: active-leg state, route feedback, an
 
 Remaining scope:
 
-- LNAV track intercept and cross-track error law.
-- Turn anticipation and RFMS-backed route edits.
-- MCP selected heading/speed/altitude/vertical-speed lifecycle with knobs/values, not only mode buttons/defaults.
-- Full VNAV SPD, VNAV PTH, ALT ACQ, and ALT HOLD transitions.
+- RFMS-backed route edits and route modification UI.
+- Use turn anticipation metrics to advance LNAV guidance before leg transitions.
+- Phase-gate LOAD PLAN / AP auto-engagement so route loading cannot surprise the player during manual takeoff or low-altitude states.
 - Autothrottle N1 behavior in addition to SPEED behavior.
 - RFMS Flight Mode Annunciator lifecycle integration beyond current truth-mode display.
 
@@ -98,11 +95,9 @@ Why this follows state stabilization: moving a broken state contract to a worker
 
 Scope:
 
-- State codec between `AircraftState` and transferable/SharedArrayBuffer storage.
-- Worker loop at a fixed simulation timestep.
-- Main-thread bridge for inputs, AP state, flight plan, and wind.
-- Deterministic accumulator to decouple render FPS from physics tick rate.
-- Worker lifecycle and error handling in Zustand.
+- Worker codec, feature flag, and worker entry scaffolding exist.
+- Remaining: main-thread bridge for inputs, AP state, flight plan, wind, lifecycle errors, and actually enabling the worker path.
+- Keep the fixed-timestep accumulator and deterministic main-thread tests green while migrating.
 
 Suggested implementation files:
 
@@ -126,9 +121,9 @@ Why this matters: the renderer now has a persistent aircraft, cockpit shell, cam
 
 Remaining scope:
 
-- Remove the browser warning from duplicate Three.js instances.
-- Add deterministic visual regression snapshots for initial runway, takeoff/climb, cockpit mode, and route/PFD/MCP overlays.
+- Reduce debug overlay crowding after the controls settings panel landed.
 - Keep lifecycle cleanup assertions for event listeners, Cesium entities, and the single Three/Cesium bridge.
+- Bundle splitting for Cesium-heavy chunks; current build still warns about >500 kB chunks.
 
 Suggested implementation files:
 
@@ -151,10 +146,9 @@ Why this is required for realism: current coefficients are approximations. Simul
 
 Scope:
 
-- Move remaining hardcoded aero and moment coefficients into aircraft data.
+- Move remaining hardcoded aero and moment coefficients into versioned aircraft/aero data.
 - Add multiple aircraft spec/model interface boundaries.
-- Add trim solver for steady flight conditions.
-- Validate climb, cruise, approach, stall, and turn performance against references.
+- Expand trim/performance cards into validated reference tables for climb, cruise, approach, stall, turn, and engine lapse behavior.
 - Add phugoid/short-period/dutch-roll sanity tests.
 
 Suggested implementation files:
@@ -176,10 +170,8 @@ Acceptance tests:
 
 Scope:
 
-- Gusts/turbulence as stochastic air-relative velocity perturbations.
-- Crosswind runway tests after ground model exists.
-- Cloud/visibility rendering tied to parsed METAR layers.
-- QNH/temperature effects for pressure/density altitude.
+- Deterministic gusts now perturb air-relative velocity without mutating ground velocity.
+- Remaining: crosswind runway tests, cloud/visibility rendering tied to parsed METAR layers, and QNH/temperature effects for pressure/density altitude.
 
 Acceptance tests:
 
@@ -190,22 +182,18 @@ Acceptance tests:
 
 Remaining scope:
 
-- Scenario persistence and saved flight states.
-- Keyboard/gamepad settings UI.
 - Better loading/error/scenery-status screens.
 - PWA completeness if desired: manifest link, icons, service worker strategy.
 - Bundle splitting for Cesium-heavy chunks.
 - More complete cockpit/interior model, instrument layout, and audio immersion.
+- Save/load UX policy: exact running-state resume vs load-as-paused training loops.
 
-## Immediate Phase 6 tasks
+## Immediate follow-ups from the 2026-05-26 dogfood
 
-Track the next batch in `docs/plans/2026-05-26-rfs-comprehensive-usability-realism-plan.md`:
-
-1. Cesium token/degraded scene policy.
-2. Deduplicate Three.js.
-3. Add deterministic visual regression snapshots.
-4. Fixed timestep / worker migration after contracts stabilize.
-5. Audio immersion pass.
+1. Phase-gate route/AP engagement so LOAD PLAN cannot auto-bank or auto-command the aircraft during manual takeoff or low-altitude states.
+2. Reduce DEBUG overlay crowding now that Controls settings is visible.
+3. Decide whether scenario LOAD should restore exact running state or pause for training-loop repeatability.
+4. Keep `npm run check`, `npm run test:visual`, and browser dogfood in the release checklist.
 
 ## Execution discipline
 
