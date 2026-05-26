@@ -104,6 +104,54 @@ describe('useSimStore', () => {
   });
   it('pause → paused', () => { useSimStore.getState().start(); useSimStore.getState().pause(); expect(useSimStore.getState().status).toBe('paused'); });
   it('setInput partial', () => { useSimStore.getState().setInput({ throttle1: 0.8 }); expect(useSimStore.getState().inputs.throttle1).toBe(0.8); expect(useSimStore.getState().inputs.throttle2).toBe(0); });
+  it('neutral input-manager frames do not erase external control commands', () => {
+    useSimStore.setState((s) => ({ inputs: { ...s.inputs, elevator: 0.42 } }));
+
+    useSimStore.getState().applyInputActions({}, 1 / 60);
+
+    expect(useSimStore.getState().inputs.elevator).toBe(0.42);
+  });
+  it('neutral input-manager frames preserve split-throttle partial inputs', () => {
+    useSimStore.getState().setInput({ throttle1: 0.8 });
+
+    useSimStore.getState().applyInputActions({}, 1 / 60);
+
+    expect(useSimStore.getState().inputs.throttle1).toBe(0.8);
+    expect(useSimStore.getState().inputs.throttle2).toBe(0);
+  });
+  it('neutral input-manager frames do not erase public setInput axis commands', () => {
+    useSimStore.getState().setInput({ elevator: 0.42 });
+
+    useSimStore.getState().applyInputActions({}, 1 / 60);
+
+    expect(useSimStore.getState().inputs.elevator).toBe(0.42);
+  });
+  it('public setInput axis commands detach stale input-manager recentering', () => {
+    useSimStore.getState().applyInputActions({ pitch: -1 }, 1 / 60);
+    expect(useSimStore.getState().inputs.elevator).toBeLessThan(0);
+
+    useSimStore.getState().setInput({ elevator: 0.42 });
+    useSimStore.getState().applyInputActions({}, 1 / 60);
+
+    expect(useSimStore.getState().inputs.elevator).toBe(0.42);
+  });
+  it('neutral input-manager frames do not erase direct AP-style input mutations', () => {
+    useSimStore.getState().applyInputActions({ pitch: -1 }, 1 / 60);
+    expect(useSimStore.getState().inputs.elevator).toBeLessThan(0);
+    useSimStore.setState((s) => ({ inputs: { ...s.inputs, elevator: 0.42 } }));
+
+    useSimStore.getState().applyInputActions({}, 1 / 60);
+
+    expect(useSimStore.getState().inputs.elevator).toBe(0.42);
+  });
+  it('throttle input-manager actions start from the live throttle lever after split-throttle input', () => {
+    useSimStore.getState().setInput({ throttle1: 0.8 });
+
+    useSimStore.getState().applyInputActions({ throttleDelta: 0.05 }, 0);
+
+    expect(useSimStore.getState().inputs.throttle1).toBeCloseTo(0.85, 8);
+    expect(useSimStore.getState().inputs.throttle2).toBeCloseTo(0.85, 8);
+  });
   it('tick advances simTime when running', () => { useSimStore.getState().start(); const b = useSimStore.getState().aircraft.simTime; useSimStore.getState().tick(performance.now()); expect(useSimStore.getState().aircraft.simTime).toBeGreaterThanOrEqual(b); });
   it('reset clears everything', () => { useSimStore.getState().setInput({ throttle1: 1 }); useSimStore.getState().start(); useSimStore.getState().tick(1000); useSimStore.getState().reset(); expect(useSimStore.getState().status).toBe('stopped'); expect(useSimStore.getState().inputs.throttle1).toBe(0); });
   it('starts from the KSEA tutorial scenario mass and runway setup', () => {

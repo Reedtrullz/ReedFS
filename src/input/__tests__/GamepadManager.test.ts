@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { __resetGamepadStateForTests, readGamepad } from '../GamepadManager';
+import { DEFAULT_GAMEPAD_CALIBRATION, __resetGamepadStateForTests, readGamepad, readGamepadActions } from '../GamepadManager';
 
 const originalGetGamepadsDescriptor = Object.getOwnPropertyDescriptor(navigator, 'getGamepads');
 
@@ -55,7 +55,7 @@ describe('readGamepad', () => {
     expect(readGamepad()).toBeNull();
   });
 
-  it('emits a one-shot clear payload after active inputs return to neutral', () => {
+  it('does not emit a clear payload after active inputs return to neutral', () => {
     setGamepads([
       {
         axes: [0.2, -0.3, 0.4],
@@ -78,14 +78,7 @@ describe('readGamepad', () => {
       },
     ]);
 
-    const cleared = readGamepad();
-    expect(cleared).toEqual({
-      elevator: 0,
-      aileron: 0,
-      rudder: 0,
-      throttle1: 0,
-      throttle2: 0,
-    });
+    expect(readGamepad()).toBeNull();
 
     expect(readGamepad()).toBeNull();
   });
@@ -104,7 +97,7 @@ describe('readGamepad', () => {
     expect(result?.aileron).toBeCloseTo(0.175, 8);
   });
 
-  it('clears fields that become neutral while other controls remain active', () => {
+  it('returns only fields that are currently active while other controls become neutral', () => {
     setGamepads([
       {
         axes: [0.25, 0, 0],
@@ -123,10 +116,7 @@ describe('readGamepad', () => {
     ]);
 
     const second = readGamepad();
-    expect(second).toEqual({
-      rudder: 0.2,
-      aileron: 0,
-    });
+    expect(second).toEqual({ rudder: 0.2 });
   });
 
   it('returns null for malformed partial gamepad object without throwing', () => {
@@ -154,5 +144,36 @@ describe('readGamepad', () => {
     expect(result?.rudder).toBeCloseTo(0.2, 8);
     expect(result?.throttle1).toBeCloseTo(0.8, 8);
     expect(result?.throttle2).toBeCloseTo(0.8, 8);
+  });
+
+  it('returns normalized action intent for the input manager', () => {
+    setGamepads([
+      {
+        axes: [0.2, -0.3, 0.4],
+        buttons: Array.from({ length: 8 }, (_, i) => button(i === 7 ? 0.6 : 0)),
+      },
+    ]);
+
+    const result = readGamepadActions();
+
+    expect(result).toEqual({
+      pitch: -0.3,
+      roll: 0.2,
+      yaw: 0.4,
+      throttleRate: 0.6,
+    });
+  });
+
+  it('applies calibration inversion to action intent', () => {
+    setGamepads([
+      {
+        axes: [0, -0.3, 0],
+        buttons: Array.from({ length: 8 }, () => button(0)),
+      },
+    ]);
+
+    const result = readGamepadActions({ ...DEFAULT_GAMEPAD_CALIBRATION, invertElevator: true });
+
+    expect(result).toEqual({ pitch: 0.3 });
   });
 });

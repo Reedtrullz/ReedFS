@@ -9,8 +9,14 @@ import { ControlsHelp } from './components/ControlsHelp';
 import { useSimLoop } from './hooks/useSimLoop';
 import { useAudioLoop } from './hooks/useAudioLoop';
 import { useSimStore } from './store/simStore';
-import { readGamepad } from './input/GamepadManager';
-import { applyDiscreteKeyInput, computeHeldKeyInputs } from './input/keyboardControls';
+import { readGamepadActions } from './input/GamepadManager';
+import {
+  applyDiscreteKeyAction,
+  applyDiscreteKeyInput,
+  computeHeldKeyActions,
+  shouldIgnoreKeyboardEvent,
+} from './input/keyboardControls';
+import { mergeInputActions } from './input/InputManager';
 import { fetchMetar, parseMetarWind } from './sim/weather';
 import type { MetarData } from './sim/weather';
 import { CloudLayer } from './viewport/CloudLayer';
@@ -47,16 +53,19 @@ export function App() {
   useEffect(() => {
     const keys = keysRef.current;
 
-    const updateFromKeys = () => {
-      setInput(computeHeldKeyInputs(keys));
-    };
-
     const onKey = (e: KeyboardEvent) => {
+      if (shouldIgnoreKeyboardEvent(e)) return;
       const key = e.key.toLowerCase();
       if (['w', 's', 'a', 'd', 'q', 'e', ' '].includes(key)) {
         if (key === ' ') e.preventDefault();
         keys.add(key);
-        updateFromKeys();
+        return;
+      }
+
+      const action = applyDiscreteKeyAction(key);
+      if (action) {
+        e.preventDefault();
+        useSimStore.getState().applyInputActions(action, 0);
         return;
       }
 
@@ -72,27 +81,39 @@ export function App() {
     const onKeyUp = (e: KeyboardEvent) => {
       const key = e.key.toLowerCase();
       keys.delete(key);
-      updateFromKeys();
+    };
+
+    const clearHeldKeys = () => {
+      keys.clear();
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') clearHeldKeys();
     };
 
     window.addEventListener('keydown', onKey);
     window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('blur', clearHeldKeys);
+    document.addEventListener('visibilitychange', onVisibilityChange);
     return () => {
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', clearHeldKeys);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
       keys.clear();
       setInput({ elevator: 0, aileron: 0, rudder: 0, brake: 0 });
     };
   }, [setInput]);
 
-  // Gamepad polling
+  // Input dynamics and gamepad polling
   useEffect(() => {
     let raf: number;
-    const poll = () => {
-      const gpInputs = readGamepad();
-      if (gpInputs) {
-        useSimStore.getState().setInput(gpInputs);
-      }
+    let lastTimestamp = 0;
+    const poll = (timestamp: number) => {
+      const dt = lastTimestamp > 0 ? Math.min((timestamp - lastTimestamp) / 1000, 0.05) : 1 / 60;
+      lastTimestamp = timestamp;
+      const actions = mergeInputActions(computeHeldKeyActions(keysRef.current), readGamepadActions());
+      useSimStore.getState().applyInputActions(actions, dt);
       raf = requestAnimationFrame(poll);
     };
     raf = requestAnimationFrame(poll);

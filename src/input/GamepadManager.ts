@@ -1,73 +1,113 @@
 import type { ControlInputs } from '../sim/types';
+import type { InputActions } from './InputManager';
 
-const AXIS_DEADZONE = 0.08;
-const TRIGGER_DEADZONE = 0.05;
-
-type GamepadControlField = 'elevator' | 'aileron' | 'rudder' | 'throttle1' | 'throttle2';
-
-let previouslyEmittedFields = new Set<GamepadControlField>();
-
-function activeAxis(value: number | undefined): number {
-  const v = value ?? 0;
-  return Math.abs(v) < AXIS_DEADZONE ? 0 : v;
+export interface GamepadCalibration {
+  axisDeadzone: number;
+  triggerDeadzone: number;
+  invertElevator: boolean;
+  invertAileron: boolean;
+  invertRudder: boolean;
 }
 
-function activeTrigger(value: number | undefined): number {
-  const v = value ?? 0;
-  return v < TRIGGER_DEADZONE ? 0 : Math.max(0, Math.min(1, v));
+export const DEFAULT_GAMEPAD_CALIBRATION: GamepadCalibration = {
+  axisDeadzone: 0.08,
+  triggerDeadzone: 0.05,
+  invertElevator: false,
+  invertAileron: false,
+  invertRudder: false,
+};
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
 }
 
-function finalizePayload(activeInputs: Partial<ControlInputs>): Partial<ControlInputs> | null {
-  const activeFields = new Set(Object.keys(activeInputs) as GamepadControlField[]);
-  const payload: Partial<ControlInputs> = { ...activeInputs };
-  let hasAnyField = activeFields.size > 0;
+function clampSigned(value: number): number {
+  return clamp(value, -1, 1);
+}
 
-  for (const field of previouslyEmittedFields) {
-    if (!activeFields.has(field)) {
-      payload[field] = 0;
-      hasAnyField = true;
-    }
-  }
+function clamp01(value: number): number {
+  return clamp(value, 0, 1);
+}
 
-  if (!hasAnyField) {
-    return null;
-  }
+function activeAxis(value: number | undefined, deadzone: number): number | undefined {
+  const v = value ?? 0;
+  return Math.abs(v) < deadzone ? undefined : clampSigned(v);
+}
 
-  previouslyEmittedFields = activeFields;
-  return payload;
+function activeTrigger(value: number | undefined, deadzone: number): number | undefined {
+  const v = value ?? 0;
+  return v < deadzone ? undefined : clamp01(v);
+}
+
+function maybeInvert(value: number, inverted: boolean): number {
+  return inverted ? -value : value;
+}
+
+function getFirstGamepad(): Gamepad | null {
+  const nav = typeof globalThis.navigator === 'undefined' ? undefined : globalThis.navigator;
+  if (!nav || typeof nav.getGamepads !== 'function') return null;
+
+  const gamepads = nav.getGamepads();
+  if (!gamepads) return null;
+
+  return Array.from(gamepads).find((pad): pad is Gamepad => pad != null) ?? null;
 }
 
 export function __resetGamepadStateForTests(): void {
-  previouslyEmittedFields.clear();
+  // Gamepad input is stateless now: neutral axes/triggers simply produce no
+  // action intent, so they cannot clear a keyboard/UI-controlled lever.
 }
 
-export function readGamepad(): Partial<ControlInputs> | null {
-  const nav = typeof globalThis.navigator === 'undefined' ? undefined : globalThis.navigator;
-  if (!nav || typeof nav.getGamepads !== 'function') return finalizePayload({});
+export function readGamepadActions(calibration: GamepadCalibration = DEFAULT_GAMEPAD_CALIBRATION): InputActions | null {
+  const gp = getFirstGamepad();
+  if (!gp) return null;
 
-  const gamepads = nav.getGamepads();
-  if (!gamepads) return finalizePayload({});
+  const leftX = activeAxis(gp.axes?.[0], calibration.axisDeadzone);
+  const leftY = activeAxis(gp.axes?.[1], calibration.axisDeadzone);
+  const rightX = activeAxis(gp.axes?.[2], calibration.axisDeadzone);
+  const rightTrigger = activeTrigger(gp.buttons?.[7]?.value, calibration.triggerDeadzone);
+  const leftTrigger = activeTrigger(gp.buttons?.[6]?.value, calibration.triggerDeadzone);
+  const trimNoseUp = gp.buttons?.[12]?.pressed ? 1 : 0;
+  const trimNoseDown = gp.buttons?.[13]?.pressed ? 1 : 0;
 
-  const gp = Array.from(gamepads).find((pad): pad is Gamepad => pad != null);
-  if (!gp) return finalizePayload({});
+  const actions: InputActions = {};
 
-  const leftX = activeAxis(gp.axes?.[0]);
-  const leftY = activeAxis(gp.axes?.[1]);
-  const rightX = activeAxis(gp.axes?.[2]);
-  const rightTrigger = activeTrigger(gp.buttons?.[7]?.value);
-  const leftTrigger = activeTrigger(gp.buttons?.[6]?.value);
+  if (leftY !== undefined) actions.pitch = maybeInvert(leftY, calibration.invertElevator);
+  if (leftX !== undefined) actions.roll = maybeInvert(leftX, calibration.invertAileron);
+  if (rightX !== undefined) actions.yaw = maybeInvert(rightX, calibration.invertRudder);
+
+  if (rightTrigger !== undefined || leftTrigger !== undefined) {
+    actions.throttleRate = (rightTrigger ?? 0) - (leftTrigger ?? 0);
+  }
+
+  if (trimNoseUp !== trimNoseDown) {
+    actions.trimRate = trimNoseUp - trimNoseDown;
+  }
+
+  return Object.keys(actions).length > 0 ? actions : null;
+}
+
+export function readGamepad(calibration: GamepadCalibration = DEFAULT_GAMEPAD_CALIBRATION): Partial<ControlInputs> | null {
+  const gp = getFirstGamepad();
+  if (!gp) return null;
+
+  const leftX = activeAxis(gp.axes?.[0], calibration.axisDeadzone);
+  const leftY = activeAxis(gp.axes?.[1], calibration.axisDeadzone);
+  const rightX = activeAxis(gp.axes?.[2], calibration.axisDeadzone);
+  const rightTrigger = activeTrigger(gp.buttons?.[7]?.value, calibration.triggerDeadzone);
+  const leftTrigger = activeTrigger(gp.buttons?.[6]?.value, calibration.triggerDeadzone);
 
   const inputs: Partial<ControlInputs> = {};
 
-  if (leftY !== 0) inputs.elevator = leftY * 0.7;
-  if (leftX !== 0) inputs.aileron = leftX * 0.7;
-  if (rightX !== 0) inputs.rudder = rightX * 0.5;
+  if (leftY !== undefined) inputs.elevator = clampSigned(maybeInvert(leftY, calibration.invertElevator) * 0.7);
+  if (leftX !== undefined) inputs.aileron = clampSigned(maybeInvert(leftX, calibration.invertAileron) * 0.7);
+  if (rightX !== undefined) inputs.rudder = clampSigned(maybeInvert(rightX, calibration.invertRudder) * 0.5);
 
-  if (rightTrigger > 0 || leftTrigger > 0) {
-    const throttle1 = Math.max(0, Math.min(1, 0.5 + rightTrigger * 0.5 - leftTrigger * 0.5));
-    inputs.throttle1 = throttle1;
-    inputs.throttle2 = throttle1;
+  if (rightTrigger !== undefined || leftTrigger !== undefined) {
+    const throttle = clamp01(0.5 + (rightTrigger ?? 0) * 0.5 - (leftTrigger ?? 0) * 0.5);
+    inputs.throttle1 = throttle;
+    inputs.throttle2 = throttle;
   }
 
-  return finalizePayload(inputs);
+  return Object.keys(inputs).length > 0 ? inputs : null;
 }

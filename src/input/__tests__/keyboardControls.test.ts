@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ControlInputs } from '../../sim/types';
-import { applyDiscreteKeyInput, computeHeldKeyInputs } from '../keyboardControls';
+import { applyDiscreteKeyInput, computeHeldKeyInputs, shouldIgnoreKeyboardEvent } from '../keyboardControls';
 
 const inputs: ControlInputs = {
   elevator: 0,
@@ -13,6 +13,12 @@ const inputs: ControlInputs = {
   spoilers: 0,
   brake: 0,
 };
+
+function keyboardEventForTarget(key: string, target: HTMLElement, init: KeyboardEventInit = {}): KeyboardEvent {
+  const event = new KeyboardEvent('keydown', { key, ...init });
+  Object.defineProperty(event, 'target', { value: target });
+  return event;
+}
 
 describe('keyboardControls', () => {
   it('computes simultaneous pitch roll and rudder axes from held keys', () => {
@@ -52,5 +58,19 @@ describe('keyboardControls', () => {
     expect(applyDiscreteKeyInput('f', { ...inputs, flapLever: 0 })).toEqual({ flapLever: 5 });
     expect(applyDiscreteKeyInput('f', { ...inputs, flapLever: 5 })).toEqual({ flapLever: 10 });
     expect(applyDiscreteKeyInput('f', { ...inputs, flapLever: 40 })).toEqual({ flapLever: 0 });
+  });
+
+  it('ignores editable targets and browser shortcut modifiers', () => {
+    expect(shouldIgnoreKeyboardEvent(keyboardEventForTarget('w', document.createElement('input')))).toBe(true);
+    expect(shouldIgnoreKeyboardEvent(keyboardEventForTarget('f', document.body, { ctrlKey: true }))).toBe(true);
+    expect(shouldIgnoreKeyboardEvent(keyboardEventForTarget('f', document.body, { metaKey: true }))).toBe(true);
+  });
+
+  it('allows flight keys on focused buttons except native activation keys', () => {
+    const button = document.createElement('button');
+
+    expect(shouldIgnoreKeyboardEvent(keyboardEventForTarget('w', button))).toBe(false);
+    expect(shouldIgnoreKeyboardEvent(keyboardEventForTarget(' ', button))).toBe(true);
+    expect(shouldIgnoreKeyboardEvent(keyboardEventForTarget('Enter', button))).toBe(true);
   });
 });
