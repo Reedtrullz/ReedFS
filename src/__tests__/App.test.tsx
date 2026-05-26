@@ -192,6 +192,9 @@ vi.mock('../sim/physics/derived', () => ({
 }));
 
 const mockFlyTo = vi.fn();
+const mockCancelFlight = vi.fn();
+const mockSetView = vi.fn();
+const mockLookAt = vi.fn();
 const mockDestroy = vi.fn();
 const mockPostRenderAdd = vi.fn();
 const mockPostRenderRemove = vi.fn();
@@ -204,7 +207,12 @@ vi.mock('cesium', () => ({
   Ion: { defaultAccessToken: '' },
   Viewer: class {
     destroy = mockDestroy;
-    camera = { flyTo: mockFlyTo };
+    camera = {
+      flyTo: mockFlyTo,
+      cancelFlight: mockCancelFlight,
+      setView: mockSetView,
+      lookAt: mockLookAt,
+    };
     scene = {
       postRender: {
         addEventListener: mockPostRenderAdd,
@@ -221,9 +229,16 @@ vi.mock('cesium', () => ({
     };
     entities = { add: mockEntityAdd, remove: mockEntityRemove };
   },
-  Cartesian3: {
-    fromDegrees: vi.fn(() => ({ x: 0, y: 0, z: 0 })),
-    fromDegreesArrayHeights: vi.fn((positions: number[]) => positions),
+  Cartesian3: class {
+    constructor(public x = 0, public y = 0, public z = 0) {}
+    static fromDegrees = vi.fn(() => ({ x: 0, y: 0, z: 0 }));
+    static fromDegreesArrayHeights = vi.fn((positions: number[]) => positions);
+    static normalize = vi.fn((vector) => vector);
+  },
+  Matrix4: class {
+    static IDENTITY = {};
+    static multiplyByPoint = vi.fn(() => ({ x: 0, y: 0, z: 0 }));
+    static multiplyByPointAsVector = vi.fn(() => ({ x: 0, y: 0, z: 0 }));
   },
   Cartesian2: class {
     constructor(public x: number, public y: number) {}
@@ -327,6 +342,9 @@ describe('App', () => {
     vi.clearAllMocks();
     mockAudioContexts.length = 0;
     useSimStore.getState().apState = structuredClone(defaultAppTestApState);
+    useSimStore.getState().status = 'stopped';
+    useSimStore.getState().aircraft.flightPhase = 'PARKED';
+    delete (useSimStore.getState().aircraft as { ground?: unknown }).ground;
   });
 
   afterEach(() => {
@@ -415,6 +433,30 @@ describe('App', () => {
     expect(nextApState.boeing.hdgSel).toBe(false);
     expect(nextApState.boeing.n1).toBe(false);
     expect(nextApState.boeing.autothrottleArm).toBe(true);
+  });
+
+  it('LOAD PLAN only stores the route during a running takeoff instead of auto-commanding AP modes', () => {
+    const store = useSimStore.getState();
+    store.status = 'running';
+    store.aircraft.flightPhase = 'TAKEOFF';
+    Object.assign(store.aircraft, {
+      ground: {
+        onRunway: true,
+        weightOnWheels: true,
+        aglFt: 0,
+        groundAltFt: 432,
+        normalForceN: 600_000,
+        contact: 'gear',
+        stations: [],
+      },
+    });
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'LOAD PLAN' }));
+
+    expect(mockSetFlightPlan).toHaveBeenCalledTimes(1);
+    expect(mockSetApState).not.toHaveBeenCalled();
   });
 
   it('uses a single Three/Cesium overlay canvas for the aircraft only', () => {

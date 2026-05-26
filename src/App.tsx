@@ -37,6 +37,8 @@ import { ScenarioPanel } from './components/ScenarioPanel';
 import { RouteStatus } from './components/RouteStatus';
 import { SceneStatus } from './components/SceneStatus';
 import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
+import type { AircraftState } from './sim/types';
+import type { SimulationStatus } from './sim/simulationStatus';
 
 const cesiumScenePolicy = initCesium();
 type AudioUiStatus = 'off' | 'starting' | 'on' | 'blocked';
@@ -56,6 +58,10 @@ function applyLoadedRouteAutopilotDefaults(apState: AutopilotState): AutopilotSt
   next.boeing.n1 = false;
   next.boeing.autothrottleArm = true;
   return next;
+}
+
+function shouldApplyLoadedRouteAutopilotDefaults(status: SimulationStatus, aircraft: AircraftState): boolean {
+  return status === 'stopped' && aircraft.flightPhase === 'PARKED';
 }
 
 export function App() {
@@ -284,9 +290,11 @@ export function App() {
         <button
           onClick={() => {
             const fp = createKseaKpdxFlight();
-            useSimStore.getState().setFlightPlan(fp);
-            const ap = useSimStore.getState().apState ?? createDefaultAutopilotState();
-            useSimStore.getState().setApState(applyLoadedRouteAutopilotDefaults(ap));
+            const store = useSimStore.getState();
+            store.setFlightPlan(fp);
+            if (!shouldApplyLoadedRouteAutopilotDefaults(store.status, store.aircraft)) return;
+            const ap = store.apState ?? createDefaultAutopilotState();
+            store.setApState(applyLoadedRouteAutopilotDefaults(ap));
           }}
           style={btnStyle}
         >

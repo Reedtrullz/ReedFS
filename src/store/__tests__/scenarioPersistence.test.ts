@@ -80,6 +80,19 @@ describe('scenario persistence', () => {
     expect(restored.wind).toEqual(KSEA_LIGHT_PATTERN_SCENARIO.wind);
   });
 
+  it('loads saved running states paused for repeatable training loops', () => {
+    const storage = memoryStorage();
+    useSimStore.getState().startTakeoffRoll();
+    expect(useSimStore.getState().status).toBe('running');
+
+    useSimStore.getState().saveScenarioState(storage);
+    useSimStore.getState().reset();
+    useSimStore.getState().loadScenarioState(storage);
+
+    expect(useSimStore.getState().status).toBe('paused');
+    expect(useSimStore.getState().scenarioPersistenceMessage).toMatch(/paused/i);
+  });
+
   it('ignores corrupt saved data with a visible reason', () => {
     const storage = memoryStorage();
     storage.setItem(SCENARIO_SAVE_KEY, '{definitely not json');

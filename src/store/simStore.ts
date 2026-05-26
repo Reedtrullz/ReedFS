@@ -279,13 +279,17 @@ function restoreSnapshotSlice(snapshot: ScenarioSnapshot): Partial<SimStore> {
   const controlsSlice = composeControlsSlice(pilotInputs, apCommands, apState);
   const routeStatus = flightPlan ? computeRouteStatus(aircraft, flightPlan, activeLegIndex) : createNoRouteStatus();
   const scenario = scenarioById(snapshot.selectedScenarioId);
+  const restoredStatus: SimStatus = snapshot.status === 'running' ? 'paused' : snapshot.status;
+  const scenarioPersistenceMessage = snapshot.status === 'running'
+    ? 'Saved scenario loaded paused.'
+    : 'Saved scenario loaded.';
 
   return {
     selectedScenarioId: scenario.id,
     aircraft,
     ...controlsSlice,
     inputManager: structuredClone(snapshot.inputManager),
-    status: snapshot.status,
+    status: restoredStatus,
     lastFrameTime: 0,
     fixedStepAccumulatorSeconds: 0,
     simulationTimeSeconds: snapshot.simulationTimeSeconds,
@@ -297,11 +301,11 @@ function restoreSnapshotSlice(snapshot: ScenarioSnapshot): Partial<SimStore> {
     wind: structuredClone(snapshot.wind),
     guidance: buildGuidanceState({
       scenario,
-      status: snapshot.status,
+      status: restoredStatus,
       aircraft,
       controls: controlsSlice.effectiveControls,
     }),
-    scenarioPersistenceMessage: 'Saved scenario loaded.',
+    scenarioPersistenceMessage,
   };
 }
 

@@ -106,14 +106,14 @@ RFS bridges RFMS-compatible avionics state into native physics and player-facing
 
 - `RfsMCP.tsx` edits RFMS-compatible selected speed/heading/altitude/vertical-speed targets, creates a default AP state on first valid mode/target click, and keeps unsupported modes hidden.
 - `RfsPFD.tsx` renders readable speed/altitude tapes, attitude/heading, and an FMA row from the same truth modes the servo laws use.
-- `App.tsx` can load the KSEA -> OLM -> BTG -> KPDX sample route and applies safe LNAV + SPEED + ALT_HOLD defaults without engaging unsupported VNAV.
+- `App.tsx` can load the KSEA -> OLM -> BTG -> KPDX sample route. LOAD PLAN applies the safe LNAV + SPEED + ALT_HOLD defaults only in the stopped/PARKED preflight state; during a running takeoff it stores the route without auto-commanding AP modes.
 - `navigation.ts` validates route coordinates/discontinuities, computes store-owned active-leg status including signed cross-track/along-track metrics, estimates next-leg turn angle/anticipation distance, and sequences the active leg.
 - `RouteStatus.tsx` exposes active leg, next waypoint, DTG, track, ETA, and LNAV unavailable reasons.
 - `autopilot.ts` maps active RFMS truth modes to AP-owned control commands. LNAV uses the store-owned active route leg plus a capped cross-track intercept law; VNAV uses the active route leg constraints. Invalid route status does not fall back to waypoint 0.
 - `vnav.ts` reports VNAV availability, unavailable reasons, altitude targets, target vertical speed, speed constraints, and the conservative VNAV_PTH -> ALT* -> ALT_HOLD path lifecycle for actionable altitude constraints.
 - `GuidanceState` combines scenario phase, tutorial, checklist, coach messages, and alerts for the player-facing flow; route status and AP truth remain adjacent store-owned state used by `RouteStatus`, `RfsPFD`, and the servo laws.
-- `scenarioPersistence.ts` saves cloneable scenario snapshots to `localStorage`, and `ScenarioPanel` exposes SAVE/LOAD controls with visible ignored/corrupt-save feedback.
-- `controlBindings.ts`, `ControlsHelp`, and `ControlsSettings` provide a validated, visible keyboard/gamepad binding model for repeated play.
+- `scenarioPersistence.ts` saves cloneable scenario snapshots to `localStorage`, and `ScenarioPanel` exposes SAVE/LOAD controls with visible ignored/corrupt-save feedback. Running saves restore as paused so training loops do not surprise-resume.
+- `controlBindings.ts`, `ControlsHelp`, and collapsed-by-default `ControlsSettings` provide a validated, visible keyboard/gamepad binding model for repeated play without covering primary instruments unless expanded.
 
 Known guidance follow-up:
 

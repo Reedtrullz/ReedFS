@@ -68,7 +68,6 @@ Remaining scope:
 
 - RFMS-backed route edits and route modification UI.
 - Use turn anticipation metrics to advance LNAV guidance before leg transitions.
-- Phase-gate LOAD PLAN / AP auto-engagement so route loading cannot surprise the player during manual takeoff or low-altitude states.
 - Autothrottle N1 behavior in addition to SPEED behavior.
 - RFMS Flight Mode Annunciator lifecycle integration beyond current truth-mode display.
 
@@ -121,7 +120,6 @@ Why this matters: the renderer now has a persistent aircraft, cockpit shell, cam
 
 Remaining scope:
 
-- Reduce debug overlay crowding after the controls settings panel landed.
 - Keep lifecycle cleanup assertions for event listeners, Cesium entities, and the single Three/Cesium bridge.
 - Bundle splitting for Cesium-heavy chunks; current build still warns about >500 kB chunks.
 
@@ -186,13 +184,14 @@ Remaining scope:
 - PWA completeness if desired: manifest link, icons, service worker strategy.
 - Bundle splitting for Cesium-heavy chunks.
 - More complete cockpit/interior model, instrument layout, and audio immersion.
-- Save/load UX policy: exact running-state resume vs load-as-paused training loops.
 
 ## Immediate follow-ups from the 2026-05-26 dogfood
 
-1. Phase-gate route/AP engagement so LOAD PLAN cannot auto-bank or auto-command the aircraft during manual takeoff or low-altitude states.
-2. Reduce DEBUG overlay crowding now that Controls settings is visible.
-3. Decide whether scenario LOAD should restore exact running state or pause for training-loop repeatability.
+Completed in the follow-up pass after Task 10.4:
+
+1. LOAD PLAN phase-gating: stopped/PARKED can apply safe LNAV + SPEED + ALT_HOLD defaults, while running takeoff states only load the route and never auto-command AP modes.
+2. DEBUG overlay crowding: Controls settings now starts collapsed and expands only on demand.
+3. Scenario LOAD policy: saved running states restore as paused for repeatable training loops.
 4. Keep `npm run check`, `npm run test:visual`, and browser dogfood in the release checklist.
 
 ## Execution discipline

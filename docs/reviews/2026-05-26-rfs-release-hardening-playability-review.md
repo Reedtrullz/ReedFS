@@ -10,6 +10,8 @@ Screenshot evidence: /Users/reidar/.hermes/cache/screenshots/browser_screenshot_
 
 The local RFS player loop is materially more usable than the original “impossible to play” state. The app loads without JavaScript console errors, truthfully announces degraded Cesium scenery when no Ion token is configured, starts a runway roll from KSEA, accelerates on repeated attempts, rotates into a positive climb with manual W input, allows gear-up after positive rate, resets cleanly, and exposes route/MCP/FMA feedback, audio startup, scenario save/load, and controls settings.
 
+Post-review follow-up status: the LOAD PLAN/AP phase-gate, collapsed Controls settings panel, and load-as-paused scenario restore policy have since been implemented. The original findings below remain as dogfood evidence from the review moment.
+
 Quality gates run after the implementation pass:
 
 - `npm run check`: PASS (70 test files, 425 tests, build PASS)

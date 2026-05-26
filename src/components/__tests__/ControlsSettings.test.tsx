@@ -1,11 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { ControlsSettings } from '../ControlsSettings';
 import { DEFAULT_CONTROL_BINDINGS } from '../../input/controlBindings';
 
 describe('ControlsSettings', () => {
-  it('renders current keyboard and gamepad binding names', () => {
+  it('starts collapsed so debug overlays do not cover the primary flight instruments', () => {
     render(<ControlsSettings bindings={DEFAULT_CONTROL_BINDINGS} />);
+
+    expect(screen.getByRole('button', { name: 'Show controls settings' })).toBeTruthy();
+    expect(screen.queryByText('Pitch')).toBeNull();
+    expect(screen.getByText('Bindings valid.')).toBeTruthy();
+  });
+
+  it('renders current keyboard and gamepad binding names after expanding', () => {
+    render(<ControlsSettings bindings={DEFAULT_CONTROL_BINDINGS} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Show controls settings' }));
 
     expect(screen.getByRole('group', { name: 'Controls settings' })).toBeTruthy();
     expect(screen.getByText('Pitch')).toBeTruthy();
