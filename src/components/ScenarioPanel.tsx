@@ -32,6 +32,9 @@ export function ScenarioPanel() {
   const guidance = useSimStore((s) => s.guidance);
   const setScenario = useSimStore((s) => s.setScenario);
   const setTutorialStep = useSimStore((s) => s.setTutorialStep);
+  const saveScenarioState = useSimStore((s) => s.saveScenarioState);
+  const loadScenarioState = useSimStore((s) => s.loadScenarioState);
+  const persistenceMessage = useSimStore((s) => s.scenarioPersistenceMessage);
   const tutorial = guidance.tutorial;
   const currentStep = guidance.activeTutorialStep;
   const scenario = SCENARIOS.find((candidate) => candidate.id === selectedScenarioId) ?? SCENARIOS[0];
@@ -65,6 +68,19 @@ export function ScenarioPanel() {
         ))}
       </select>
       <div style={{ color: '#9db2bc', fontSize: 11, marginTop: 6 }}>{scenario.description}</div>
+      <div aria-label="Scenario persistence controls" style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 10 }}>
+        <button aria-label="Save scenario state" style={buttonStyle} onClick={() => saveScenarioState()}>
+          SAVE
+        </button>
+        <button aria-label="Load saved scenario state" style={buttonStyle} onClick={() => loadScenarioState()}>
+          LOAD
+        </button>
+      </div>
+      {persistenceMessage ? (
+        <div role="status" style={{ color: '#ffd84a', fontSize: 11, marginTop: 6 }}>
+          {persistenceMessage}
+        </div>
+      ) : null}
 
       <div style={{ marginTop: 12, borderTop: '1px solid rgba(157,220,255,0.18)', paddingTop: 10 }}>
         <div style={{ color: '#9ddcff', fontSize: 12, fontWeight: 800, letterSpacing: 1.2 }}>Tutorial</div>

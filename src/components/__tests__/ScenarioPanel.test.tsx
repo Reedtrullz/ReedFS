@@ -6,6 +6,7 @@ import { KSEA_LIGHT_PATTERN_SCENARIO, KSEA_TUTORIAL_SCENARIO } from '../../sim/s
 
 describe('ScenarioPanel', () => {
   beforeEach(() => {
+    window.localStorage.clear();
     useSimStore.getState().setScenario(KSEA_TUTORIAL_SCENARIO.id);
     useSimStore.getState().reset();
   });
@@ -65,5 +66,28 @@ describe('ScenarioPanel', () => {
     expect(useSimStore.getState().selectedScenarioId).toBe(KSEA_TUTORIAL_SCENARIO.id);
     expect(useSimStore.getState().guidance.tutorial.stepIndex).toBe(1);
     expect(screen.getByText(/Step 2/i)).toBeTruthy();
+  });
+
+  it('saves and loads scenario state from the panel controls', () => {
+    render(<ScenarioPanel />);
+    fireEvent.change(screen.getByLabelText('Scenario'), { target: { value: KSEA_LIGHT_PATTERN_SCENARIO.id } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save scenario state' }));
+
+    fireEvent.change(screen.getByLabelText('Scenario'), { target: { value: KSEA_TUTORIAL_SCENARIO.id } });
+    expect(useSimStore.getState().selectedScenarioId).toBe(KSEA_TUTORIAL_SCENARIO.id);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Load saved scenario state' }));
+
+    expect(useSimStore.getState().selectedScenarioId).toBe(KSEA_LIGHT_PATTERN_SCENARIO.id);
+    expect(screen.getByText(/saved scenario loaded/i)).toBeTruthy();
+  });
+
+  it('shows a load warning when saved scenario data is corrupt', () => {
+    window.localStorage.setItem('rfs.scenarioSnapshot.v1', '{not valid json');
+    render(<ScenarioPanel />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Load saved scenario state' }));
+
+    expect(screen.getByText(/ignored saved scenario/i)).toBeTruthy();
   });
 });

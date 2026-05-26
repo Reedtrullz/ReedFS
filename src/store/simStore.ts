@@ -30,6 +30,14 @@ import {
   type InputManagerState,
 } from '../input/InputManager';
 
+import {
+  createScenarioSnapshot,
+  loadScenarioSnapshot,
+  saveScenarioSnapshot,
+  type ScenarioPersistenceStorage,
+  type ScenarioSnapshot,
+} from './scenarioPersistence';
+
 export type SimStatus = SimulationStatus;
 
 export interface SimStore {
@@ -56,6 +64,7 @@ export interface SimStore {
   wind: WindInfo | null;
   selectedScenarioId: string;
   guidance: GuidanceState;
+  scenarioPersistenceMessage: string | null;
   setInput: (partial: Partial<ControlInputs>) => void;
   applyInputActions: (actions: InputActions, dt: number) => void;
   tick: (timestamp: number) => void;
@@ -69,6 +78,8 @@ export interface SimStore {
   setApState: (ap: AutopilotState | null) => void;
   setFlightPlan: (fp: FlightPlan | null) => void;
   setWind: (w: WindInfo | null) => void;
+  saveScenarioState: (storage?: ScenarioPersistenceStorage) => void;
+  loadScenarioState: (storage?: ScenarioPersistenceStorage) => void;
 }
 
 const FIXED_STEP_SECONDS = 1 / 60;
@@ -254,6 +265,46 @@ const initialGuidance = buildGuidanceState({
 });
 const initialRouteStatus = createNoRouteStatus();
 
+function defaultScenarioStorage(): ScenarioPersistenceStorage | null {
+  return typeof globalThis.localStorage === 'undefined' ? null : globalThis.localStorage;
+}
+
+function restoreSnapshotSlice(snapshot: ScenarioSnapshot): Partial<SimStore> {
+  const aircraft = structuredClone(snapshot.aircraft);
+  const apState = structuredClone(snapshot.apState);
+  const apCommands = structuredClone(snapshot.apCommands);
+  const pilotInputs = structuredClone(snapshot.pilotInputs);
+  const flightPlan = structuredClone(snapshot.flightPlan);
+  const activeLegIndex = snapshot.activeLegIndex;
+  const controlsSlice = composeControlsSlice(pilotInputs, apCommands, apState);
+  const routeStatus = flightPlan ? computeRouteStatus(aircraft, flightPlan, activeLegIndex) : createNoRouteStatus();
+  const scenario = scenarioById(snapshot.selectedScenarioId);
+
+  return {
+    selectedScenarioId: scenario.id,
+    aircraft,
+    ...controlsSlice,
+    inputManager: structuredClone(snapshot.inputManager),
+    status: snapshot.status,
+    lastFrameTime: 0,
+    fixedStepAccumulatorSeconds: 0,
+    simulationTimeSeconds: snapshot.simulationTimeSeconds,
+    droppedSimulationTimeSeconds: 0,
+    apState,
+    flightPlan,
+    activeLegIndex: routeStatus.activeLegIndex,
+    routeStatus,
+    wind: structuredClone(snapshot.wind),
+    guidance: buildGuidanceState({
+      scenario,
+      status: snapshot.status,
+      aircraft,
+      controls: controlsSlice.effectiveControls,
+    }),
+    scenarioPersistenceMessage: 'Saved scenario loaded.',
+  };
+}
+
 export const useSimStore = create<SimStore>((set, get) => ({
   aircraft: initialAircraft,
   ...initialControls,
@@ -271,6 +322,7 @@ export const useSimStore = create<SimStore>((set, get) => ({
   wind: cloneWind(KSEA_TUTORIAL_SCENARIO.wind),
   selectedScenarioId: KSEA_TUTORIAL_SCENARIO.id,
   guidance: initialGuidance,
+  scenarioPersistenceMessage: null,
 
   setInput: (partial) =>
     set((s) => {
@@ -550,4 +602,38 @@ export const useSimStore = create<SimStore>((set, get) => ({
     };
   }),
   setWind: (w) => set({ wind: w }),
+
+  saveScenarioState: (storage) => set((s) => {
+    const targetStorage = storage ?? defaultScenarioStorage();
+    if (!targetStorage) {
+      return { scenarioPersistenceMessage: 'Scenario save unavailable: localStorage is not available.' };
+    }
+
+    try {
+      saveScenarioSnapshot(targetStorage, createScenarioSnapshot(s));
+      return { scenarioPersistenceMessage: 'Scenario state saved.' };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'unknown storage error';
+      return { scenarioPersistenceMessage: `Scenario save failed: ${message}` };
+    }
+  }),
+
+  loadScenarioState: (storage) => set(() => {
+    const targetStorage = storage ?? defaultScenarioStorage();
+    if (!targetStorage) {
+      return { scenarioPersistenceMessage: 'Ignored saved scenario: localStorage is not available.' };
+    }
+
+    const loaded = loadScenarioSnapshot(targetStorage);
+    if (!loaded.ok) {
+      return { scenarioPersistenceMessage: `Ignored saved scenario: ${loaded.reason}.` };
+    }
+
+    try {
+      return restoreSnapshotSlice(loaded.snapshot);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'restore failed';
+      return { scenarioPersistenceMessage: `Ignored saved scenario: ${message}.` };
+    }
+  }),
 }));
