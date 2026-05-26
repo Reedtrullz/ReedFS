@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { useSimStore } from '../simStore';
 import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
 import { KSEA_RUNWAY_ALT_FT } from '../../sim/systems/ground';
+import { KSEA_LIGHT_PATTERN_SCENARIO, KSEA_TUTORIAL_SCENARIO } from '../../sim/scenarios';
 
 function minimalApState(): AutopilotState {
   return {
@@ -105,6 +106,46 @@ describe('useSimStore', () => {
   it('setInput partial', () => { useSimStore.getState().setInput({ throttle1: 0.8 }); expect(useSimStore.getState().inputs.throttle1).toBe(0.8); expect(useSimStore.getState().inputs.throttle2).toBe(0); });
   it('tick advances simTime when running', () => { useSimStore.getState().start(); const b = useSimStore.getState().aircraft.simTime; useSimStore.getState().tick(performance.now()); expect(useSimStore.getState().aircraft.simTime).toBeGreaterThanOrEqual(b); });
   it('reset clears everything', () => { useSimStore.getState().setInput({ throttle1: 1 }); useSimStore.getState().start(); useSimStore.getState().tick(1000); useSimStore.getState().reset(); expect(useSimStore.getState().status).toBe('stopped'); expect(useSimStore.getState().inputs.throttle1).toBe(0); });
+  it('starts from the KSEA tutorial scenario mass and runway setup', () => {
+    const state = useSimStore.getState();
+
+    expect(state.selectedScenarioId).toBe(KSEA_TUTORIAL_SCENARIO.id);
+    expect(state.aircraft.payloadWeight).toBe(KSEA_TUTORIAL_SCENARIO.payloadWeightKg);
+    expect(state.aircraft.zeroFuelWeight).toBe(KSEA_TUTORIAL_SCENARIO.zeroFuelWeightKg);
+    expect(state.aircraft.cg).toBe(KSEA_TUTORIAL_SCENARIO.cgPercent);
+    expect(state.aircraft.config.stabilizerTrimUnits).toBe(KSEA_TUTORIAL_SCENARIO.stabilizerTrimUnits);
+    expect(state.aircraft.fuel.totalFuel).toBe(KSEA_TUTORIAL_SCENARIO.fuel.totalFuel);
+    expect(state.aircraft.ground.groundAltFt).toBe(KSEA_TUTORIAL_SCENARIO.runway.elevationFt);
+  });
+  it('reset returns to the selected scenario instead of hardcoded defaults', () => {
+    useSimStore.getState().setScenario(KSEA_LIGHT_PATTERN_SCENARIO.id);
+    useSimStore.getState().setInput({ throttle1: 1, flapLever: 30 });
+    useSimStore.getState().start();
+    useSimStore.getState().tick(1000);
+    useSimStore.getState().reset();
+
+    const state = useSimStore.getState();
+    expect(state.selectedScenarioId).toBe(KSEA_LIGHT_PATTERN_SCENARIO.id);
+    expect(state.aircraft.payloadWeight).toBe(KSEA_LIGHT_PATTERN_SCENARIO.payloadWeightKg);
+    expect(state.aircraft.zeroFuelWeight).toBe(KSEA_LIGHT_PATTERN_SCENARIO.zeroFuelWeightKg);
+    expect(state.aircraft.cg).toBe(KSEA_LIGHT_PATTERN_SCENARIO.cgPercent);
+    expect(state.aircraft.config.stabilizerTrimUnits).toBe(KSEA_LIGHT_PATTERN_SCENARIO.stabilizerTrimUnits);
+    expect(state.aircraft.config.flapSetting).toBe(KSEA_LIGHT_PATTERN_SCENARIO.flapSetting);
+    expect(state.inputs.flapLever).toBe(KSEA_LIGHT_PATTERN_SCENARIO.flapSetting);
+    expect(state.aircraft.ground.groundAltFt).toBe(KSEA_LIGHT_PATTERN_SCENARIO.runway.elevationFt);
+    expect(state.wind).toEqual(KSEA_LIGHT_PATTERN_SCENARIO.wind);
+    expect(state.inputs.throttle1).toBe(0);
+  });
+  it('reset restores selected scenario wind from an immutable copy', () => {
+    useSimStore.getState().setScenario(KSEA_LIGHT_PATTERN_SCENARIO.id);
+    const wind = useSimStore.getState().wind;
+    if (wind) wind.speed = 99;
+
+    useSimStore.getState().reset();
+
+    expect(KSEA_LIGHT_PATTERN_SCENARIO.wind.speed).toBe(6);
+    expect(useSimStore.getState().wind).toEqual(KSEA_LIGHT_PATTERN_SCENARIO.wind);
+  });
   it('apState starts null', () => expect(useSimStore.getState().apState).toBeNull());
   it('setApState stores autopilot state', () => { useSimStore.getState().setApState(minimalApState()); expect(useSimStore.getState().apState).toBeTruthy(); });
   it('reset clears apState', () => { useSimStore.getState().setApState(minimalApState()); useSimStore.getState().reset(); expect(useSimStore.getState().apState).toBeNull(); });

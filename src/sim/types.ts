@@ -112,6 +112,7 @@ export interface AircraftConfig {
   spoilersArmed: boolean;
   spoilersDeployed: boolean;
   speedBrake: number; // 0-1
+  stabilizerTrimUnits: number;
 }
 
 // ── Full Aircraft State ──
@@ -129,6 +130,8 @@ export interface AircraftState {
   fuel: FuelState;
   electrical: ElectricalState;
   hydraulic: HydraulicState;
+  zeroFuelWeight: number;
+  zeroFuelCg: number;
   grossWeight: number;
   payloadWeight: number;
   cg: number; // % MAC
@@ -182,7 +185,8 @@ export const B737_800_SPEC: AircraftSpec = {
 export function createInitialState(spec: AircraftSpec): AircraftState {
   const attitude: Attitude = { phi: 0, theta: 0, psi: Math.PI };
   const initialAltFt = 432;
-  const grossWeight = spec.emptyWeight + spec.maxFuel;
+  const zeroFuelWeight = spec.emptyWeight;
+  const grossWeight = zeroFuelWeight + spec.maxFuel;
 
   return {
     position: { lat: 47.45, lon: -122.31, alt: initialAltFt },
@@ -190,7 +194,7 @@ export function createInitialState(spec: AircraftSpec): AircraftState {
     attitude, // facing south (180°)
     quaternion: eulerToQuat(attitude.phi, attitude.theta, attitude.psi),
     angularVel: { p: 0, q: 0, r: 0 },
-    config: { flapSetting: 0, gearDown: true, spoilersArmed: false, spoilersDeployed: false, speedBrake: 0 },
+    config: { flapSetting: 0, gearDown: true, spoilersArmed: false, spoilersDeployed: false, speedBrake: 0, stabilizerTrimUnits: 0 },
     engines: [
       { n1: 0, n2: 0, egt: 20, fuelFlow: 0, thrust: 0, running: false },
       { n1: 0, n2: 0, egt: 20, fuelFlow: 0, thrust: 0, running: false },
@@ -198,6 +202,8 @@ export function createInitialState(spec: AircraftSpec): AircraftState {
     fuel: { totalFuel: spec.maxFuel, fuelFlowTotal: 0, centerTank: spec.fuelCapacity.center, leftTank: spec.fuelCapacity.left, rightTank: spec.fuelCapacity.right },
     electrical: { gen1Online: false, gen2Online: false, acBusPowered: false, batteryVolts: 28 },
     hydraulic: { systemAPsi: 0, systemBPsi: 0, standbyPsi: 0 },
+    zeroFuelWeight,
+    zeroFuelCg: 25,
     grossWeight,
     payloadWeight: 0,
     cg: 25,

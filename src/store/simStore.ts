@@ -1,10 +1,12 @@
 import { create } from 'zustand';
 import type { AircraftState, ControlInputs, AircraftSpec } from '../sim/types';
-import { createInitialState, B737_800_SPEC } from '../sim/types';
+import { B737_800_SPEC } from '../sim/types';
 import { integrate } from '../sim/physics/integrate';
 import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
 import type { FlightPlan } from '@shared/types/fmc';
 import type { WindInfo } from '../sim/weather';
+import { KSEA_TUTORIAL_SCENARIO, createAircraftStateForScenario, scenarioById } from '../sim/scenarios';
+import type { FlightScenario } from '../sim/scenarios';
 
 export type SimStatus = 'stopped' | 'running' | 'paused';
 
@@ -17,6 +19,7 @@ export interface SimStore {
   apState: AutopilotState | null;
   flightPlan: FlightPlan | null;
   wind: WindInfo | null;
+  selectedScenarioId: string;
   setInput: (partial: Partial<ControlInputs>) => void;
   tick: (timestamp: number) => void;
   start: () => void;
@@ -24,6 +27,7 @@ export interface SimStore {
   pause: () => void;
   resume: () => void;
   reset: () => void;
+  setScenario: (scenarioId: string) => void;
   setApState: (ap: AutopilotState | null) => void;
   setFlightPlan: (fp: FlightPlan | null) => void;
   setWind: (w: WindInfo | null) => void;
@@ -36,15 +40,24 @@ const defaultInputs: ControlInputs = {
   spoilers: 0, brake: 0,
 };
 
+function cloneWind(wind: WindInfo): WindInfo {
+  return { ...wind };
+}
+
+function inputsForScenario(scenario: FlightScenario): ControlInputs {
+  return { ...defaultInputs, flapLever: scenario.flapSetting, gearLever: 'DOWN' };
+}
+
 export const useSimStore = create<SimStore>((set, get) => ({
-  aircraft: createInitialState(B737_800_SPEC),
-  inputs: { ...defaultInputs },
+  aircraft: createAircraftStateForScenario(B737_800_SPEC, KSEA_TUTORIAL_SCENARIO),
+  inputs: inputsForScenario(KSEA_TUTORIAL_SCENARIO),
   spec: B737_800_SPEC,
   status: 'stopped',
   lastFrameTime: 0,
   apState: null,
   flightPlan: null,
-  wind: null,
+  wind: cloneWind(KSEA_TUTORIAL_SCENARIO.wind),
+  selectedScenarioId: KSEA_TUTORIAL_SCENARIO.id,
 
   setInput: (partial) => set((s) => ({ inputs: { ...s.inputs, ...partial } })),
 
@@ -67,7 +80,7 @@ export const useSimStore = create<SimStore>((set, get) => ({
         ...s.inputs,
         throttle1: 1,
         throttle2: 1,
-        flapLever: 5,
+        flapLever: aircraft.config.flapSetting,
         gearLever: 'DOWN',
         brake: 0,
         elevator: 0,
@@ -78,13 +91,31 @@ export const useSimStore = create<SimStore>((set, get) => ({
   }),
   pause: () => set({ status: 'paused' }),
   resume: () => set({ status: 'running', lastFrameTime: 0 }),
-  reset: () => set({
-    aircraft: createInitialState(B737_800_SPEC),
-    inputs: { ...defaultInputs },
-    status: 'stopped',
-    lastFrameTime: 0,
-    apState: null,
-    flightPlan: null,
+  reset: () => set((s) => {
+    const scenario = scenarioById(s.selectedScenarioId);
+    return {
+      aircraft: createAircraftStateForScenario(B737_800_SPEC, scenario),
+      inputs: inputsForScenario(scenario),
+      status: 'stopped',
+      lastFrameTime: 0,
+      apState: null,
+      flightPlan: null,
+      wind: cloneWind(scenario.wind),
+    };
+  }),
+
+  setScenario: (scenarioId) => set(() => {
+    const scenario = scenarioById(scenarioId);
+    return {
+      selectedScenarioId: scenario.id,
+      aircraft: createAircraftStateForScenario(B737_800_SPEC, scenario),
+      inputs: inputsForScenario(scenario),
+      status: 'stopped',
+      lastFrameTime: 0,
+      apState: null,
+      flightPlan: null,
+      wind: cloneWind(scenario.wind),
+    };
   }),
 
   setApState: (ap) => set({ apState: ap }),

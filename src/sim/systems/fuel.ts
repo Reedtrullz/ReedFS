@@ -18,15 +18,15 @@ export function updateFuel(
   state.fuel.rightTank -= perWing;
 
   state.fuel.totalFuel = state.fuel.centerTank + state.fuel.leftTank + state.fuel.rightTank;
-  state.grossWeight = spec.emptyWeight + state.payloadWeight + state.fuel.totalFuel;
+  state.zeroFuelWeight = spec.emptyWeight + state.payloadWeight;
+  state.grossWeight = state.zeroFuelWeight + state.fuel.totalFuel;
 
   // CG shift: center tank arm = 22% MAC, wings = 30% MAC, empty aircraft = 25% MAC
   if (state.fuel.totalFuel > 0 || state.payloadWeight > 0) {
-    const cgCenter = 22, cgWing = 30, cgEmpty = 25, cgPayload = 25;
-    const totalMass = spec.emptyWeight + state.payloadWeight + state.fuel.totalFuel;
+    const cgCenter = 22, cgWing = 30;
+    const totalMass = state.zeroFuelWeight + state.fuel.totalFuel;
     state.cg = (
-      spec.emptyWeight * cgEmpty +
-      state.payloadWeight * cgPayload +
+      state.zeroFuelWeight * state.zeroFuelCg +
       state.fuel.centerTank * cgCenter +
       (state.fuel.leftTank + state.fuel.rightTank) * cgWing
     ) / totalMass;
