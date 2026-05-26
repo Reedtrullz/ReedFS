@@ -3,12 +3,9 @@ import * as Cesium from 'cesium';
 import * as THREE from 'three';
 import ThreeToCesium from 'three-to-cesium';
 import { useSimStore } from '../store/simStore';
-import { createBoeing737Model } from './AircraftModel';
 import { computeSunPosition, sunLightIntensity } from '../sim/sun';
-import { quatToEuler } from '../sim/physics/quaternion';
-import { createAircraftModelQuaternion } from './aircraftOrientation';
-import { applyAircraftModelAnimations } from './aircraftModelAnimation';
 import { isCesiumResourceDestroyed } from './cesiumLifecycle';
+import { AircraftRenderer } from './AircraftRenderer';
 
 export interface ThreeLayerProps {
   viewerRef: RefObject<Cesium.Viewer | null>;
@@ -16,7 +13,6 @@ export interface ThreeLayerProps {
 
 export function ThreeLayer({ viewerRef }: ThreeLayerProps) {
   const ttcRef = useRef<ReturnType<typeof ThreeToCesium> | null>(null);
-  const proxyRef = useRef<THREE.Group | null>(null);
 
   useEffect(() => {
     const viewer = viewerRef.current;
@@ -38,27 +34,12 @@ export function ThreeLayer({ viewerRef }: ThreeLayerProps) {
     ttc.threeScene.add(ambient);
     ttc.threeScene.add(dirLight);
 
-    // Create model template ONCE — clone per frame instead of rebuilding geometry
-    const modelTemplate = createBoeing737Model();
+    const aircraftRenderer = new AircraftRenderer(ttc);
 
     // Per-frame sync: update proxy position from sim state
     const sync = () => {
       const aircraft = useSimStore.getState().aircraft;
-      const { lat, lon, alt } = aircraft.position;
-      const attitude = quatToEuler(aircraft.quaternion);
-
-      // Remove old proxy
-      if (proxyRef.current) {
-        ttc.remove(proxyRef.current);
-      }
-
-      // Clone template (shares geometry buffers, only creates wrapper objects)
-      const model = modelTemplate.clone(true) as THREE.Group;
-      model.quaternion.copy(createAircraftModelQuaternion(attitude));
-      applyAircraftModelAnimations(model, aircraft);
-
-      const pos = Cesium.Cartesian3.fromDegrees(lon, lat, alt * 0.3048);
-      proxyRef.current = ttc.add(model, pos);
+      const { lat, lon } = aircraft.position;
 
       // Update lighting from sun position
       const sun = computeSunPosition(lat, lon, aircraft.timeOfDay ?? 12);
@@ -72,7 +53,7 @@ export function ThreeLayer({ viewerRef }: ThreeLayerProps) {
         2000 * Math.cos(sun.azimuth) * Math.cos(sun.elevation),
       );
 
-      ttc.update();
+      aircraftRenderer.render(aircraft);
     };
 
     const postRender = scene.postRender;
@@ -81,6 +62,11 @@ export function ThreeLayer({ viewerRef }: ThreeLayerProps) {
     return () => {
       if (!isCesiumResourceDestroyed(viewer)) {
         postRender.removeEventListener(sync);
+      }
+      try {
+        aircraftRenderer.dispose();
+      } catch {
+        // Three/Cesium bridge internals may already be partially torn down.
       }
       try {
         ttc.destroy();
