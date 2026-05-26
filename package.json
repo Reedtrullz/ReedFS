@@ -12,7 +12,9 @@
     "lint:ci": "eslint . --max-warnings=0",
     "check:deps": "node scripts/check-single-three.mjs",
     "check": "npm run check:deps && npm run lint:ci && npm run typecheck && npm run test && npm run build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:visual": "playwright test --pass-with-no-tests",
+    "test:visual:update": "playwright test --update-snapshots --pass-with-no-tests"
   },
   "dependencies": {
     "@virtual-cdu/shared": "file:../RFMS/shared",
@@ -30,6 +32,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.60.0",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
