@@ -1,6 +1,7 @@
 export interface MetarData {
   windDir: number;
   windSpeed: number; // knots
+  windGust?: number; // knots
   temperature: number; // °C
   visibility: number; // meters
   clouds: { cover: string; base: number }[]; // base in feet
@@ -10,6 +11,8 @@ export interface MetarData {
 export interface WindInfo {
   dir: number; // degrees true wind is FROM (METAR convention)
   speed: number; // knots
+  gustSpeed?: number; // knots, peak gust from same METAR direction
+  gustSeed?: number; // deterministic turbulence seed for repeatable sim/test runs
 }
 
 type JsonObject = Record<string, unknown>;
@@ -42,7 +45,11 @@ function parseClouds(value: unknown): MetarData['clouds'] {
 }
 
 export function parseMetarWind(m: MetarData): WindInfo {
-  return { dir: m.windDir, speed: m.windSpeed };
+  return {
+    dir: m.windDir,
+    speed: m.windSpeed,
+    ...(typeof m.windGust === 'number' && Number.isFinite(m.windGust) ? { gustSpeed: m.windGust } : {}),
+  };
 }
 
 export async function fetchMetar(icao: string): Promise<MetarData | null> {
@@ -62,6 +69,7 @@ export async function fetchMetar(icao: string): Promise<MetarData | null> {
     return {
       windDir: numberOrDefault(m.wdir, 0),
       windSpeed: numberOrDefault(m.wspd, 0),
+      windGust: numberOrDefault(m.wgst, 0) || undefined,
       temperature: numberOrDefault(m.tmp, 15),
       visibility: visibilityOrDefault(m.visib, 9999),
       clouds: parseClouds(m.clouds),

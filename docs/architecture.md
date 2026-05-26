@@ -120,10 +120,10 @@ Known guidance follow-up:
 
 ## Weather architecture
 
-- `weather.ts` fetches/parses METAR data.
-- `parseMetarWind()` interprets wind direction as FROM direction.
-- `environment.ts` converts METAR wind to NED then to body axes.
-- Wind is threaded into `integrate()`, `computeAero()`, and `computeDerived()` without modifying ground velocity.
+- `weather.ts` parses optional METAR gust speed into `WindInfo.gustSpeed`.
+- `environment.ts` converts METAR wind to NED then to body axes, and layers deterministic seeded gust perturbations onto air-relative velocity only.
+- `computeAirRelativeVelocity()` subtracts wind/gust from ground-relative body velocity and returns a new object.
+- Wind/gust never mutate `state.velocity`; position, GS, and VS remain ground-relative while TAS/IAS/AoA/beta use the perturbed air-relative vector.
 
 ## Ground model architecture
 

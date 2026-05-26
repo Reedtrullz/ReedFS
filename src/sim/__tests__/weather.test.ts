@@ -9,6 +9,15 @@ describe('parseMetarWind', () => {
     expect(w.speed).toBe(15);
   });
 
+  it('parses gust speed when METAR data includes one', () => {
+    const m: MetarData = { windDir: 180, windSpeed: 15, windGust: 28, temperature: 20, visibility: 9999, clouds: [], qnh: 1013 };
+    const w = parseMetarWind(m);
+
+    expect(w.dir).toBe(180);
+    expect(w.speed).toBe(15);
+    expect(w.gustSpeed).toBe(28);
+  });
+
   it('handles zero wind', () => {
     const m: MetarData = { windDir: 0, windSpeed: 0, temperature: 15, visibility: 9999, clouds: [], qnh: 1013 };
     const w = parseMetarWind(m);

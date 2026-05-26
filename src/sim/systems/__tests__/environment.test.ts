@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeAirRelativeVelocity } from '../environment';
+import { computeAirRelativeVelocity, computeGustNed } from '../environment';
 import { createInitialState, B737_800_SPEC } from '../../types';
 import type { WindInfo } from '../../weather';
 
@@ -40,5 +40,31 @@ describe('computeAirRelativeVelocity', () => {
     expect(air.u).toBeCloseTo(100 + 20 * 0.514444, 6);
     expect(air.v).toBeCloseTo(0, 6);
     expect(air.w).toBeCloseTo(0, 6);
+  });
+
+  it('applies gusts only to air-relative velocity and never mutates ground velocity', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.velocity.u = 100;
+    s.simTime = 12_345;
+    const gustyWind: WindInfo = { dir: 180, speed: 20, gustSpeed: 35, gustSeed: 42 };
+    const steadyWind: WindInfo = { dir: 180, speed: 20 };
+    const before = structuredClone(s.velocity);
+
+    const steady = computeAirRelativeVelocity(s, steadyWind);
+    const gusty = computeAirRelativeVelocity(s, gustyWind);
+
+    expect(s.velocity).toEqual(before);
+    expect(gusty.u).not.toBeCloseTo(steady.u, 6);
+  });
+
+  it('computes seeded gust perturbations deterministically', () => {
+    const wind: WindInfo = { dir: 210, speed: 12, gustSpeed: 28, gustSeed: 7 };
+
+    const first = computeGustNed(wind, 30_000);
+    const second = computeGustNed(wind, 30_000);
+    const otherSeed = computeGustNed({ ...wind, gustSeed: 8 }, 30_000);
+
+    expect(second).toEqual(first);
+    expect(otherSeed).not.toEqual(first);
   });
 });
