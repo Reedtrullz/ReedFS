@@ -237,6 +237,30 @@ describe('resolveAutopilotTargets VNAV', () => {
 });
 
 describe('resolveAutopilotTargets LNAV', () => {
+  it('commands an intercept angle back toward the active route leg when right of course', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.position.lat = 47.05;
+    s.position.lon = -121.98;
+    s.attitude.psi = 0;
+    const ap = makeAp('LNAV', 'ALT_HOLD', 'SPEED');
+    const fp: FlightPlan = {
+      origin: 'ORIG',
+      destination: 'DEST',
+      flightNumber: 'TST789',
+      route: 'ORIG DEST',
+      waypoints: [
+        { ident: 'ORIG', lat: 47.0, lon: -122.0, discontinuity: false },
+        { ident: 'DEST', lat: 47.2, lon: -122.0, discontinuity: false },
+      ],
+    };
+
+    const targets = resolveAutopilotTargets(s, ap, fp, 0);
+    const signedInterceptRad = ((targets.targetHeadingRad + Math.PI) % (2 * Math.PI)) - Math.PI;
+
+    expect(signedInterceptRad).toBeLessThan(-5 * Math.PI / 180);
+    expect(signedInterceptRad).toBeGreaterThan(-30 * Math.PI / 180);
+  });
+
   it('uses the active route leg to target the next waypoint instead of the from waypoint', () => {
     const s = createInitialState(B737_800_SPEC);
     s.position.lat = 47.1;

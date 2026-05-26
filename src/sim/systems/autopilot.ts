@@ -23,6 +23,8 @@ const DEFAULT_TARGET_SPEED_KT = 250;
 const ELEVATOR_RATE_LIMIT_PER_SEC = 1.5;
 const THROTTLE_RATE_LIMIT_PER_SEC = 1.5;
 const MAX_VS_ELEVATOR = 0.35;
+const LNAV_INTERCEPT_MAX_RAD = 25 * Math.PI / 180;
+const LNAV_INTERCEPT_FULL_SCALE_M = 1852;
 
 function finiteOrUndefined(value: number | undefined | null): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
@@ -61,6 +63,20 @@ function rateLimitElevator(target: number, dt: number): number {
   );
   elevatorCommand.value = limited;
   return limited;
+}
+
+function normalizeHeadingRad(rad: number): number {
+  const twoPi = Math.PI * 2;
+  return ((rad % twoPi) + twoPi) % twoPi;
+}
+
+function lnavInterceptHeading(desiredTrackRad: number, crossTrackErrorM: number): number {
+  const interceptRad = clamp(
+    crossTrackErrorM / LNAV_INTERCEPT_FULL_SCALE_M,
+    -1,
+    1,
+  ) * LNAV_INTERCEPT_MAX_RAD;
+  return normalizeHeadingRad(desiredTrackRad - interceptRad);
 }
 
 function normalizeHeadingError(rad: number): number {
@@ -116,10 +132,11 @@ export function resolveAutopilotTargets(
 
     const routeStatus = computeRouteStatus(state, flightPlan, legIndex);
     if (routeStatus?.lnavAvailable && routeStatus.desiredTrackRad !== null) {
+      const crossTrackError = routeStatus.crossTrackErrorM ?? 0;
       const nav: NavOutput = {
-        crossTrackError: 0,
-        alongTrackDist: routeStatus.distanceToNextM ?? 0,
-        desiredTrack: routeStatus.desiredTrackRad,
+        crossTrackError,
+        alongTrackDist: routeStatus.alongTrackM ?? routeStatus.distanceToNextM ?? 0,
+        desiredTrack: lnavInterceptHeading(routeStatus.desiredTrackRad, crossTrackError),
         activeWaypointIndex: routeStatus.toWaypointIndex ?? legIndex,
         waypointReached: routeStatus.waypointReached,
       };

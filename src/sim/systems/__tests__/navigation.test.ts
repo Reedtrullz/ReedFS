@@ -195,6 +195,21 @@ describe('computeRouteStatus', () => {
     expect(status.etaMinutes).toBeCloseTo((status.distanceToNextM ?? 0) / 100 / 60, 2);
   });
 
+  it('reports signed cross-track error for the active route leg', () => {
+    const fp = makePlan([
+      { ident: 'ORIG', lat: 47.0, lon: -122.0, discontinuity: false },
+      { ident: 'NEXT', lat: 47.2, lon: -122.0, discontinuity: false },
+    ]);
+    const rightOfCourse = makeState(47.05, -121.98, 100);
+    const leftOfCourse = makeState(47.05, -122.02, 100);
+
+    const rightStatus = computeRouteStatus(rightOfCourse, fp, 0);
+    const leftStatus = computeRouteStatus(leftOfCourse, fp, 0);
+
+    expect(rightStatus.crossTrackErrorM).toBeGreaterThan(1000);
+    expect(leftStatus.crossTrackErrorM).toBeLessThan(-1000);
+  });
+
   it('marks LNAV unavailable with a clear reason when a waypoint is missing coordinates', () => {
     const fp = makePlan([
       { ident: 'ORIG', lat: 47.0, lon: -122.0, discontinuity: false },

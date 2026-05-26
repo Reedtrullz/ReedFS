@@ -29,6 +29,9 @@ export interface RouteStatusSnapshot {
   distanceToNextNm: number | null;
   desiredTrackRad: number | null;
   desiredTrackDegTrue: number | null;
+  crossTrackErrorM: number | null;
+  alongTrackM: number | null;
+  legLengthM: number | null;
   etaMinutes: number | null;
   waypointReached: boolean;
   sequenced: boolean;
@@ -206,6 +209,9 @@ export function createNoRouteStatus(
     distanceToNextNm: null,
     desiredTrackRad: null,
     desiredTrackDegTrue: null,
+    crossTrackErrorM: null,
+    alongTrackM: null,
+    legLengthM: null,
     etaMinutes: null,
     waypointReached: false,
     sequenced: false,
@@ -243,6 +249,7 @@ export function computeRouteStatus(
   const trackFromLon = leg.fromLon ?? state.position.lon;
   const desiredTrackRad = bearingRad(trackFromLat, trackFromLon, leg.toLat, leg.toLon);
   const desiredTrackDegTrue = normalizeDeg(desiredTrackRad * 180 / Math.PI);
+  const relative = positionRelativeToLegM(leg, state.position.lat, state.position.lon);
   const speedMps = groundOrTasMps(state);
 
   return {
@@ -260,6 +267,9 @@ export function computeRouteStatus(
     distanceToNextNm,
     desiredTrackRad,
     desiredTrackDegTrue,
+    crossTrackErrorM: relative?.crossTrackM ?? null,
+    alongTrackM: relative?.alongTrackM ?? null,
+    legLengthM: relative?.legLengthM ?? null,
     etaMinutes: speedMps ? distanceToNextM / speedMps / 60 : null,
     waypointReached: distanceToNextM <= captureRadiusM,
     sequenced,
