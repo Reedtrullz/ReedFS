@@ -1,3 +1,4 @@
+import { WORKER_PHYSICS_ENABLED_BY_DEFAULT } from '../config/workerPhysics';
 import { advanceSimulationStep } from './simulationStep';
 import {
   decodeSimulationStepRequest,
@@ -6,7 +7,7 @@ import {
   type SimulationStepResponseMessage,
 } from './workerCodec';
 
-export const SIMULATION_WORKER_PHYSICS_ENABLED_BY_DEFAULT = false as const;
+export const SIMULATION_WORKER_PHYSICS_ENABLED_BY_DEFAULT = WORKER_PHYSICS_ENABLED_BY_DEFAULT;
 
 const MALFORMED_SIMULATION_WORKER_REQUEST_ID = 'simulation-worker-malformed-request';
 

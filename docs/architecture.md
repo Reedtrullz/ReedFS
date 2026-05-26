@@ -159,7 +159,7 @@ push master
 These are intentional gaps, not regressions:
 
 1. Full gear/tire ground model: individual gear stations, oleo compression, anti-skid, nosewheel/tiller steering, rollout braking, and touchdown dynamics beyond the current runway-normal/normal-force contract.
-2. Worker physics: codec, worker loop, main-thread bridge, deterministic fixed-timestep state handoff.
+2. Worker physics: codec and worker entry scaffolding exist, and `VITE_RFS_WORKER_PHYSICS` is parsed as an experimental/default-off runtime flag for future wiring. The active runtime still uses main-thread physics; no `simStore` tick migration or runtime Worker bridge is enabled yet.
 3. Advanced flight guidance: LNAV intercept/turn anticipation, RFMS route edits, full VNAV SPD/PTH/ALT ACQ mode transitions, and selected MCP target lifecycle.
 4. Data-driven flight model: validated aircraft coefficient tables and trim/response tests.
 5. Release hardening: Three.js deduplication, deterministic visual regression snapshots, fixed-timestep/worker migration, and audio immersion pass.

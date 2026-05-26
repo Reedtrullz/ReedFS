@@ -192,6 +192,12 @@ React App
 
 Moving physics to a fixed-timestep Web Worker remains a recommended follow-up after the state/control/route contracts stabilize.
 
+### Experimental worker physics flag
+
+`VITE_RFS_WORKER_PHYSICS` is parsed by `src/config/workerPhysics.ts` as an experimental, default-off feature flag for future worker-physics wiring. Truthy tokens are `1`, `true`, `yes`, `on`, and `enabled`; false/off tokens are `0`, `false`, `no`, `off`, `disabled`, and an empty value. Invalid values fall back safely to main-thread physics with an explanatory config reason.
+
+The current runtime still keeps `simStore.tick()` and physics execution on the main thread. Enabling the flag today does not migrate ticks to a Worker or instantiate a runtime Worker; that bridge remains future work.
+
 ## Deployment
 
 Pushes to `master` trigger GitHub Actions:
