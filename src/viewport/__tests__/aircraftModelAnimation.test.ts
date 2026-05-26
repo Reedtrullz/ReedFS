@@ -2,44 +2,60 @@ import { describe, expect, it } from 'vitest';
 import { createBoeing737Model } from '../AircraftModel';
 import { createAircraftModelQuaternion } from '../aircraftOrientation';
 import { applyAircraftModelAnimations } from '../aircraftModelAnimation';
-import { B737_800_SPEC, createInitialState, type AircraftState } from '../../sim/types';
+import { B737_800_SPEC, createInitialState, type AircraftState, type ControlInputs } from '../../sim/types';
 
-function aircraftForAnimation(overrides: Partial<AircraftState> = {}): Pick<AircraftState, 'engines' | 'simTime' | 'ground' | 'config'> {
+function aircraftForAnimation(overrides: Partial<AircraftState> = {}): AircraftState {
   const aircraft = createInitialState(B737_800_SPEC);
-  aircraft.engines[0].n1 = 1;
-  aircraft.engines[1].n1 = 0.8;
-  aircraft.simTime = 3;
+  aircraft.engines[0].n1 = 100;
+  aircraft.engines[1].n1 = 80;
+  aircraft.electrical.batteryVolts = 28;
+  aircraft.simTime = 3000;
 
   return {
-    engines: aircraft.engines,
-    simTime: aircraft.simTime,
-    ground: aircraft.ground,
-    config: aircraft.config,
+    ...aircraft,
+    ...overrides,
+  };
+}
+
+function controls(overrides: Partial<ControlInputs> = {}): ControlInputs {
+  return {
+    elevator: 0,
+    aileron: 0,
+    rudder: 0,
+    throttle1: 0,
+    throttle2: 0,
+    flapLever: 0,
+    gearLever: 'DOWN',
+    spoilers: 0,
+    brake: 0,
     ...overrides,
   };
 }
 
 describe('aircraft model animations', () => {
-  it('spins engine meshes without rotating the aircraft root', () => {
+  it('spins fan discs without rotating the aircraft root or static engine nacelles', () => {
     const model = createBoeing737Model();
     const expectedQuaternion = createAircraftModelQuaternion({ phi: 0, theta: 0, psi: Math.PI });
     model.quaternion.copy(expectedQuaternion);
 
-    applyAircraftModelAnimations(model, aircraftForAnimation());
+    applyAircraftModelAnimations(model, aircraftForAnimation(), controls());
 
     expect(model.quaternion.angleTo(expectedQuaternion)).toBeLessThan(1e-9);
     expect(Math.abs(model.rotation.z)).toBeCloseTo(Math.PI, 9);
-    expect(model.getObjectByName('leftEngine')?.rotation.y).not.toBe(0);
-    expect(model.getObjectByName('rightEngine')?.rotation.y).not.toBe(0);
+    expect(model.getObjectByName('leftEngine')?.rotation.y).toBeCloseTo(0, 9);
+    expect(model.getObjectByName('rightEngine')?.rotation.y).toBeCloseTo(0, 9);
+    expect(model.getObjectByName('leftFan')?.rotation.y).not.toBe(0);
+    expect(model.getObjectByName('rightFan')?.rotation.y).not.toBe(0);
   });
 
   it('compresses landing gear along the model down/up axis only', () => {
     const model = createBoeing737Model();
 
-    applyAircraftModelAnimations(model, aircraftForAnimation());
+    applyAircraftModelAnimations(model, aircraftForAnimation(), controls());
 
     ['noseGear', 'leftMainGear', 'rightMainGear'].forEach((gearName) => {
       const gear = model.getObjectByName(gearName);
+      expect(gear?.visible).toBe(true);
       expect(gear?.scale.z).toBeCloseTo(0.7, 9);
       expect(gear?.scale.x).toBeCloseTo(1, 9);
       expect(gear?.scale.y).toBeCloseTo(1, 9);
@@ -49,27 +65,75 @@ describe('aircraft model animations', () => {
     });
   });
 
-  it('leaves gear uncompressed when airborne or retracted', () => {
+  it('hides/retracts gear when the effective gear lever is up or gearDown is false', () => {
+    const model = createBoeing737Model();
+    const retracted = aircraftForAnimation({
+      config: { ...createInitialState(B737_800_SPEC).config, gearDown: false },
+    });
+
+    applyAircraftModelAnimations(model, retracted, controls({ gearLever: 'UP' }));
+
+    ['noseGear', 'leftMainGear', 'rightMainGear'].forEach((gearName) => {
+      const gear = model.getObjectByName(gearName);
+      expect(gear?.visible).toBe(false);
+      expect(gear?.scale.z).toBeCloseTo(1, 9);
+    });
+  });
+
+  it('deflects flaps increasingly with effective flap detents', () => {
+    const model = createBoeing737Model();
+    const aircraft = aircraftForAnimation();
+
+    applyAircraftModelAnimations(model, aircraft, controls({ flapLever: 5 }));
+    const flaps5 = model.getObjectByName('leftFlap')?.rotation.x ?? 0;
+
+    applyAircraftModelAnimations(model, aircraft, controls({ flapLever: 15 }));
+    const flaps15 = model.getObjectByName('leftFlap')?.rotation.x ?? 0;
+
+    applyAircraftModelAnimations(model, aircraft, controls({ flapLever: 30 }));
+    const flaps30 = model.getObjectByName('leftFlap')?.rotation.x ?? 0;
+
+    expect(flaps5).toBeGreaterThan(0);
+    expect(flaps15).toBeGreaterThan(flaps5);
+    expect(flaps30).toBeGreaterThan(flaps15);
+    expect(model.getObjectByName('rightFlap')?.rotation.x).toBeCloseTo(flaps30, 9);
+  });
+
+  it('deflects elevator, aileron, and rudder surfaces from effective controls', () => {
     const model = createBoeing737Model();
 
-    const airborne = createInitialState(B737_800_SPEC);
-    airborne.ground = {
-      ...airborne.ground,
-      aglFt: 1000,
-      weightOnWheels: false,
-      normalForceN: 0,
-      onRunway: false,
-      contact: 'none',
-    };
+    applyAircraftModelAnimations(model, aircraftForAnimation(), controls({
+      aileron: 1,
+      elevator: -0.5,
+      rudder: 1,
+    }));
 
-    applyAircraftModelAnimations(model, aircraftForAnimation({ ground: airborne.ground }));
+    expect(model.getObjectByName('leftAileron')?.rotation.x).toBeGreaterThan(0);
+    expect(model.getObjectByName('rightAileron')?.rotation.x).toBeLessThan(0);
+    expect(model.getObjectByName('leftElevator')?.rotation.x).toBeLessThan(0);
+    expect(model.getObjectByName('rightElevator')?.rotation.x).toBeLessThan(0);
+    expect(model.getObjectByName('rudder')?.rotation.z).toBeGreaterThan(0);
+  });
 
-    expect(model.getObjectByName('noseGear')?.scale.z).toBeCloseTo(1, 9);
+  it('toggles lights deterministically for tests', () => {
+    const model = createBoeing737Model();
+    const aircraft = aircraftForAnimation({ simTime: 0 });
 
-    const retracted = createInitialState(B737_800_SPEC);
-    retracted.config.gearDown = false;
-    applyAircraftModelAnimations(model, aircraftForAnimation({ config: retracted.config }));
+    applyAircraftModelAnimations(model, aircraft, controls({ gearLever: 'DOWN' }));
+    expect(model.getObjectByName('leftNavLight')?.visible).toBe(true);
+    expect(model.getObjectByName('rightNavLight')?.visible).toBe(true);
+    expect(model.getObjectByName('tailNavLight')?.visible).toBe(true);
+    expect(model.getObjectByName('landingLight')?.visible).toBe(true);
+    expect(model.getObjectByName('beacon')?.visible).toBe(true);
 
-    expect(model.getObjectByName('noseGear')?.scale.z).toBeCloseTo(1, 9);
+    applyAircraftModelAnimations(model, aircraftForAnimation({ simTime: 750 }), controls({ gearLever: 'DOWN' }));
+    expect(model.getObjectByName('beacon')?.visible).toBe(false);
+
+    const unpowered = aircraftForAnimation({
+      electrical: { ...aircraft.electrical, batteryVolts: 0, acBusPowered: false },
+    });
+    applyAircraftModelAnimations(model, unpowered, controls({ gearLever: 'DOWN' }));
+    expect(model.getObjectByName('leftNavLight')?.visible).toBe(false);
+    expect(model.getObjectByName('landingLight')?.visible).toBe(false);
   });
 });

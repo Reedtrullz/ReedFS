@@ -1,7 +1,7 @@
 import * as Cesium from 'cesium';
 import * as THREE from 'three';
 import type ThreeToCesium from 'three-to-cesium';
-import type { AircraftState } from '../sim/types';
+import type { AircraftState, ControlInputs } from '../sim/types';
 import { quatToEuler } from '../sim/physics/quaternion';
 import { createAircraftModelQuaternion } from './aircraftOrientation';
 import { applyAircraftModelAnimations } from './aircraftModelAnimation';
@@ -47,11 +47,11 @@ export class AircraftRenderer {
     this.model = modelFactory();
   }
 
-  render(aircraft: AircraftState): void {
+  render(aircraft: AircraftState, controls?: Partial<ControlInputs>): void {
     if (this.disposed) return;
 
     this.model.quaternion.copy(createAircraftModelQuaternion(quatToEuler(aircraft.quaternion)));
-    applyAircraftModelAnimations(this.model, aircraft);
+    applyAircraftModelAnimations(this.model, aircraft, controls);
 
     const position = aircraftPositionCartesian(aircraft);
     if (!this.wrapper) {

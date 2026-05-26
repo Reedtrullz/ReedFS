@@ -46,8 +46,8 @@ describe('AircraftRenderer', () => {
     const { bridge } = createBridge();
     const renderer = new AircraftRenderer(bridge);
 
-    renderer.render(aircraftAt({ simTime: 0, n1: 0.2 }));
-    renderer.render(aircraftAt({ lat: 47.45, lon: -122.31, alt: 500, simTime: 1, n1: 0.2 }));
+    renderer.render(aircraftAt({ simTime: 0, n1: 20 }));
+    renderer.render(aircraftAt({ lat: 47.45, lon: -122.31, alt: 500, simTime: 1000, n1: 20 }));
 
     expect(bridge.add).toHaveBeenCalledTimes(1);
     expect(bridge.remove).not.toHaveBeenCalled();
@@ -58,16 +58,16 @@ describe('AircraftRenderer', () => {
     const { bridge } = createBridge();
     const renderer = new AircraftRenderer(bridge);
 
-    renderer.render(aircraftAt({ simTime: 1, n1: 0.3 }));
+    renderer.render(aircraftAt({ simTime: 1000, n1: 30 }));
     const model = bridge.add.mock.calls[0][0] as THREE.Object3D;
-    const leftEngine = model.getObjectByName('leftEngine');
-    const firstRotation = leftEngine?.rotation.y ?? 0;
+    const leftFan = model.getObjectByName('leftFan');
+    const firstRotation = leftFan?.rotation.y ?? 0;
 
-    renderer.render(aircraftAt({ simTime: 2, n1: 0.3 }));
+    renderer.render(aircraftAt({ simTime: 2000, n1: 30 }));
 
     expect(bridge.add.mock.calls[0][0]).toBe(model);
-    expect(leftEngine?.rotation.y).not.toBe(firstRotation);
-    expect(leftEngine?.rotation.y).toBeCloseTo(2 * 0.3 * 40, 8);
+    expect(leftFan?.rotation.y).not.toBe(firstRotation);
+    expect(leftFan?.rotation.y).toBeCloseTo(2 * 0.3 * 40, 8);
   });
 
   it('updates the bridge wrapper geospatial transform in place when the aircraft moves', () => {

@@ -38,7 +38,7 @@ export function ThreeLayer({ viewerRef }: ThreeLayerProps) {
 
     // Per-frame sync: update proxy position from sim state
     const sync = () => {
-      const aircraft = useSimStore.getState().aircraft;
+      const { aircraft, effectiveControls } = useSimStore.getState();
       const { lat, lon } = aircraft.position;
 
       // Update lighting from sun position
@@ -53,7 +53,7 @@ export function ThreeLayer({ viewerRef }: ThreeLayerProps) {
         2000 * Math.cos(sun.azimuth) * Math.cos(sun.elevation),
       );
 
-      aircraftRenderer.render(aircraft);
+      aircraftRenderer.render(aircraft, effectiveControls);
     };
 
     const postRender = scene.postRender;
