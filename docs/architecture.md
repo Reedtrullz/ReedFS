@@ -105,7 +105,7 @@ RFS bridges RFMS-compatible avionics state into native physics and player-facing
 - `RfsMCP.tsx` edits RFMS-compatible selected speed/heading/altitude/vertical-speed targets, creates a default AP state on first valid mode/target click, and keeps unsupported modes hidden.
 - `RfsPFD.tsx` renders readable speed/altitude tapes, attitude/heading, and an FMA row from the same truth modes the servo laws use.
 - `App.tsx` can load the KSEA -> OLM -> BTG -> KPDX sample route and applies safe LNAV + SPEED + ALT_HOLD defaults without engaging unsupported VNAV.
-- `navigation.ts` validates route coordinates/discontinuities, computes store-owned active-leg status including signed cross-track/along-track metrics, and sequences the active leg.
+- `navigation.ts` validates route coordinates/discontinuities, computes store-owned active-leg status including signed cross-track/along-track metrics, estimates next-leg turn angle/anticipation distance, and sequences the active leg.
 - `RouteStatus.tsx` exposes active leg, next waypoint, DTG, track, ETA, and LNAV unavailable reasons.
 - `autopilot.ts` maps active RFMS truth modes to AP-owned control commands. LNAV uses the store-owned active route leg plus a capped cross-track intercept law; VNAV uses the active route leg constraints. Invalid route status does not fall back to waypoint 0.
 - `vnav.ts` reports VNAV availability, unavailable reasons, altitude targets, target vertical speed, and speed constraints.
@@ -113,7 +113,7 @@ RFS bridges RFMS-compatible avionics state into native physics and player-facing
 
 Known guidance follow-up:
 
-- Add richer LNAV turn anticipation and RFMS-backed route edits.
+- Use turn anticipation metrics to advance LNAV guidance before leg transitions and add RFMS-backed route edits.
 - Add full VNAV SPD/PTH/ALT ACQ mode lifecycle beyond the current conservative constraint targeting.
 
 ## Weather architecture

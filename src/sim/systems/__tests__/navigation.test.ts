@@ -210,6 +210,38 @@ describe('computeRouteStatus', () => {
     expect(leftStatus.crossTrackErrorM).toBeLessThan(-1000);
   });
 
+  it('reports turn anticipation metrics for the next active leg transition', () => {
+    const fp = makePlan([
+      { ident: 'ORIG', lat: 47.0, lon: -122.0, discontinuity: false },
+      { ident: 'MID', lat: 47.2, lon: -122.0, discontinuity: false },
+      { ident: 'DEST', lat: 47.2, lon: -121.8, discontinuity: false },
+    ]);
+    const state = makeState(47.1, -122.0, 128.6);
+
+    const status = computeRouteStatus(state, fp, 0);
+
+    expect(status.nextDesiredTrackRad).toBeCloseTo(Math.PI / 2, 1);
+    expect(status.nextDesiredTrackDegTrue).toBeCloseTo(90, 0);
+    expect(status.turnAngleRad).toBeCloseTo(Math.PI / 2, 1);
+    expect(status.turnAnticipationDistanceM).toBeGreaterThan(1000);
+    expect(status.turnAnticipationDistanceNm).toBeCloseTo((status.turnAnticipationDistanceM ?? 0) / 1852, 5);
+  });
+
+  it('reports no turn anticipation metrics on the final route leg', () => {
+    const fp = makePlan([
+      { ident: 'ORIG', lat: 47.0, lon: -122.0, discontinuity: false },
+      { ident: 'MID', lat: 47.2, lon: -122.0, discontinuity: false },
+      { ident: 'DEST', lat: 47.2, lon: -121.8, discontinuity: false },
+    ]);
+    const state = makeState(47.2, -121.9, 128.6);
+
+    const status = computeRouteStatus(state, fp, 1);
+
+    expect(status.nextDesiredTrackRad).toBeNull();
+    expect(status.turnAngleRad).toBeNull();
+    expect(status.turnAnticipationDistanceM).toBeNull();
+  });
+
   it('marks LNAV unavailable with a clear reason when a waypoint is missing coordinates', () => {
     const fp = makePlan([
       { ident: 'ORIG', lat: 47.0, lon: -122.0, discontinuity: false },

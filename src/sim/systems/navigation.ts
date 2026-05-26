@@ -5,6 +5,8 @@ const EARTH_RADIUS_M = 6371000;
 const M_PER_NM = 1852;
 const DEFAULT_CAPTURE_RADIUS_M = 0.5 * M_PER_NM;
 const LEG_COMPLETE_RADIUS_M = 0.1 * M_PER_NM;
+const STANDARD_LNAV_BANK_RAD = 25 * Math.PI / 180;
+const GRAVITY_MPS2 = 9.80665;
 
 export interface NavOutput {
   crossTrackError: number;
@@ -32,6 +34,11 @@ export interface RouteStatusSnapshot {
   crossTrackErrorM: number | null;
   alongTrackM: number | null;
   legLengthM: number | null;
+  nextDesiredTrackRad: number | null;
+  nextDesiredTrackDegTrue: number | null;
+  turnAngleRad: number | null;
+  turnAnticipationDistanceM: number | null;
+  turnAnticipationDistanceNm: number | null;
   etaMinutes: number | null;
   waypointReached: boolean;
   sequenced: boolean;
@@ -74,6 +81,13 @@ function normalizeRad(rad: number): number {
 
 function normalizeDeg(deg: number): number {
   return ((deg % 360) + 360) % 360;
+}
+
+function normalizeSignedRad(rad: number): number {
+  let normalized = rad;
+  while (normalized > Math.PI) normalized -= 2 * Math.PI;
+  while (normalized < -Math.PI) normalized += 2 * Math.PI;
+  return normalized;
 }
 
 function routeNameFor(flightPlan: FlightPlan | null | undefined): string {
@@ -167,6 +181,14 @@ function groundOrTasMps(state: AircraftState): number | null {
   return total > 1 ? total : null;
 }
 
+function computeTurnAnticipationDistanceM(speedMps: number | null, turnAngleRad: number | null): number | null {
+  if (speedMps === null || turnAngleRad === null) return null;
+  const angle = Math.abs(turnAngleRad);
+  if (angle < 1 * Math.PI / 180) return 0;
+  const turnRadiusM = speedMps ** 2 / (GRAVITY_MPS2 * Math.tan(STANDARD_LNAV_BANK_RAD));
+  return turnRadiusM * Math.tan(angle / 2);
+}
+
 function positionRelativeToLegM(leg: RouteLeg, lat: number, lon: number): { alongTrackM: number; crossTrackM: number; legLengthM: number } | null {
   if (leg.fromLat === null || leg.fromLon === null) return null;
   const refLat = toRad((leg.fromLat + leg.toLat) / 2);
@@ -212,6 +234,11 @@ export function createNoRouteStatus(
     crossTrackErrorM: null,
     alongTrackM: null,
     legLengthM: null,
+    nextDesiredTrackRad: null,
+    nextDesiredTrackDegTrue: null,
+    turnAngleRad: null,
+    turnAnticipationDistanceM: null,
+    turnAnticipationDistanceNm: null,
     etaMinutes: null,
     waypointReached: false,
     sequenced: false,
@@ -251,6 +278,17 @@ export function computeRouteStatus(
   const desiredTrackDegTrue = normalizeDeg(desiredTrackRad * 180 / Math.PI);
   const relative = positionRelativeToLegM(leg, state.position.lat, state.position.lon);
   const speedMps = groundOrTasMps(state);
+  const nextLeg = legs[legIndex + 1];
+  const nextDesiredTrackRad = nextLeg ? bearingRad(
+    nextLeg.fromLat ?? leg.toLat,
+    nextLeg.fromLon ?? leg.toLon,
+    nextLeg.toLat,
+    nextLeg.toLon,
+  ) : null;
+  const nextDesiredTrackDegTrue = nextDesiredTrackRad === null ? null : normalizeDeg(nextDesiredTrackRad * 180 / Math.PI);
+  const turnAngleRad = nextDesiredTrackRad === null ? null : normalizeSignedRad(nextDesiredTrackRad - desiredTrackRad);
+  const turnAnticipationDistanceM = computeTurnAnticipationDistanceM(speedMps, turnAngleRad);
+  const turnAnticipationDistanceNm = turnAnticipationDistanceM === null ? null : turnAnticipationDistanceM / M_PER_NM;
 
   return {
     routeName: route.routeName,
@@ -270,6 +308,11 @@ export function computeRouteStatus(
     crossTrackErrorM: relative?.crossTrackM ?? null,
     alongTrackM: relative?.alongTrackM ?? null,
     legLengthM: relative?.legLengthM ?? null,
+    nextDesiredTrackRad,
+    nextDesiredTrackDegTrue,
+    turnAngleRad,
+    turnAnticipationDistanceM,
+    turnAnticipationDistanceNm,
     etaMinutes: speedMps ? distanceToNextM / speedMps / 60 : null,
     waypointReached: distanceToNextM <= captureRadiusM,
     sequenced,
