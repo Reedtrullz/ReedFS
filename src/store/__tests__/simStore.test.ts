@@ -214,6 +214,34 @@ describe('useSimStore', () => {
   });
   it('tick advances simTime when running', () => { useSimStore.getState().start(); const b = useSimStore.getState().aircraft.simTime; useSimStore.getState().tick(performance.now()); expect(useSimStore.getState().aircraft.simTime).toBeGreaterThanOrEqual(b); });
 
+  it('splits a long frame into fixed simulation steps', () => {
+    const store = useSimStore.getState();
+    store.reset();
+    useSimStore.getState().startTakeoffRoll();
+
+    useSimStore.getState().tick(1000);
+    useSimStore.getState().tick(1200);
+
+    const after = useSimStore.getState();
+    expect(after.lastFrameTime).toBe(1200);
+    expect(after.fixedStepAccumulatorSeconds).toBeLessThan(1 / 60);
+    expect(after.simulationTimeSeconds).toBeGreaterThanOrEqual(0.21);
+    expect(after.simulationTimeSeconds).toBeLessThanOrEqual(0.22);
+  });
+
+  it('caps catch-up work and records dropped simulation time after a giant frame', () => {
+    useSimStore.getState().startTakeoffRoll();
+
+    useSimStore.getState().tick(1000);
+    useSimStore.getState().tick(11000);
+
+    const after = useSimStore.getState();
+    expect(after.lastFrameTime).toBe(11000);
+    expect(after.simulationTimeSeconds).toBeCloseTo(17 / 60, 8);
+    expect(after.fixedStepAccumulatorSeconds).toBe(0);
+    expect(after.droppedSimulationTimeSeconds).toBeGreaterThan(9.7);
+  });
+
   it('setFlightPlan initializes the first valid active leg and route feedback', () => {
     const fp = createKseaKpdxFlight();
 

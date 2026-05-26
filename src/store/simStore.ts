@@ -46,6 +46,9 @@ export interface SimStore {
   spec: AircraftSpec;
   status: SimStatus;
   lastFrameTime: number;
+  fixedStepAccumulatorSeconds: number;
+  simulationTimeSeconds: number;
+  droppedSimulationTimeSeconds: number;
   apState: AutopilotState | null;
   flightPlan: FlightPlan | null;
   activeLegIndex: number | null;
@@ -67,6 +70,9 @@ export interface SimStore {
   setFlightPlan: (fp: FlightPlan | null) => void;
   setWind: (w: WindInfo | null) => void;
 }
+
+const FIXED_STEP_SECONDS = 1 / 60;
+const MAX_STEPS_PER_FRAME = 16;
 
 const defaultInputs: ControlInputs = {
   elevator: 0, aileron: 0, rudder: 0,
@@ -255,6 +261,9 @@ export const useSimStore = create<SimStore>((set, get) => ({
   spec: B737_800_SPEC,
   status: 'stopped',
   lastFrameTime: 0,
+  fixedStepAccumulatorSeconds: 0,
+  simulationTimeSeconds: 0,
+  droppedSimulationTimeSeconds: 0,
   apState: null,
   flightPlan: null,
   activeLegIndex: null,
@@ -316,6 +325,9 @@ export const useSimStore = create<SimStore>((set, get) => ({
     const {
       status,
       lastFrameTime,
+      fixedStepAccumulatorSeconds,
+      simulationTimeSeconds,
+      droppedSimulationTimeSeconds,
       aircraft,
       pilotInputs,
       spec,
@@ -328,28 +340,71 @@ export const useSimStore = create<SimStore>((set, get) => ({
       guidance,
     } = get();
     if (status !== 'running') return;
-    const dt = lastFrameTime > 0 ? Math.min((timestamp - lastFrameTime) / 1000, 0.05) : 1 / 60;
-    const next = advanceSimulationStep({
-      aircraft,
-      spec,
-      pilotInputs,
-      apState,
-      flightPlan,
-      activeLegIndex,
-      routeStatus,
-      wind,
-      dt,
-      status,
-      selectedScenarioId,
-      guidance,
-    });
+
+    const frameDeltaSeconds = lastFrameTime > 0
+      ? Math.max(0, (timestamp - lastFrameTime) / 1000)
+      : FIXED_STEP_SECONDS;
+    let accumulator = fixedStepAccumulatorSeconds + frameDeltaSeconds;
+    let stepCount = Math.floor(accumulator / FIXED_STEP_SECONDS);
+    let droppedTime = droppedSimulationTimeSeconds;
+
+    if (stepCount > MAX_STEPS_PER_FRAME) {
+      const executableTime = MAX_STEPS_PER_FRAME * FIXED_STEP_SECONDS;
+      droppedTime += accumulator - executableTime;
+      accumulator = executableTime;
+      stepCount = MAX_STEPS_PER_FRAME;
+    }
+
+    if (stepCount <= 0) {
+      set({
+        lastFrameTime: timestamp,
+        fixedStepAccumulatorSeconds: accumulator,
+        droppedSimulationTimeSeconds: droppedTime,
+      });
+      return;
+    }
+
+    let nextAircraft = aircraft;
+    let nextActiveLegIndex = activeLegIndex;
+    let nextRouteStatus = routeStatus;
+    let nextGuidance = guidance;
+    let nextControls = composeControlsSlice(pilotInputs, get().apCommands, apState);
+
+    for (let step = 0; step < stepCount; step++) {
+      const next = advanceSimulationStep({
+        aircraft: nextAircraft,
+        spec,
+        pilotInputs,
+        apState,
+        flightPlan,
+        activeLegIndex: nextActiveLegIndex,
+        routeStatus: nextRouteStatus,
+        wind,
+        dt: FIXED_STEP_SECONDS,
+        status,
+        selectedScenarioId,
+        guidance: nextGuidance,
+      });
+      nextAircraft = next.aircraft;
+      nextControls = next.controls;
+      nextActiveLegIndex = next.activeLegIndex;
+      nextRouteStatus = next.routeStatus;
+      nextGuidance = next.guidance;
+    }
+
+    accumulator -= stepCount * FIXED_STEP_SECONDS;
+    if (Math.abs(accumulator) < 1e-12) accumulator = 0;
+
     set({
-      aircraft: next.aircraft,
+      aircraft: nextAircraft,
       lastFrameTime: timestamp,
-      ...next.controls,
-      activeLegIndex: next.activeLegIndex,
-      routeStatus: next.routeStatus,
-      guidance: next.guidance,
+      fixedStepAccumulatorSeconds: accumulator,
+      simulationTimeSeconds: simulationTimeSeconds + stepCount * FIXED_STEP_SECONDS,
+      droppedSimulationTimeSeconds: droppedTime,
+      ...nextControls,
+      activeLegIndex: nextActiveLegIndex,
+      routeStatus: nextRouteStatus,
+      guidance: nextGuidance,
     });
   },
 
@@ -358,6 +413,7 @@ export const useSimStore = create<SimStore>((set, get) => ({
     return {
       status: 'running',
       lastFrameTime: 0,
+      fixedStepAccumulatorSeconds: 0,
       guidance: syncGuidanceState(s.guidance, scenario, 'running', s.aircraft, s.effectiveControls),
     };
   }),
@@ -386,6 +442,9 @@ export const useSimStore = create<SimStore>((set, get) => ({
       apState: null,
       status: 'running',
       lastFrameTime: 0,
+      fixedStepAccumulatorSeconds: 0,
+      simulationTimeSeconds: 0,
+      droppedSimulationTimeSeconds: 0,
       guidance: syncGuidanceState(s.guidance, scenario, 'running', aircraft, controlsSlice.effectiveControls),
     };
   }),
@@ -401,6 +460,7 @@ export const useSimStore = create<SimStore>((set, get) => ({
     return {
       status: 'running',
       lastFrameTime: 0,
+      fixedStepAccumulatorSeconds: 0,
       guidance: syncGuidanceState(s.guidance, scenario, 'running', s.aircraft, s.effectiveControls),
     };
   }),
@@ -416,6 +476,9 @@ export const useSimStore = create<SimStore>((set, get) => ({
       inputManager: inputManagerForScenario(scenario),
       status: 'stopped',
       lastFrameTime: 0,
+      fixedStepAccumulatorSeconds: 0,
+      simulationTimeSeconds: 0,
+      droppedSimulationTimeSeconds: 0,
       apState: null,
       flightPlan: null,
       activeLegIndex: null,
@@ -443,6 +506,9 @@ export const useSimStore = create<SimStore>((set, get) => ({
       inputManager: inputManagerForScenario(scenario),
       status: 'stopped',
       lastFrameTime: 0,
+      fixedStepAccumulatorSeconds: 0,
+      simulationTimeSeconds: 0,
+      droppedSimulationTimeSeconds: 0,
       apState: null,
       flightPlan: null,
       activeLegIndex: null,
