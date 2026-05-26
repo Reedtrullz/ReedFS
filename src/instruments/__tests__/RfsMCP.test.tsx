@@ -37,6 +37,34 @@ describe('RfsMCP', () => {
     expect(ap?.boeing.verticalSpeed).toBe(0);
   });
 
+  it('edits selected MCP speed target without engaging SPEED mode', () => {
+    render(<RfsMCP />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'SPD +5' }));
+
+    const ap = useSimStore.getState().apState;
+    expect(ap).not.toBeNull();
+    expect(ap?.boeing.speed).toBe(255);
+    expect(ap?.truth.thrustActive).toBe('OFF');
+    expect(screen.getByText('SPD 255')).toBeTruthy();
+  });
+
+  it('edits selected MCP heading altitude and vertical-speed targets', () => {
+    render(<RfsMCP />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'HDG -5' }));
+    fireEvent.click(screen.getByRole('button', { name: 'ALT +1000' }));
+    fireEvent.click(screen.getByRole('button', { name: 'VS +100' }));
+
+    const ap = useSimStore.getState().apState;
+    expect(ap?.boeing.heading).toBe(355);
+    expect(ap?.boeing.altitude).toBe(11000);
+    expect(ap?.boeing.verticalSpeed).toBe(100);
+    expect(screen.getByText('HDG 355')).toBeTruthy();
+    expect(screen.getByText('ALT 11000')).toBeTruthy();
+    expect(screen.getByText('VS +100')).toBeTruthy();
+  });
+
   it('does not render a clickable VNAV button when VNAV availability is not gated', () => {
     render(<RfsMCP />);
 

@@ -102,7 +102,7 @@ Known rendering follow-up:
 
 RFS bridges RFMS-compatible avionics state into native physics and player-facing feedback:
 
-- `RfsMCP.tsx` edits an RFMS-compatible `AutopilotState` and creates a default AP state on the first valid mode click.
+- `RfsMCP.tsx` edits RFMS-compatible selected speed/heading/altitude/vertical-speed targets, creates a default AP state on first valid mode/target click, and keeps unsupported modes hidden.
 - `RfsPFD.tsx` renders readable speed/altitude tapes, attitude/heading, and an FMA row from the same truth modes the servo laws use.
 - `App.tsx` can load the KSEA -> OLM -> BTG -> KPDX sample route and applies safe LNAV + SPEED + ALT_HOLD defaults without engaging unsupported VNAV.
 - `navigation.ts` validates route coordinates/discontinuities, computes store-owned active-leg status, and sequences the active leg.
@@ -115,7 +115,6 @@ Known guidance follow-up:
 
 - Add richer LNAV intercept/turn anticipation and RFMS-backed route edits.
 - Add full VNAV SPD/PTH/ALT ACQ mode lifecycle beyond the current conservative constraint targeting.
-- Add selectable MCP targets and cockpit controls instead of only fixed defaults/buttons.
 
 ## Weather architecture
 
