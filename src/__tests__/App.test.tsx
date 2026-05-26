@@ -299,10 +299,19 @@ vi.mock('three-to-cesium', () => ({
   })),
 }));
 
+vi.mock('../viewport/CesiumViewport', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../viewport/CesiumViewport')>();
+  return {
+    ...actual,
+    CesiumViewport: vi.fn(actual.CesiumViewport),
+  };
+});
+
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import ThreeToCesium from 'three-to-cesium';
 import { App } from '../App';
 import { useSimStore } from '../store/simStore';
+import { CesiumViewport } from '../viewport/CesiumViewport';
 
 const defaultAppTestApState = structuredClone(useSimStore.getState().apState);
 
@@ -333,6 +342,23 @@ describe('App', () => {
     expect(screen.getByLabelText('Route status')).toBeTruthy();
     expect(screen.getByText('KSEA→KPDX')).toBeTruthy();
     expect(screen.getByText(/KSEA → OLM/)).toBeTruthy();
+  });
+
+  it('shows degraded scenery status and passes the degraded policy to the viewport when Ion is unavailable', () => {
+    render(<App />);
+
+    const status = screen.getByRole('status');
+    expect(status.textContent).toMatch(/SCENERY DEGRADED/i);
+    expect(status.textContent).toMatch(/VITE_CESIUM_ION_TOKEN/i);
+
+    const viewportProps = vi.mocked(CesiumViewport).mock.calls[0][0];
+    expect(viewportProps.scenePolicy).toMatchObject({
+      mode: 'degraded',
+      terrain: 'ellipsoid',
+      osmBuildings: false,
+      token: null,
+    });
+    expect(viewportProps.scenePolicy?.reason).toMatch(/VITE_CESIUM_ION_TOKEN/);
   });
 
   it('LOAD PLAN creates and stores the default route', () => {

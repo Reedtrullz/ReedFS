@@ -33,9 +33,10 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { FPSMonitor } from './components/FPSMonitor';
 import { ScenarioPanel } from './components/ScenarioPanel';
 import { RouteStatus } from './components/RouteStatus';
+import { SceneStatus } from './components/SceneStatus';
 import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
 
-initCesium();
+const cesiumScenePolicy = initCesium();
 
 function applyLoadedRouteAutopilotDefaults(apState: AutopilotState): AutopilotState {
   const next = structuredClone(apState);
@@ -189,7 +190,8 @@ export function App() {
   return (
     <ErrorBoundary>
     <div style={{ width: '100%', height: '100%' }}>
-      <CesiumViewport onReady={handleViewerReady} />
+      <CesiumViewport onReady={handleViewerReady} scenePolicy={cesiumScenePolicy} />
+      <SceneStatus policy={cesiumScenePolicy} />
       <RunwayLayer viewerRef={viewerRef} />
       {camMode === 'cockpit' ? <CockpitLayer viewerRef={viewerRef} /> : <ThreeLayer viewerRef={viewerRef} />}
       <CloudLayer viewerRef={viewerRef} metar={metarData} />
