@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { createInitialState, B737_800_SPEC } from '../../types';
+import { createInitialState, B737_800_SPEC, createB737GearStations } from '../../types';
 import type { ControlInputs } from '../../types';
-import { applyGroundContact, KSEA_RUNWAY_ALT_FT } from '../ground';
+import { applyGroundContact, computeGroundRollForces, KSEA_RUNWAY_ALT_FT } from '../ground';
 import { bodyToNed } from '../../physics/frames';
 import { eulerToQuat } from '../../physics/quaternion';
 
@@ -155,6 +155,35 @@ describe('applyGroundContact', () => {
     const ned = bodyToNed(state.velocity, state.attitude);
     expect(ned.down).toBeCloseTo(0, 8);
     expect(state.velocity.w).toBeGreaterThan(0);
+  });
+
+  it('computes rolling friction and brake force from gear station loads', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.grossWeight = 10_000;
+    const gearStations = createB737GearStations(100_000, true);
+    const braking: ControlInputs = { ...idle, brake: 1 };
+
+    const forces = computeGroundRollForces(state, braking, gearStations);
+
+    expect(forces.rollingNormalForceN).toBe(100_000);
+    expect(forces.brakeNormalForceN).toBe(90_000);
+    expect(forces.brakeForceN).toBeGreaterThan(forces.rollingFrictionForceN);
+    expect(forces.brakeForceN).toBeLessThan(100_000 * (6 / 9.80665));
+    expect(forces.accelerationMps2).toBeCloseTo(forces.retardingForceN / 10_000, 8);
+  });
+
+  it('applies brake deceleration from loaded brake-capable stations without reversing direction', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.position.alt = KSEA_RUNWAY_ALT_FT;
+    state.velocity.u = 20;
+    state.grossWeight = 10_000;
+    state.config.gearDown = true;
+    const braking: ControlInputs = { ...idle, brake: 1 };
+
+    applyGroundContact(state, braking, 1, KSEA_RUNWAY_ALT_FT, { normalForceN: 100_000 });
+
+    expect(state.velocity.u).toBeGreaterThanOrEqual(0);
+    expect(state.velocity.u).toBeCloseTo(14.1366, 3);
   });
 
   it('applies rolling and brake deceleration on the runway without reversing direction', () => {

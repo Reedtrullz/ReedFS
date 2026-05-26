@@ -1,4 +1,4 @@
-import type { AircraftState, ControlInputs, GroundContactType, GroundState } from '../types';
+import type { AircraftState, ControlInputs, GearStationState, GroundContactType, GroundState } from '../types';
 import { createB737GearStations } from '../types';
 import { bodyToNed, nedToBody } from '../physics/frames';
 import { eulerToQuat } from '../physics/quaternion';
@@ -7,8 +7,8 @@ export const KSEA_RUNWAY_ALT_FT = 432;
 export const GROUND_CONTACT_EPSILON_FT = 0.5;
 const G = 9.80665;
 
-const ROLLING_FRICTION_ACCEL_MPS2 = 0.35;
-const MAX_BRAKE_ACCEL_MPS2 = 6.0;
+const ROLLING_FRICTION_COEFFICIENT = 0.35 / G;
+const MAX_BRAKE_COEFFICIENT = 6.0 / G;
 const STOP_EPSILON_MPS = 0.05;
 const BREAKAWAY_THROTTLE = 0.05;
 const MIN_GROUND_PITCH_RAD = 0;
@@ -20,6 +20,15 @@ export type GroundContactResult = GroundState;
 export interface GroundContactOptions {
   normalForceN?: number;
   allowLiftoff?: boolean;
+}
+
+export interface GroundRollForceBreakdown {
+  rollingNormalForceN: number;
+  brakeNormalForceN: number;
+  rollingFrictionForceN: number;
+  brakeForceN: number;
+  retardingForceN: number;
+  accelerationMps2: number;
 }
 
 function clamp01(value: number): number {
@@ -64,9 +73,37 @@ export function constrainRunwayNormalVelocity(state: AircraftState): void {
   state.velocity = nedToBody({ ...ned, down: 0 }, state.attitude);
 }
 
-function applyLongitudinalGroundDecel(state: AircraftState, inputs: ControlInputs, dt: number, normalForceN: number): void {
-  const speed = state.velocity.u;
+export function computeGroundRollForces(
+  state: AircraftState,
+  inputs: ControlInputs,
+  gearStations: GearStationState[] = state.ground.gearStations,
+): GroundRollForceBreakdown {
+  const loadedStations = gearStations.filter((station) => station.weightOnWheel);
+  const rollingNormalForceN = loadedStations.reduce((sum, station) => sum + Math.max(0, station.normalForceN), 0);
+  const brakeNormalForceN = loadedStations
+    .filter((station) => station.brakeCapable)
+    .reduce((sum, station) => sum + Math.max(0, station.normalForceN), 0);
   const brake = clamp01(inputs.brake);
+  const rollingFrictionForceN = ROLLING_FRICTION_COEFFICIENT * rollingNormalForceN;
+  const brakeForceN = brake * MAX_BRAKE_COEFFICIENT * brakeNormalForceN;
+  const retardingForceN = rollingFrictionForceN + brakeForceN;
+  return {
+    rollingNormalForceN,
+    brakeNormalForceN,
+    rollingFrictionForceN,
+    brakeForceN,
+    retardingForceN,
+    accelerationMps2: retardingForceN / Math.max(1, state.grossWeight),
+  };
+}
+
+function applyLongitudinalGroundDecel(
+  state: AircraftState,
+  inputs: ControlInputs,
+  dt: number,
+  gearStations: GearStationState[],
+): void {
+  const speed = state.velocity.u;
   const breakawayThrust = hasBreakawayThrustCommand(inputs);
 
   if (Math.abs(speed) <= STOP_EPSILON_MPS && !breakawayThrust) {
@@ -74,8 +111,8 @@ function applyLongitudinalGroundDecel(state: AircraftState, inputs: ControlInput
     return;
   }
 
-  const normalForceScale = clamp01(normalForceN / Math.max(1, grossWeightForceN(state)));
-  const decel = (ROLLING_FRICTION_ACCEL_MPS2 + brake * MAX_BRAKE_ACCEL_MPS2) * normalForceScale * Math.max(0, dt);
+  const forces = computeGroundRollForces(state, inputs, gearStations);
+  const decel = forces.accelerationMps2 * Math.max(0, dt);
 
   if (speed > 0) {
     state.velocity.u = Math.max(0, speed - decel);
@@ -131,11 +168,12 @@ export function applyGroundContact(
   }
 
   const gearNormalForceN = options.normalForceN ?? grossWeightForceN(state);
+  const loadedGearStations = createB737GearStations(gearNormalForceN, true);
   state.position.alt = groundAltFt;
   state.config.gearDown = true;
 
   stabilizeGroundAttitude(state);
-  applyLongitudinalGroundDecel(state, inputs, dt, gearNormalForceN);
+  applyLongitudinalGroundDecel(state, inputs, dt, loadedGearStations);
   constrainRunwayNormalVelocity(state);
 
   return setGroundState(state, groundAltFt, 'gear', true, gearNormalForceN);
