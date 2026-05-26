@@ -1,5 +1,6 @@
 import type { AircraftState } from '../sim/types';
 import { quatToEuler } from '../sim/physics/quaternion';
+import { mapGpwsCalloutToSpeechParams } from './audioMapping';
 
 function checkMode1(state: AircraftState): string | null {
   const descentRate = -state.velocity.w * 196.85;
@@ -61,9 +62,10 @@ export function updateGPWS(state: AircraftState): void {
 
 function speakCallout(text: string): void {
   if (typeof speechSynthesis === 'undefined') return;
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.rate = 0.8;
-  utterance.pitch = 0.9;
-  utterance.volume = 0.7;
+  const speech = mapGpwsCalloutToSpeechParams(text);
+  const utterance = new SpeechSynthesisUtterance(speech.text);
+  utterance.rate = speech.rate;
+  utterance.pitch = speech.pitch;
+  utterance.volume = speech.volume;
   speechSynthesis.speak(utterance);
 }

@@ -1,3 +1,5 @@
+import { clampAudioUnit } from './audioMapping';
+
 export class AudioEngine {
   ctx: AudioContext;
   master: GainNode;
@@ -32,7 +34,7 @@ export class AudioEngine {
   get started() { return this._started; }
 
   setMasterVolume(v: number) {
-    this.master.gain.value = Math.max(0, Math.min(1, v));
+    this.master.gain.value = clampAudioUnit(v);
   }
 
   dispose() {

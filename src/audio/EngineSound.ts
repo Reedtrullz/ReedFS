@@ -1,4 +1,5 @@
 import { getAudioEngine } from './AudioEngine';
+import { mapEngineN1ToSoundParams } from './audioMapping';
 
 export class EngineSound {
   private osc: OscillatorNode;
@@ -21,10 +22,9 @@ export class EngineSound {
   }
 
   update(n1: number) {
-    // N1 0-100% → frequency 40-180Hz
-    this.osc.frequency.value = 40 + n1 * 1.4;
-    // N1 0-100% → gain 0-0.12
-    this.gain.gain.value = (n1 / 100) * 0.12;
+    const params = mapEngineN1ToSoundParams(n1);
+    this.osc.frequency.value = params.frequencyHz;
+    this.gain.gain.value = params.gain;
   }
 
   dispose() {
