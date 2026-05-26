@@ -8,6 +8,7 @@ import { AttitudeIndicator } from './components/AttitudeIndicator';
 import { ControlsHelp } from './components/ControlsHelp';
 import { useSimLoop } from './hooks/useSimLoop';
 import { useAudioLoop } from './hooks/useAudioLoop';
+import { getAudioEngine } from './audio/AudioEngine';
 import { useSimStore } from './store/simStore';
 import { readGamepadActions } from './input/GamepadManager';
 import {
@@ -37,6 +38,7 @@ import { SceneStatus } from './components/SceneStatus';
 import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
 
 const cesiumScenePolicy = initCesium();
+type AudioUiStatus = 'off' | 'starting' | 'on' | 'blocked';
 
 function applyLoadedRouteAutopilotDefaults(apState: AutopilotState): AutopilotState {
   const next = structuredClone(apState);
@@ -57,8 +59,10 @@ function applyLoadedRouteAutopilotDefaults(apState: AutopilotState): AutopilotSt
 
 export function App() {
   const viewerRef = useRef<Cesium.Viewer | null>(null);
+  const [audioEnabled, setAudioEnabled] = useState(false);
+  const [audioStatus, setAudioStatus] = useState<AudioUiStatus>('off');
   useSimLoop();
-  useAudioLoop();
+  useAudioLoop(audioEnabled);
 
   const startTakeoffRoll = useSimStore((s) => s.startTakeoffRoll);
   const pause = useSimStore((s) => s.pause);
@@ -184,6 +188,35 @@ export function App() {
     startTakeoffRoll();
   };
 
+  const handleToggleAudio = async () => {
+    if (audioEnabled) {
+      getAudioEngine().setMasterVolume(0);
+      setAudioEnabled(false);
+      setAudioStatus('off');
+      return;
+    }
+
+    setAudioStatus('starting');
+    try {
+      const engine = getAudioEngine();
+      await engine.start();
+      engine.setMasterVolume(0.5);
+      setAudioEnabled(true);
+      setAudioStatus('on');
+    } catch {
+      setAudioEnabled(false);
+      setAudioStatus('blocked');
+    }
+  };
+
+  const audioButtonLabel = audioStatus === 'starting'
+    ? 'AUDIO: STARTING'
+    : audioStatus === 'blocked'
+      ? 'AUDIO: BLOCKED'
+      : audioEnabled
+        ? 'AUDIO: ON'
+        : 'AUDIO: OFF';
+
   const showDebugOverlays = shouldShowDebugOverlays(overlayMode);
   const showFlightInstruments = shouldShowFlightInstruments(overlayMode);
 
@@ -239,6 +272,12 @@ export function App() {
           style={btnStyle}
         >
           OVL: {overlayMode.toUpperCase()}
+        </button>
+        <button
+          onClick={handleToggleAudio}
+          style={btnStyle}
+        >
+          {audioButtonLabel}
         </button>
         <button
           onClick={() => {

@@ -198,6 +198,10 @@ Moving physics to a fixed-timestep Web Worker remains a recommended follow-up af
 
 The current runtime still keeps `simStore.tick()` and physics execution on the main thread. Enabling the flag today does not migrate ticks to a Worker or instantiate a runtime Worker; that bridge remains future work.
 
+### Audio startup
+
+Audio is explicit and browser-autoplay-safe. The `AUDIO: OFF` cockpit control is the only path that starts the `AudioContext`; mounting the app no longer resumes Web Audio or creates engine oscillators. Once enabled, `useAudioLoop(true)` drives engine sound parameters and GPWS callouts from the current sim state. Turning audio off stops the loop and mutes the master bus.
+
 ## Deployment
 
 Pushes to `master` trigger GitHub Actions:

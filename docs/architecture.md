@@ -94,8 +94,8 @@ RFS renders with Cesium plus a focused Three.js overlay:
 
 Known rendering follow-up:
 
-- Deduplicate the Three.js copies that still produce the browser warning.
-- Add deterministic visual regression snapshots for aircraft/runway/cockpit/instruments.
+- The dependency guard enforces a single Three.js copy before build/test to avoid `instanceof` and bridge mismatch bugs.
+- Playwright visual regression snapshots cover deterministic initial chase/cockpit views in CI.
 - Continue improving the procedural 737 and cockpit model fidelity.
 
 ## Avionics and guidance architecture
@@ -123,6 +123,13 @@ Known guidance follow-up:
 - `parseMetarWind()` interprets wind direction as FROM direction.
 - `environment.ts` converts METAR wind to NED then to body axes.
 - Wind is threaded into `integrate()`, `computeAero()`, and `computeDerived()` without modifying ground velocity.
+
+## Audio architecture
+
+- `audioMapping.ts` contains pure mappings for gain clamping, engine N1 -> oscillator parameters, and GPWS speech parameters.
+- `AudioEngine.ts` owns the `AudioContext`, master/engine/cockpit buses, explicit `start()`, idempotent `dispose()`, and lifecycle status reporting.
+- `App.tsx` exposes the `AUDIO: OFF/ON` control. Mounting the app does not start or resume Web Audio; the player must click the audio control to satisfy browser autoplay policy.
+- `useAudioLoop(true)` creates engine oscillators, updates them from sim state each RAF, and runs GPWS callout checks. When disabled, no audio loop or engine oscillators are created.
 
 ## Quality and release architecture
 
@@ -162,4 +169,4 @@ These are intentional gaps, not regressions:
 2. Worker physics: codec and worker entry scaffolding exist, and `VITE_RFS_WORKER_PHYSICS` is parsed as an experimental/default-off runtime flag for future wiring. The active runtime still uses main-thread physics; no `simStore` tick migration or runtime Worker bridge is enabled yet.
 3. Advanced flight guidance: LNAV intercept/turn anticipation, RFMS route edits, full VNAV SPD/PTH/ALT ACQ mode transitions, and selected MCP target lifecycle.
 4. Data-driven flight model: validated aircraft coefficient tables and trim/response tests.
-5. Release hardening: Three.js deduplication, deterministic visual regression snapshots, fixed-timestep/worker migration, and audio immersion pass.
+5. Audio immersion: explicit Web Audio startup and deterministic mapping are in place; richer engine/cockpit/airframe sound layers remain future work.

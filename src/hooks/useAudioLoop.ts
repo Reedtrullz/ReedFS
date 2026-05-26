@@ -1,21 +1,15 @@
 import { useEffect, useRef } from 'react';
 import { useSimStore } from '../store/simStore';
-import { getAudioEngine } from '../audio/AudioEngine';
 import { EngineSound } from '../audio/EngineSound';
 import { updateGPWS } from '../audio/GPWS';
 
-export function useAudioLoop() {
+export function useAudioLoop(enabled = false) {
   const enginesRef = useRef<EngineSound[] | null>(null);
-  const startedRef = useRef(false);
 
   useEffect(() => {
-    // Start audio context (requires user gesture — will be triggered by first TAKEOFF click)
-    if (!startedRef.current && getAudioEngine().ctx.state === 'suspended') {
-      getAudioEngine().start().catch(() => {});
-      startedRef.current = true;
-    }
+    if (!enabled) return undefined;
 
-    // Create engine sounds
+    // Create engine sounds only after the player explicitly enables audio.
     if (!enginesRef.current) {
       enginesRef.current = [new EngineSound(0), new EngineSound(1)];
     }
@@ -38,5 +32,5 @@ export function useAudioLoop() {
       enginesRef.current?.forEach((e) => e.dispose());
       enginesRef.current = null;
     };
-  }, []);
+  }, [enabled]);
 }

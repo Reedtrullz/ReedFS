@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 
 // Mock Web Audio API (not available in jsdom)
+const mockAudioContexts: MockAudioContext[] = [];
 class MockAudioContext {
   createGain = vi.fn(() => ({ gain: { value: 0 }, connect: vi.fn(), disconnect: vi.fn() }));
   createOscillator = vi.fn(() => ({
@@ -11,9 +12,13 @@ class MockAudioContext {
     stop: vi.fn(),
   }));
   destination = {};
-  state = 'running';
-  close = vi.fn();
-  resume = vi.fn();
+  state: AudioContextState = 'suspended';
+  close = vi.fn(async () => { this.state = 'closed'; });
+  resume = vi.fn(async () => { this.state = 'running'; });
+
+  constructor() {
+    mockAudioContexts.push(this);
+  }
 }
 vi.stubGlobal('AudioContext', MockAudioContext);
 vi.stubGlobal('speechSynthesis', undefined);
@@ -26,8 +31,9 @@ class MockOscillatorNode {
 }
 vi.stubGlobal('OscillatorNode', MockOscillatorNode);
 
-const { mockSetInput, mockStart, mockStartTakeoffRoll, mockPause, mockResume, mockReset, mockSetScenario, mockSetTutorialStep, mockSetFlightPlan, mockSetApState } = vi.hoisted(() => ({
+const { mockSetInput, mockApplyInputActions, mockStart, mockStartTakeoffRoll, mockPause, mockResume, mockReset, mockSetScenario, mockSetTutorialStep, mockSetFlightPlan, mockSetApState } = vi.hoisted(() => ({
   mockSetInput: vi.fn(),
+  mockApplyInputActions: vi.fn(),
   mockStart: vi.fn(),
   mockStartTakeoffRoll: vi.fn(),
   mockPause: vi.fn(),
@@ -162,6 +168,7 @@ vi.mock('../store/simStore', () => {
     resume: mockResume,
     reset: mockReset,
     setInput: mockSetInput,
+    applyInputActions: mockApplyInputActions,
     setScenario: mockSetScenario,
     setTutorialStep: mockSetTutorialStep,
     setFlightPlan: mockSetFlightPlan,
@@ -318,6 +325,7 @@ const defaultAppTestApState = structuredClone(useSimStore.getState().apState);
 describe('App', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockAudioContexts.length = 0;
     useSimStore.getState().apState = structuredClone(defaultAppTestApState);
   });
 
@@ -438,6 +446,19 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: 'START ROLL' }));
 
     expect(mockStartTakeoffRoll).toHaveBeenCalledTimes(1);
+  });
+
+  it('starts audio only from the explicit AUDIO control', async () => {
+    render(<App />);
+
+    expect(screen.getByRole('button', { name: 'AUDIO: OFF' })).toBeTruthy();
+    expect(mockAudioContexts).toHaveLength(0);
+
+    fireEvent.click(screen.getByRole('button', { name: 'AUDIO: OFF' }));
+
+    expect(await screen.findByRole('button', { name: 'AUDIO: ON' })).toBeTruthy();
+    expect(mockAudioContexts).toHaveLength(1);
+    expect(mockAudioContexts[0].resume).toHaveBeenCalledTimes(1);
   });
 
   it('cycles overlays from flight to minimal to debug', () => {
