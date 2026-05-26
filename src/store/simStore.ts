@@ -1,13 +1,18 @@
 import { create } from 'zustand';
 import type { AircraftState, AutopilotCommands, ControlInputs, AircraftSpec } from '../sim/types';
 import { B737_800_SPEC } from '../sim/types';
-import { integrate } from '../sim/physics/integrate';
 import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
 import type { FlightPlan } from '@shared/types/fmc';
 import type { WindInfo } from '../sim/weather';
 import { KSEA_TUTORIAL_SCENARIO, createAircraftStateForScenario, scenarioById } from '../sim/scenarios';
 import type { FlightScenario } from '../sim/scenarios';
-import { buildGuidanceState, rebuildGuidanceState, type GuidanceState } from '../sim/guidanceState';
+import { buildGuidanceState, type GuidanceState } from '../sim/guidanceState';
+import {
+  advanceSimulationStep,
+  composeControlsSlice,
+  syncGuidanceState,
+  type SimulationStatus,
+} from '../sim/simulationStep';
 import {
   computeRouteStatus,
   createNoRouteStatus,
@@ -15,8 +20,6 @@ import {
   type RouteStatusSnapshot,
 } from '../sim/systems/navigation';
 import {
-  composeEffectiveControls,
-  computeAutopilotCommandsForState,
   isAutopilotEngaged,
   resetAutopilotPID,
 } from '../sim/systems/autopilot';
@@ -27,7 +30,7 @@ import {
   type InputManagerState,
 } from '../input/InputManager';
 
-export type SimStatus = 'stopped' | 'running' | 'paused';
+export type SimStatus = SimulationStatus;
 
 export interface SimStore {
   aircraft: AircraftState;
@@ -85,32 +88,6 @@ function inputManagerForScenario(scenario: FlightScenario): InputManagerState {
     ...inputsForScenario(scenario),
     stabilizerTrimUnits: scenario.stabilizerTrimUnits,
   });
-}
-
-function composeControlsSlice(
-  pilotInputs: ControlInputs,
-  apCommands: AutopilotCommands = {},
-  apState: AutopilotState | null = null,
-): Pick<SimStore, 'pilotInputs' | 'apCommands' | 'effectiveControls' | 'inputs'> {
-  const active = isAutopilotEngaged(apState);
-  const effectiveControls = composeEffectiveControls(pilotInputs, active ? apCommands : {}, active);
-  return {
-    pilotInputs,
-    apCommands: active ? apCommands : {},
-    effectiveControls,
-    inputs: effectiveControls,
-  };
-}
-
-function syncGuidance(
-  currentGuidance: GuidanceState,
-  scenario: FlightScenario,
-  status: SimStatus,
-  aircraft: AircraftState,
-  controls: ControlInputs,
-  tutorialStepIndex?: number,
-): GuidanceState {
-  return rebuildGuidanceState(currentGuidance, { scenario, status, aircraft, controls, tutorialStepIndex });
 }
 
 function syncInputManagerWithInputPartial(
@@ -304,7 +281,7 @@ export const useSimStore = create<SimStore>((set, get) => ({
         ...controlsSlice,
         apState,
         inputManager: syncInputManagerWithInputPartial(s.inputManager, pilotPatch),
-        guidance: syncGuidance(s.guidance, scenario, s.status, s.aircraft, controlsSlice.effectiveControls),
+        guidance: syncGuidanceState(s.guidance, scenario, s.status, s.aircraft, controlsSlice.effectiveControls),
       };
     }),
 
@@ -331,7 +308,7 @@ export const useSimStore = create<SimStore>((set, get) => ({
         inputManager,
         aircraft,
         apState,
-        guidance: syncGuidance(s.guidance, scenario, s.status, aircraft, controlsSlice.effectiveControls),
+        guidance: syncGuidanceState(s.guidance, scenario, s.status, aircraft, controlsSlice.effectiveControls),
       };
     }),
 
@@ -345,33 +322,34 @@ export const useSimStore = create<SimStore>((set, get) => ({
       apState,
       flightPlan,
       activeLegIndex,
+      routeStatus,
       wind,
       selectedScenarioId,
       guidance,
     } = get();
     if (status !== 'running') return;
     const dt = lastFrameTime > 0 ? Math.min((timestamp - lastFrameTime) / 1000, 0.05) : 1 / 60;
-    const state = structuredClone(aircraft);
-    const routeBeforeTick = flightPlan
-      ? computeRouteStatus(state, flightPlan, activeLegIndex)
-      : createNoRouteStatus();
-    const apActive = isAutopilotEngaged(apState);
-    const apCommands = apActive
-      ? computeAutopilotCommandsForState(state, apState, flightPlan, dt, routeBeforeTick.activeLegIndex)
-      : {};
-    const controls = composeControlsSlice(pilotInputs, apCommands, apState);
-    integrate(state, controls.effectiveControls, spec, dt, null, flightPlan, wind);
-    const routeStatus = flightPlan
-      ? computeRouteStatus(state, flightPlan, routeBeforeTick.activeLegIndex)
-      : createNoRouteStatus();
-    const scenario = scenarioById(selectedScenarioId);
-    set({
-      aircraft: state,
-      lastFrameTime: timestamp,
-      ...controls,
-      activeLegIndex: routeStatus.activeLegIndex,
+    const next = advanceSimulationStep({
+      aircraft,
+      spec,
+      pilotInputs,
+      apState,
+      flightPlan,
+      activeLegIndex,
       routeStatus,
-      guidance: syncGuidance(guidance, scenario, status, state, controls.effectiveControls),
+      wind,
+      dt,
+      status,
+      selectedScenarioId,
+      guidance,
+    });
+    set({
+      aircraft: next.aircraft,
+      lastFrameTime: timestamp,
+      ...next.controls,
+      activeLegIndex: next.activeLegIndex,
+      routeStatus: next.routeStatus,
+      guidance: next.guidance,
     });
   },
 
@@ -380,7 +358,7 @@ export const useSimStore = create<SimStore>((set, get) => ({
     return {
       status: 'running',
       lastFrameTime: 0,
-      guidance: syncGuidance(s.guidance, scenario, 'running', s.aircraft, s.effectiveControls),
+      guidance: syncGuidanceState(s.guidance, scenario, 'running', s.aircraft, s.effectiveControls),
     };
   }),
   startTakeoffRoll: () => set((s) => {
@@ -408,14 +386,14 @@ export const useSimStore = create<SimStore>((set, get) => ({
       apState: null,
       status: 'running',
       lastFrameTime: 0,
-      guidance: syncGuidance(s.guidance, scenario, 'running', aircraft, controlsSlice.effectiveControls),
+      guidance: syncGuidanceState(s.guidance, scenario, 'running', aircraft, controlsSlice.effectiveControls),
     };
   }),
   pause: () => set((s) => {
     const scenario = scenarioById(s.selectedScenarioId);
     return {
       status: 'paused',
-      guidance: syncGuidance(s.guidance, scenario, 'paused', s.aircraft, s.effectiveControls),
+      guidance: syncGuidanceState(s.guidance, scenario, 'paused', s.aircraft, s.effectiveControls),
     };
   }),
   resume: () => set((s) => {
@@ -423,7 +401,7 @@ export const useSimStore = create<SimStore>((set, get) => ({
     return {
       status: 'running',
       lastFrameTime: 0,
-      guidance: syncGuidance(s.guidance, scenario, 'running', s.aircraft, s.effectiveControls),
+      guidance: syncGuidanceState(s.guidance, scenario, 'running', s.aircraft, s.effectiveControls),
     };
   }),
   reset: () => set((s) => {
@@ -482,7 +460,7 @@ export const useSimStore = create<SimStore>((set, get) => ({
   setTutorialStep: (stepIndex) => set((s) => {
     const scenario = scenarioById(s.selectedScenarioId);
     return {
-      guidance: syncGuidance(s.guidance, scenario, s.status, s.aircraft, s.effectiveControls, stepIndex),
+      guidance: syncGuidanceState(s.guidance, scenario, s.status, s.aircraft, s.effectiveControls, stepIndex),
     };
   }),
 
@@ -494,7 +472,7 @@ export const useSimStore = create<SimStore>((set, get) => ({
     return {
       apState: ap,
       ...controlsSlice,
-      guidance: syncGuidance(s.guidance, scenario, s.status, s.aircraft, controlsSlice.effectiveControls),
+      guidance: syncGuidanceState(s.guidance, scenario, s.status, s.aircraft, controlsSlice.effectiveControls),
     };
   }),
   setFlightPlan: (fp) => set((s) => {
