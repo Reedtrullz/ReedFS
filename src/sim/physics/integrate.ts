@@ -4,10 +4,7 @@ import { updateEngines } from '../systems/engine';
 import { updateFuel } from '../systems/fuel';
 import { updateElectrical } from '../systems/electrical';
 import { updateHydraulic } from '../systems/hydraulic';
-import { updateAutopilot } from '../systems/autopilot';
 import { applyGroundContact, constrainRunwayNormalVelocity, GROUND_CONTACT_EPSILON_FT, KSEA_RUNWAY_ALT_FT } from '../systems/ground';
-import { computeLNAV } from '../systems/navigation';
-import { computeVNAV } from '../systems/vnav';
 import { geodeticToEcef, ecefToGeodetic, ecefToEnu, enuToEcef } from './geodesy';
 import { bodyToNed } from './frames';
 import { ftToM, ktToMs, mToFt } from './units';
@@ -54,20 +51,25 @@ function shouldAllowLiftoff(state: AircraftState, normalForceN: number, weightN:
 
 export function integrate(
   state: AircraftState,
-  inputs: ControlInputs,
+  controls: ControlInputs,
   spec: AircraftSpec,
   dt: number,
   apState?: AutopilotState | null,
   flightPlan?: FlightPlan | null,
   wind?: WindInfo | null,
 ): void {
+  // Autopilot is composed upstream. These legacy parameters are intentionally
+  // accepted for older call sites, but the integrator consumes only effective controls.
+  void apState;
+  void flightPlan;
+
   // ── Systems (must run before aero so engine/fuel state is current) ──
-  updateEngines(state, inputs, spec, dt);
+  updateEngines(state, controls, spec, dt);
   updateFuel(state, spec, dt);
   updateElectrical(state, dt);
   updateHydraulic(state, dt);
 
-  const aero = computeAero(state, inputs, spec, undefined, wind ?? null);
+  const aero = computeAero(state, controls, spec, undefined, wind ?? null);
   const mass = state.grossWeight;
   const { p, q, r } = state.angularVel;
 
@@ -151,38 +153,14 @@ export function integrate(
   // First playable slice: a flat KSEA runway contact solver. This is intentionally
   // applied after position integration as a post-solve constraint so the existing
   // free-flight equations and sign conventions remain unchanged.
-  const groundContact = applyGroundContact(state, inputs, dt, KSEA_RUNWAY_ALT_FT, { allowLiftoff, normalForceN });
+  const groundContact = applyGroundContact(state, controls, dt, KSEA_RUNWAY_ALT_FT, { allowLiftoff, normalForceN });
 
   // ── Config ──
-  state.config.flapSetting = inputs.flapLever;
-  state.config.gearDown = groundContact.weightOnWheels ? true : inputs.gearLever === 'DOWN';
-  state.config.spoilersDeployed = inputs.spoilers > 0.5;
-  state.config.speedBrake = inputs.spoilers;
+  state.config.flapSetting = controls.flapLever;
+  state.config.gearDown = groundContact.weightOnWheels ? true : controls.gearLever === 'DOWN';
+  state.config.spoilersDeployed = controls.spoilers > 0.5;
+  state.config.speedBrake = controls.spoilers;
   updateTakeoffPhase(state);
-
-  // ── Autopilot (overwrites inputs for next frame) ──
-  if (apState && apState.truth.autopilotStatus !== 'OFF') {
-    let targetHeading = state.attitude.psi;
-    let targetAlt = state.position.alt;
-    const targetSpeed = 250;
-
-    // LNAV: compute desired track from flight plan
-    if (apState.truth.lateralActive === 'LNAV' && flightPlan) {
-      const nav = computeLNAV(state, flightPlan, 0);
-      targetHeading = nav.desiredTrack;
-    }
-
-    // VNAV: compute target altitude from flight plan
-    if (apState.truth.verticalActive === 'VNAV' && flightPlan) {
-      const navDefault = { crossTrackError: 0, alongTrackDist: 0, desiredTrack: targetHeading, activeWaypointIndex: 0, waypointReached: false };
-      const vnav = computeVNAV(state, flightPlan, navDefault);
-      if (vnav.altitudeConstraint) {
-        targetAlt = vnav.targetAlt;
-      }
-    }
-
-    updateAutopilot(state, inputs, apState, targetHeading, targetAlt, targetSpeed, dt);
-  }
 
   // ── Clock ──
   state.simTime += dt * 1000;

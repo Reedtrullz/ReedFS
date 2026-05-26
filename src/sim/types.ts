@@ -66,6 +66,8 @@ export interface ControlInputs {
   brake: number;      // 0 to 1
 }
 
+export type AutopilotCommands = Partial<Pick<ControlInputs, 'elevator' | 'aileron' | 'throttle1' | 'throttle2'>>;
+
 // ── Engine State ──
 
 export interface EngineState {

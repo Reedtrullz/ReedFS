@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useSimStore } from '../simStore';
 import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
+import type { AutopilotCommands } from '../../sim/types';
 import { KSEA_RUNWAY_ALT_FT } from '../../sim/systems/ground';
 import { KSEA_LIGHT_PATTERN_SCENARIO, KSEA_TUTORIAL_SCENARIO } from '../../sim/scenarios';
 
@@ -86,6 +87,17 @@ describe('useSimStore', () => {
   beforeEach(() => useSimStore.getState().reset());
 
   it('starts stopped', () => expect(useSimStore.getState().status).toBe('stopped'));
+  it('separates pilot inputs, AP commands, effective controls, and legacy inputs alias', () => {
+    const state = useSimStore.getState();
+
+    expect(state.apCommands).toEqual({});
+    expect(state.pilotInputs).toEqual(expect.objectContaining({
+      flapLever: KSEA_TUTORIAL_SCENARIO.flapSetting,
+      gearLever: 'DOWN',
+    }));
+    expect(state.effectiveControls).toEqual(state.pilotInputs);
+    expect(state.inputs).toBe(state.effectiveControls);
+  });
   it('start → running', () => { useSimStore.getState().start(); expect(useSimStore.getState().status).toBe('running'); });
   it('startTakeoffRoll sets inputs, running status, and TAKEOFF phase', () => {
     useSimStore.getState().startTakeoffRoll();
@@ -100,15 +112,28 @@ describe('useSimStore', () => {
       brake: 0,
       elevator: 0,
     }));
+    expect(state.pilotInputs).toEqual(expect.objectContaining({ throttle1: 1, throttle2: 1, elevator: 0 }));
+    expect(state.inputs).toBe(state.effectiveControls);
     expect(state.aircraft.flightPhase).toBe('TAKEOFF');
   });
   it('pause → paused', () => { useSimStore.getState().start(); useSimStore.getState().pause(); expect(useSimStore.getState().status).toBe('paused'); });
-  it('setInput partial', () => { useSimStore.getState().setInput({ throttle1: 0.8 }); expect(useSimStore.getState().inputs.throttle1).toBe(0.8); expect(useSimStore.getState().inputs.throttle2).toBe(0); });
+  it('setInput partial updates pilot inputs and effective controls when AP is off', () => {
+    useSimStore.getState().setInput({ throttle1: 0.8 });
+    expect(useSimStore.getState().pilotInputs.throttle1).toBe(0.8);
+    expect(useSimStore.getState().effectiveControls.throttle1).toBe(0.8);
+    expect(useSimStore.getState().inputs.throttle1).toBe(0.8);
+    expect(useSimStore.getState().inputs.throttle2).toBe(0);
+  });
   it('neutral input-manager frames do not erase external control commands', () => {
-    useSimStore.setState((s) => ({ inputs: { ...s.inputs, elevator: 0.42 } }));
+    useSimStore.setState((s) => {
+      const pilotInputs = { ...s.pilotInputs, elevator: 0.42 };
+      const effectiveControls = { ...pilotInputs };
+      return { pilotInputs, effectiveControls, inputs: effectiveControls };
+    });
 
     useSimStore.getState().applyInputActions({}, 1 / 60);
 
+    expect(useSimStore.getState().pilotInputs.elevator).toBe(0.42);
     expect(useSimStore.getState().inputs.elevator).toBe(0.42);
   });
   it('neutral input-manager frames preserve split-throttle partial inputs', () => {
@@ -135,13 +160,18 @@ describe('useSimStore', () => {
 
     expect(useSimStore.getState().inputs.elevator).toBe(0.42);
   });
-  it('neutral input-manager frames do not erase direct AP-style input mutations', () => {
-    useSimStore.getState().applyInputActions({ pitch: -1 }, 1 / 60);
-    expect(useSimStore.getState().inputs.elevator).toBeLessThan(0);
-    useSimStore.setState((s) => ({ inputs: { ...s.inputs, elevator: 0.42 } }));
+  it('neutral input-manager frames do not erase separated AP commands', () => {
+    useSimStore.getState().setApState(minimalApState());
+    const apCommands: AutopilotCommands = { elevator: 0.42, aileron: -0.2, throttle1: 0.8, throttle2: 0.8 };
+    useSimStore.setState((s) => {
+      const effectiveControls = { ...s.pilotInputs, ...apCommands };
+      return { apCommands, effectiveControls, inputs: effectiveControls };
+    });
 
     useSimStore.getState().applyInputActions({}, 1 / 60);
 
+    expect(useSimStore.getState().apCommands).toEqual(apCommands);
+    expect(useSimStore.getState().pilotInputs.elevator).not.toBe(0.42);
     expect(useSimStore.getState().inputs.elevator).toBe(0.42);
   });
   it('throttle input-manager actions start from the live throttle lever after split-throttle input', () => {
@@ -153,7 +183,22 @@ describe('useSimStore', () => {
     expect(useSimStore.getState().inputs.throttle2).toBeCloseTo(0.85, 8);
   });
   it('tick advances simTime when running', () => { useSimStore.getState().start(); const b = useSimStore.getState().aircraft.simTime; useSimStore.getState().tick(performance.now()); expect(useSimStore.getState().aircraft.simTime).toBeGreaterThanOrEqual(b); });
-  it('reset clears everything', () => { useSimStore.getState().setInput({ throttle1: 1 }); useSimStore.getState().start(); useSimStore.getState().tick(1000); useSimStore.getState().reset(); expect(useSimStore.getState().status).toBe('stopped'); expect(useSimStore.getState().inputs.throttle1).toBe(0); });
+  it('reset clears everything', () => {
+    useSimStore.getState().setInput({ throttle1: 1 });
+    useSimStore.getState().setApState(minimalApState());
+    useSimStore.setState((s) => {
+      const apCommands: AutopilotCommands = { throttle1: 0.9, throttle2: 0.9 };
+      const effectiveControls = { ...s.pilotInputs, ...apCommands };
+      return { apCommands, effectiveControls, inputs: effectiveControls };
+    });
+    useSimStore.getState().start();
+    useSimStore.getState().tick(1000);
+    useSimStore.getState().reset();
+    expect(useSimStore.getState().status).toBe('stopped');
+    expect(useSimStore.getState().pilotInputs.throttle1).toBe(0);
+    expect(useSimStore.getState().apCommands).toEqual({});
+    expect(useSimStore.getState().inputs.throttle1).toBe(0);
+  });
   it('starts from the KSEA tutorial scenario mass and runway setup', () => {
     const state = useSimStore.getState();
 
@@ -196,7 +241,115 @@ describe('useSimStore', () => {
   });
   it('apState starts null', () => expect(useSimStore.getState().apState).toBeNull());
   it('setApState stores autopilot state', () => { useSimStore.getState().setApState(minimalApState()); expect(useSimStore.getState().apState).toBeTruthy(); });
+
+  it('target-only setApState preserves existing AP commands until the next tick recomputes them', () => {
+    const initialAp = minimalApState();
+    useSimStore.getState().setApState(initialAp);
+    const apCommands: AutopilotCommands = { elevator: 0.3, aileron: -0.2, throttle1: 0.65, throttle2: 0.65 };
+    useSimStore.setState((s) => {
+      const effectiveControls = { ...s.pilotInputs, ...apCommands };
+      return { apCommands, effectiveControls, inputs: effectiveControls };
+    });
+
+    const targetOnlyUpdate = structuredClone(initialAp);
+    targetOnlyUpdate.boeing.heading = 25;
+    targetOnlyUpdate.boeing.altitude = 3500;
+    useSimStore.getState().setApState(targetOnlyUpdate);
+
+    const state = useSimStore.getState();
+    expect(state.apCommands).toEqual(apCommands);
+    expect(state.effectiveControls).toEqual(expect.objectContaining(apCommands));
+    expect(state.inputs).toBe(state.effectiveControls);
+    expect(state.apState?.boeing.heading).toBe(25);
+  });
+
   it('reset clears apState', () => { useSimStore.getState().setApState(minimalApState()); useSimStore.getState().reset(); expect(useSimStore.getState().apState).toBeNull(); });
+
+  it('AP tick writes commands/effective controls without mutating pilot input object', () => {
+    useSimStore.getState().setInput({
+      throttle1: 0.2,
+      throttle2: 0.2,
+      elevator: 0.15,
+      aileron: -0.1,
+      flapLever: 5,
+      gearLever: 'UP',
+    });
+    const pilotBeforeRef = useSimStore.getState().pilotInputs;
+    const pilotBefore = structuredClone(pilotBeforeRef);
+
+    useSimStore.getState().setApState(minimalApState());
+    useSimStore.getState().start();
+    useSimStore.getState().tick(1000);
+
+    const state = useSimStore.getState();
+    expect(state.pilotInputs).toBe(pilotBeforeRef);
+    expect(state.pilotInputs).toEqual(pilotBefore);
+    expect(state.apCommands.throttle1).toBeGreaterThan(0);
+    expect(state.effectiveControls.throttle1).toBe(state.apCommands.throttle1);
+    expect(state.effectiveControls.flapLever).toBe(pilotBefore.flapLever);
+    expect(state.effectiveControls.gearLever).toBe(pilotBefore.gearLever);
+    expect(state.inputs).toBe(state.effectiveControls);
+  });
+
+  it('manual input override disconnects AP and makes pilot controls effective deterministically', () => {
+    useSimStore.getState().setApState(minimalApState());
+    useSimStore.setState((s) => {
+      const apCommands: AutopilotCommands = { elevator: -0.7, aileron: 0.4, throttle1: 0.9, throttle2: 0.9 };
+      const effectiveControls = { ...s.pilotInputs, ...apCommands };
+      return { apCommands, effectiveControls, inputs: effectiveControls };
+    });
+
+    useSimStore.getState().setInput({ elevator: 0.25 });
+
+    const state = useSimStore.getState();
+    expect(state.apState?.truth.autopilotStatus).toBe('OFF');
+    expect(state.apCommands).toEqual({});
+    expect(state.pilotInputs.elevator).toBe(0.25);
+    expect(state.effectiveControls.elevator).toBe(0.25);
+    expect(state.inputs).toBe(state.effectiveControls);
+  });
+
+  it('pilot-owned gear/flaps/spoilers remain effective while AP commands flight axes', () => {
+    useSimStore.getState().setApState(minimalApState());
+    const apCommands: AutopilotCommands = { elevator: -0.5, aileron: 0.25, throttle1: 0.7, throttle2: 0.7 };
+    useSimStore.setState((s) => {
+      const effectiveControls = { ...s.pilotInputs, ...apCommands };
+      return { apCommands, effectiveControls, inputs: effectiveControls };
+    });
+
+    useSimStore.getState().setInput({ flapLever: 15, gearLever: 'UP', spoilers: 0.3 });
+
+    const state = useSimStore.getState();
+    expect(state.apState?.truth.autopilotStatus).toBe('CMD_A');
+    expect(state.effectiveControls.elevator).toBe(apCommands.elevator);
+    expect(state.effectiveControls.throttle1).toBe(apCommands.throttle1);
+    expect(state.effectiveControls.flapLever).toBe(15);
+    expect(state.effectiveControls.gearLever).toBe('UP');
+    expect(state.effectiveControls.spoilers).toBe(0.3);
+  });
+
+  it('legacy full-object setInput does not copy AP-owned effective axes into pilot inputs', () => {
+    useSimStore.getState().setApState(minimalApState());
+    const apCommands: AutopilotCommands = { elevator: -0.5, aileron: 0.25, throttle1: 0.7, throttle2: 0.7 };
+    useSimStore.setState((s) => {
+      const effectiveControls = { ...s.pilotInputs, ...apCommands };
+      return { apCommands, effectiveControls, inputs: effectiveControls };
+    });
+    const pilotBefore = structuredClone(useSimStore.getState().pilotInputs);
+
+    useSimStore.getState().setInput({ ...useSimStore.getState().inputs, flapLever: 15 });
+
+    const state = useSimStore.getState();
+    expect(state.apState?.truth.autopilotStatus).toBe('CMD_A');
+    expect(state.pilotInputs.elevator).toBe(pilotBefore.elevator);
+    expect(state.pilotInputs.aileron).toBe(pilotBefore.aileron);
+    expect(state.pilotInputs.throttle1).toBe(pilotBefore.throttle1);
+    expect(state.pilotInputs.throttle2).toBe(pilotBefore.throttle2);
+    expect(state.pilotInputs.flapLever).toBe(15);
+    expect(state.effectiveControls.elevator).toBe(apCommands.elevator);
+    expect(state.effectiveControls.throttle1).toBe(apCommands.throttle1);
+    expect(state.effectiveControls.flapLever).toBe(15);
+  });
 
   it('takeoff roll stays at or above runway elevation through store ticks', () => {
     const store = useSimStore.getState();

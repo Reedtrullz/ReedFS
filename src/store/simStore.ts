@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { AircraftState, ControlInputs, AircraftSpec } from '../sim/types';
+import type { AircraftState, AutopilotCommands, ControlInputs, AircraftSpec } from '../sim/types';
 import { B737_800_SPEC } from '../sim/types';
 import { integrate } from '../sim/physics/integrate';
 import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
@@ -7,6 +7,12 @@ import type { FlightPlan } from '@shared/types/fmc';
 import type { WindInfo } from '../sim/weather';
 import { KSEA_TUTORIAL_SCENARIO, createAircraftStateForScenario, scenarioById } from '../sim/scenarios';
 import type { FlightScenario } from '../sim/scenarios';
+import {
+  composeEffectiveControls,
+  computeAutopilotCommandsForState,
+  isAutopilotEngaged,
+  resetAutopilotPID,
+} from '../sim/systems/autopilot';
 import {
   createInputManagerState,
   updateInputManager,
@@ -18,7 +24,14 @@ export type SimStatus = 'stopped' | 'running' | 'paused';
 
 export interface SimStore {
   aircraft: AircraftState;
+  /** Legacy alias for effectiveControls. Keep this object identical to effectiveControls for existing UI/tests. */
   inputs: ControlInputs;
+  /** Pilot-authored controls from keyboard/gamepad/UI. Autopilot must never mutate this object. */
+  pilotInputs: ControlInputs;
+  /** Autopilot-authored axis commands. Pilot-owned gear/flaps/spoilers are never stored here. */
+  apCommands: AutopilotCommands;
+  /** The controls actually sent to systems/physics after pilot + AP ownership composition. */
+  effectiveControls: ControlInputs;
   inputManager: InputManagerState;
   spec: AircraftSpec;
   status: SimStatus;
@@ -61,6 +74,21 @@ function inputManagerForScenario(scenario: FlightScenario): InputManagerState {
     ...inputsForScenario(scenario),
     stabilizerTrimUnits: scenario.stabilizerTrimUnits,
   });
+}
+
+function composeControlsSlice(
+  pilotInputs: ControlInputs,
+  apCommands: AutopilotCommands = {},
+  apState: AutopilotState | null = null,
+): Pick<SimStore, 'pilotInputs' | 'apCommands' | 'effectiveControls' | 'inputs'> {
+  const active = isAutopilotEngaged(apState);
+  const effectiveControls = composeEffectiveControls(pilotInputs, active ? apCommands : {}, active);
+  return {
+    pilotInputs,
+    apCommands: active ? apCommands : {},
+    effectiveControls,
+    inputs: effectiveControls,
+  };
 }
 
 function syncInputManagerWithInputPartial(
@@ -129,9 +157,93 @@ function controlPatchFromInputManager(
   return patch;
 }
 
+const AP_OWNED_INPUT_KEYS = ['elevator', 'aileron', 'throttle1', 'throttle2'] as const;
+
+function sanitizeSetInputPartial(
+  partial: Partial<ControlInputs>,
+  pilotInputs: ControlInputs,
+  effectiveControls: ControlInputs,
+  apActive: boolean,
+): { pilotPatch: Partial<ControlInputs>; shouldDisconnect: boolean } {
+  if (!apActive) return { pilotPatch: partial, shouldDisconnect: false };
+
+  const pilotPatch: Partial<ControlInputs> = { ...partial };
+  let shouldDisconnect = false;
+
+  for (const key of AP_OWNED_INPUT_KEYS) {
+    const value = partial[key];
+    if (value === undefined) continue;
+
+    if (value === effectiveControls[key] && value !== pilotInputs[key]) {
+      delete pilotPatch[key];
+      continue;
+    }
+
+    if (value !== effectiveControls[key]) {
+      shouldDisconnect = true;
+    }
+  }
+
+  return { pilotPatch, shouldDisconnect };
+}
+
+function inputActionsIncludeManualApAxis(actions: InputActions): boolean {
+  return actions.pitch !== undefined || actions.roll !== undefined || inputActionsIncludeThrottle(actions);
+}
+
+function autopilotModesChanged(previous: AutopilotState | null, next: AutopilotState | null): boolean {
+  if (!previous || !next) return previous !== next;
+  return (
+    previous.truth.autopilotStatus !== next.truth.autopilotStatus ||
+    previous.truth.lateralActive !== next.truth.lateralActive ||
+    previous.truth.verticalActive !== next.truth.verticalActive ||
+    previous.truth.thrustActive !== next.truth.thrustActive
+  );
+}
+
+function disconnectAutopilot(apState: AutopilotState | null): AutopilotState | null {
+  if (!apState) return null;
+  resetAutopilotPID();
+  const next = structuredClone(apState);
+  next.truth = {
+    ...next.truth,
+    autopilotStatus: 'OFF',
+    lateralActive: 'OFF',
+    verticalActive: 'OFF',
+    thrustActive: 'OFF',
+  };
+  next.boeing = {
+    ...next.boeing,
+    cmdA: false,
+    cmdB: false,
+    cwsA: false,
+    cwsB: false,
+    speedMode: false,
+    lnav: false,
+    vnav: false,
+    hdgSel: false,
+    vorLoc: false,
+    app: false,
+    altHold: false,
+    vs: false,
+  };
+  next.airbus = {
+    ...next.airbus,
+    ap1: false,
+    ap2: false,
+    athr: false,
+    loc: false,
+    appr: false,
+  };
+  return next;
+}
+
+const initialPilotInputs = inputsForScenario(KSEA_TUTORIAL_SCENARIO);
+const initialControls = composeControlsSlice(initialPilotInputs);
+
 export const useSimStore = create<SimStore>((set, get) => ({
   aircraft: createAircraftStateForScenario(B737_800_SPEC, KSEA_TUTORIAL_SCENARIO),
-  inputs: inputsForScenario(KSEA_TUTORIAL_SCENARIO),
+  ...initialControls,
   inputManager: inputManagerForScenario(KSEA_TUTORIAL_SCENARIO),
   spec: B737_800_SPEC,
   status: 'stopped',
@@ -142,14 +254,27 @@ export const useSimStore = create<SimStore>((set, get) => ({
   selectedScenarioId: KSEA_TUTORIAL_SCENARIO.id,
 
   setInput: (partial) =>
-    set((s) => ({
-      inputs: { ...s.inputs, ...partial },
-      inputManager: syncInputManagerWithInputPartial(s.inputManager, partial),
-    })),
+    set((s) => {
+      const apActive = isAutopilotEngaged(s.apState);
+      const { pilotPatch, shouldDisconnect } = sanitizeSetInputPartial(
+        partial,
+        s.pilotInputs,
+        s.effectiveControls,
+        apActive,
+      );
+      const pilotInputs = { ...s.pilotInputs, ...pilotPatch };
+      const apState = shouldDisconnect ? disconnectAutopilot(s.apState) : s.apState;
+      const apCommands = shouldDisconnect ? {} : s.apCommands;
+      return {
+        ...composeControlsSlice(pilotInputs, apCommands, apState),
+        apState,
+        inputManager: syncInputManagerWithInputPartial(s.inputManager, pilotPatch),
+      };
+    }),
 
   applyInputActions: (actions, dt) =>
     set((s) => {
-      const previousInputManager = seedInputManagerFromLiveInputs(s.inputManager, s.inputs, actions);
+      const previousInputManager = seedInputManagerFromLiveInputs(s.inputManager, s.pilotInputs, actions);
       const inputManager = updateInputManager(previousInputManager, actions, dt);
       const inputPatch = controlPatchFromInputManager(previousInputManager, inputManager, actions);
       const trimChanged = inputManager.stabilizerTrimUnits !== s.aircraft.config.stabilizerTrimUnits;
@@ -158,28 +283,41 @@ export const useSimStore = create<SimStore>((set, get) => ({
         aircraft.config.stabilizerTrimUnits = inputManager.stabilizerTrimUnits;
       }
 
+      const pilotInputs = Object.keys(inputPatch).length > 0 ? { ...s.pilotInputs, ...inputPatch } : s.pilotInputs;
+      const shouldDisconnect = isAutopilotEngaged(s.apState) && inputActionsIncludeManualApAxis(actions);
+      const apState = shouldDisconnect ? disconnectAutopilot(s.apState) : s.apState;
+      const apCommands = shouldDisconnect ? {} : s.apCommands;
+
       return {
+        ...composeControlsSlice(pilotInputs, apCommands, apState),
         inputManager,
-        inputs: Object.keys(inputPatch).length > 0 ? { ...s.inputs, ...inputPatch } : s.inputs,
         aircraft,
+        apState,
       };
     }),
 
   tick: (timestamp: number) => {
-    const { status, lastFrameTime, aircraft, inputs, spec, apState, flightPlan, wind } = get();
+    const { status, lastFrameTime, aircraft, pilotInputs, spec, apState, flightPlan, wind } = get();
     if (status !== 'running') return;
     const dt = lastFrameTime > 0 ? Math.min((timestamp - lastFrameTime) / 1000, 0.05) : 1 / 60;
     const state = structuredClone(aircraft);
-    integrate(state, inputs, spec, dt, apState, flightPlan, wind);
-    set({ aircraft: state, lastFrameTime: timestamp });
+    const apActive = isAutopilotEngaged(apState);
+    const apCommands = apActive ? computeAutopilotCommandsForState(state, apState, flightPlan, dt) : {};
+    const controls = composeControlsSlice(pilotInputs, apCommands, apState);
+    integrate(state, controls.effectiveControls, spec, dt, null, flightPlan, wind);
+    set({
+      aircraft: state,
+      lastFrameTime: timestamp,
+      ...controls,
+    });
   },
 
   start: () => set({ status: 'running', lastFrameTime: 0 }),
   startTakeoffRoll: () => set((s) => {
     const aircraft = structuredClone(s.aircraft);
     aircraft.flightPhase = 'TAKEOFF';
-    const inputs: ControlInputs = {
-      ...s.inputs,
+    const pilotInputs: ControlInputs = {
+      ...s.pilotInputs,
       throttle1: 1,
       throttle2: 1,
       flapLever: aircraft.config.flapSetting,
@@ -187,13 +325,15 @@ export const useSimStore = create<SimStore>((set, get) => ({
       brake: 0,
       elevator: 0,
     };
+    resetAutopilotPID();
     return {
       aircraft,
-      inputs,
+      ...composeControlsSlice(pilotInputs),
       inputManager: createInputManagerState({
-        ...inputs,
+        ...pilotInputs,
         stabilizerTrimUnits: aircraft.config.stabilizerTrimUnits,
       }),
+      apState: null,
       status: 'running',
       lastFrameTime: 0,
     };
@@ -202,9 +342,11 @@ export const useSimStore = create<SimStore>((set, get) => ({
   resume: () => set({ status: 'running', lastFrameTime: 0 }),
   reset: () => set((s) => {
     const scenario = scenarioById(s.selectedScenarioId);
+    const pilotInputs = inputsForScenario(scenario);
+    resetAutopilotPID();
     return {
       aircraft: createAircraftStateForScenario(B737_800_SPEC, scenario),
-      inputs: inputsForScenario(scenario),
+      ...composeControlsSlice(pilotInputs),
       inputManager: inputManagerForScenario(scenario),
       status: 'stopped',
       lastFrameTime: 0,
@@ -216,10 +358,12 @@ export const useSimStore = create<SimStore>((set, get) => ({
 
   setScenario: (scenarioId) => set(() => {
     const scenario = scenarioById(scenarioId);
+    const pilotInputs = inputsForScenario(scenario);
+    resetAutopilotPID();
     return {
       selectedScenarioId: scenario.id,
       aircraft: createAircraftStateForScenario(B737_800_SPEC, scenario),
-      inputs: inputsForScenario(scenario),
+      ...composeControlsSlice(pilotInputs),
       inputManager: inputManagerForScenario(scenario),
       status: 'stopped',
       lastFrameTime: 0,
@@ -229,7 +373,14 @@ export const useSimStore = create<SimStore>((set, get) => ({
     };
   }),
 
-  setApState: (ap) => set({ apState: ap }),
+  setApState: (ap) => set((s) => {
+    const modesChanged = autopilotModesChanged(s.apState, ap);
+    if (modesChanged) resetAutopilotPID();
+    return {
+      apState: ap,
+      ...composeControlsSlice(s.pilotInputs, modesChanged ? {} : s.apCommands, ap),
+    };
+  }),
   setFlightPlan: (fp) => set({ flightPlan: fp }),
   setWind: (w) => set({ wind: w }),
 }));
