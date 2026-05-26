@@ -101,6 +101,17 @@ npm run dev -- --host 127.0.0.1
 
 The app starts at the default Vite URL. The dev server sets COOP/COEP headers in `vite.config.ts` so future SharedArrayBuffer/worker work can run locally.
 
+### Cesium scenery token
+
+RFS can run without a Cesium Ion token. Without `VITE_CESIUM_ION_TOKEN`, it uses degraded ellipsoid scenery, disables Cesium Ion terrain/imagery/buildings requests, and shows a visible `SCENERY DEGRADED` status banner. With a valid token, it enables Cesium World Terrain and OSM buildings.
+
+```bash
+cp .env.example .env.local
+# edit .env.local and set VITE_CESIUM_ION_TOKEN if desired
+```
+
+Never commit a real Cesium token.
+
 ## Quality gate
 
 Run the same gate CI uses:

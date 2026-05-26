@@ -84,6 +84,7 @@ See `docs/physics-invariants.md` for the detailed checklist and test locations.
 RFS renders with Cesium plus a focused Three.js overlay:
 
 - `CesiumViewport.tsx` owns the Cesium viewer lifecycle and base globe/terrain setup.
+- `config/cesium.ts` defines the scene policy: with `VITE_CESIUM_ION_TOKEN`, RFS enables Cesium World Terrain and OSM buildings; without it, RFS disables Ion terrain/imagery/buildings, uses degraded ellipsoid scenery, and `SceneStatus.tsx` shows a visible banner.
 - `RunwayLayer.tsx` renders the KSEA runway/centerline as Cesium-native entities instead of a ground-attached Three overlay.
 - `ThreeLayer.tsx` owns a single `three-to-cesium` bridge for the exterior aircraft and lights.
 - `AircraftRenderer.ts` keeps the aircraft object persistent and updates transform/animation state each frame.
@@ -161,4 +162,4 @@ These are intentional gaps, not regressions:
 2. Worker physics: codec, worker loop, main-thread bridge, deterministic fixed-timestep state handoff.
 3. Advanced flight guidance: LNAV intercept/turn anticipation, RFMS route edits, full VNAV SPD/PTH/ALT ACQ mode transitions, and selected MCP target lifecycle.
 4. Data-driven flight model: validated aircraft coefficient tables and trim/response tests.
-5. Release hardening: Cesium token/degraded-scene policy, Three.js deduplication, deterministic visual regression snapshots, and audio immersion pass.
+5. Release hardening: Three.js deduplication, deterministic visual regression snapshots, fixed-timestep/worker migration, and audio immersion pass.
