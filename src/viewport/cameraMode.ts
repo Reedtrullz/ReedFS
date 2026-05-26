@@ -1,4 +1,4 @@
-import type { SimStatus } from '../store/simStore';
+import type { SimStatus } from '../sim/simulationStatus';
 
 export type CameraMode = 'chase' | 'cockpit' | 'tower' | 'free';
 

@@ -1,4 +1,4 @@
-import type { SimStatus } from '../store/simStore';
+import type { SimStatus } from './simulationStatus';
 import { buildTakeoffChecklist, coachMessageForState, type ChecklistItem } from './checklistCoach';
 import type { FlightScenario, ScenarioTutorialStep } from './scenarios';
 import type { AircraftState, ControlInputs } from './types';

@@ -11,8 +11,8 @@ import {
   advanceSimulationStep,
   composeControlsSlice,
   syncGuidanceState,
-  type SimulationStatus,
 } from '../sim/simulationStep';
+import type { SimulationStatus } from '../sim/simulationStatus';
 import {
   computeRouteStatus,
   createNoRouteStatus,

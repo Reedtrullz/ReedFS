@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { CameraManager, cockpitCameraOffset, cockpitCameraOrientation } from '../CameraManager';
 import { B737_800_SPEC, createInitialState, type AircraftState } from '../../sim/types';
 import type { CameraMode } from '../cameraMode';
-import type { SimStatus } from '../../store/simStore';
+import type { SimStatus } from '../../sim/simulationStatus';
 
 function aircraftAtHeading(psi: number): AircraftState {
   const aircraft = createInitialState(B737_800_SPEC);

@@ -1,5 +1,6 @@
 import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
 import type { FlightPlan } from '@shared/types/fmc';
+import type { SimulationStatus } from './simulationStatus';
 import type { WindInfo } from './weather';
 import type { AircraftSpec, AircraftState, AutopilotCommands, ControlInputs } from './types';
 import { integrate } from './physics/integrate';
@@ -15,8 +16,6 @@ import {
   computeAutopilotCommandsForState,
   isAutopilotEngaged,
 } from './systems/autopilot';
-
-export type SimulationStatus = 'stopped' | 'running' | 'paused';
 
 export interface ControlsSlice {
   pilotInputs: ControlInputs;

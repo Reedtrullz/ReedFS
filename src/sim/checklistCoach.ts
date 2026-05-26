@@ -1,6 +1,6 @@
 import type { AircraftState, ControlInputs } from './types';
 import type { FlightScenario } from './scenarios';
-import type { SimStatus } from '../store/simStore';
+import type { SimStatus } from './simulationStatus';
 
 export interface ChecklistItem {
   id: string;

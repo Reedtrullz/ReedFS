@@ -1,7 +1,7 @@
 import * as Cesium from 'cesium';
 import * as THREE from 'three';
 import type { AircraftState, Attitude } from '../sim/types';
-import type { SimStatus } from '../store/simStore';
+import type { SimStatus } from '../sim/simulationStatus';
 import { chaseCameraOffset, type EnuOffset } from './cameraFollow';
 import { shouldAutoFollowCamera, type CameraMode } from './cameraMode';
 import { createAircraftModelQuaternion } from './aircraftOrientation';
