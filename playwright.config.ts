@@ -1,4 +1,4 @@
-import { defineConfig, devices } from '@playwright/test';
+import { defineConfig, devices, type PlaywrightTestConfig } from '@playwright/test';
 
 export default defineConfig({
   testDir: './e2e',
@@ -14,7 +14,9 @@ export default defineConfig({
     viewport: { width: 1440, height: 900 },
     deviceScaleFactor: 1,
     colorScheme: 'dark',
-    reducedMotion: 'reduce',
+    contextOptions: {
+      reducedMotion: 'reduce',
+    },
   },
   webServer: {
     command: 'npm run dev -- --host 127.0.0.1',
@@ -26,4 +28,4 @@ export default defineConfig({
     },
   },
   projects: [{ name: 'chromium', use: { browserName: 'chromium' } }],
-});
+}) as PlaywrightTestConfig;
