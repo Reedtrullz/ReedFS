@@ -1,9 +1,11 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useSimStore } from '../simStore';
 import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
+import type { FlightPlan } from '@shared/types/fmc';
 import type { AutopilotCommands } from '../../sim/types';
 import { KSEA_RUNWAY_ALT_FT } from '../../sim/systems/ground';
 import { KSEA_LIGHT_PATTERN_SCENARIO, KSEA_TUTORIAL_SCENARIO } from '../../sim/scenarios';
+import { createKseaKpdxFlight } from '../../sim/flightPlanLoader';
 
 function minimalApState(): AutopilotState {
   return {
@@ -83,10 +85,36 @@ function tickAtHz(hz: number, seconds: number): void {
   }
 }
 
+function shortRoutePlan(): FlightPlan {
+  return {
+    origin: 'ORIG',
+    destination: 'DEST',
+    flightNumber: 'TST123',
+    route: 'ORIG MID DEST',
+    waypoints: [
+      { ident: 'ORIG', lat: 47.0, lon: -122.0, discontinuity: false },
+      { ident: 'MID', lat: 47.1, lon: -122.0, discontinuity: false },
+      { ident: 'DEST', lat: 47.2, lon: -122.0, discontinuity: false },
+    ],
+  };
+}
+
 describe('useSimStore', () => {
   beforeEach(() => useSimStore.getState().reset());
 
   it('starts stopped', () => expect(useSimStore.getState().status).toBe('stopped'));
+
+  it('starts with unified scenario guidance derived from the initial aircraft and controls', () => {
+    const state = useSimStore.getState();
+
+    expect(state.guidance.scenarioId).toBe(KSEA_TUTORIAL_SCENARIO.id);
+    expect(state.guidance.phase).toBe('preflight');
+    expect(state.guidance.tutorial.stepIndex).toBe(0);
+    expect(state.guidance.activeTutorialStep?.id).toBe('line-up');
+    expect(state.guidance.checklist.every((item) => item.complete)).toBe(true);
+    expect(state.guidance.coachMessage).toMatch(/start roll/i);
+  });
+
   it('separates pilot inputs, AP commands, effective controls, and legacy inputs alias', () => {
     const state = useSimStore.getState();
 
@@ -115,6 +143,8 @@ describe('useSimStore', () => {
     expect(state.pilotInputs).toEqual(expect.objectContaining({ throttle1: 1, throttle2: 1, elevator: 0 }));
     expect(state.inputs).toBe(state.effectiveControls);
     expect(state.aircraft.flightPhase).toBe('TAKEOFF');
+    expect(state.guidance.phase).toBe('takeoff-roll');
+    expect(state.guidance.coachMessage).toMatch(/centerline|rotate|IAS/i);
   });
   it('pause → paused', () => { useSimStore.getState().start(); useSimStore.getState().pause(); expect(useSimStore.getState().status).toBe('paused'); });
   it('setInput partial updates pilot inputs and effective controls when AP is off', () => {
@@ -183,6 +213,54 @@ describe('useSimStore', () => {
     expect(useSimStore.getState().inputs.throttle2).toBeCloseTo(0.85, 8);
   });
   it('tick advances simTime when running', () => { useSimStore.getState().start(); const b = useSimStore.getState().aircraft.simTime; useSimStore.getState().tick(performance.now()); expect(useSimStore.getState().aircraft.simTime).toBeGreaterThanOrEqual(b); });
+
+  it('setFlightPlan initializes the first valid active leg and route feedback', () => {
+    const fp = createKseaKpdxFlight();
+
+    useSimStore.getState().setFlightPlan(fp);
+
+    const state = useSimStore.getState();
+    expect(state.flightPlan).toBe(fp);
+    expect(state.activeLegIndex).toBe(0);
+    expect(state.routeStatus.routeName).toBe('KSEA→KPDX');
+    expect(state.routeStatus.lnavAvailable).toBe(true);
+    expect(state.routeStatus.fromIdent).toBe('KSEA');
+    expect(state.routeStatus.nextWaypointIdent).not.toBe('KPDX');
+    expect(state.routeStatus.distanceToNextNm).toBeGreaterThan(0);
+  });
+
+  it('tick advances the active leg and refreshes route feedback as the aircraft progresses', () => {
+    const fp = shortRoutePlan();
+    useSimStore.getState().setFlightPlan(fp);
+    useSimStore.setState((s) => ({
+      aircraft: {
+        ...s.aircraft,
+        position: { ...s.aircraft.position, lat: 47.1005, lon: -122.0 },
+        velocity: { ...s.aircraft.velocity, u: 0, v: 0, w: 0 },
+      },
+    }));
+
+    useSimStore.getState().start();
+    useSimStore.getState().tick(1000);
+
+    const state = useSimStore.getState();
+    expect(state.activeLegIndex).toBe(1);
+    expect(state.routeStatus.activeLegIndex).toBe(1);
+    expect(state.routeStatus.fromIdent).toBe('MID');
+    expect(state.routeStatus.nextWaypointIdent).toBe('DEST');
+  });
+
+  it('reset clears route state cleanly', () => {
+    useSimStore.getState().setFlightPlan(createKseaKpdxFlight());
+
+    useSimStore.getState().reset();
+
+    const state = useSimStore.getState();
+    expect(state.flightPlan).toBeNull();
+    expect(state.activeLegIndex).toBeNull();
+    expect(state.routeStatus.lnavAvailable).toBe(false);
+    expect(state.routeStatus.lnavUnavailableReason).toMatch(/no flight plan/i);
+  });
   it('reset clears everything', () => {
     useSimStore.getState().setInput({ throttle1: 1 });
     useSimStore.getState().setApState(minimalApState());
@@ -228,6 +306,33 @@ describe('useSimStore', () => {
     expect(state.aircraft.ground.groundAltFt).toBe(KSEA_LIGHT_PATTERN_SCENARIO.runway.elevationFt);
     expect(state.wind).toEqual(KSEA_LIGHT_PATTERN_SCENARIO.wind);
     expect(state.inputs.throttle1).toBe(0);
+    expect(state.guidance.scenarioId).toBe(KSEA_LIGHT_PATTERN_SCENARIO.id);
+    expect(state.guidance.phase).toBe('preflight');
+    expect(state.guidance.activeTutorialStep?.id).toBe('pattern-setup');
+  });
+
+  it('setScenario resets unified guidance and setTutorialStep clamps it in place', () => {
+    useSimStore.getState().setScenario(KSEA_TUTORIAL_SCENARIO.id);
+    useSimStore.getState().setTutorialStep(99);
+    expect(useSimStore.getState().guidance.tutorial.stepIndex).toBe(KSEA_TUTORIAL_SCENARIO.tutorialSteps.length - 1);
+    expect(useSimStore.getState().guidance.activeTutorialStep?.id).toBe('rotate-positive-rate');
+
+    useSimStore.getState().setScenario(KSEA_LIGHT_PATTERN_SCENARIO.id);
+    expect(useSimStore.getState().guidance.scenarioId).toBe(KSEA_LIGHT_PATTERN_SCENARIO.id);
+    expect(useSimStore.getState().guidance.tutorial.stepIndex).toBe(0);
+    expect(useSimStore.getState().guidance.activeTutorialStep?.id).toBe('pattern-setup');
+
+    useSimStore.getState().setTutorialStep(99);
+    expect(useSimStore.getState().guidance.tutorial.stepIndex).toBe(KSEA_LIGHT_PATTERN_SCENARIO.tutorialSteps.length - 1);
+    expect(useSimStore.getState().guidance.activeTutorialStep?.id).toBe('repeat-handfly');
+  });
+
+  it('keeps unified guidance checklist and coach synchronized after pilot input changes', () => {
+    useSimStore.getState().setInput({ flapLever: 0 });
+
+    const state = useSimStore.getState();
+    expect(state.guidance.checklist.find((item) => item.id === 'flaps')?.complete).toBe(false);
+    expect(state.guidance.coachMessage).toMatch(/Flaps set for takeoff/);
   });
   it('reset restores selected scenario wind from an immutable copy', () => {
     useSimStore.getState().setScenario(KSEA_LIGHT_PATTERN_SCENARIO.id);

@@ -4,6 +4,7 @@ import type { RefObject } from 'react';
 import { ThreeLayer } from '../ThreeLayer';
 import { AirportLayer } from '../AirportLayer';
 import { ContrailLayer } from '../ContrailLayer';
+import { CockpitLayer } from '../CockpitLayer';
 
 const mockTtc = vi.hoisted(() => ({
   add: vi.fn(() => ({ children: [] })),
@@ -29,6 +30,13 @@ vi.mock('../AircraftModel', () => ({
       rotation: { set: vi.fn() },
       children: [],
     })),
+  })),
+}));
+
+vi.mock('../CockpitModel', () => ({
+  createCockpitModel: vi.fn(() => ({
+    quaternion: { copy: vi.fn() },
+    children: [],
   })),
 }));
 
@@ -68,6 +76,10 @@ type TestViewer = {
       addEventListener: ReturnType<typeof vi.fn>;
       removeEventListener: ReturnType<typeof vi.fn>;
     };
+    preRender: {
+      addEventListener: ReturnType<typeof vi.fn>;
+      removeEventListener: ReturnType<typeof vi.fn>;
+    };
     primitives: {
       add: ReturnType<typeof vi.fn>;
       remove: ReturnType<typeof vi.fn>;
@@ -79,6 +91,10 @@ function createViewerRef() {
   const viewer: TestViewer = {
     scene: {
       postRender: {
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      },
+      preRender: {
         addEventListener: vi.fn(),
         removeEventListener: vi.fn(),
       },
@@ -108,10 +124,20 @@ describe('viewport layer cleanup', () => {
     vi.clearAllMocks();
   });
 
+  it('CockpitLayer renders on postRender so CameraManager preRender updates the camera first', () => {
+    const { viewer, viewerRef } = createViewerRef();
+
+    render(<CockpitLayer viewerRef={viewerRef as never} />);
+
+    expect(viewer.scene?.postRender.addEventListener).toHaveBeenCalledTimes(1);
+    expect(viewer.scene?.preRender.addEventListener).not.toHaveBeenCalled();
+  });
+
   it.each([
     ['ThreeLayer', ThreeLayer],
     ['AirportLayer', AirportLayer],
     ['ContrailLayer', ContrailLayer],
+    ['CockpitLayer', CockpitLayer],
   ])('%s does not read viewer.scene during cleanup after Cesium has destroyed it', (_name, Layer) => {
     const { viewer, viewerRef } = createViewerRef();
     const { unmount } = render(<Layer viewerRef={viewerRef as never} />);
@@ -125,6 +151,7 @@ describe('viewport layer cleanup', () => {
     ['ThreeLayer', ThreeLayer],
     ['AirportLayer', AirportLayer],
     ['ContrailLayer', ContrailLayer],
+    ['CockpitLayer', CockpitLayer],
   ])('%s does not touch destroyed Cesium scene resources during cleanup', (_name, Layer) => {
     const { viewer, viewerRef } = createViewerRef();
     const { unmount } = render(<Layer viewerRef={viewerRef as never} />);

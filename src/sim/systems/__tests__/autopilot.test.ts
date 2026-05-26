@@ -2,11 +2,14 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   composeEffectiveControls,
   computeAutopilotCommands,
+  computeAutopilotCommandsForState,
   resetAutopilotPID,
+  resolveAutopilotTargets,
 } from '../autopilot';
 import { createInitialState, B737_800_SPEC } from '../../types';
 import type { AutopilotCommands, ControlInputs } from '../../types';
 import type { AutopilotState, LateralMode, ThrustMode, VerticalMode } from '@shared/autopilot/autopilotTypes';
+import type { FlightPlan } from '@shared/types/fmc';
 
 beforeEach(() => resetAutopilotPID());
 
@@ -83,6 +86,201 @@ describe('computeAutopilotCommands SPEED', () => {
     const ap = makeAp('HDG_SEL', 'ALT_HOLD', 'SPEED');
     const commands = computeAutopilotCommands(s, ap, 0, 10000, 250, 1/60);
     expect(commands.throttle1).toBeGreaterThan(0);
+  });
+
+  it('rate-limits the first throttle command instead of jumping to full power', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.velocity.u = 50; // far below target, raw SPEED demand would saturate.
+    const ap = makeAp('HDG_SEL', 'ALT_HOLD', 'SPEED');
+
+    const commands = computeAutopilotCommands(s, ap, 0, 10000, 300, 1/60);
+
+    expect(commands.throttle1).toBeGreaterThan(0);
+    expect(commands.throttle1).toBeLessThan(0.15);
+    expect(commands.throttle2).toBe(commands.throttle1);
+  });
+});
+
+describe('computeAutopilotCommands VS', () => {
+  it('commands nose-up elevator when selected VS is above current VS', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.velocity.u = 128.6;
+    s.velocity.w = 0;
+    s.attitude.theta = 0;
+    const ap = makeAp('HDG_SEL', 'VS', 'OFF');
+    ap.boeing.verticalSpeed = 1000;
+
+    const targets = resolveAutopilotTargets(s, ap);
+    const commands = computeAutopilotCommands(
+      s,
+      ap,
+      targets.targetHeadingRad,
+      targets.targetAltFt,
+      targets.targetSpeedKt,
+      1 / 60,
+      targets.targetVerticalSpeedFpm,
+    );
+
+    expect(targets.targetVerticalSpeedFpm).toBe(1000);
+    expect(commands.elevator).toBeLessThan(0);
+    expect(commands.elevator).toBeGreaterThan(-0.5);
+  });
+});
+
+describe('resolveAutopilotTargets VNAV', () => {
+  it('uses VNAV target VS and commands elevator for a valid altitude constraint', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.position.lat = 47.45;
+    s.position.lon = -122.31;
+    s.position.alt = 5000;
+    s.velocity.u = 128.6;
+    const ap = makeAp('LNAV', 'VNAV', 'SPEED');
+    const fp: FlightPlan = {
+      origin: 'KSEA',
+      destination: 'KPDX',
+      flightNumber: 'TST789',
+      route: 'KSEA OLM',
+      waypoints: [
+        { ident: 'KSEA', lat: 47.45, lon: -122.31, discontinuity: false },
+        { ident: 'OLM', lat: 46.97, lon: -122.9, discontinuity: false, altitudeConstraint: { type: 'AT', altitude: 10000 } },
+      ],
+    };
+
+    const targets = resolveAutopilotTargets(s, ap, fp, 0);
+    const commands = computeAutopilotCommandsForState(s, ap, fp, 1 / 60, 0);
+
+    expect(targets.targetAltFt).toBe(10000);
+    expect(targets.targetVerticalSpeedFpm).toBeGreaterThan(0);
+    expect(commands.elevator).toBeLessThan(0);
+  });
+
+  it('uses VNAV speed constraint for SPEED mode when no MCP speed is selected', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.position.lat = 47.45;
+    s.position.lon = -122.31;
+    s.velocity.u = 128.6;
+    const ap = makeAp('LNAV', 'VNAV', 'SPEED');
+    ap.boeing.speed = null;
+    const fp: FlightPlan = {
+      origin: 'KSEA',
+      destination: 'KPDX',
+      flightNumber: 'TST790',
+      route: 'KSEA OLM',
+      waypoints: [
+        { ident: 'KSEA', lat: 47.45, lon: -122.31, discontinuity: false },
+        { ident: 'OLM', lat: 46.97, lon: -122.9, discontinuity: false, speedConstraint: { type: 'AT_OR_BELOW', speed: 210 } },
+      ],
+    };
+
+    const targets = resolveAutopilotTargets(s, ap, fp, 0);
+
+    expect(targets.targetSpeedKt).toBe(210);
+  });
+
+  it('leaves altitude and VS targets unchanged when VNAV has no active constraint', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.position.lat = 47.45;
+    s.position.lon = -122.31;
+    s.position.alt = 7000;
+    s.velocity.u = 128.6;
+    const ap = makeAp('LNAV', 'VNAV', 'SPEED');
+    const fp: FlightPlan = {
+      origin: 'KSEA',
+      destination: 'KPDX',
+      flightNumber: 'TST791',
+      route: 'KSEA OLM',
+      waypoints: [
+        { ident: 'KSEA', lat: 47.45, lon: -122.31, discontinuity: false },
+        { ident: 'OLM', lat: 46.97, lon: -122.9, discontinuity: false },
+      ],
+    };
+
+    const targets = resolveAutopilotTargets(s, ap, fp, 0);
+    const commands = computeAutopilotCommandsForState(s, ap, fp, 1 / 60, 0);
+
+    expect(targets.targetAltFt).toBe(s.position.alt);
+    expect(targets.targetVerticalSpeedFpm).toBeUndefined();
+    expect(commands.elevator).toBeUndefined();
+  });
+
+  it.each([Number.NaN, Number.POSITIVE_INFINITY, -1])(
+    'falls back to current heading and no VNAV target for invalid activeLegIndex %s',
+    (invalidActiveLegIndex) => {
+      const s = createInitialState(B737_800_SPEC);
+      s.position.lat = 47.45;
+      s.position.lon = -122.31;
+      s.position.alt = 7000;
+      s.attitude.psi = 1.23;
+      s.velocity.u = 128.6;
+      const ap = makeAp('LNAV', 'VNAV', 'SPEED');
+      const fp: FlightPlan = {
+        origin: 'KSEA',
+        destination: 'KPDX',
+        flightNumber: 'TST792',
+        route: 'KSEA OLM',
+        waypoints: [
+          { ident: 'KSEA', lat: 47.45, lon: -122.31, discontinuity: false },
+          { ident: 'OLM', lat: 46.97, lon: -122.9, discontinuity: false, altitudeConstraint: { type: 'AT', altitude: 10000 } },
+        ],
+      };
+      let targets: ReturnType<typeof resolveAutopilotTargets> | undefined;
+
+      expect(() => {
+        targets = resolveAutopilotTargets(s, ap, fp, invalidActiveLegIndex);
+      }).not.toThrow();
+
+      expect(targets?.targetHeadingRad).toBeCloseTo(s.attitude.psi, 12);
+      expect(targets?.targetAltFt).toBe(s.position.alt);
+      expect(targets?.targetVerticalSpeedFpm).toBeUndefined();
+    },
+  );
+});
+
+describe('resolveAutopilotTargets LNAV', () => {
+  it('uses the active route leg to target the next waypoint instead of the from waypoint', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.position.lat = 47.1;
+    s.position.lon = -122.0;
+    s.attitude.psi = 0;
+    const ap = makeAp('LNAV', 'ALT_HOLD', 'SPEED');
+    const fp: FlightPlan = {
+      origin: 'ORIG',
+      destination: 'DEST',
+      flightNumber: 'TST123',
+      route: 'ORIG MID DEST',
+      waypoints: [
+        { ident: 'ORIG', lat: 47.0, lon: -122.0, discontinuity: false },
+        { ident: 'MID', lat: 47.1, lon: -122.0, discontinuity: false },
+        { ident: 'DEST', lat: 47.1, lon: -121.9, discontinuity: false },
+      ],
+    };
+
+    const targets = resolveAutopilotTargets(s, ap, fp, 1);
+
+    expect(targets.targetHeadingRad).toBeCloseTo(Math.PI / 2, 1);
+  });
+
+  it('keeps current heading when route status marks LNAV unavailable for a discontinuity', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.position.lat = 47.1;
+    s.position.lon = -122.0;
+    s.attitude.psi = 0;
+    const ap = makeAp('LNAV', 'ALT_HOLD', 'SPEED');
+    const fp: FlightPlan = {
+      origin: 'ORIG',
+      destination: 'DEST',
+      flightNumber: 'TST456',
+      route: 'ORIG DISCO DEST',
+      waypoints: [
+        { ident: 'ORIG', lat: 47.0, lon: -122.0, discontinuity: false },
+        { ident: 'DISCO', discontinuity: true },
+        { ident: 'DEST', lat: 47.1, lon: -121.9, discontinuity: false },
+      ],
+    };
+
+    const targets = resolveAutopilotTargets(s, ap, fp, 1);
+
+    expect(targets.targetHeadingRad).toBeCloseTo(s.attitude.psi, 12);
   });
 });
 

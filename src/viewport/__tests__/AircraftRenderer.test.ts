@@ -1,7 +1,9 @@
 import * as THREE from 'three';
 import { describe, expect, it, vi } from 'vitest';
+import { eulerToQuat } from '../../sim/physics/quaternion';
+import { B737_800_SPEC, createInitialState, type AircraftState, type Attitude } from '../../sim/types';
 import { AircraftRenderer } from '../AircraftRenderer';
-import { B737_800_SPEC, createInitialState, type AircraftState } from '../../sim/types';
+import { createCockpitModel } from '../CockpitModel';
 
 type FakeBridge = {
   add: ReturnType<typeof vi.fn<(object: THREE.Object3D, position?: unknown) => THREE.Group>>;
@@ -15,12 +17,17 @@ function aircraftAt(params: {
   alt?: number;
   simTime?: number;
   n1?: number;
+  attitude?: Attitude;
 } = {}): AircraftState {
   const aircraft = createInitialState(B737_800_SPEC);
   aircraft.position.lat = params.lat ?? 47.449;
   aircraft.position.lon = params.lon ?? -122.309;
   aircraft.position.alt = params.alt ?? 433;
   aircraft.simTime = params.simTime ?? 0;
+  if (params.attitude) {
+    aircraft.attitude = params.attitude;
+    aircraft.quaternion = eulerToQuat(params.attitude.phi, params.attitude.theta, params.attitude.psi);
+  }
   aircraft.engines[0].n1 = params.n1 ?? 0;
   aircraft.engines[1].n1 = params.n1 ?? 0;
   return aircraft;
@@ -81,6 +88,22 @@ describe('AircraftRenderer', () => {
 
     expect(bridge.add).toHaveBeenCalledTimes(1);
     expect(wrapper.matrix.equals(firstMatrix)).toBe(false);
+  });
+
+  it('rotates a cockpit model shell with aircraft heading instead of leaving its station offset in parent ENU', () => {
+    const { bridge, wrapper } = createBridge();
+    const renderer = new AircraftRenderer(bridge, createCockpitModel);
+
+    renderer.render(aircraftAt({ attitude: { phi: 0, theta: 0, psi: Math.PI / 2 } }));
+    wrapper.updateMatrixWorld(true);
+    const cockpit = bridge.add.mock.calls[0][0] as THREE.Object3D;
+    const mainPanel = cockpit.getObjectByName('mainPanel');
+    const panelPosition = new THREE.Vector3();
+    mainPanel?.getWorldPosition(panelPosition);
+
+    expect(cockpit.position.y).toBe(0);
+    expect(panelPosition.x).toBeGreaterThan(15);
+    expect(Math.abs(panelPosition.y)).toBeLessThan(0.01);
   });
 
   it('removes the persistent model once on dispose, not once per frame', () => {

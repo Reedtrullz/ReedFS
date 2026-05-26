@@ -4,9 +4,20 @@
 
 **Goal:** Turn RFS from a debug flight-test build into a usable, believable 737-style simulator loop: visible runway start, realistic takeoff/climb/controls, better aircraft visuals, a real cockpit view, cohesive instruments, and trustworthy route/autopilot feedback.
 
-**Architecture:** Add scenario-level regression tests first, then fix the ground/contact and flight-control contracts that make the sim arcadey. In parallel after the contracts are measured, evolve rendering into persistent aircraft/cockpit layers and split UI into player/cockpit/debug modes. Keep RFMS/autopilot integration behind a single guidance state so visible FMA/MCP modes match the actual servo laws.
+**Architecture:** Add scenario-level regression tests first, then fix the ground/contact and flight-control contracts that make the sim arcadey. In parallel after the contracts are measured, evolve rendering into persistent aircraft/cockpit layers and split UI into player/cockpit/debug modes. Keep RFMS/autopilot integration behind explicit store-owned guidance, route, and AP truth state so visible FMA/MCP modes match the actual servo laws.
 
 **Tech Stack:** React 19, TypeScript strict, Vite, Vitest, Zustand, CesiumJS, Three.js, three-to-cesium, Web Audio, RFMS shared types.
+
+**Implementation status (current repository state):** Phases 0 through 5.5 are complete and covered by `npm run check`. The next unfinished batch is Phase 6: Cesium token/degraded-scene policy, Three.js deduplication, deterministic visual regression snapshots, fixed-timestep/worker migration, and audio immersion.
+
+Completed task groups:
+
+- Phase 0: measurement and regression harness.
+- Phase 1: runway-normal ground contact, normal-force liftoff, and removal of core attitude assist.
+- Phase 2: performance envelope fixtures, data-backed aero/engine behavior, input dynamics, AP/pilot/effective-control split, trim, and CG pitch moment.
+- Phase 3: aircraft visual contract, persistent renderer, visual animation state, and Cesium-native runway layer.
+- Phase 4: camera manager, cockpit shell, overlay modes, readable PFD/FMA, and cockpit interaction hooks.
+- Phase 5: scenario/tutorial/checklist/coach flow, store-owned guidance/route/AP truth state, active-leg route feedback, and honest LNAV/VNAV/SPD/VS behavior.
 
 ---
 
@@ -882,36 +893,32 @@ export interface TakeoffEnvelope {
 - Gear-up prompt becomes actionable after positive rate.
 - If gear remains down too long, warning escalates.
 
-## Task 5.3 [PARENT-DIRECT]: Create unified `GuidanceState`
+## Task 5.3 [PARENT-DIRECT]: Create store-owned guidance/route/AP truth state
 
-**Objective:** Make MCP, AP servo laws, route state, and PFD FMA use one source of truth.
+**Objective:** Keep player guidance, route feedback, and AP/FMA truth synchronized without hiding route/AP state inside the tutorial/checklist projection.
 
-**Files:**
-- Create: `src/sim/guidance/types.ts`
+**Implemented files:**
+- Create: `src/sim/guidanceState.ts`
 - Modify: `src/store/simStore.ts`
 - Modify: `src/instruments/RfsMCP.tsx`
 - Modify: `src/instruments/RfsPFD.tsx`
 - Modify: `src/sim/systems/autopilot.ts`
-- Modify: `src/sim/physics/integrate.ts`
-- Test: `src/sim/guidance/__tests__/guidanceState.test.ts`
+- Test: `src/sim/__tests__/guidanceState.test.ts`
 - Test: `src/instruments/__tests__/RfsMCP.test.tsx`
 
-**State should include:**
+**Current state ownership:**
 
-- selected heading, altitude, speed, vertical speed.
-- active/armed roll mode.
-- active/armed pitch mode.
-- active/armed thrust mode.
-- AP/FD/AT status.
-- active leg index and route validity.
-- FMA display fields.
+- `guidance`: scenario phase, tutorial state, checklist, coach message, and alerts.
+- `apState.truth`: active FMA/AP modes used by the PFD and servo laws.
+- `routeStatus`: active leg, route validity, next waypoint, distance, track, ETA, and LNAV availability.
+- `pilotInputs`, `apCommands`, and `effectiveControls`: separate pilot/AP/control ownership fields.
 
 **Tests:**
 
-- First HDG click engages HDG SEL with current/selected heading.
-- First ALT click engages ALT mode or shows unavailable reason.
+- Guidance phase follows scenario/status/aircraft/control state.
+- First MCP clicks create AP state and engage the clicked mode.
 - OFF truly sets AP/FMA status OFF.
-- PFD FMA matches guidance state.
+- PFD FMA reads the same AP truth state used by guidance laws.
 
 ## Task 5.4: Implement route active leg and LNAV feedback
 

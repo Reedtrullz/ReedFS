@@ -21,17 +21,38 @@ import { fetchMetar, parseMetarWind } from './sim/weather';
 import type { MetarData } from './sim/weather';
 import { CloudLayer } from './viewport/CloudLayer';
 import { RfsPFD } from './instruments/RfsPFD';
-import { RfsMCP } from './instruments/RfsMCP';
+import { createDefaultAutopilotState, RfsMCP } from './instruments/RfsMCP';
 import { ContrailLayer } from './viewport/ContrailLayer';
 import { RunwayLayer } from './viewport/RunwayLayer';
+import { CockpitLayer } from './viewport/CockpitLayer';
 import { nextCameraMode, type CameraMode } from './viewport/cameraMode';
+import { nextOverlayMode, shouldShowDebugOverlays, shouldShowFlightInstruments, type OverlayMode } from './viewport/overlayMode';
 import { CameraManager } from './viewport/CameraManager';
 import { createKseaKpdxFlight } from './sim/flightPlanLoader';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { FPSMonitor } from './components/FPSMonitor';
-import type { LateralMode, ThrustMode, VerticalMode } from '@shared/autopilot/autopilotTypes';
+import { ScenarioPanel } from './components/ScenarioPanel';
+import { RouteStatus } from './components/RouteStatus';
+import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
 
 initCesium();
+
+function applyLoadedRouteAutopilotDefaults(apState: AutopilotState): AutopilotState {
+  const next = structuredClone(apState);
+  next.truth.lateralActive = 'LNAV';
+  next.truth.verticalActive = 'ALT_HOLD';
+  next.truth.thrustActive = 'SPEED';
+  next.truth.autopilotStatus = 'CMD_A';
+  next.boeing.lnav = true;
+  next.boeing.hdgSel = false;
+  next.boeing.vnav = false;
+  next.boeing.altHold = true;
+  next.boeing.vs = false;
+  next.boeing.speedMode = true;
+  next.boeing.n1 = false;
+  next.boeing.autothrottleArm = true;
+  return next;
+}
 
 export function App() {
   const viewerRef = useRef<Cesium.Viewer | null>(null);
@@ -47,6 +68,7 @@ export function App() {
 
   const keysRef = useRef(new Set<string>());
   const [camMode, setCamMode] = useState<CameraMode>('chase');
+  const [overlayMode, setOverlayMode] = useState<OverlayMode>('flight');
   const [metarData, setMetarData] = useState<MetarData | null>(null);
   const [viewerGeneration, setViewerGeneration] = useState(0);
 
@@ -161,32 +183,39 @@ export function App() {
     startTakeoffRoll();
   };
 
+  const showDebugOverlays = shouldShowDebugOverlays(overlayMode);
+  const showFlightInstruments = shouldShowFlightInstruments(overlayMode);
+
   return (
     <ErrorBoundary>
     <div style={{ width: '100%', height: '100%' }}>
       <CesiumViewport onReady={handleViewerReady} />
       <RunwayLayer viewerRef={viewerRef} />
-      <ThreeLayer viewerRef={viewerRef} />
+      {camMode === 'cockpit' ? <CockpitLayer viewerRef={viewerRef} /> : <ThreeLayer viewerRef={viewerRef} />}
       <CloudLayer viewerRef={viewerRef} metar={metarData} />
       <ContrailLayer viewerRef={viewerRef} />
-      <Telemetry />
-      <ControlsHelp />
-      <AttitudeIndicator />
-      <RfsPFD />
-      <RfsMCP />
-      <div
-        style={{
-          position: 'fixed',
-          top: 10,
-          left: 10,
-          color: '#0f0',
-          fontFamily: 'monospace',
-          zIndex: 10,
-          pointerEvents: 'none',
-        }}
-      >
-        RFS — Flight Test Build
-      </div>
+      {showDebugOverlays && <Telemetry />}
+      {showDebugOverlays && <ControlsHelp />}
+      {showDebugOverlays && <AttitudeIndicator />}
+      {showFlightInstruments && <ScenarioPanel />}
+      {showFlightInstruments && <RouteStatus />}
+      {showFlightInstruments && <RfsPFD />}
+      {showFlightInstruments && <RfsMCP />}
+      {showDebugOverlays && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 10,
+            left: 10,
+            color: '#0f0',
+            fontFamily: 'monospace',
+            zIndex: 10,
+            pointerEvents: 'none',
+          }}
+        >
+          RFS — Flight Test Build
+        </div>
+      )}
       <div style={{ position: 'fixed', bottom: 20, left: 20, zIndex: 100, display: 'flex', gap: 8 }}>
         {status === 'stopped' || status === 'paused' ? (
           <>
@@ -204,21 +233,17 @@ export function App() {
           CAM: {camMode.toUpperCase()}
         </button>
         <button
+          onClick={() => setOverlayMode(nextOverlayMode)}
+          style={btnStyle}
+        >
+          OVL: {overlayMode.toUpperCase()}
+        </button>
+        <button
           onClick={() => {
             const fp = createKseaKpdxFlight();
             useSimStore.getState().setFlightPlan(fp);
-            const ap = useSimStore.getState().apState;
-            if (ap) {
-              const next = structuredClone(ap);
-              const lateral: LateralMode = 'LNAV';
-              const vertical: VerticalMode = 'VNAV';
-              const thrust: ThrustMode = 'SPEED';
-              next.truth.lateralActive = lateral;
-              next.truth.verticalActive = vertical;
-              next.truth.thrustActive = thrust;
-              next.truth.autopilotStatus = 'CMD_A';
-              useSimStore.getState().setApState(next);
-            }
+            const ap = useSimStore.getState().apState ?? createDefaultAutopilotState();
+            useSimStore.getState().setApState(applyLoadedRouteAutopilotDefaults(ap));
           }}
           style={btnStyle}
         >
@@ -226,7 +251,7 @@ export function App() {
         </button>
       </div>
     </div>
-    <FPSMonitor />
+    {showDebugOverlays && <FPSMonitor />}
     </ErrorBoundary>
   );
 }

@@ -1,0 +1,94 @@
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { cleanup, render, screen } from '@testing-library/react';
+import { RouteStatus } from '../RouteStatus';
+import { useSimStore } from '../../store/simStore';
+import type { RouteStatusSnapshot } from '../../sim/systems/navigation';
+
+function routeStatus(overrides: Partial<RouteStatusSnapshot> = {}): RouteStatusSnapshot {
+  return {
+    routeName: 'KSEA→KPDX',
+    routeValid: true,
+    lnavAvailable: true,
+    lnavUnavailableReason: null,
+    activeLegIndex: 0,
+    activeLegCount: 2,
+    fromWaypointIndex: 0,
+    toWaypointIndex: 1,
+    fromIdent: 'KSEA',
+    nextWaypointIdent: 'OLM',
+    distanceToNextM: 49300,
+    distanceToNextNm: 26.6,
+    desiredTrackRad: 2.95,
+    desiredTrackDegTrue: 169,
+    etaMinutes: 7.1,
+    waypointReached: false,
+    sequenced: false,
+    ...overrides,
+  };
+}
+
+describe('RouteStatus', () => {
+  beforeEach(() => {
+    useSimStore.getState().reset();
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it('renders store-owned route feedback without recomputing from the flight plan', () => {
+    useSimStore.setState({
+      flightPlan: null,
+      activeLegIndex: 7,
+      routeStatus: routeStatus({
+        routeName: 'MOCKA→MOCKB',
+        activeLegIndex: 7,
+        fromIdent: 'FAKE1',
+        nextWaypointIdent: 'FAKE2',
+        fromWaypointIndex: 10,
+        toWaypointIndex: 42,
+        distanceToNextNm: 12.3,
+        desiredTrackDegTrue: 87,
+        etaMinutes: 4.4,
+      }),
+    });
+
+    render(<RouteStatus />);
+
+    expect(screen.getByLabelText('Route status')).toBeTruthy();
+    expect(screen.getByText('MOCKA→MOCKB')).toBeTruthy();
+    expect(screen.getByText(/LEG 7/i)).toBeTruthy();
+    expect(screen.getByText(/FAKE1 → FAKE2/i)).toBeTruthy();
+    expect(screen.getByText(/12\.3 NM/i)).toBeTruthy();
+    expect(screen.getByText(/087°T/i)).toBeTruthy();
+    expect(screen.getByText(/4\.4 MIN/i)).toBeTruthy();
+    expect(screen.queryByText(/LNAV unavailable/i)).toBeNull();
+  });
+
+  it('displays an explicit unavailable reason from route feedback', () => {
+    useSimStore.setState({
+      routeStatus: routeStatus({
+        routeValid: false,
+        lnavAvailable: false,
+        lnavUnavailableReason: 'missing coordinates for waypoint BROKEN',
+        activeLegIndex: null,
+        activeLegCount: 0,
+        fromWaypointIndex: null,
+        toWaypointIndex: null,
+        fromIdent: null,
+        nextWaypointIdent: null,
+        distanceToNextM: null,
+        distanceToNextNm: null,
+        desiredTrackRad: null,
+        desiredTrackDegTrue: null,
+        etaMinutes: null,
+      }),
+    });
+
+    render(<RouteStatus />);
+
+    expect(screen.getByText('KSEA→KPDX')).toBeTruthy();
+    expect(screen.getByText(/LNAV unavailable: missing coordinates for waypoint BROKEN/i)).toBeTruthy();
+    expect(screen.queryByText(/DTG/i)).toBeNull();
+  });
+});

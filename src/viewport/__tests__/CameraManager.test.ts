@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { CameraManager, cockpitCameraOffset } from '../CameraManager';
+import { CameraManager, cockpitCameraOffset, cockpitCameraOrientation } from '../CameraManager';
 import { B737_800_SPEC, createInitialState, type AircraftState } from '../../sim/types';
 import type { CameraMode } from '../cameraMode';
 import type { SimStatus } from '../../store/simStore';
@@ -16,6 +16,7 @@ function createViewer() {
     camera: {
       cancelFlight: vi.fn(),
       lookAt: vi.fn(),
+      setView: vi.fn(),
     },
     scene: {
       screenSpaceCameraController: { enableInputs: true },
@@ -46,7 +47,7 @@ describe('CameraManager', () => {
   });
 
   it('keeps the cockpit eye point inside the cockpit envelope but ahead of the exterior fuselage center', () => {
-    const offset = cockpitCameraOffset({ psi: 0 });
+    const offset = cockpitCameraOffset({ phi: 0, theta: 0, psi: 0 });
 
     expect(offset.north).toBeGreaterThan(14);
     expect(offset.north).toBeLessThan(21);
@@ -55,16 +56,43 @@ describe('CameraManager', () => {
     expect(offset.up).toBeLessThan(3);
   });
 
-  it('aims cockpit lookAt forward through the windscreen instead of back at the aircraft origin', () => {
+  it('sets cockpit camera at the pilot eye with an orthonormal body-frame orientation', () => {
     const viewer = createViewer();
     const manager = new CameraManager(viewer as never);
 
-    const call = update(manager, viewer, 'running', 'cockpit', aircraftAtHeading(0));
-    const offset = call?.[1] as { x: number; y: number; z: number };
+    update(manager, viewer, 'running', 'cockpit', aircraftAtHeading(0));
+    const view = viewer.camera.setView.mock.calls.at(-1)?.[0] as {
+      orientation: { direction: { x: number; y: number; z: number }; up: { x: number; y: number; z: number } };
+    };
+    const direction = view.orientation.direction;
+    const up = view.orientation.up;
+    const dot = direction.x * up.x + direction.y * up.y + direction.z * up.z;
 
-    expect(offset.x).toBeCloseTo(0, 6);
-    expect(offset.y).toBeLessThan(-500);
-    expect(offset.z).toBeCloseTo(0, 6);
+    expect(viewer.camera.lookAt).not.toHaveBeenCalled();
+    expect(viewer.camera.setView).toHaveBeenCalledTimes(1);
+    expect(dot).toBeCloseTo(0, 5);
+  });
+
+  it('rolls cockpit camera up vector with the aircraft instead of horizon-stabilizing it', () => {
+    const localRoll = cockpitCameraOrientation({ phi: Math.PI / 2, theta: 0, psi: 0 });
+    expect(Math.abs(localRoll.up.east)).toBeGreaterThan(0.9);
+    expect(Math.abs(localRoll.up.up)).toBeLessThan(0.1);
+
+    const levelViewer = createViewer();
+    const rolledViewer = createViewer();
+    const levelManager = new CameraManager(levelViewer as never);
+    const rolledManager = new CameraManager(rolledViewer as never);
+
+    update(levelManager, levelViewer, 'running', 'cockpit', aircraftAtHeading(0));
+    const rolledAircraft = aircraftAtHeading(0);
+    rolledAircraft.attitude.phi = Math.PI / 2;
+    update(rolledManager, rolledViewer, 'running', 'cockpit', rolledAircraft);
+
+    const levelUp = levelViewer.camera.setView.mock.calls.at(-1)?.[0].orientation.up as { x: number; y: number; z: number };
+    const rolledUp = rolledViewer.camera.setView.mock.calls.at(-1)?.[0].orientation.up as { x: number; y: number; z: number };
+    const upDot = Math.abs(levelUp.x * rolledUp.x + levelUp.y * rolledUp.y + levelUp.z * rolledUp.z);
+
+    expect(upDot).toBeLessThan(0.25);
   });
 
   it('does not call follow lookAt in free camera mode while running', () => {

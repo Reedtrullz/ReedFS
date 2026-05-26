@@ -1,8 +1,10 @@
 import * as Cesium from 'cesium';
+import * as THREE from 'three';
 import type { AircraftState, Attitude } from '../sim/types';
 import type { SimStatus } from '../store/simStore';
-import { chaseCameraOffset, headingForwardEnu, type EnuOffset } from './cameraFollow';
+import { chaseCameraOffset, type EnuOffset } from './cameraFollow';
 import { shouldAutoFollowCamera, type CameraMode } from './cameraMode';
+import { createAircraftModelQuaternion } from './aircraftOrientation';
 
 export interface CameraManagerUpdate {
   aircraft: Pick<AircraftState, 'position' | 'attitude'>;
@@ -10,13 +12,19 @@ export interface CameraManagerUpdate {
   mode: CameraMode;
 }
 
-export function cockpitCameraOffset(attitude: Pick<Attitude, 'psi'>): EnuOffset {
-  const forward = headingForwardEnu(attitude.psi);
-  const eyeForwardMeters = 17.5;
+function modelOffsetToEnu(attitude: Attitude, offset: THREE.Vector3): EnuOffset {
+  const enu = offset.clone().applyQuaternion(createAircraftModelQuaternion(attitude));
+  return { east: enu.x, north: enu.y, up: enu.z };
+}
+
+export function cockpitCameraOffset(attitude: Attitude): EnuOffset {
+  return modelOffsetToEnu(attitude, new THREE.Vector3(0, 17.5, 1.9));
+}
+
+export function cockpitCameraOrientation(attitude: Attitude): { direction: EnuOffset; up: EnuOffset } {
   return {
-    east: forward.east * eyeForwardMeters,
-    north: forward.north * eyeForwardMeters,
-    up: 1.9,
+    direction: modelOffsetToEnu(attitude, new THREE.Vector3(0, 1, 0)),
+    up: modelOffsetToEnu(attitude, new THREE.Vector3(0, 0, 1)),
   };
 }
 
@@ -28,13 +36,17 @@ function targetForAircraft(aircraft: Pick<AircraftState, 'position'>, altitudeOf
   );
 }
 
-function targetForAircraftOffset(aircraft: Pick<AircraftState, 'position'>, offset: EnuOffset): Cesium.Cartesian3 {
-  const metersPerDegLon = 111_320 * Math.cos(aircraft.position.lat * Math.PI / 180);
-  return Cesium.Cartesian3.fromDegrees(
-    aircraft.position.lon + offset.east / metersPerDegLon,
-    aircraft.position.lat + offset.north / 111_320,
-    aircraft.position.alt * 0.3048 + offset.up,
-  );
+function fixedFrameForAircraft(aircraft: Pick<AircraftState, 'position'>): Cesium.Matrix4 {
+  return Cesium.Transforms.eastNorthUpToFixedFrame(targetForAircraft(aircraft));
+}
+
+function positionFromEnuOffset(frame: Cesium.Matrix4, offset: EnuOffset): Cesium.Cartesian3 {
+  return Cesium.Matrix4.multiplyByPoint(frame, cesiumOffset(offset), new Cesium.Cartesian3());
+}
+
+function vectorFromEnuOffset(frame: Cesium.Matrix4, offset: EnuOffset): Cesium.Cartesian3 {
+  const vector = Cesium.Matrix4.multiplyByPointAsVector(frame, cesiumOffset(offset), new Cesium.Cartesian3());
+  return Cesium.Cartesian3.normalize(vector, vector);
 }
 
 function cesiumOffset(offset: EnuOffset): Cesium.Cartesian3 {
@@ -64,13 +76,17 @@ export class CameraManager {
 
     this.viewer.camera.cancelFlight();
     if (mode === 'cockpit') {
+      const localFrame = fixedFrameForAircraft(aircraft);
       const eye = cockpitCameraOffset(aircraft.attitude);
-      const forward = headingForwardEnu(aircraft.attitude.psi);
-      const lookAhead: EnuOffset = { east: forward.east * 800, north: forward.north * 800, up: eye.up };
-      this.viewer.camera.lookAt(
-        targetForAircraftOffset(aircraft, lookAhead),
-        cesiumOffset({ east: eye.east - lookAhead.east, north: eye.north - lookAhead.north, up: 0 }),
-      );
+      const orientation = cockpitCameraOrientation(aircraft.attitude);
+      this.viewer.camera.setView({
+        destination: positionFromEnuOffset(localFrame, eye),
+        orientation: {
+          direction: vectorFromEnuOffset(localFrame, orientation.direction),
+          up: vectorFromEnuOffset(localFrame, orientation.up),
+        },
+        endTransform: Cesium.Matrix4.IDENTITY,
+      });
       return;
     }
 

@@ -7,17 +7,17 @@ Repository: https://github.com/Reedtrullz/ReedFS
 
 ## Current status
 
-The simulator foundation is stabilized and release-gated:
+The simulator now has a stabilized flight-model foundation plus the first gameplay/usability productization pass:
 
 - Quaternion attitude is authoritative; Euler attitude is mirrored only for compatibility and display boundaries.
-- Initial south-facing attitude is aligned between Euler and quaternion state.
-- Body/NED frame transforms are centralized and covered by regression tests.
-- Gravity signs follow the simulator convention: body x-forward, y-right, z-down; NED down-positive.
-- Wind is non-mutating and air-relative; ground velocity remains ground-relative.
-- Drag is signed against air-relative flow, including reverse-flow/tailwind cases.
+- Body/NED frame transforms, gravity signs, air-relative wind, signed drag, and physics regressions are covered by tests.
+- Ground contact now has explicit ground state, runway-normal constraints, normal-force liftoff gating, and phase handling so takeoff is no longer driven by core attitude hacks.
+- Pilot inputs, autopilot commands, and effective controls are separated in the store; input dynamics, stabilizer trim, CG pitch moment, and AP-owned axes have regression coverage.
+- The aircraft renderer uses a persistent named visual contract with animated control surfaces/gear, Cesium-native runway references, and chase/cockpit camera management.
+- The default player view has scenario/tutorial/checklist/coach flow, readable PFD/FMA, MCP controls, route status, active-leg LNAV feedback, and conservative VNAV/SPD/VS behavior that does not advertise unsupported modes.
 - CI enforces lint, typecheck, tests, and production build before publish/deploy.
 
-The next major enhancements are documented in `docs/roadmap.md`.
+The next major enhancements are the Phase 6 release-hardening tasks documented in `docs/roadmap.md` and `docs/plans/2026-05-26-rfs-comprehensive-usability-realism-plan.md`.
 
 ## Stack
 
@@ -50,15 +50,21 @@ src/
       geodesy.ts                   WGS84/ECEF/ENU helpers
     systems/
       environment.ts               Pure wind -> air-relative body velocity helpers
+      ground.ts                    Runway contact, AGL, normal force, liftoff state
       engine.ts fuel.ts            Engine spool/fuel burn systems
       electrical.ts hydraulic.ts   Simplified aircraft systems
-      autopilot.ts                 RFMS AutopilotState -> control input bridge
-      navigation.ts vnav.ts        LNAV/VNAV helpers
+      navigation.ts vnav.ts        Route validation, active-leg LNAV, conservative VNAV targets
+      autopilot.ts                 RFMS AutopilotState -> AP-owned control commands
+    scenarios.ts                   Player scenarios and initial conditions
+    guidanceState.ts               Scenario/tutorial/checklist coach projection
+    tutorialState.ts               Tutorial step state helpers
+    checklistCoach.ts              Checklist and coach-message evaluation
     weather.ts                     METAR fetch + wind parsing
-  viewport/                        Cesium, Three.js, airport, cloud, contrail layers
-  instruments/                     RFS PFD and MCP
+  viewport/                        Cesium, Three.js, runway, cockpit, cloud, contrail layers
+  instruments/                     RFS PFD/FMA and MCP
+  components/                      Scenario, route, telemetry, controls, error UI
   audio/                           Web Audio engine and GPWS checks
-  input/                           Gamepad/keyboard support
+  input/                           Gamepad/keyboard/input dynamics support
 
 docs/
   architecture.md                  Current implementation architecture
@@ -156,20 +162,24 @@ Current implementation is still main-thread physics:
 React App
   -> useSimLoop RAF
     -> simStore.tick(dt)
+      -> computeRouteStatus before physics for active-leg AP targets
+      -> computeAutopilotCommandsForState
+      -> compose pilotInputs + apCommands into effectiveControls
       -> structuredClone(aircraft)
-      -> integrate(state, inputs, spec, dt, apState, flightPlan, wind)
+      -> integrate(state, effectiveControls, spec, dt, null, flightPlan, wind)
         -> updateEngines
         -> updateFuel
         -> updateElectrical
         -> updateHydraulic
         -> computeAero(..., wind)
         -> integrate angular velocity, quaternion, velocity, position
-        -> updateAutopilot for the next frame
-      -> computeDerived(state, wind)
+        -> update ground/contact and flight phase
+      -> recompute routeStatus / activeLegIndex
+      -> rebuild GuidanceState
       -> Zustand state update
 ```
 
-Moving physics to a Web Worker remains a recommended follow-up after the stabilized state contract.
+Moving physics to a fixed-timestep Web Worker remains a recommended follow-up after the state/control/route contracts stabilize.
 
 ## Deployment
 
@@ -204,6 +214,9 @@ Do not claim a deploy is complete until the GitHub Actions run is completed/succ
 
 - `docs/architecture.md` — current architecture and integration contracts.
 - `docs/physics-invariants.md` — physics sign/frame/wind/drag invariants.
-- `docs/roadmap.md` — prioritized necessary enhancements.
+- `docs/roadmap.md` — prioritized remaining enhancement backlog.
+- `docs/reviews/2026-05-26-comprehensive-gameplay-review.md` — audit that drove the current usability/realism pass.
+- `docs/reviews/templates/playability-dogfood-checklist.md` — browser dogfood checklist for future playable/deployed claims.
+- `docs/plans/2026-05-26-rfs-comprehensive-usability-realism-plan.md` — current implementation plan/status for gameplay, cockpit, visuals, and guidance work.
 - `docs/plans/2026-05-25-rfs-foundation-stabilization.md` — completed stabilization record.
 - `docs/plans/phase-*.md` — historical/future implementation plans; check each file's status note before treating it as current.

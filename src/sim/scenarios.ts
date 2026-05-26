@@ -18,6 +18,12 @@ export interface RunwayScenario {
   headingDeg: number;
 }
 
+export interface ScenarioTutorialStep {
+  id: string;
+  title: string;
+  body: string;
+}
+
 export interface FlightScenario {
   id: string;
   name: string;
@@ -32,6 +38,7 @@ export interface FlightScenario {
   stabilizerTrimUnits: number;
   flapSetting: number;
   wind: WindInfo;
+  tutorialSteps: ScenarioTutorialStep[];
 }
 
 export const KSEA_TUTORIAL_SCENARIO: FlightScenario = {
@@ -48,6 +55,23 @@ export const KSEA_TUTORIAL_SCENARIO: FlightScenario = {
   stabilizerTrimUnits: 5.0,
   flapSetting: 5,
   wind: { dir: 180, speed: 0 },
+  tutorialSteps: [
+    {
+      id: 'line-up',
+      title: 'Line up and configure',
+      body: 'Start on KSEA 16L with flaps 5, trim set, gear down, and both throttles idle. Use START ROLL when ready.',
+    },
+    {
+      id: 'advance-thrust',
+      title: 'Advance thrust smoothly',
+      body: 'Bring both thrust levers to takeoff power, keep the centerline with small rudder inputs, and monitor IAS on the PFD.',
+    },
+    {
+      id: 'rotate-positive-rate',
+      title: 'Rotate and clean up',
+      body: 'At VR, ease back to about 10° pitch. After positive rate, retract gear and climb out before cleaning flaps.',
+    },
+  ],
 };
 
 export const KSEA_LIGHT_PATTERN_SCENARIO: FlightScenario = {
@@ -64,6 +88,23 @@ export const KSEA_LIGHT_PATTERN_SCENARIO: FlightScenario = {
   stabilizerTrimUnits: 4.5,
   flapSetting: 5,
   wind: { dir: 200, speed: 6 },
+  tutorialSteps: [
+    {
+      id: 'pattern-setup',
+      title: 'Pattern setup',
+      body: 'Use the light pattern scenario for hand-flying practice: flaps 5, light fuel, and a small left-crosswind correction.',
+    },
+    {
+      id: 'climb-crosswind',
+      title: 'Climb and turn crosswind',
+      body: 'Climb at a controlled pitch, keep wings level until safe altitude, then make a gentle pattern turn.',
+    },
+    {
+      id: 'repeat-handfly',
+      title: 'Repeat hand-flying corrections',
+      body: 'Use small pitch/roll inputs and watch PFD trend cues instead of chasing the debug telemetry.',
+    },
+  ],
 };
 
 export const SCENARIOS: FlightScenario[] = [KSEA_TUTORIAL_SCENARIO, KSEA_LIGHT_PATTERN_SCENARIO];

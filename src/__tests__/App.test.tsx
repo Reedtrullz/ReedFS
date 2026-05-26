@@ -26,16 +26,76 @@ class MockOscillatorNode {
 }
 vi.stubGlobal('OscillatorNode', MockOscillatorNode);
 
-const { mockSetInput, mockStart, mockStartTakeoffRoll, mockPause, mockResume, mockReset } = vi.hoisted(() => ({
+const { mockSetInput, mockStart, mockStartTakeoffRoll, mockPause, mockResume, mockReset, mockSetScenario, mockSetTutorialStep, mockSetFlightPlan, mockSetApState } = vi.hoisted(() => ({
   mockSetInput: vi.fn(),
   mockStart: vi.fn(),
   mockStartTakeoffRoll: vi.fn(),
   mockPause: vi.fn(),
   mockResume: vi.fn(),
   mockReset: vi.fn(),
+  mockSetScenario: vi.fn(),
+  mockSetTutorialStep: vi.fn(),
+  mockSetFlightPlan: vi.fn(),
+  mockSetApState: vi.fn(),
 }));
 
 vi.mock('../store/simStore', () => {
+  const apState = {
+    boeing: {
+      courseL: 0,
+      courseR: 0,
+      speed: null,
+      mach: null,
+      heading: 0,
+      altitude: 10000,
+      verticalSpeed: null,
+      fdLeft: false,
+      fdRight: false,
+      autothrottleArm: true,
+      n1: false,
+      speedMode: false,
+      lnav: false,
+      vnav: false,
+      lvlChg: false,
+      hdgSel: false,
+      vorLoc: false,
+      app: false,
+      altHold: true,
+      vs: false,
+      cmdA: true,
+      cmdB: false,
+      cwsA: false,
+      cwsB: false,
+    },
+    airbus: {
+      speed: null,
+      speedManaged: false,
+      heading: null,
+      headingManaged: false,
+      altitude: 10000,
+      altitudeManaged: false,
+      verticalSpeed: null,
+      fpa: null,
+      fd1: false,
+      fd2: false,
+      athr: false,
+      ap1: false,
+      ap2: false,
+      loc: false,
+      appr: false,
+      exped: false,
+      hdgTrkMode: 'HDG_VS' as const,
+      metricAltitude: false,
+      speedMachMode: 'SPD' as const,
+    },
+    truth: {
+      lateralActive: 'HDG_SEL' as const,
+      verticalActive: 'ALT_HOLD' as const,
+      thrustActive: 'OFF' as const,
+      autopilotStatus: 'CMD_A' as const,
+      lastModeChangeTimestamps: { thrust: 0, lateral: 0, vertical: 0 },
+    },
+  };
   const state = {
     aircraft: {
       position: { lat: 0, lon: 0, alt: 0 },
@@ -52,7 +112,49 @@ vi.mock('../store/simStore', () => {
       grossWeight: 0, cg: 0, simTime: 0, flightPhase: 'PARKED' as const,
     },
     status: 'stopped' as const,
+    selectedScenarioId: 'ksea-tutorial',
+    flightPlan: null,
+    activeLegIndex: null,
+    routeStatus: {
+      routeName: 'KSEA→KPDX',
+      routeValid: true,
+      lnavAvailable: true,
+      lnavUnavailableReason: null,
+      activeLegIndex: 0,
+      activeLegCount: 2,
+      fromWaypointIndex: 0,
+      toWaypointIndex: 1,
+      fromIdent: 'KSEA',
+      nextWaypointIdent: 'OLM',
+      distanceToNextM: 49300,
+      distanceToNextNm: 26.6,
+      desiredTrackRad: 2.95,
+      desiredTrackDegTrue: 169,
+      etaMinutes: 7.1,
+      waypointReached: false,
+      sequenced: false,
+    },
+    apState,
+    guidance: {
+      scenarioId: 'ksea-tutorial',
+      phase: 'preflight' as const,
+      tutorial: {
+        scenarioId: 'ksea-tutorial',
+        stepIndex: 0,
+        steps: [
+          { id: 'line-up', title: 'Line up and configure', body: 'Start on KSEA 16L with flaps 5.' },
+          { id: 'advance-thrust', title: 'Advance thrust smoothly', body: 'Advance thrust and track centerline.' },
+        ],
+      },
+      activeTutorialStep: { id: 'line-up', title: 'Line up and configure', body: 'Start on KSEA 16L with flaps 5.' },
+      checklist: [
+        { id: 'flaps', label: 'Flaps set for takeoff', complete: true, detail: 'Need flaps 5' },
+      ],
+      coachMessage: 'Checklist complete. Press START ROLL when ready.',
+      alerts: [],
+    },
     inputs: { elevator: 0, aileron: 0, rudder: 0, throttle1: 0, throttle2: 0, flapLever: 0, gearLever: 'DOWN' as const, spoilers: 0, brake: 0 },
+    effectiveControls: { elevator: 0, aileron: 0, rudder: 0, throttle1: 0, throttle2: 0, flapLever: 0, gearLever: 'DOWN' as const, spoilers: 0, brake: 0 },
     tick: vi.fn(),
     start: mockStart,
     startTakeoffRoll: mockStartTakeoffRoll,
@@ -60,6 +162,10 @@ vi.mock('../store/simStore', () => {
     resume: mockResume,
     reset: mockReset,
     setInput: mockSetInput,
+    setScenario: mockSetScenario,
+    setTutorialStep: mockSetTutorialStep,
+    setFlightPlan: mockSetFlightPlan,
+    setApState: mockSetApState,
   };
   type MockSimStoreState = typeof state;
   const mock = Object.assign(
@@ -196,19 +302,85 @@ vi.mock('three-to-cesium', () => ({
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import ThreeToCesium from 'three-to-cesium';
 import { App } from '../App';
+import { useSimStore } from '../store/simStore';
+
+const defaultAppTestApState = structuredClone(useSimStore.getState().apState);
 
 describe('App', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    useSimStore.getState().apState = structuredClone(defaultAppTestApState);
   });
 
   afterEach(() => {
     cleanup();
   });
 
-  it('renders RFS label', () => {
+  it('hides debug overlays by default while keeping the flight instrument overlay available', () => {
     render(<App />);
-    expect(screen.getByText('RFS — Flight Test Build')).toBeTruthy();
+
+    expect(screen.getByRole('button', { name: 'OVL: FLIGHT' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'HDG' })).toBeTruthy();
+    expect(screen.queryByText('RFS — Flight Test Build')).toBeNull();
+    expect(screen.queryByText('Controls')).toBeNull();
+    expect(screen.queryByText(/SIM:/)).toBeNull();
+    expect(screen.queryByText(/FPS/)).toBeNull();
+  });
+
+  it('mounts route status with the flight instruments overlay', () => {
+    render(<App />);
+
+    expect(screen.getByLabelText('Route status')).toBeTruthy();
+    expect(screen.getByText('KSEA→KPDX')).toBeTruthy();
+    expect(screen.getByText(/KSEA → OLM/)).toBeTruthy();
+  });
+
+  it('LOAD PLAN creates and stores the default route', () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'LOAD PLAN' }));
+
+    expect(mockSetFlightPlan).toHaveBeenCalledTimes(1);
+    expect(mockSetFlightPlan).toHaveBeenCalledWith(expect.objectContaining({ origin: 'KSEA', destination: 'KPDX' }));
+  });
+
+  it('LOAD PLAN does not engage VNAV on the default route when no VNAV constraint exists', () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'LOAD PLAN' }));
+
+    expect(mockSetApState).toHaveBeenCalledTimes(1);
+    const nextApState = mockSetApState.mock.calls[0][0];
+    expect(nextApState.truth.lateralActive).toBe('LNAV');
+    expect(nextApState.truth.thrustActive).toBe('SPEED');
+    expect(nextApState.truth.verticalActive).toBe('ALT_HOLD');
+    expect(nextApState.boeing.lnav).toBe(true);
+    expect(nextApState.boeing.speedMode).toBe(true);
+    expect(nextApState.boeing.vnav).toBe(false);
+    expect(nextApState.boeing.altHold).toBe(true);
+  });
+
+  it('LOAD PLAN creates and annunciates safe AP defaults when AP state is null', () => {
+    useSimStore.getState().apState = null;
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'LOAD PLAN' }));
+
+    expect(mockSetFlightPlan).toHaveBeenCalledTimes(1);
+    expect(mockSetApState).toHaveBeenCalledTimes(1);
+    const nextApState = mockSetApState.mock.calls[0][0];
+    expect(nextApState.truth.lateralActive).toBe('LNAV');
+    expect(nextApState.truth.thrustActive).toBe('SPEED');
+    expect(nextApState.truth.verticalActive).toBe('ALT_HOLD');
+    expect(nextApState.truth.autopilotStatus).toBe('CMD_A');
+    expect(nextApState.boeing.lnav).toBe(true);
+    expect(nextApState.boeing.speedMode).toBe(true);
+    expect(nextApState.boeing.altHold).toBe(true);
+    expect(nextApState.boeing.vnav).toBe(false);
+    expect(nextApState.boeing.vs).toBe(false);
+    expect(nextApState.boeing.hdgSel).toBe(false);
+    expect(nextApState.boeing.n1).toBe(false);
+    expect(nextApState.boeing.autothrottleArm).toBe(true);
   });
 
   it('uses a single Three/Cesium overlay canvas for the aircraft only', () => {
@@ -224,6 +396,16 @@ describe('App', () => {
     expect(mockEntityAdd).toHaveBeenCalledWith(expect.objectContaining({ id: 'runway-centerline-KSEA-16L' }));
   });
 
+  it('switches from exterior aircraft layer to cockpit layer in cockpit mode', () => {
+    render(<App />);
+    const cameraButton = screen.getByRole('button', { name: 'CAM: CHASE' });
+
+    fireEvent.click(cameraButton);
+
+    expect(screen.getByRole('button', { name: 'CAM: COCKPIT' })).toBeTruthy();
+    expect(ThreeToCesium).toHaveBeenCalledTimes(2);
+  });
+
   it('calls startTakeoffRoll from the START ROLL button', () => {
     render(<App />);
 
@@ -232,14 +414,19 @@ describe('App', () => {
     expect(mockStartTakeoffRoll).toHaveBeenCalledTimes(1);
   });
 
-  it('shows keyboard controls help', () => {
+  it('cycles overlays from flight to minimal to debug', () => {
     render(<App />);
+    const overlayButton = screen.getByRole('button', { name: 'OVL: FLIGHT' });
 
+    fireEvent.click(overlayButton);
+    expect(screen.getByRole('button', { name: 'OVL: MINIMAL' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'HDG' })).toBeNull();
+    expect(screen.queryByText('Controls')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'OVL: MINIMAL' }));
+    expect(screen.getByRole('button', { name: 'OVL: DEBUG' })).toBeTruthy();
+    expect(screen.getByText('RFS — Flight Test Build')).toBeTruthy();
     expect(screen.getByText('Controls')).toBeTruthy();
-    expect(screen.getByText(/W rotate\/nose up/i)).toBeTruthy();
-    expect(screen.getByText(/S nose down/i)).toBeTruthy();
-    expect(screen.getByText(/ArrowUp\/ArrowDown throttle/i)).toBeTruthy();
-    expect(screen.getByText(/Space brake/i)).toBeTruthy();
-    expect(screen.getByText(/G gear after positive rate/i)).toBeTruthy();
+    expect(screen.getByText(/SIM:/)).toBeTruthy();
   });
 });

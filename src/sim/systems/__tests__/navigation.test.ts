@@ -1,7 +1,27 @@
 import { describe, it, expect } from 'vitest';
-import { computeLNAV } from '../navigation';
+import { computeLNAV, computeRouteStatus } from '../navigation';
 import { createInitialState, B737_800_SPEC } from '../../types';
 import type { FlightPlan } from '@shared/types/fmc';
+
+function makeState(lat: number, lon: number, speedMps = 100) {
+  const state = createInitialState(B737_800_SPEC);
+  state.position.lat = lat;
+  state.position.lon = lon;
+  state.velocity.u = speedMps;
+  state.velocity.v = 0;
+  state.velocity.w = 0;
+  return state;
+}
+
+function makePlan(waypoints: FlightPlan['waypoints']): FlightPlan {
+  return {
+    origin: waypoints[0]?.ident ?? 'ORIG',
+    destination: waypoints.at(-1)?.ident ?? 'DEST',
+    flightNumber: '123',
+    route: waypoints.map((waypoint) => waypoint.ident).join(' '),
+    waypoints,
+  };
+}
 
 describe('computeLNAV', () => {
   it('returns default when no flight plan', () => {
@@ -118,5 +138,92 @@ describe('computeLNAV', () => {
     // activeWptIndex 5 is out of range, should clamp to last waypoint (index 1)
     const nav = computeLNAV(s, fp, 5);
     expect(nav.activeWaypointIndex).toBe(1);
+  });
+});
+
+describe('computeRouteStatus', () => {
+  it('sequences to the next leg inside the capture radius and preserves original waypoint indexes', () => {
+    const fp = makePlan([
+      { ident: 'ORIG', lat: 47.0, lon: -122.0, discontinuity: false },
+      { ident: 'MID', lat: 47.1, lon: -122.0, discontinuity: false },
+      { ident: 'DEST', lat: 47.2, lon: -122.0, discontinuity: false },
+    ]);
+    const state = makeState(47.1005, -122.0);
+
+    const status = computeRouteStatus(state, fp, 0);
+
+    expect(status.lnavAvailable).toBe(true);
+    expect(status.activeLegIndex).toBe(1);
+    expect(status.fromWaypointIndex).toBe(1);
+    expect(status.toWaypointIndex).toBe(2);
+    expect(status.fromIdent).toBe('MID');
+    expect(status.nextWaypointIdent).toBe('DEST');
+  });
+
+  it('sequences after passing the to-waypoint using along-track geometry even outside capture radius', () => {
+    const fp = makePlan([
+      { ident: 'ORIG', lat: 47.0, lon: -122.0, discontinuity: false },
+      { ident: 'MID', lat: 47.1, lon: -122.0, discontinuity: false },
+      { ident: 'DEST', lat: 47.2, lon: -122.0, discontinuity: false },
+    ]);
+    const state = makeState(47.105, -122.0);
+
+    const status = computeRouteStatus(state, fp, 0, { captureRadiusM: 50 });
+
+    expect(status.lnavAvailable).toBe(true);
+    expect(status.activeLegIndex).toBe(1);
+    expect(status.fromIdent).toBe('MID');
+    expect(status.nextWaypointIdent).toBe('DEST');
+  });
+
+  it('reports distance, desired track, and ETA to the active next waypoint', () => {
+    const fp = makePlan([
+      { ident: 'ORIG', lat: 47.0, lon: -122.0, discontinuity: false },
+      { ident: 'NEXT', lat: 47.1, lon: -122.0, discontinuity: false },
+    ]);
+    const state = makeState(47.0, -122.0, 100);
+
+    const status = computeRouteStatus(state, fp, 0);
+
+    expect(status.routeValid).toBe(true);
+    expect(status.lnavAvailable).toBe(true);
+    expect(status.nextWaypointIdent).toBe('NEXT');
+    expect(status.distanceToNextM).toBeGreaterThan(11000);
+    expect(status.distanceToNextNm).toBeCloseTo((status.distanceToNextM ?? 0) / 1852, 5);
+    expect(status.desiredTrackRad).toBeCloseTo(0, 1);
+    expect(status.desiredTrackDegTrue).toBeCloseTo(0, 0);
+    expect(status.etaMinutes).toBeCloseTo((status.distanceToNextM ?? 0) / 100 / 60, 2);
+  });
+
+  it('marks LNAV unavailable with a clear reason when a waypoint is missing coordinates', () => {
+    const fp = makePlan([
+      { ident: 'ORIG', lat: 47.0, lon: -122.0, discontinuity: false },
+      { ident: 'BROKEN', discontinuity: false },
+      { ident: 'DEST', lat: 47.2, lon: -122.0, discontinuity: false },
+    ]);
+    const state = makeState(47.0, -122.0);
+
+    const status = computeRouteStatus(state, fp, 0);
+
+    expect(status.routeValid).toBe(false);
+    expect(status.lnavAvailable).toBe(false);
+    expect(status.lnavUnavailableReason).toMatch(/missing coordinates.*BROKEN/i);
+    expect(status.nextWaypointIdent).toBeNull();
+  });
+
+  it('does not skip discontinuities when building route legs', () => {
+    const fp = makePlan([
+      { ident: 'ORIG', lat: 47.0, lon: -122.0, discontinuity: false },
+      { ident: 'DISCO', discontinuity: true },
+      { ident: 'DEST', lat: 47.2, lon: -122.0, discontinuity: false },
+    ]);
+    const state = makeState(47.0, -122.0);
+
+    const status = computeRouteStatus(state, fp, 0);
+
+    expect(status.routeValid).toBe(false);
+    expect(status.lnavAvailable).toBe(false);
+    expect(status.lnavUnavailableReason).toMatch(/discontinuity.*DISCO/i);
+    expect(status.nextWaypointIdent).toBeNull();
   });
 });

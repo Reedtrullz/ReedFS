@@ -16,6 +16,8 @@ The next plan should not be “one more small bug fix.” It should be a staged 
 
 Companion implementation plan: `docs/plans/2026-05-26-rfs-comprehensive-usability-realism-plan.md`.
 
+Status note: this review captures the pre-implementation audit that motivated the current pass. The repository now implements phases 0 through 5.5 of that plan; use `docs/architecture.md` and `docs/roadmap.md` for the current state and remaining work.
+
 ## Review inputs
 
 ### Live browser dogfood
@@ -444,7 +446,7 @@ Evidence:
 
 Root cause:
 
-There is no unified guidance state. Display state, truth/FMA modes, selected targets, active route leg, and servo laws are loosely connected.
+At review time, there was no unified guidance/state ownership model. Display state, truth/FMA modes, selected targets, active route leg, and servo laws were loosely connected.
 
 Impact:
 
@@ -453,7 +455,7 @@ Impact:
 
 Required direction:
 
-- Add `GuidanceState` with selected targets, active/armed modes, FMA, active leg, nav validity, and AP/FD/AT status.
+- Add store-owned guidance/route/AP truth state with selected targets, active/armed modes, FMA, active leg, nav validity, and AP/FD/AT status. Current implementation keeps these as separate `guidance`, `routeStatus`, and `apState` slices rather than one monolithic object.
 - Make first MCP click do the thing clicked.
 - Disable/hide unsupported modes until they have real control laws.
 - Add route/waypoint feedback and clear invalid-state messages.

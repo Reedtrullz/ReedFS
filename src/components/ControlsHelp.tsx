@@ -25,6 +25,7 @@ export function ControlsHelp() {
       <div>[ / ] trim · Space brake · F flaps</div>
       <div>G gear after positive rate</div>
       <div>CAM cycles chase/cockpit/tower</div>
+      <div>OVL cycles flight/minimal/debug</div>
     </div>
   );
 }

@@ -24,23 +24,28 @@ src/App.tsx
   -> src/hooks/useSimLoop.ts
     -> src/store/simStore.ts tick()
       -> structuredClone(aircraft)
+      -> computeRouteStatus(state, flightPlan, activeLegIndex)
+      -> computeAutopilotCommandsForState(state, apState, flightPlan, dt, activeLegIndex)
+      -> compose pilot inputs + AP-owned axis commands into effectiveControls
       -> src/sim/physics/integrate.ts
-        1. updateEngines(state, inputs, spec, dt)
+        1. updateEngines(state, effectiveControls, spec, dt)
         2. updateFuel(state, spec, dt)
         3. updateElectrical(state, dt)
         4. updateHydraulic(state, dt)
-        5. computeAero(state, inputs, spec, B737_AERO, wind)
+        5. computeAero(state, effectiveControls, spec, B737_AERO, wind)
         6. integrate angular rates, quaternion, velocity, and position
-        7. updateAutopilot(state, inputs, apState, targets, dt) for the next frame
-      -> computeDerived(state, wind)
-      -> commit next Zustand aircraft snapshot
+        7. update ground/contact state and flight phase
+      -> recompute routeStatus / activeLegIndex
+      -> rebuild GuidanceState from aircraft, scenario, status, and effective controls
+      -> commit next Zustand aircraft/control/guidance snapshot
 ```
 
 The system order is intentional:
 
 - Engine and fuel update before aero so thrust and mass are current.
 - Aero receives wind as an input and computes air-relative values without mutating state.
-- Autopilot runs after physics integration and writes commands into `inputs` for the next tick.
+- Pilot inputs, AP commands, and effective controls are separate store fields; AP can own elevator/aileron/throttle without mutating pilot-authored inputs.
+- Route status is store-owned and computed before and after integration so LNAV/VNAV use the active leg instead of hardcoded waypoint fallbacks.
 
 ## State model
 
@@ -76,35 +81,40 @@ See `docs/physics-invariants.md` for the detailed checklist and test locations.
 
 ## Rendering architecture
 
-RFS currently renders with Cesium plus a Three.js overlay:
+RFS renders with Cesium plus a focused Three.js overlay:
 
 - `CesiumViewport.tsx` owns the Cesium viewer lifecycle and base globe/terrain setup.
-- `ThreeLayer.tsx` bridges Three.js into Cesium, creates a Boeing 737 model template once, and clones it per frame.
-- `AirportLayer.tsx`, `CloudLayer.tsx`, and `ContrailLayer.tsx` add scene content and effects.
-- Camera behavior lives in `App.tsx` and follows the aircraft in chase/cockpit/tower modes.
+- `RunwayLayer.tsx` renders the KSEA runway/centerline as Cesium-native entities instead of a ground-attached Three overlay.
+- `ThreeLayer.tsx` owns a single `three-to-cesium` bridge for the exterior aircraft and lights.
+- `AircraftRenderer.ts` keeps the aircraft object persistent and updates transform/animation state each frame.
+- `CockpitLayer.tsx` and `CockpitModel.ts` provide the first-pass pilot-eye cockpit shell for cockpit camera mode.
+- `CameraManager.ts` owns chase/cockpit camera updates from Cesium `preRender` so follow cameras stay live while the sim runs.
+- `CloudLayer.tsx` and `ContrailLayer.tsx` add scene content and effects.
 
 Known rendering follow-up:
 
-- Consolidate Cesium/Three lifecycle into a single viewer provider/bridge.
-- Keep a persistent aircraft object instead of per-frame cloning.
-- Apply full quaternion orientation consistently in camera and model code.
-- Extract a dedicated camera manager.
+- Deduplicate the Three.js copies that still produce the browser warning.
+- Add deterministic visual regression snapshots for aircraft/runway/cockpit/instruments.
+- Continue improving the procedural 737 and cockpit model fidelity.
 
 ## Avionics and guidance architecture
 
-RFS bridges RFMS avionics state into native physics:
+RFS bridges RFMS-compatible avionics state into native physics and player-facing feedback:
 
-- `RfsMCP.tsx` edits an RFMS-compatible `AutopilotState`.
-- `App.tsx` can load a KSEA -> KPDX sample flight plan.
-- `autopilot.ts` maps active RFMS truth modes to control inputs.
-- `navigation.ts` and `vnav.ts` provide basic LNAV/VNAV target helpers.
+- `RfsMCP.tsx` edits an RFMS-compatible `AutopilotState` and creates a default AP state on the first valid mode click.
+- `RfsPFD.tsx` renders readable speed/altitude tapes, attitude/heading, and an FMA row from the same truth modes the servo laws use.
+- `App.tsx` can load the KSEA -> OLM -> BTG -> KPDX sample route and applies safe LNAV + SPEED + ALT_HOLD defaults without engaging unsupported VNAV.
+- `navigation.ts` validates route coordinates/discontinuities, computes store-owned active-leg status, and sequences the active leg.
+- `RouteStatus.tsx` exposes active leg, next waypoint, DTG, track, ETA, and LNAV unavailable reasons.
+- `autopilot.ts` maps active RFMS truth modes to AP-owned control commands. LNAV/VNAV use store-owned active-leg routing; invalid route status does not fall back to waypoint 0.
+- `vnav.ts` reports VNAV availability, unavailable reasons, altitude targets, target vertical speed, and speed constraints.
+- `GuidanceState` combines scenario phase, tutorial, checklist, coach messages, and alerts for the player-facing flow; route status and AP truth remain adjacent store-owned state used by `RouteStatus`, `RfsPFD`, and the servo laws.
 
 Known guidance follow-up:
 
-- Add durable active-leg state and waypoint sequencing.
-- Use MCP selected targets throughout the AP lifecycle.
-- Implement VNAV SPD/PTH mode behavior instead of one-shot altitude targeting.
-- Feed RFMS Flight Mode Annunciator state from the same source as the servo logic.
+- Add richer LNAV intercept/turn anticipation and RFMS-backed route edits.
+- Add full VNAV SPD/PTH/ALT ACQ mode lifecycle beyond the current conservative constraint targeting.
+- Add selectable MCP targets and cockpit controls instead of only fixed defaults/buttons.
 
 ## Weather architecture
 
@@ -147,8 +157,8 @@ push master
 
 These are intentional gaps, not regressions:
 
-1. Ground model: terrain/runway AGL, gear stations, oleo compression, brakes, anti-skid, nosewheel steering.
-2. Worker physics: codec, worker loop, main-thread bridge, deterministic state handoff.
-3. Advanced flight guidance: active-leg sequencing, LNAV turn anticipation, VNAV SPD/PTH, RFMS FMA lifecycle.
+1. Full gear/tire ground model: individual gear stations, oleo compression, anti-skid, nosewheel/tiller steering, rollout braking, and touchdown dynamics beyond the current runway-normal/normal-force contract.
+2. Worker physics: codec, worker loop, main-thread bridge, deterministic fixed-timestep state handoff.
+3. Advanced flight guidance: LNAV intercept/turn anticipation, RFMS route edits, full VNAV SPD/PTH/ALT ACQ mode transitions, and selected MCP target lifecycle.
 4. Data-driven flight model: validated aircraft coefficient tables and trim/response tests.
-5. Rendering lifecycle cleanup: persistent objects, full quaternion use, camera manager.
+5. Release hardening: Cesium token/degraded-scene policy, Three.js deduplication, deterministic visual regression snapshots, and audio immersion pass.

@@ -1,17 +1,17 @@
 # RFS Enhancement Roadmap
 
-This roadmap lists the enhancements that are still necessary after the foundation stabilization pass. It is ordered by dependency and risk: fix the aircraft/ground interaction first, then guidance, then performance architecture and rendering cleanup.
+This roadmap lists the enhancements that remain after the foundation stabilization and first gameplay/usability productization pass. It is ordered by dependency and risk: finish gear/tire physics and guidance fidelity, then worker timing, visual regression/release hardening, data quality, and immersion.
 
-Latest comprehensive gameplay/cockpit/realism audit and detailed implementation plan:
+Latest comprehensive gameplay/cockpit/realism audit and implementation plan:
 
 - `docs/reviews/2026-05-26-comprehensive-gameplay-review.md`
 - `docs/plans/2026-05-26-rfs-comprehensive-usability-realism-plan.md`
 
-The 2026-05-26 review reorders near-term work slightly: product loop, cockpit, UI feedback, input feel, and visual model quality are now treated as core usability work rather than late polish, because browser dogfood showed they are part of why the simulator still feels arcadey and unfinished.
+As of the current repository state, phases 0 through 5.5 of the 2026-05-26 plan are implemented and tested. Phase 6 release-hardening tasks remain pending.
 
 ## Completed baseline
 
-Foundation stabilization is complete:
+The completed baseline now includes:
 
 - Quality scripts and CI release gate are in place.
 - React hook/lint blockers are cleaned up.
@@ -21,23 +21,29 @@ Foundation stabilization is complete:
 - Wind is pure air-relative input, not destructive state mutation.
 - Longitudinal drag is signed against air-relative flow.
 - Physics regressions are covered by unit tests.
+- Scenario-level takeoff/climb helpers and envelope tests exist.
+- Ground state, runway-normal contact, normal-force liftoff, and flight-phase decoupling are implemented.
+- Input dynamics, pilot/AP/effective-control separation, stabilizer trim, CG pitch moment, and data-backed aero/engine envelope work are implemented.
+- Aircraft visual contract, persistent renderer, visual animation state, Cesium runway layer, cockpit shell, overlay modes, PFD/FMA, cockpit interaction hooks, scenario/tutorial/checklist/coach flow, guidance state, active-leg route status, LNAV feedback, and conservative VNAV/SPD/VS behavior are implemented.
 
-Completion record: `docs/plans/2026-05-25-rfs-foundation-stabilization.md`.
+Completion records:
 
-## P1 — Ground model and takeoff/landing realism
+- `docs/plans/2026-05-25-rfs-foundation-stabilization.md`
+- `docs/plans/2026-05-26-rfs-comprehensive-usability-realism-plan.md`
 
-Why this is next: without a real ground model, RFS cannot evaluate takeoff roll, rotation, touchdown, braking, taxiing, or runway handling realistically.
+## P1 — Finish gear/tire ground model and takeoff/landing realism
 
-Scope:
+Why this remains: the current pass establishes runway-normal contact, normal-force liftoff, and phase semantics, but RFS still needs detailed gear/tire/brake behavior before touchdown, rollout, taxi, and crosswind handling can feel like an airliner.
 
-- Terrain/runway AGL source.
+Remaining scope:
+
 - Landing gear station model: nose, left main, right main.
 - Oleo spring-damper compression.
 - Tire friction with rolling, braking, and side loads.
 - Brake input and anti-skid logic.
 - Nosewheel steering and rudder/tiller blending.
 - Ground effect near runway.
-- Flight-phase transitions: PARKED, TAXI, TAKEOFF, CLIMB, APPROACH, LANDED.
+- Touchdown, rollout, taxi, and rejected-takeoff handling.
 
 Suggested implementation files:
 
@@ -56,20 +62,18 @@ Acceptance tests:
 - Touchdown compresses gear and damps vertical velocity.
 - Gear-up belly contact is explicitly handled or prevented.
 
-## P2 — Flight guidance and RFMS integration
+## P2 — Advanced flight guidance and RFMS integration
 
-Why this follows ground model: the autopilot needs reliable energy/trajectory behavior before detailed LNAV/VNAV tuning is meaningful.
+Why this follows the current guidance pass: active-leg state, route feedback, and honest VNAV/SPD/VS are now in place, but advanced LNAV/VNAV needs the aircraft energy model and selectable cockpit controls to be more complete.
 
-Scope:
+Remaining scope:
 
-- Durable active-leg state in the store.
-- Waypoint sequencing with capture radius and turn anticipation.
 - LNAV track intercept and cross-track error law.
-- MCP selected heading/speed/altitude/vertical-speed lifecycle.
-- VNAV SPD and VNAV PTH modes.
-- ALT ACQ and ALT HOLD transitions.
-- RFMS Flight Mode Annunciator source-of-truth integration.
-- Autothrottle N1/SPEED behavior with throttle rate limits.
+- Turn anticipation and RFMS-backed route edits.
+- MCP selected heading/speed/altitude/vertical-speed lifecycle with knobs/values, not only mode buttons/defaults.
+- Full VNAV SPD, VNAV PTH, ALT ACQ, and ALT HOLD transitions.
+- Autothrottle N1 behavior in addition to SPEED behavior.
+- RFMS Flight Mode Annunciator lifecycle integration beyond current truth-mode display.
 
 Suggested implementation files:
 
@@ -116,18 +120,15 @@ Acceptance tests:
 - Inputs and weather updates are applied on worker ticks without stale closures.
 - `npm run check` passes with worker enabled.
 
-## P4 — Rendering lifecycle cleanup
+## P4 — Release rendering hardening
 
-Why this matters: Cesium + Three.js can be expensive; lifecycle churn will limit performance before richer scenery/aircraft models are added.
+Why this matters: the renderer now has a persistent aircraft, cockpit shell, camera manager, and Cesium-native runway layer. The next rendering risk is release confidence: dependency duplication and deterministic visual proof.
 
-Scope:
+Remaining scope:
 
-- Single Cesium viewer provider.
-- Single `three-to-cesium` bridge owner.
-- Persistent aircraft object; no per-frame object reconstruction.
-- Full quaternion model orientation.
-- Dedicated camera manager for chase/cockpit/tower modes.
-- Explicit cleanup for event listeners and post-render hooks.
+- Remove the browser warning from duplicate Three.js instances.
+- Add deterministic visual regression snapshots for initial runway, takeoff/climb, cockpit mode, and route/PFD/MCP overlays.
+- Keep lifecycle cleanup assertions for event listeners, Cesium entities, and the single Three/Cesium bridge.
 
 Suggested implementation files:
 
@@ -187,14 +188,24 @@ Acceptance tests:
 
 ## P7 — Product polish
 
-Scope:
+Remaining scope:
 
-- Scenario picker and saved flight states.
+- Scenario persistence and saved flight states.
 - Keyboard/gamepad settings UI.
-- Better loading/error screens.
+- Better loading/error/scenery-status screens.
 - PWA completeness if desired: manifest link, icons, service worker strategy.
 - Bundle splitting for Cesium-heavy chunks.
-- Visual regression testing for cockpit/instruments.
+- More complete cockpit/interior model, instrument layout, and audio immersion.
+
+## Immediate Phase 6 tasks
+
+Track the next batch in `docs/plans/2026-05-26-rfs-comprehensive-usability-realism-plan.md`:
+
+1. Cesium token/degraded scene policy.
+2. Deduplicate Three.js.
+3. Add deterministic visual regression snapshots.
+4. Fixed timestep / worker migration after contracts stabilize.
+5. Audio immersion pass.
 
 ## Execution discipline
 

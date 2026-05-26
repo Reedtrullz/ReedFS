@@ -1,73 +1,96 @@
+import type { CSSProperties } from 'react';
 import { useSimStore } from '../store/simStore';
 import { computeDerived } from '../sim/physics/derived';
 import { quatToEuler } from '../sim/physics/quaternion';
 
-export function RfsPFD() {
-  const a = useSimStore((s) => s.aircraft);
-  const wind = useSimStore((s) => s.wind);
-  const d = computeDerived(a, wind);
-  const euler = quatToEuler(a.quaternion);
-  const pitch = (euler.theta * 180) / Math.PI;
-  const hdg = ((euler.psi * 180) / Math.PI + 360) % 360;
+const glass: CSSProperties = {
+  background: 'linear-gradient(180deg, rgba(9,14,18,0.95), rgba(2,5,7,0.92))',
+  border: '1px solid rgba(120,180,210,0.45)',
+  boxShadow: '0 0 18px rgba(0,0,0,0.55)',
+  color: '#e8f8ff',
+  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+};
 
-  const tapeH = 280;
-  const tapeW = 56;
-  const pxPerKt = 2.2;
-  const pxPerFt = 0.018;
+function modeText(value: string | undefined): string {
+  return value && value.length > 0 ? value : 'OFF';
+}
 
-  const spdOffset = -d.ias * pxPerKt + tapeH / 2;
-  const altOffset = -a.position.alt * pxPerFt + tapeH / 2;
+function tapeTicks(center: number, step: number, radius: number, min = 0): number[] {
+  const base = Math.round(center / step) * step;
+  const ticks: number[] = [];
+  for (let i = -radius; i <= radius; i += 1) {
+    const value = base + i * step;
+    if (value >= min && !ticks.includes(value)) ticks.push(value);
+  }
+  return ticks;
+}
 
-  const round10 = (v: number) => Math.round(v / 10) * 10;
-  const round100 = (v: number) => Math.round(v / 100) * 100;
-
+function FmaCell({ label, value }: { label: string; value: string }) {
+  const active = value !== 'OFF';
   return (
     <div
       style={{
-        position: 'fixed',
-        bottom: 20,
-        right: 200,
-        zIndex: 100,
-        pointerEvents: 'none',
-        display: 'flex',
-        gap: 4,
+        flex: 1,
+        borderLeft: '1px solid rgba(120,180,210,0.25)',
+        padding: '5px 8px',
+        minWidth: 0,
       }}
     >
-      {/* Speed tape */}
+      <div style={{ color: '#7fa6b7', fontSize: 10, letterSpacing: 1.4 }}>{label}</div>
+      <div style={{ color: active ? '#6dff8d' : '#95a6ad', fontSize: 16, fontWeight: 800, whiteSpace: 'nowrap' }}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function Tape({
+  label,
+  value,
+  unit,
+  ticks,
+  align,
+}: {
+  label: string;
+  value: number;
+  unit: string;
+  ticks: number[];
+  align: 'left' | 'right';
+}) {
+  return (
+    <div
+      aria-label={label === 'IAS' ? 'Airspeed tape' : 'Altitude tape'}
+      style={{
+        ...glass,
+        width: 104,
+        height: 292,
+        borderRadius: 8,
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      <div style={{ padding: '7px 8px 4px', color: '#9ddcff', fontSize: 13, fontWeight: 800, letterSpacing: 1.2 }}>
+        {label}
+      </div>
       <div
         style={{
-          background: '#0a0a0a',
-          border: '1px solid #333',
+          margin: '0 8px',
+          padding: '3px 6px',
+          border: '1px solid #ffd84a',
           borderRadius: 4,
-          overflow: 'hidden',
-          width: tapeW,
-          height: tapeH,
-          position: 'relative',
+          color: '#ffffff',
+          background: 'rgba(0,0,0,0.76)',
+          fontSize: 28,
+          fontWeight: 900,
+          textAlign: align,
+          lineHeight: 1.1,
         }}
       >
-        <div style={{ position: 'absolute', top: spdOffset, left: 0, right: 0 }}>
-          {Array.from({ length: 40 }, (_, i) => {
-            const spd = round10(d.ias) - 100 + i * 10;
-            if (spd < 0) return null;
-            const isMajor = spd % 20 === 0;
-            return (
-              <div
-                key={spd}
-                style={{
-                  height: pxPerKt * 10,
-                  textAlign: 'right',
-                  paddingRight: 6,
-                  fontFamily: 'monospace',
-                  fontSize: isMajor ? 11 : 9,
-                  color: isMajor ? '#fff' : '#888',
-                  lineHeight: `${pxPerKt * 10}px`,
-                }}
-              >
-                {isMajor ? spd : '·'}
-              </div>
-            );
-          })}
-        </div>
+        {Math.round(value)}
+      </div>
+      <div style={{ color: '#7fa6b7', fontSize: 10, textAlign: align, padding: '2px 10px 4px' }}>{unit}</div>
+      <div style={{ position: 'relative', flex: 1, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
         <div
           style={{
             position: 'absolute',
@@ -75,119 +98,152 @@ export function RfsPFD() {
             left: 0,
             right: 0,
             height: 2,
-            background: '#ff0',
-            marginTop: -1,
+            background: '#ffd84a',
+            boxShadow: '0 0 8px rgba(255,216,74,0.9)',
           }}
         />
-        <div
-          style={{
-            position: 'absolute',
-            top: '50%',
-            right: 6,
-            transform: 'translateY(-50%)',
-            color: '#0f0',
-            fontFamily: 'monospace',
-            fontSize: 22,
-            fontWeight: 'bold',
-            background: 'rgba(0,0,0,0.8)',
-            padding: '0 4px',
-            borderRadius: 2,
-          }}
-        >
-          {d.ias.toFixed(0)}
+        <div style={{ display: 'flex', flexDirection: 'column-reverse', height: '100%', justifyContent: 'space-around' }}>
+          {ticks.map((tick) => (
+            <div
+              key={tick}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: align === 'right' ? 'flex-end' : 'flex-start',
+                gap: 6,
+                padding: '0 8px',
+                color: tick % (label === 'IAS' ? 20 : 1000) === 0 ? '#ffffff' : '#9db2bc',
+                fontSize: tick % (label === 'IAS' ? 20 : 1000) === 0 ? 13 : 11,
+                fontWeight: 700,
+              }}
+            >
+              {align === 'left' && <span style={{ width: 15, height: 1, background: '#9db2bc' }} />}
+              <span>{tick}</span>
+              {align === 'right' && <span style={{ width: 15, height: 1, background: '#9db2bc' }} />}
+            </div>
+          ))}
         </div>
       </div>
+    </div>
+  );
+}
 
-      {/* Center — heading + pitch */}
+export function RfsPFD() {
+  const a = useSimStore((s) => s.aircraft);
+  const wind = useSimStore((s) => s.wind);
+  const apState = useSimStore((s) => s.apState);
+  const d = computeDerived(a, wind);
+  const euler = quatToEuler(a.quaternion);
+  const pitch = (euler.theta * 180) / Math.PI;
+  const roll = (euler.phi * 180) / Math.PI;
+  const hdg = ((euler.psi * 180) / Math.PI + 360) % 360;
+  const ias = Math.max(0, d.ias);
+  const altitude = Math.max(0, a.position.alt);
+  const fma = apState?.truth;
+
+  return (
+    <div
+      aria-label="Primary flight display"
+      style={{
+        ...glass,
+        position: 'fixed',
+        bottom: 24,
+        right: 188,
+        zIndex: 100,
+        width: 492,
+        borderRadius: 10,
+        pointerEvents: 'none',
+        overflow: 'hidden',
+      }}
+    >
       <div
         style={{
-          background: '#0a0a0a',
-          border: '1px solid #333',
-          borderRadius: 4,
-          width: 70,
-          height: tapeH,
           display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          alignItems: 'center',
-          gap: 4,
+          alignItems: 'stretch',
+          borderBottom: '1px solid rgba(120,180,210,0.35)',
+          background: 'rgba(0,0,0,0.48)',
         }}
       >
-        <div style={{ color: '#0f0', fontFamily: 'monospace', fontSize: 16, fontWeight: 'bold' }}>
-          {hdg.toFixed(0)}°
+        <div style={{ width: 48, padding: '5px 8px', color: '#9ddcff', fontSize: 12, fontWeight: 900, letterSpacing: 1.5 }}>
+          FMA
         </div>
-        <div style={{ color: '#0f0', fontFamily: 'monospace', fontSize: 11 }}>HDG</div>
-        <div style={{ color: '#0f0', fontFamily: 'monospace', fontSize: 11 }}>
-          P {pitch.toFixed(1)}°
-        </div>
-        <div style={{ color: '#0f0', fontFamily: 'monospace', fontSize: 11 }}>
-          VS {d.vs.toFixed(0)}
-        </div>
+        <FmaCell label="THR" value={modeText(fma?.thrustActive)} />
+        <FmaCell label="ROLL" value={modeText(fma?.lateralActive)} />
+        <FmaCell label="PITCH" value={modeText(fma?.verticalActive)} />
+        <FmaCell label="AP" value={modeText(fma?.autopilotStatus)} />
       </div>
 
-      {/* Altitude tape */}
-      <div
-        style={{
-          background: '#0a0a0a',
-          border: '1px solid #333',
-          borderRadius: 4,
-          overflow: 'hidden',
-          width: tapeW,
-          height: tapeH,
-          position: 'relative',
-        }}
-      >
-        <div style={{ position: 'absolute', top: altOffset, left: 0, right: 0 }}>
-          {Array.from({ length: 30 }, (_, i) => {
-            const alt = round100(a.position.alt) - 1000 + i * 100;
-            if (alt < 0) return null;
-            const isMajor = alt % 200 === 0;
-            return (
-              <div
-                key={alt}
-                style={{
-                  height: pxPerFt * 100,
-                  textAlign: 'left',
-                  paddingLeft: 6,
-                  fontFamily: 'monospace',
-                  fontSize: isMajor ? 11 : 9,
-                  color: isMajor ? '#fff' : '#888',
-                  lineHeight: `${pxPerFt * 100}px`,
-                }}
-              >
-                {isMajor ? alt : '·'}
-              </div>
-            );
-          })}
-        </div>
+      <div style={{ display: 'flex', gap: 8, padding: 10, alignItems: 'stretch' }}>
+        <Tape label="IAS" value={ias} unit="KT" ticks={tapeTicks(ias, 10, 7)} align="right" />
+
         <div
+          aria-label="Attitude and heading display"
           style={{
-            position: 'absolute',
-            top: '50%',
-            left: 0,
-            right: 0,
-            height: 2,
-            background: '#ff0',
-            marginTop: -1,
-          }}
-        />
-        <div
-          style={{
-            position: 'absolute',
-            top: '50%',
-            left: 6,
-            transform: 'translateY(-50%)',
-            color: '#0f0',
-            fontFamily: 'monospace',
-            fontSize: 22,
-            fontWeight: 'bold',
-            background: 'rgba(0,0,0,0.8)',
-            padding: '0 4px',
-            borderRadius: 2,
+            ...glass,
+            flex: 1,
+            minWidth: 0,
+            borderRadius: 8,
+            height: 292,
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
           }}
         >
-          {a.position.alt.toFixed(0)}
+          <div style={{ padding: '7px 10px 4px', color: '#9ddcff', fontSize: 13, fontWeight: 800, letterSpacing: 1.2 }}>
+            ATT
+          </div>
+          <div style={{ position: 'relative', flex: 1, overflow: 'hidden', background: '#112534' }}>
+            <div
+              style={{
+                position: 'absolute',
+                inset: -80,
+                transform: `translateY(${pitch * 4}px) rotate(${-roll}deg)`,
+                transformOrigin: 'center',
+              }}
+            >
+              <div style={{ height: '50%', background: 'linear-gradient(#2176b8, #54a9db)' }} />
+              <div style={{ height: '50%', background: 'linear-gradient(#6f4829, #9b6434)' }} />
+              <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: 2, background: '#ffffff' }} />
+              {[-20, -10, 10, 20].map((deg) => (
+                <div
+                  key={deg}
+                  style={{
+                    position: 'absolute',
+                    top: `calc(50% - ${deg * 4}px)`,
+                    left: '36%',
+                    width: '28%',
+                    height: 1,
+                    background: '#ffffff',
+                  }}
+                />
+              ))}
+            </div>
+            <div style={{ position: 'absolute', top: '50%', left: '18%', right: '18%', height: 3, background: '#ffd84a' }} />
+            <div style={{ position: 'absolute', top: 'calc(50% - 10px)', left: '50%', width: 3, height: 20, background: '#ffd84a' }} />
+            <div style={{ position: 'absolute', left: 12, bottom: 10, color: '#ffffff', fontSize: 13, fontWeight: 800 }}>
+              P {pitch.toFixed(1)}°
+            </div>
+            <div style={{ position: 'absolute', right: 12, bottom: 10, color: '#ffffff', fontSize: 13, fontWeight: 800 }}>
+              R {roll.toFixed(1)}°
+            </div>
+          </div>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '7px 10px',
+              borderTop: '1px solid rgba(120,180,210,0.25)',
+              background: 'rgba(0,0,0,0.45)',
+            }}
+          >
+            <span style={{ color: '#9ddcff', fontSize: 13, fontWeight: 800 }}>HDG</span>
+            <span style={{ color: '#ffffff', fontSize: 26, fontWeight: 900 }}>{hdg.toFixed(0).padStart(3, '0')}°</span>
+            <span style={{ color: '#9ddcff', fontSize: 13, fontWeight: 800 }}>VS {d.vs.toFixed(0)}</span>
+          </div>
         </div>
+
+        <Tape label="ALT" value={altitude} unit="FT" ticks={tapeTicks(altitude, 500, 5)} align="left" />
       </div>
     </div>
   );
