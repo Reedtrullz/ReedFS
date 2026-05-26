@@ -1,8 +1,11 @@
 import 'cesium/Build/Cesium/Widgets/widgets.css';
 import { useEffect, useRef } from 'react';
 import * as Cesium from 'cesium';
+import { getCesiumScenePolicy, type CesiumScenePolicy } from '../config/cesium';
 
 export interface CesiumViewportProps {
+  /** Overrides the resolved Cesium scene asset policy */
+  scenePolicy?: CesiumScenePolicy;
   /** Called with the viewer instance after mount */
   onReady?: (viewer: Cesium.Viewer) => void;
 }
@@ -12,7 +15,7 @@ type GlobeWithOptionalEffects = Cesium.Globe & {
   showWaterEffect?: boolean;
 };
 
-export function CesiumViewport({ onReady }: CesiumViewportProps) {
+export function CesiumViewport({ onReady, scenePolicy }: CesiumViewportProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<Cesium.Viewer | null>(null);
 
@@ -20,7 +23,8 @@ export function CesiumViewport({ onReady }: CesiumViewportProps) {
     if (!containerRef.current) return;
     if (viewerRef.current) return; // React StrictMode double-mount guard
 
-    const viewer = new Cesium.Viewer(containerRef.current, {
+    const policy = scenePolicy ?? getCesiumScenePolicy();
+    const viewerOptions = {
       useDefaultRenderLoop: true,
       animation: false,
       timeline: false,
@@ -32,16 +36,19 @@ export function CesiumViewport({ onReady }: CesiumViewportProps) {
       sceneModePicker: false,
       selectionIndicator: false,
       navigationHelpButton: false,
-      terrain: Cesium.Terrain.fromWorldTerrain(),
-    });
+      ...(policy.terrain === 'world' ? { terrain: Cesium.Terrain.fromWorldTerrain() } : {}),
+    };
+    const viewer = new Cesium.Viewer(containerRef.current, viewerOptions);
     viewer.scene.screenSpaceCameraController.enableInputs = false;
 
     // Enable Cesium OSM 3D buildings
-    Cesium.createOsmBuildingsAsync().then((buildings) => {
-      if (viewerRef.current && !viewerRef.current.isDestroyed()) {
-        viewerRef.current.scene.primitives.add(buildings);
-      }
-    }).catch(() => {});
+    if (policy.osmBuildings) {
+      Cesium.createOsmBuildingsAsync().then((buildings) => {
+        if (viewerRef.current && !viewerRef.current.isDestroyed()) {
+          viewerRef.current.scene.primitives.add(buildings);
+        }
+      }).catch(() => {});
+    }
 
     // Scene enhancements
     const globe = viewer.scene.globe as GlobeWithOptionalEffects;
@@ -57,7 +64,7 @@ export function CesiumViewport({ onReady }: CesiumViewportProps) {
       viewer.destroy();
       viewerRef.current = null;
     };
-  }, [onReady]);
+  }, [onReady, scenePolicy]);
 
   return (
     <div
