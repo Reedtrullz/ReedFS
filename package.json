@@ -10,7 +10,8 @@
     "test": "vitest run",
     "lint": "eslint .",
     "lint:ci": "eslint . --max-warnings=0",
-    "check": "npm run lint:ci && npm run typecheck && npm run test && npm run build",
+    "check:deps": "node scripts/check-single-three.mjs",
+    "check": "npm run check:deps && npm run lint:ci && npm run typecheck && npm run test && npm run build",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -21,6 +22,11 @@
     "three": "^0.184.0",
     "three-to-cesium": "^1.1.1",
     "zustand": "^5.0.13"
+  },
+  "overrides": {
+    "three-to-cesium": {
+      "three": "$three"
+    }
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
