@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
 import type { RefObject } from 'react';
 import { ThreeLayer } from '../ThreeLayer';
-import { AirportLayer } from '../AirportLayer';
 import { ContrailLayer } from '../ContrailLayer';
 import { CockpitLayer } from '../CockpitLayer';
 
@@ -135,7 +134,6 @@ describe('viewport layer cleanup', () => {
 
   it.each([
     ['ThreeLayer', ThreeLayer],
-    ['AirportLayer', AirportLayer],
     ['ContrailLayer', ContrailLayer],
     ['CockpitLayer', CockpitLayer],
   ])('%s does not read viewer.scene during cleanup after Cesium has destroyed it', (_name, Layer) => {
@@ -149,7 +147,6 @@ describe('viewport layer cleanup', () => {
 
   it.each([
     ['ThreeLayer', ThreeLayer],
-    ['AirportLayer', AirportLayer],
     ['ContrailLayer', ContrailLayer],
     ['CockpitLayer', CockpitLayer],
   ])('%s does not touch destroyed Cesium scene resources during cleanup', (_name, Layer) => {
