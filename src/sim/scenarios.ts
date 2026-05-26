@@ -2,6 +2,7 @@ import type { AircraftSpec, AircraftState, FuelState, GeoPosition } from './type
 import { createInitialState } from './types';
 import { eulerToQuat } from './physics/quaternion';
 import type { WindInfo } from './weather';
+import { KSEA_RUNWAY_16L } from '../viewport/runwayData';
 
 export interface ScenarioFuelLoad {
   centerTank: number;
@@ -37,8 +38,8 @@ export const KSEA_TUTORIAL_SCENARIO: FlightScenario = {
   id: 'ksea-tutorial',
   name: 'KSEA Tutorial Takeoff',
   description: 'Medium-weight 737-800 configured for a flaps-5 southbound KSEA takeoff.',
-  position: { lat: 47.45, lon: -122.31, alt: 432 },
-  runway: { airport: 'KSEA', runway: '16L', elevationFt: 432, headingDeg: 180 },
+  position: { lat: KSEA_RUNWAY_16L.start.lat, lon: KSEA_RUNWAY_16L.start.lon, alt: KSEA_RUNWAY_16L.elevationFt },
+  runway: { airport: KSEA_RUNWAY_16L.airport, runway: KSEA_RUNWAY_16L.id, elevationFt: KSEA_RUNWAY_16L.elevationFt, headingDeg: KSEA_RUNWAY_16L.headingDeg },
   fuel: { centerTank: 8_000, leftTank: 2_000, rightTank: 2_000, totalFuel: 12_000 },
   zeroFuelWeightKg: 49_913,
   grossWeightKg: 61_913,
@@ -53,8 +54,8 @@ export const KSEA_LIGHT_PATTERN_SCENARIO: FlightScenario = {
   id: 'ksea-light-pattern',
   name: 'KSEA Light Pattern Work',
   description: 'Lightweight flaps-5 setup for repeated hand-flying and pattern practice.',
-  position: { lat: 47.45, lon: -122.31, alt: 432 },
-  runway: { airport: 'KSEA', runway: '16L', elevationFt: 432, headingDeg: 180 },
+  position: { lat: KSEA_RUNWAY_16L.start.lat, lon: KSEA_RUNWAY_16L.start.lon, alt: KSEA_RUNWAY_16L.elevationFt },
+  runway: { airport: KSEA_RUNWAY_16L.airport, runway: KSEA_RUNWAY_16L.id, elevationFt: KSEA_RUNWAY_16L.elevationFt, headingDeg: KSEA_RUNWAY_16L.headingDeg },
   fuel: { centerTank: 4_000, leftTank: 1_000, rightTank: 1_000, totalFuel: 6_000 },
   zeroFuelWeightKg: 44_413,
   grossWeightKg: 50_413,

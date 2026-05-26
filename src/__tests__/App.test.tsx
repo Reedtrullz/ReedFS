@@ -84,6 +84,8 @@ const mockPostRenderAdd = vi.fn();
 const mockPostRenderRemove = vi.fn();
 const mockPreRenderAdd = vi.fn();
 const mockPreRenderRemove = vi.fn();
+const mockEntityAdd = vi.fn((entity) => entity);
+const mockEntityRemove = vi.fn();
 
 vi.mock('cesium', () => ({
   Ion: { defaultAccessToken: '' },
@@ -104,8 +106,24 @@ vi.mock('cesium', () => ({
       skyAtmosphere: { show: true },
       primitives: { add: vi.fn(() => ({})), remove: vi.fn() },
     };
+    entities = { add: mockEntityAdd, remove: mockEntityRemove };
   },
-  Cartesian3: { fromDegrees: vi.fn(() => ({ x: 0, y: 0, z: 0 })) },
+  Cartesian3: {
+    fromDegrees: vi.fn(() => ({ x: 0, y: 0, z: 0 })),
+    fromDegreesArrayHeights: vi.fn((positions: number[]) => positions),
+  },
+  Cartesian2: class {
+    constructor(public x: number, public y: number) {}
+  },
+  Color: {
+    WHITE: { withAlpha: vi.fn(() => 'white-alpha') },
+    YELLOW: { withAlpha: vi.fn(() => 'yellow-alpha') },
+    BLACK: { withAlpha: vi.fn(() => 'black-alpha') },
+    DARKGRAY: { withAlpha: vi.fn(() => 'darkgray-alpha') },
+    GRAY: { withAlpha: vi.fn(() => 'gray-alpha') },
+    ORANGE: { withAlpha: vi.fn(() => 'orange-alpha') },
+    CYAN: { withAlpha: vi.fn(() => 'cyan-alpha') },
+  },
   Math: { toRadians: (d: number) => (d * Math.PI) / 180 },
   Terrain: { fromWorldTerrain: vi.fn(() => ({})) },
   Transforms: { eastNorthUpToFixedFrame: vi.fn(() => ({})) },
@@ -197,6 +215,13 @@ describe('App', () => {
     render(<App />);
 
     expect(ThreeToCesium).toHaveBeenCalledTimes(1);
+  });
+
+  it('mounts the Cesium-native runway layer', () => {
+    render(<App />);
+
+    expect(mockEntityAdd).toHaveBeenCalledWith(expect.objectContaining({ id: 'runway-pavement-KSEA-16L' }));
+    expect(mockEntityAdd).toHaveBeenCalledWith(expect.objectContaining({ id: 'runway-centerline-KSEA-16L' }));
   });
 
   it('calls startTakeoffRoll from the START ROLL button', () => {

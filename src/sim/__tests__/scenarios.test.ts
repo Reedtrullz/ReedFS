@@ -27,7 +27,7 @@ describe('flight scenarios', () => {
     const state = createAircraftStateForScenario(B737_800_SPEC, KSEA_TUTORIAL_SCENARIO);
 
     expect(state.position).toEqual(expect.objectContaining(KSEA_TUTORIAL_SCENARIO.position));
-    expect(state.attitude.psi).toBeCloseTo(Math.PI, 9);
+    expect(state.attitude.psi).toBeCloseTo(KSEA_TUTORIAL_SCENARIO.runway.headingDeg * Math.PI / 180, 9);
     expect(state.config.flapSetting).toBe(KSEA_TUTORIAL_SCENARIO.flapSetting);
     expect(state.config.gearDown).toBe(true);
     expect(state.payloadWeight).toBe(KSEA_TUTORIAL_SCENARIO.payloadWeightKg);

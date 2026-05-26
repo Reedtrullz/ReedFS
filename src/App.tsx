@@ -23,6 +23,7 @@ import { CloudLayer } from './viewport/CloudLayer';
 import { RfsPFD } from './instruments/RfsPFD';
 import { RfsMCP } from './instruments/RfsMCP';
 import { ContrailLayer } from './viewport/ContrailLayer';
+import { RunwayLayer } from './viewport/RunwayLayer';
 import { shouldAutoFollowCamera, type CameraMode } from './viewport/cameraMode';
 import { chaseCameraOffset } from './viewport/cameraFollow';
 import { createKseaKpdxFlight } from './sim/flightPlanLoader';
@@ -191,6 +192,7 @@ export function App() {
     <ErrorBoundary>
     <div style={{ width: '100%', height: '100%' }}>
       <CesiumViewport onReady={handleViewerReady} />
+      <RunwayLayer viewerRef={viewerRef} />
       <ThreeLayer viewerRef={viewerRef} />
       <CloudLayer viewerRef={viewerRef} metar={metarData} />
       <ContrailLayer viewerRef={viewerRef} />
