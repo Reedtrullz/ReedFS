@@ -86,6 +86,7 @@ describe('CesiumViewport scene policy', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv('VITE_CESIUM_ION_TOKEN', '');
+    vi.stubEnv('VITE_RFS_VISUAL_TEST', undefined);
     mockViewerInstances.length = 0;
     mockCreateOsmBuildingsAsync.mockResolvedValue(mockOsmBuildings);
   });
