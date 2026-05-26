@@ -24,6 +24,7 @@ export function CesiumViewport({ onReady, scenePolicy }: CesiumViewportProps) {
     if (viewerRef.current) return; // React StrictMode double-mount guard
 
     const policy = scenePolicy ?? getCesiumScenePolicy();
+    let disposed = false;
     const viewerOptions = {
       useDefaultRenderLoop: true,
       animation: false,
@@ -36,16 +37,18 @@ export function CesiumViewport({ onReady, scenePolicy }: CesiumViewportProps) {
       sceneModePicker: false,
       selectionIndicator: false,
       navigationHelpButton: false,
+      ...(policy.mode === 'degraded' ? { baseLayer: false as const } : {}),
       ...(policy.terrain === 'world' ? { terrain: Cesium.Terrain.fromWorldTerrain() } : {}),
     };
     const viewer = new Cesium.Viewer(containerRef.current, viewerOptions);
+    viewerRef.current = viewer;
     viewer.scene.screenSpaceCameraController.enableInputs = false;
 
     // Enable Cesium OSM 3D buildings
     if (policy.osmBuildings) {
       Cesium.createOsmBuildingsAsync().then((buildings) => {
-        if (viewerRef.current && !viewerRef.current.isDestroyed()) {
-          viewerRef.current.scene.primitives.add(buildings);
+        if (!disposed && viewerRef.current === viewer && !viewer.isDestroyed()) {
+          viewer.scene.primitives.add(buildings);
         }
       }).catch(() => {});
     }
@@ -57,12 +60,14 @@ export function CesiumViewport({ onReady, scenePolicy }: CesiumViewportProps) {
     globe.showWaterEffect = true;
     if (viewer.scene.skyAtmosphere) viewer.scene.skyAtmosphere.show = true;
 
-    viewerRef.current = viewer;
     onReady?.(viewer);
 
     return () => {
+      disposed = true;
       viewer.destroy();
-      viewerRef.current = null;
+      if (viewerRef.current === viewer) {
+        viewerRef.current = null;
+      }
     };
   }, [onReady, scenePolicy]);
 
