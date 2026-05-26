@@ -34,6 +34,10 @@ function validActiveLegIndexOrNull(value: number | undefined | null): number | n
   return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : null;
 }
 
+function isVnavVerticalMode(mode: string): boolean {
+  return mode === 'VNAV' || mode === 'VNAV_PTH' || mode === 'ALT*';
+}
+
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
@@ -168,7 +172,7 @@ export function resolveAutopilotTargets(
   }
 
   // VNAV: only expose altitude/VS/speed targets when the active route leg has an actionable constraint.
-  if (apState.truth.verticalActive === 'VNAV' && flightPlan) {
+  if (isVnavVerticalMode(apState.truth.verticalActive) && flightPlan) {
     const nav = navForActiveLeg();
     if (nav) {
       const vnav = computeVNAV(state, flightPlan, nav);
@@ -217,7 +221,7 @@ export function computeAutopilotCommands(
     const altErr = state.position.alt - targetAltFt;
     const rawElevator = pid(pitchIntegral, altErr, 0.00004, 0.000001, 0.00001, dt);
     commands.elevator = rateLimitElevator(rawElevator, dt);
-  } else if (t.verticalActive === 'VS' || t.verticalActive === 'VNAV') {
+  } else if (t.verticalActive === 'VS' || isVnavVerticalMode(t.verticalActive)) {
     const selectedVs = t.verticalActive === 'VS'
       ? finiteOrUndefined(apState.boeing.verticalSpeed) ?? 0
       : finiteOrUndefined(targetVerticalSpeedFpm);

@@ -82,4 +82,52 @@ describe('computeVNAV', () => {
     expect(v.targetSpeedKt).toBe(220);
     expect(v.altitudeConstraint).toBe(false);
   });
+
+  it('reports VNAV_PTH while tracking a distant altitude constraint', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.position.alt = 5000;
+    s.velocity.u = 128.6;
+    const fp: FlightPlan = {
+      origin: 'KSEA',
+      destination: 'KPDX',
+      flightNumber: '',
+      route: 'KSEA WPT1',
+      waypoints: [{
+        ident: 'WPT1',
+        lat: 47.5,
+        lon: -122.31,
+        discontinuity: false,
+        altitudeConstraint: { type: 'AT', altitude: 10000 },
+      }],
+    };
+
+    const v = computeVNAV(s, fp, navOut);
+
+    expect(v.verticalMode).toBe('VNAV_PTH');
+  });
+
+  it('transitions from ALT* acquisition to ALT_HOLD near the VNAV target altitude', () => {
+    const fp: FlightPlan = {
+      origin: 'KSEA',
+      destination: 'KPDX',
+      flightNumber: '',
+      route: 'KSEA WPT1',
+      waypoints: [{
+        ident: 'WPT1',
+        lat: 47.5,
+        lon: -122.31,
+        discontinuity: false,
+        altitudeConstraint: { type: 'AT', altitude: 10000 },
+      }],
+    };
+    const acquiring = createInitialState(B737_800_SPEC);
+    acquiring.position.alt = 9875;
+    acquiring.velocity.u = 128.6;
+    const captured = createInitialState(B737_800_SPEC);
+    captured.position.alt = 10020;
+    captured.velocity.u = 128.6;
+
+    expect(computeVNAV(acquiring, fp, navOut).verticalMode).toBe('ALT*');
+    expect(computeVNAV(captured, fp, navOut).verticalMode).toBe('ALT_HOLD');
+  });
 });

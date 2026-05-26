@@ -1,14 +1,19 @@
 import type { AircraftState } from '../types';
 import type { AltitudeConstraint, FlightPlan, FlightPlanWaypoint, SpeedConstraint } from '@shared/types/fmc';
+import type { VerticalMode } from '@shared/autopilot/autopilotTypes';
 import type { NavOutput } from './navigation';
 
 const M_PER_NM = 1852;
 const MAX_VNAV_VS_FPM = 3000;
+const VNAV_ALT_HOLD_CAPTURE_FT = 50;
+const VNAV_ALT_ACQUIRE_FT = 250;
 
 export interface VnavOutput {
   targetAlt: number;
   targetVs: number;
   altitudeConstraint: boolean;
+  /** Honest vertical mode implied by the current VNAV path lifecycle. */
+  verticalMode: VerticalMode | null;
   /** True only when the active waypoint has an actionable VNAV altitude and/or speed target. */
   available: boolean;
   unavailableReason: string | null;
@@ -29,6 +34,7 @@ function unavailable(state: AircraftState, reason: string): VnavOutput {
     targetAlt: state.position.alt,
     targetVs: 0,
     altitudeConstraint: false,
+    verticalMode: null,
     available: false,
     unavailableReason: reason,
     speedConstraint: false,
@@ -72,6 +78,13 @@ function requiredVerticalSpeedFpm(state: AircraftState, targetAltFt: number, nav
   return clamp(rawVs, -MAX_VNAV_VS_FPM, MAX_VNAV_VS_FPM);
 }
 
+function resolveVnavVerticalMode(state: AircraftState, targetAltFt: number): VerticalMode {
+  const altitudeErrorFt = Math.abs(targetAltFt - state.position.alt);
+  if (altitudeErrorFt <= VNAV_ALT_HOLD_CAPTURE_FT) return 'ALT_HOLD';
+  if (altitudeErrorFt <= VNAV_ALT_ACQUIRE_FT) return 'ALT*';
+  return 'VNAV_PTH';
+}
+
 export function computeVNAV(
   state: AircraftState,
   flightPlan: FlightPlan | null,
@@ -87,6 +100,7 @@ export function computeVNAV(
   const speedTarget = resolveSpeedTarget(wpt.speedConstraint);
   const hasAltitudeTarget = altitudeTarget !== undefined;
   const hasSpeedTarget = speedTarget !== undefined;
+  const verticalMode = hasAltitudeTarget ? resolveVnavVerticalMode(state, altitudeTarget) : 'VNAV';
 
   if (!hasAltitudeTarget && !hasSpeedTarget) {
     return unavailable(state, 'active waypoint has no actionable VNAV altitude or speed constraint');
@@ -96,6 +110,7 @@ export function computeVNAV(
     targetAlt: altitudeTarget ?? state.position.alt,
     targetVs: hasAltitudeTarget ? requiredVerticalSpeedFpm(state, altitudeTarget, nav) : 0,
     altitudeConstraint: hasAltitudeTarget,
+    verticalMode,
     available: true,
     unavailableReason: null,
     speedConstraint: hasSpeedTarget,

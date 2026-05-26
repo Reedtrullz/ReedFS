@@ -108,13 +108,13 @@ RFS bridges RFMS-compatible avionics state into native physics and player-facing
 - `navigation.ts` validates route coordinates/discontinuities, computes store-owned active-leg status including signed cross-track/along-track metrics, estimates next-leg turn angle/anticipation distance, and sequences the active leg.
 - `RouteStatus.tsx` exposes active leg, next waypoint, DTG, track, ETA, and LNAV unavailable reasons.
 - `autopilot.ts` maps active RFMS truth modes to AP-owned control commands. LNAV uses the store-owned active route leg plus a capped cross-track intercept law; VNAV uses the active route leg constraints. Invalid route status does not fall back to waypoint 0.
-- `vnav.ts` reports VNAV availability, unavailable reasons, altitude targets, target vertical speed, and speed constraints.
+- `vnav.ts` reports VNAV availability, unavailable reasons, altitude targets, target vertical speed, speed constraints, and the conservative VNAV_PTH -> ALT* -> ALT_HOLD path lifecycle for actionable altitude constraints.
 - `GuidanceState` combines scenario phase, tutorial, checklist, coach messages, and alerts for the player-facing flow; route status and AP truth remain adjacent store-owned state used by `RouteStatus`, `RfsPFD`, and the servo laws.
 
 Known guidance follow-up:
 
 - Use turn anticipation metrics to advance LNAV guidance before leg transitions and add RFMS-backed route edits.
-- Add full VNAV SPD/PTH/ALT ACQ mode lifecycle beyond the current conservative constraint targeting.
+- Wire VNAV path lifecycle transitions into live AP truth/FMA updates once a gated VNAV MCP control is exposed.
 
 ## Weather architecture
 

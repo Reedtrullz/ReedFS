@@ -234,6 +234,31 @@ describe('resolveAutopilotTargets VNAV', () => {
       expect(targets?.targetVerticalSpeedFpm).toBeUndefined();
     },
   );
+
+  it('uses VNAV_PTH active mode as a path-tracking VNAV command', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.position.lat = 47.45;
+    s.position.lon = -122.31;
+    s.position.alt = 5000;
+    s.velocity.u = 128.6;
+    const ap = makeAp('LNAV', 'VNAV_PTH', 'SPEED');
+    const fp: FlightPlan = {
+      origin: 'KSEA',
+      destination: 'KPDX',
+      flightNumber: 'TST793',
+      route: 'KSEA OLM',
+      waypoints: [
+        { ident: 'KSEA', lat: 47.45, lon: -122.31, discontinuity: false },
+        { ident: 'OLM', lat: 46.97, lon: -122.9, discontinuity: false, altitudeConstraint: { type: 'AT', altitude: 10000 } },
+      ],
+    };
+
+    const targets = resolveAutopilotTargets(s, ap, fp, 0);
+    const commands = computeAutopilotCommandsForState(s, ap, fp, 1 / 60, 0);
+
+    expect(targets.targetVerticalSpeedFpm).toBeGreaterThan(0);
+    expect(commands.elevator).toBeLessThan(0);
+  });
 });
 
 describe('resolveAutopilotTargets LNAV', () => {
