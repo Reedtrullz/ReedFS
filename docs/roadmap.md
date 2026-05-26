@@ -159,7 +159,7 @@ Scope:
 
 Suggested implementation files:
 
-- `src/sim/data/b737.json`
+- `src/sim/data/aircraft/b737-800.v1.ts`
 - `src/sim/systems/AeroModel.ts`
 - `src/sim/physics/aero.ts`
 - `src/sim/physics/__tests__/aero.test.ts`

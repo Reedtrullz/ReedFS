@@ -1,7 +1,7 @@
 // ── 6-DOF State Vector ──
 
 import { eulerToQuat, type Quaternion } from './physics/quaternion';
-import b737Data from './data/b737.json';
+import { B737_800_AIRCRAFT_DATA } from './data/aircraft/b737-800.v1';
 
 export interface GeoPosition {
   lat: number; // decimal degrees
@@ -192,25 +192,7 @@ export interface AircraftSpec {
   ixz: number;
 }
 
-export const B737_800_SPEC: AircraftSpec = {
-  emptyWeight: 41413,
-  maxFuel: 20894,
-  maxTakeoffWeight: 79015,
-  wingArea: 124.6,
-  wingSpan: 35.8,
-  meanChord: 3.96,
-  aerodynamicCenterPercentMac: 25,
-  maxThrust: 27300,
-  engineCount: 2,
-  vStall: 120,
-  maxFlaps: 40,
-  cgLimits: [7, 30],
-  fuelCapacity: { center: 13066, left: 3914, right: 3914 },
-  ixx: 1340000,
-  iyy: 3450000,
-  izz: 4610000,
-  ixz: 40000,
-};
+export const B737_800_SPEC: AircraftSpec = loadAircraftSpec();
 
 const B737_GEAR_STATION_BASE: Omit<GearStationState, 'compressionM' | 'normalForceN' | 'weightOnWheel' | 'steeringAngleRad'>[] = [
   {
@@ -311,7 +293,7 @@ export function createInitialState(spec: AircraftSpec): AircraftState {
 }
 
 export function loadAircraftSpec(): AircraftSpec {
-  const d = b737Data;
+  const d = B737_800_AIRCRAFT_DATA;
   return {
     emptyWeight: d.mass.emptyWeight,
     maxFuel: d.mass.maxFuel,
@@ -319,13 +301,13 @@ export function loadAircraftSpec(): AircraftSpec {
     wingArea: d.geometry.wingArea,
     wingSpan: d.geometry.wingSpan,
     meanChord: d.geometry.meanChord,
-    aerodynamicCenterPercentMac: B737_800_SPEC.aerodynamicCenterPercentMac,
+    aerodynamicCenterPercentMac: d.geometry.aerodynamicCenterPercentMac,
     maxThrust: d.propulsion.maxThrust,
     engineCount: d.propulsion.engineCount,
     vStall: d.performance.stallSpeedClean,
     maxFlaps: d.performance.maxFlaps,
-    cgLimits: d.mass.cgLimits as [number, number],
-    fuelCapacity: d.mass.fuelCapacity as { center: number; left: number; right: number },
+    cgLimits: [...d.mass.cgLimits] as [number, number],
+    fuelCapacity: { ...d.mass.fuelCapacity },
     ixx: d.inertia.ixx,
     iyy: d.inertia.iyy,
     izz: d.inertia.izz,

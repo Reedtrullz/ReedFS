@@ -59,6 +59,8 @@ The system order is intentional:
 - Derived values: IAS/TAS/GS/Mach/VS/AoA/Beta, recomputed from state and wind.
 - Engine, fuel, electrical, hydraulic, config, and flight phase data.
 
+`B737_800_SPEC` is loaded from the versioned data module `src/sim/data/aircraft/b737-800.v1.ts`; the exported data version pins the mass, geometry, propulsion, inertia, fuel, CG, and baseline performance numbers used by the runtime.
+
 Quaternion is authoritative. `integrate()` updates quaternion from body rates, normalizes it, then mirrors Euler angles from the normalized quaternion.
 
 ## Coordinate and velocity contracts
@@ -174,6 +176,6 @@ These are intentional gaps, not regressions:
 
 1. Advanced gear/tire model details: anti-skid, asymmetric braking, dynamic oleo spring/damper response, tire cornering stiffness, crosswind ground handling, and non-runway surface support beyond the current station/load/friction/steering/touchdown model.
 2. Worker physics: codec and worker entry scaffolding exist, and `VITE_RFS_WORKER_PHYSICS` is parsed as an experimental/default-off runtime flag for future wiring. The active runtime still uses main-thread physics; no `simStore` tick migration or runtime Worker bridge is enabled yet.
-3. Advanced flight guidance: LNAV intercept/turn anticipation, RFMS route edits, full VNAV SPD/PTH/ALT ACQ mode transitions, and selected MCP target lifecycle.
-4. Data-driven flight model: validated aircraft coefficient tables and trim/response tests.
+3. Advanced flight guidance: RFMS route edits and wiring turn-anticipation/VNAV lifecycle metrics into live AP truth/FMA updates beyond the current conservative target laws.
+4. Data-driven flight model: the B737-800 baseline spec is versioned, but validated aircraft coefficient tables and trim/response tests remain future work.
 5. Audio immersion: explicit Web Audio startup and deterministic mapping are in place; richer engine/cockpit/airframe sound layers remain future work.
