@@ -130,6 +130,7 @@ export interface AircraftState {
   electrical: ElectricalState;
   hydraulic: HydraulicState;
   grossWeight: number;
+  payloadWeight: number;
   cg: number; // % MAC
   ground: GroundState;
   simTime: number; // ms
@@ -198,6 +199,7 @@ export function createInitialState(spec: AircraftSpec): AircraftState {
     electrical: { gen1Online: false, gen2Online: false, acBusPowered: false, batteryVolts: 28 },
     hydraulic: { systemAPsi: 0, systemBPsi: 0, standbyPsi: 0 },
     grossWeight,
+    payloadWeight: 0,
     cg: 25,
     ground: {
       aglFt: 0,

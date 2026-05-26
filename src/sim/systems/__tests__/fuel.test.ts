@@ -33,4 +33,14 @@ describe('updateFuel', () => {
     updateFuel(s, B737_800_SPEC, 1/3600);
     expect(s.fuel.totalFuel).toBeLessThan(before);
   });
+
+  it('preserves payload mass in grossWeight when fuel burns', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.payloadWeight = 12000;
+    s.fuel.fuelFlowTotal = 3600;
+
+    updateFuel(s, B737_800_SPEC, 1);
+
+    expect(s.grossWeight).toBeCloseTo(B737_800_SPEC.emptyWeight + s.payloadWeight + s.fuel.totalFuel, 6);
+  });
 });
