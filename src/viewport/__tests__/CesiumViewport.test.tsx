@@ -118,6 +118,28 @@ describe('CesiumViewport scene policy', () => {
     expect(Cesium.createOsmBuildingsAsync).not.toHaveBeenCalled();
   });
 
+  it('enables scene decorations outside visual test mode', () => {
+    render(<CesiumViewport scenePolicy={degradedPolicy} />);
+
+    const { globe, skyAtmosphere } = mockViewerInstances[0].scene;
+    expect(globe.terrainExaggeration).toBe(1);
+    expect(globe.enableLighting).toBe(true);
+    expect(globe.showWaterEffect).toBe(true);
+    expect(skyAtmosphere.show).toBe(true);
+  });
+
+  it('disables nondeterministic scene decorations in visual test mode', () => {
+    vi.stubEnv('VITE_RFS_VISUAL_TEST', '1');
+
+    render(<CesiumViewport scenePolicy={degradedPolicy} />);
+
+    const { globe, skyAtmosphere } = mockViewerInstances[0].scene;
+    expect(globe.terrainExaggeration).toBe(1);
+    expect(globe.enableLighting).toBe(false);
+    expect(globe.showWaterEffect).toBe(false);
+    expect(skyAtmosphere.show).toBe(false);
+  });
+
   it('adds OSM buildings to the same Ion viewer exactly once after async resolution', async () => {
     render(<CesiumViewport scenePolicy={ionPolicy} />);
     await flushMicrotasks();

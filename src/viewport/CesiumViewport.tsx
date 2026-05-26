@@ -2,6 +2,7 @@ import 'cesium/Build/Cesium/Widgets/widgets.css';
 import { useEffect, useRef } from 'react';
 import * as Cesium from 'cesium';
 import { getCesiumScenePolicy, type CesiumScenePolicy } from '../config/cesium';
+import { isVisualTestMode } from '../config/visualTest';
 
 export interface CesiumViewportProps {
   /** Overrides the resolved Cesium scene asset policy */
@@ -55,10 +56,17 @@ export function CesiumViewport({ onReady, scenePolicy }: CesiumViewportProps) {
 
     // Scene enhancements
     const globe = viewer.scene.globe as GlobeWithOptionalEffects;
+    const visualTest = isVisualTestMode();
     globe.terrainExaggeration = 1;
-    globe.enableLighting = true;
-    globe.showWaterEffect = true;
-    if (viewer.scene.skyAtmosphere) viewer.scene.skyAtmosphere.show = true;
+    if (!visualTest) {
+      globe.enableLighting = true;
+      globe.showWaterEffect = true;
+      if (viewer.scene.skyAtmosphere) viewer.scene.skyAtmosphere.show = true;
+    } else {
+      globe.enableLighting = false;
+      globe.showWaterEffect = false;
+      if (viewer.scene.skyAtmosphere) viewer.scene.skyAtmosphere.show = false;
+    }
 
     onReady?.(viewer);
 
