@@ -124,6 +124,14 @@ Known guidance follow-up:
 - `environment.ts` converts METAR wind to NED then to body axes.
 - Wind is threaded into `integrate()`, `computeAero()`, and `computeDerived()` without modifying ground velocity.
 
+## Ground model architecture
+
+- `GroundState` carries per-station nose/left-main/right-main gear data: body-axis station position, static load fraction, compression, normal force, brake capability, steerability, and steering angle.
+- `ground.ts` distributes normal force across gear stations, computes rolling friction and brake force from loaded stations, fades nosewheel steering out as speed rises, damps lateral scrub, and records touchdown sink rate.
+- `applyGroundContact()` remains a post-solve runway constraint: it prevents sink-through, constrains runway-normal velocity, damps first-contact angular rates, applies tire rollout forces, and leaves airborne/free-flight equations untouched.
+- `aero.ts` applies a conservative ground-effect model below one wingspan AGL: modest lift increase plus induced-drag relief, without changing the wind/air-relative velocity contract.
+- `integrate.ts` transitions APPROACH/DESCENT to LANDED on gear touchdown and keeps TAKEOFF->CLIMB gated on positive rate away from the runway.
+
 ## Audio architecture
 
 - `audioMapping.ts` contains pure mappings for gain clamping, engine N1 -> oscillator parameters, and GPWS speech parameters.
@@ -165,7 +173,7 @@ push master
 
 These are intentional gaps, not regressions:
 
-1. Full gear/tire ground model: individual gear stations, oleo compression, anti-skid, nosewheel/tiller steering, rollout braking, and touchdown dynamics beyond the current runway-normal/normal-force contract.
+1. Advanced gear/tire model details: anti-skid, asymmetric braking, dynamic oleo spring/damper response, tire cornering stiffness, crosswind ground handling, and non-runway surface support beyond the current station/load/friction/steering/touchdown model.
 2. Worker physics: codec and worker entry scaffolding exist, and `VITE_RFS_WORKER_PHYSICS` is parsed as an experimental/default-off runtime flag for future wiring. The active runtime still uses main-thread physics; no `simStore` tick migration or runtime Worker bridge is enabled yet.
 3. Advanced flight guidance: LNAV intercept/turn anticipation, RFMS route edits, full VNAV SPD/PTH/ALT ACQ mode transitions, and selected MCP target lifecycle.
 4. Data-driven flight model: validated aircraft coefficient tables and trim/response tests.

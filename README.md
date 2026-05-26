@@ -11,7 +11,7 @@ The simulator now has a stabilized flight-model foundation plus the first gamepl
 
 - Quaternion attitude is authoritative; Euler attitude is mirrored only for compatibility and display boundaries.
 - Body/NED frame transforms, gravity signs, air-relative wind, signed drag, and physics regressions are covered by tests.
-- Ground contact now has explicit ground state, runway-normal constraints, normal-force liftoff gating, and phase handling so takeoff is no longer driven by core attitude hacks.
+- Ground contact now has explicit ground state, per-gear station loads, runway-normal constraints, tire braking/rolling friction, nosewheel taxi steering, touchdown damping, ground effect, normal-force liftoff gating, and phase handling so takeoff/landing are no longer driven by core attitude hacks.
 - Pilot inputs, autopilot commands, and effective controls are separated in the store; input dynamics, stabilizer trim, CG pitch moment, and AP-owned axes have regression coverage.
 - The aircraft renderer uses a persistent named visual contract with animated control surfaces/gear, Cesium-native runway references, and chase/cockpit camera management.
 - The default player view has scenario/tutorial/checklist/coach flow, readable PFD/FMA, MCP controls, route status, active-leg LNAV feedback, and conservative VNAV/SPD/VS behavior that does not advertise unsupported modes.
@@ -50,7 +50,7 @@ src/
       geodesy.ts                   WGS84/ECEF/ENU helpers
     systems/
       environment.ts               Pure wind -> air-relative body velocity helpers
-      ground.ts                    Runway contact, AGL, normal force, liftoff state
+      ground.ts                    Gear stations, runway contact, tire forces, taxi steering, touchdown/rollout
       engine.ts fuel.ts            Engine spool/fuel burn systems
       electrical.ts hydraulic.ts   Simplified aircraft systems
       navigation.ts vnav.ts        Route validation, active-leg LNAV, conservative VNAV targets

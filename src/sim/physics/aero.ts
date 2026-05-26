@@ -17,7 +17,8 @@ const STABILIZER_TRIM_CM_PER_UNIT = 0.012;
 // unlimited nose-up moment after the useful takeoff pitch range. This is force
 // shaping, not a hidden attitude clamp: the integrator still evolves q/theta.
 const NOSE_UP_ELEVATOR_FADE_START_RAD = 8 * Math.PI / 180;
-const NOSE_UP_ELEVATOR_FADE_END_RAD = 13 * Math.PI / 180;
+const NOSE_UP_ELEVATOR_FADE_END_RAD = 12.5 * Math.PI / 180;
+const FT_TO_M = 0.3048;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
@@ -94,6 +95,36 @@ export interface AeroResult {
   rollMoment: number; pitchMoment: number; yawMoment: number;
 }
 
+export interface GroundEffectFactors {
+  liftMultiplier: number;
+  inducedDragMultiplier: number;
+}
+
+export function computeGroundEffectFactors(heightAboveGroundM: number, wingSpanM: number): GroundEffectFactors {
+  if (!Number.isFinite(heightAboveGroundM) || !Number.isFinite(wingSpanM) || wingSpanM <= 0) {
+    return { liftMultiplier: 1, inducedDragMultiplier: 1 };
+  }
+
+  const hOverB = clamp(heightAboveGroundM / wingSpanM, 0, 1);
+  if (hOverB >= 1) {
+    return { liftMultiplier: 1, inducedDragMultiplier: 1 };
+  }
+
+  // Raymer-style induced-drag relief approximation: induced drag approaches its
+  // free-air value by roughly one wingspan AGL and falls sharply near the runway.
+  const downwashRatio = (16 * hOverB) ** 2;
+  const inducedDragMultiplier = downwashRatio / (1 + downwashRatio);
+  const relief = 1 - inducedDragMultiplier;
+  return {
+    liftMultiplier: 1 + 0.03 * relief,
+    inducedDragMultiplier,
+  };
+}
+
+function heightAboveGroundM(state: AircraftState): number {
+  return Math.max(0, (state.position.alt - state.ground.groundAltFt) * FT_TO_M);
+}
+
 export function computeAero(
   state: AircraftState,
   inputs: ControlInputs,
@@ -115,16 +146,19 @@ export function computeAero(
   // --- Lift ---
   const polar = flapPolarForSetting(aeroModel, state.config.flapSetting);
   const { cl, stallFraction } = liftCoefficientAtAoA(aoa, mach, polar);
+  const groundEffect = computeGroundEffectFactors(heightAboveGroundM(state), b);
+  const effectiveCl = cl * groundEffect.liftMultiplier;
 
   // --- Drag ---
   const cd0 = polar.cd0 + (state.config.gearDown ? aeroModel.gearCd : 0) + state.config.speedBrake * aeroModel.speedBrakeCd;
-  const cd = cd0 + polar.k * cl * cl + polar.stallDragRise * stallFraction * stallFraction;
+  const inducedCd = polar.k * cl * cl * groundEffect.inducedDragMultiplier;
+  const cd = cd0 + inducedCd + polar.stallDragRise * stallFraction * stallFraction;
 
   // --- Side force ---
   const cyBeta = -0.9, cyRudder = 0.15;
   const cy = cyBeta * beta + cyRudder * inputs.rudder;
 
-  const lift = q * S * cl;
+  const lift = q * S * effectiveCl;
   const drag = q * S * cd;
   const dragBodyX = tasMs > 1 ? -drag * (u / tasMs) : 0;
   const side = q * S * cy;
@@ -137,7 +171,7 @@ export function computeAero(
   const qHat = state.angularVel.q * c / (2 * Math.max(tasMs, 1));
   const elevatorDeflectionRad = effectiveElevatorInput(inputs.elevator, state.attitude.theta) * MAX_ELEVATOR_DEFLECTION_RAD;
   const cmTrim = stabilizerTrimMomentCoefficient(state.config.stabilizerTrimUnits);
-  const cmCg = cgPitchMomentCoefficient(state, spec, cl);
+  const cmCg = cgPitchMomentCoefficient(state, spec, effectiveCl);
   const cm = aeroModel.cm0 + polar.deltaCm + aeroModel.cmAlpha * aoa + aeroModel.cmElevator * elevatorDeflectionRad + cmTrim + cmCg + aeroModel.cmq * qHat;
   const pitchMoment = q * S * c * cm;
 

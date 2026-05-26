@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeAero } from '../aero';
+import { computeAero, computeGroundEffectFactors } from '../aero';
 import { createInitialState, B737_800_SPEC } from '../../types';
 import type { ControlInputs } from '../../types';
 import type { WindInfo } from '../../weather';
@@ -83,6 +83,50 @@ describe('computeAero', () => {
     const a = computeAero(s, { ...cruise, throttle1: 1, throttle2: 1 }, B737_800_SPEC);
 
     expect(a.thrust).toBeCloseTo(35_801, 6);
+  });
+
+  it('applies ground-effect factors only close to the runway', () => {
+    const near = computeGroundEffectFactors(B737_800_SPEC.wingSpan * 0.12, B737_800_SPEC.wingSpan);
+    const far = computeGroundEffectFactors(B737_800_SPEC.wingSpan * 1.2, B737_800_SPEC.wingSpan);
+
+    expect(near.liftMultiplier).toBeGreaterThan(1);
+    expect(near.inducedDragMultiplier).toBeLessThan(1);
+    expect(far.liftMultiplier).toBe(1);
+    expect(far.inducedDragMultiplier).toBe(1);
+  });
+
+  it('slightly increases lift and reduces induced drag near the runway at the same altitude', () => {
+    const near = stateAtAoA(8, 75);
+    near.position.alt = 5000;
+    near.config.flapSetting = 5;
+    near.config.gearDown = true;
+    near.ground = {
+      ...near.ground,
+      aglFt: 15,
+      groundAltFt: near.position.alt - 15,
+      weightOnWheels: false,
+      onRunway: false,
+      contact: 'none',
+    };
+
+    const far = stateAtAoA(8, 75);
+    far.position.alt = near.position.alt;
+    far.config.flapSetting = near.config.flapSetting;
+    far.config.gearDown = near.config.gearDown;
+    far.ground = {
+      ...far.ground,
+      aglFt: 1000,
+      groundAltFt: far.position.alt - 1000,
+      weightOnWheels: false,
+      onRunway: false,
+      contact: 'none',
+    };
+
+    const nearAero = computeAero(near, { ...cruise, throttle1: 0, throttle2: 0, flapLever: 5, gearLever: 'DOWN' }, B737_800_SPEC);
+    const farAero = computeAero(far, { ...cruise, throttle1: 0, throttle2: 0, flapLever: 5, gearLever: 'DOWN' }, B737_800_SPEC);
+
+    expect(nearAero.lift).toBeGreaterThan(farAero.lift * 1.005);
+    expect(nearAero.drag).toBeLessThan(farAero.drag * 0.98);
   });
 
   it('flaps increase lift and drag', () => {
