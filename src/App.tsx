@@ -24,8 +24,8 @@ import { RfsPFD } from './instruments/RfsPFD';
 import { RfsMCP } from './instruments/RfsMCP';
 import { ContrailLayer } from './viewport/ContrailLayer';
 import { RunwayLayer } from './viewport/RunwayLayer';
-import { shouldAutoFollowCamera, type CameraMode } from './viewport/cameraMode';
-import { chaseCameraOffset } from './viewport/cameraFollow';
+import { nextCameraMode, type CameraMode } from './viewport/cameraMode';
+import { CameraManager } from './viewport/CameraManager';
 import { createKseaKpdxFlight } from './sim/flightPlanLoader';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { FPSMonitor } from './components/FPSMonitor';
@@ -131,41 +131,14 @@ export function App() {
     });
   }, []);
 
-  // Chase camera — follows aircraft when sim is running
   useEffect(() => {
     const viewer = viewerRef.current;
     if (!viewer) return;
-    // Enable camera controls when paused/stopped, disable when flying
-    viewer.scene.screenSpaceCameraController.enableInputs = (status !== 'running');
-  }, [status]);
-
-  useEffect(() => {
-    const viewer = viewerRef.current;
-    if (!viewer) return;
+    const cameraManager = new CameraManager(viewer);
 
     const updateCamera = () => {
       const { status: currentStatus, aircraft: a } = useSimStore.getState();
-      if (!shouldAutoFollowCamera(currentStatus, camMode)) return;
-
-      viewer.camera.cancelFlight();
-      const altM = a.position.alt * 0.3048;
-      if (camMode === 'cockpit') {
-        const offset = chaseCameraOffset(a.attitude, 5, 0);
-        viewer.camera.lookAt(
-          Cesium.Cartesian3.fromDegrees(a.position.lon, a.position.lat, altM + 2),
-          new Cesium.Cartesian3(offset.east, offset.north, offset.up),
-        );
-      } else {
-        const offset = chaseCameraOffset(
-          a.attitude,
-          camMode === 'tower' ? 1500 : 300,
-          Cesium.Math.toRadians(camMode === 'tower' ? 5 : 15),
-        );
-        viewer.camera.lookAt(
-          Cesium.Cartesian3.fromDegrees(a.position.lon, a.position.lat, altM),
-          new Cesium.Cartesian3(offset.east, offset.north, offset.up),
-        );
-      }
+      cameraManager.update({ status: currentStatus, mode: camMode, aircraft: a });
     };
 
     updateCamera();
@@ -173,7 +146,7 @@ export function App() {
     return () => {
       viewer.scene.preRender.removeEventListener(updateCamera);
     };
-  }, [camMode, viewerGeneration]);
+  }, [camMode, status, viewerGeneration]);
 
   const handleViewerReady = useCallback((viewer: Cesium.Viewer) => {
     viewerRef.current = viewer;
@@ -225,9 +198,7 @@ export function App() {
         )}
         <button onClick={reset} style={btnStyle}>RESET</button>
         <button
-          onClick={() =>
-            setCamMode((m) => (m === 'chase' ? 'cockpit' : m === 'cockpit' ? 'tower' : 'chase'))
-          }
+          onClick={() => setCamMode(nextCameraMode)}
           style={btnStyle}
         >
           CAM: {camMode.toUpperCase()}
