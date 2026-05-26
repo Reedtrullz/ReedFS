@@ -1,4 +1,7 @@
+import { DEFAULT_CONTROL_BINDINGS, controlBindingLabels } from '../input/controlBindings';
+
 export function ControlsHelp() {
+  const labels = controlBindingLabels(DEFAULT_CONTROL_BINDINGS);
   return (
     <div
       style={{
@@ -19,13 +22,13 @@ export function ControlsHelp() {
       }}
     >
       <div style={{ fontWeight: 'bold', marginBottom: 4 }}>Controls</div>
-      <div>W rotate/nose up · S nose down</div>
-      <div>A/D roll · Q/E rudder</div>
-      <div>ArrowUp/ArrowDown throttle</div>
-      <div>[ / ] trim · Space brake · F flaps</div>
-      <div>G gear after positive rate</div>
-      <div>CAM cycles chase/cockpit/tower</div>
-      <div>OVL cycles flight/minimal/debug</div>
+      <div>{labels.pitch} pitch</div>
+      <div>{labels.roll} roll · {labels.rudder} rudder</div>
+      <div>{labels.throttle} throttle</div>
+      <div>{labels.trim} trim · {labels.brake} brake · {labels.flaps} flaps</div>
+      <div>{labels.gear} gear after positive rate</div>
+      <div>{labels.camera} camera modes</div>
+      <div>{labels.overlay} overlay modes</div>
     </div>
   );
 }

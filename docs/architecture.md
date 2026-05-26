@@ -113,6 +113,7 @@ RFS bridges RFMS-compatible avionics state into native physics and player-facing
 - `vnav.ts` reports VNAV availability, unavailable reasons, altitude targets, target vertical speed, speed constraints, and the conservative VNAV_PTH -> ALT* -> ALT_HOLD path lifecycle for actionable altitude constraints.
 - `GuidanceState` combines scenario phase, tutorial, checklist, coach messages, and alerts for the player-facing flow; route status and AP truth remain adjacent store-owned state used by `RouteStatus`, `RfsPFD`, and the servo laws.
 - `scenarioPersistence.ts` saves cloneable scenario snapshots to `localStorage`, and `ScenarioPanel` exposes SAVE/LOAD controls with visible ignored/corrupt-save feedback.
+- `controlBindings.ts`, `ControlsHelp`, and `ControlsSettings` provide a validated, visible keyboard/gamepad binding model for repeated play.
 
 Known guidance follow-up:
 

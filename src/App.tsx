@@ -6,6 +6,7 @@ import { ThreeLayer } from './viewport/ThreeLayer';
 import { Telemetry } from './components/Telemetry';
 import { AttitudeIndicator } from './components/AttitudeIndicator';
 import { ControlsHelp } from './components/ControlsHelp';
+import { ControlsSettings } from './components/ControlsSettings';
 import { useSimLoop } from './hooks/useSimLoop';
 import { useAudioLoop } from './hooks/useAudioLoop';
 import { getAudioEngine } from './audio/AudioEngine';
@@ -231,6 +232,7 @@ export function App() {
       <ContrailLayer viewerRef={viewerRef} />
       {showDebugOverlays && <Telemetry />}
       {showDebugOverlays && <ControlsHelp />}
+      {showDebugOverlays && <ControlsSettings />}
       {showDebugOverlays && <AttitudeIndicator />}
       {showFlightInstruments && <ScenarioPanel />}
       {showFlightInstruments && <RouteStatus />}
