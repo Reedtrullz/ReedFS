@@ -1,5 +1,5 @@
 import type { AircraftSpec, AircraftState, FuelState, GeoPosition } from './types';
-import { createInitialState } from './types';
+import { createB737GearStations, createInitialState } from './types';
 import { eulerToQuat } from './physics/quaternion';
 import type { WindInfo } from './weather';
 import { KSEA_RUNWAY_16L } from '../viewport/runwayData';
@@ -208,6 +208,7 @@ export function createAircraftStateForScenario(spec: AircraftSpec, scenario: Fli
     normalForceN: grossWeight * 9.80665,
     onRunway: true,
     contact: 'gear',
+    gearStations: createB737GearStations(grossWeight * 9.80665, true),
   };
   state.flightPhase = 'PARKED';
   state.simTime = 0;

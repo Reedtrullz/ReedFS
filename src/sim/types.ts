@@ -42,6 +42,30 @@ export interface DerivedState {
 // ── Ground Contact State ──
 
 export type GroundContactType = 'none' | 'gear' | 'belly' | 'crashed';
+export type GearStationId = 'nose' | 'leftMain' | 'rightMain';
+
+export interface BodyStationPosition {
+  x: number; // m, body +x forward
+  y: number; // m, body +y right
+  z: number; // m, body +z down
+}
+
+export interface GearStationState {
+  id: GearStationId;
+  label: string;
+  positionBodyM: BodyStationPosition;
+  wheelRadiusM: number;
+  strutRestLengthM: number;
+  maxCompressionM: number;
+  springStiffnessNPerM: number;
+  staticLoadFraction: number;
+  compressionM: number;
+  normalForceN: number;
+  weightOnWheel: boolean;
+  brakeCapable: boolean;
+  steerable: boolean;
+  steeringAngleRad: number;
+}
 
 export interface GroundState {
   aglFt: number;
@@ -50,6 +74,7 @@ export interface GroundState {
   normalForceN: number;
   onRunway: boolean;
   contact: GroundContactType;
+  gearStations: GearStationState[];
 }
 
 // ── Control Inputs ──
@@ -186,6 +211,63 @@ export const B737_800_SPEC: AircraftSpec = {
   ixz: 40000,
 };
 
+const B737_GEAR_STATION_BASE: Omit<GearStationState, 'compressionM' | 'normalForceN' | 'weightOnWheel' | 'steeringAngleRad'>[] = [
+  {
+    id: 'nose',
+    label: 'Nose gear',
+    positionBodyM: { x: 15.2, y: 0, z: 2.25 },
+    wheelRadiusM: 0.43,
+    strutRestLengthM: 1.05,
+    maxCompressionM: 0.32,
+    springStiffnessNPerM: 400_000,
+    staticLoadFraction: 0.10,
+    brakeCapable: false,
+    steerable: true,
+  },
+  {
+    id: 'leftMain',
+    label: 'Left main gear',
+    positionBodyM: { x: -2.8, y: -3.15, z: 2.45 },
+    wheelRadiusM: 0.58,
+    strutRestLengthM: 1.25,
+    maxCompressionM: 0.50,
+    springStiffnessNPerM: 800_000,
+    staticLoadFraction: 0.45,
+    brakeCapable: true,
+    steerable: false,
+  },
+  {
+    id: 'rightMain',
+    label: 'Right main gear',
+    positionBodyM: { x: -2.8, y: 3.15, z: 2.45 },
+    wheelRadiusM: 0.58,
+    strutRestLengthM: 1.25,
+    maxCompressionM: 0.50,
+    springStiffnessNPerM: 800_000,
+    staticLoadFraction: 0.45,
+    brakeCapable: true,
+    steerable: false,
+  },
+];
+
+function gearCompressionM(station: Omit<GearStationState, 'compressionM' | 'normalForceN' | 'weightOnWheel' | 'steeringAngleRad'>, normalForceN: number): number {
+  if (normalForceN <= 0) return 0;
+  return Math.max(0, Math.min(station.maxCompressionM, normalForceN / station.springStiffnessNPerM));
+}
+
+export function createB737GearStations(totalNormalForceN = 0, weightOnWheel = false): GearStationState[] {
+  return B737_GEAR_STATION_BASE.map((station) => {
+    const normalForceN = weightOnWheel ? totalNormalForceN * station.staticLoadFraction : 0;
+    return {
+      ...station,
+      compressionM: gearCompressionM(station, normalForceN),
+      normalForceN,
+      weightOnWheel,
+      steeringAngleRad: 0,
+    };
+  });
+}
+
 export function createInitialState(spec: AircraftSpec): AircraftState {
   const attitude: Attitude = { phi: 0, theta: 0, psi: Math.PI };
   const initialAltFt = 432;
@@ -218,6 +300,7 @@ export function createInitialState(spec: AircraftSpec): AircraftState {
       normalForceN: grossWeight * 9.80665,
       onRunway: true,
       contact: 'gear',
+      gearStations: createB737GearStations(grossWeight * 9.80665, true),
     },
     simTime: 0,
     timeOfDay: 12,

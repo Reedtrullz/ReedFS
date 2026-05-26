@@ -1,4 +1,5 @@
 import type { AircraftState, ControlInputs, GroundContactType, GroundState } from '../types';
+import { createB737GearStations } from '../types';
 import { bodyToNed, nedToBody } from '../physics/frames';
 import { eulerToQuat } from '../physics/quaternion';
 
@@ -41,6 +42,10 @@ function setGroundState(
   normalForceN: number,
 ): GroundState {
   const aglFt = Math.max(0, state.position.alt - groundAltFt);
+  const gearStations = createB737GearStations(
+    contact === 'gear' && weightOnWheels ? normalForceN : 0,
+    contact === 'gear' && weightOnWheels,
+  );
   const ground: GroundState = {
     aglFt,
     groundAltFt,
@@ -48,6 +53,7 @@ function setGroundState(
     normalForceN,
     onRunway: contact !== 'none',
     contact,
+    gearStations,
   };
   state.ground = ground;
   return ground;

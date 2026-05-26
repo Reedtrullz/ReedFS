@@ -29,6 +29,51 @@ describe('applyGroundContact', () => {
     expect(state.ground.normalForceN).toBeGreaterThan(0);
   });
 
+  it('initial state defines nose and left/right main gear stations in body axes', () => {
+    const state = createInitialState(B737_800_SPEC);
+
+    expect(state.ground.gearStations.map((station) => station.id)).toEqual(['nose', 'leftMain', 'rightMain']);
+    const nose = state.ground.gearStations[0];
+    const leftMain = state.ground.gearStations[1];
+    const rightMain = state.ground.gearStations[2];
+
+    expect(nose.positionBodyM.x).toBeGreaterThan(0);
+    expect(nose.positionBodyM.y).toBe(0);
+    expect(nose.steerable).toBe(true);
+    expect(nose.brakeCapable).toBe(false);
+    expect(leftMain.positionBodyM.x).toBeLessThan(0);
+    expect(leftMain.positionBodyM.y).toBeLessThan(0);
+    expect(rightMain.positionBodyM.x).toBe(leftMain.positionBodyM.x);
+    expect(rightMain.positionBodyM.y).toBeCloseTo(-leftMain.positionBodyM.y, 8);
+    expect(leftMain.brakeCapable).toBe(true);
+    expect(rightMain.brakeCapable).toBe(true);
+    expect(state.ground.gearStations.every((station) => station.positionBodyM.z > 0)).toBe(true);
+  });
+
+  it('distributes gear normal force across gear stations while on wheels', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.position.alt = KSEA_RUNWAY_ALT_FT;
+    state.config.gearDown = true;
+
+    const contact = applyGroundContact(state, idle, 1 / 60, KSEA_RUNWAY_ALT_FT, { normalForceN: 120_000 });
+
+    expect(contact.gearStations).toHaveLength(3);
+    expect(contact.gearStations.every((station) => station.weightOnWheel)).toBe(true);
+    expect(contact.gearStations.map((station) => station.normalForceN)).toEqual([12_000, 54_000, 54_000]);
+    expect(contact.gearStations.reduce((sum, station) => sum + station.normalForceN, 0)).toBeCloseTo(120_000, 6);
+  });
+
+  it('clears gear station weight and force when airborne', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.position.alt = KSEA_RUNWAY_ALT_FT + 1000;
+
+    const contact = applyGroundContact(state, idle, 1 / 60);
+
+    expect(contact.weightOnWheels).toBe(false);
+    expect(contact.gearStations.every((station) => !station.weightOnWheel)).toBe(true);
+    expect(contact.gearStations.every((station) => station.normalForceN === 0)).toBe(true);
+  });
+
   it('clamps a gear-down aircraft to the KSEA runway instead of letting it sink', () => {
     const state = createInitialState(B737_800_SPEC);
     state.position.alt = KSEA_RUNWAY_ALT_FT - 25;
