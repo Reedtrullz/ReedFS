@@ -59,7 +59,7 @@ The system order is intentional:
 - Derived values: IAS/TAS/GS/Mach/VS/AoA/Beta, recomputed from state and wind.
 - Engine, fuel, electrical, hydraulic, config, and flight phase data.
 
-`B737_800_SPEC` is loaded from the versioned data module `src/sim/data/aircraft/b737-800.v1.ts`; the exported data version pins the mass, geometry, propulsion, inertia, fuel, CG, and baseline performance numbers used by the runtime.
+`B737_800_SPEC` is loaded from the versioned data module `src/sim/data/aircraft/b737-800.v1.ts`; the exported data version pins the mass, geometry, propulsion, inertia, fuel, CG, and baseline performance numbers used by the runtime. `src/sim/data/performance/b737TrimFixtures.ts` and `src/sim/physics/trimSolver.ts` provide the first level-flight pitch-trim fixture and solver guard for future coefficient tuning.
 
 Quaternion is authoritative. `integrate()` updates quaternion from body rates, normalizes it, then mirrors Euler angles from the normalized quaternion.
 
