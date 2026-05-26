@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createInitialState, B737_800_SPEC, createB737GearStations } from '../../types';
 import type { ControlInputs } from '../../types';
-import { applyGroundContact, computeGroundRollForces, KSEA_RUNWAY_ALT_FT } from '../ground';
+import { applyGroundContact, computeGroundRollForces, computeNosewheelSteeringAngleRad, KSEA_RUNWAY_ALT_FT } from '../ground';
 import { bodyToNed } from '../../physics/frames';
 import { eulerToQuat } from '../../physics/quaternion';
 
@@ -155,6 +155,39 @@ describe('applyGroundContact', () => {
     const ned = bodyToNed(state.velocity, state.attitude);
     expect(ned.down).toBeCloseTo(0, 8);
     expect(state.velocity.w).toBeGreaterThan(0);
+  });
+
+  it('maps rudder command to nosewheel steering at taxi speed and fades it out at takeoff speed', () => {
+    expect(computeNosewheelSteeringAngleRad({ ...idle, rudder: 1 }, 5)).toBeGreaterThan(0.6);
+    expect(computeNosewheelSteeringAngleRad({ ...idle, rudder: -1 }, 5)).toBeLessThan(-0.6);
+    expect(computeNosewheelSteeringAngleRad({ ...idle, rudder: 1 }, 80)).toBe(0);
+  });
+
+  it('applies nosewheel steering yaw rate and stores the steering angle on the nose station', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.position.alt = KSEA_RUNWAY_ALT_FT;
+    state.velocity.u = 8;
+    state.config.gearDown = true;
+    const taxiRight: ControlInputs = { ...idle, rudder: 1 };
+
+    const contact = applyGroundContact(state, taxiRight, 1 / 2);
+
+    const nose = contact.gearStations.find((station) => station.id === 'nose');
+    expect(nose?.steeringAngleRad).toBeGreaterThan(0.6);
+    expect(state.angularVel.r).toBeGreaterThan(0);
+    expect(state.angularVel.r).toBeLessThan(0.5);
+  });
+
+  it('damps lateral scrub while taxiing on loaded wheels', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.position.alt = KSEA_RUNWAY_ALT_FT;
+    state.velocity.u = 6;
+    state.velocity.v = 3;
+    state.config.gearDown = true;
+
+    applyGroundContact(state, idle, 1);
+
+    expect(Math.abs(state.velocity.v)).toBeLessThan(3);
   });
 
   it('computes rolling friction and brake force from gear station loads', () => {

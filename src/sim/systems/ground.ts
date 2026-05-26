@@ -14,6 +14,10 @@ const BREAKAWAY_THROTTLE = 0.05;
 const MIN_GROUND_PITCH_RAD = 0;
 const MAX_GROUND_PITCH_RAD = 0.35;
 const MAX_GROUND_ROLL_RAD = 0.2;
+const MAX_NOSEWHEEL_STEERING_RAD = 45 * Math.PI / 180;
+const STEERING_FADE_START_MPS = 30;
+const STEERING_FADE_END_MPS = 70;
+const LATERAL_SCRUB_DAMPING_PER_SECOND = 0.9;
 
 export type GroundContactResult = GroundState;
 
@@ -49,9 +53,10 @@ function setGroundState(
   contact: GroundContactType,
   weightOnWheels: boolean,
   normalForceN: number,
+  gearStationsOverride?: GearStationState[],
 ): GroundState {
   const aglFt = Math.max(0, state.position.alt - groundAltFt);
-  const gearStations = createB737GearStations(
+  const gearStations = gearStationsOverride ?? createB737GearStations(
     contact === 'gear' && weightOnWheels ? normalForceN : 0,
     contact === 'gear' && weightOnWheels,
   );
@@ -95,6 +100,44 @@ export function computeGroundRollForces(
     retardingForceN,
     accelerationMps2: retardingForceN / Math.max(1, state.grossWeight),
   };
+}
+
+export function computeNosewheelSteeringAngleRad(inputs: ControlInputs, forwardSpeedMps: number): number {
+  const speed = Math.abs(forwardSpeedMps);
+  const fade = speed <= STEERING_FADE_START_MPS
+    ? 1
+    : speed >= STEERING_FADE_END_MPS
+      ? 0
+      : (STEERING_FADE_END_MPS - speed) / (STEERING_FADE_END_MPS - STEERING_FADE_START_MPS);
+  return clamp01(Math.abs(inputs.rudder)) * Math.sign(inputs.rudder) * MAX_NOSEWHEEL_STEERING_RAD * fade;
+}
+
+function wheelBaseM(gearStations: GearStationState[]): number {
+  const nose = gearStations.find((station) => station.id === 'nose');
+  const mains = gearStations.filter((station) => station.id === 'leftMain' || station.id === 'rightMain');
+  if (!nose || mains.length === 0) return 18;
+  const mainX = mains.reduce((sum, station) => sum + station.positionBodyM.x, 0) / mains.length;
+  return Math.max(1, nose.positionBodyM.x - mainX);
+}
+
+function applyNosewheelSteering(
+  state: AircraftState,
+  inputs: ControlInputs,
+  dt: number,
+  gearStations: GearStationState[],
+): GearStationState[] {
+  const steeringAngleRad = computeNosewheelSteeringAngleRad(inputs, state.velocity.u);
+  const nextStations = gearStations.map((station) => (
+    station.id === 'nose' ? { ...station, steeringAngleRad } : station
+  ));
+  const speed = state.velocity.u;
+  if (Math.abs(speed) > STOP_EPSILON_MPS && Math.abs(steeringAngleRad) > 1e-6) {
+    state.angularVel.r = (speed / wheelBaseM(nextStations)) * Math.tan(steeringAngleRad);
+  }
+
+  const damping = Math.max(0, 1 - Math.max(0, dt) * LATERAL_SCRUB_DAMPING_PER_SECOND);
+  state.velocity.v *= damping;
+  return nextStations;
 }
 
 function applyLongitudinalGroundDecel(
@@ -168,13 +211,14 @@ export function applyGroundContact(
   }
 
   const gearNormalForceN = options.normalForceN ?? grossWeightForceN(state);
-  const loadedGearStations = createB737GearStations(gearNormalForceN, true);
+  let loadedGearStations = createB737GearStations(gearNormalForceN, true);
   state.position.alt = groundAltFt;
   state.config.gearDown = true;
 
   stabilizeGroundAttitude(state);
+  loadedGearStations = applyNosewheelSteering(state, inputs, dt, loadedGearStations);
   applyLongitudinalGroundDecel(state, inputs, dt, loadedGearStations);
   constrainRunwayNormalVelocity(state);
 
-  return setGroundState(state, groundAltFt, 'gear', true, gearNormalForceN);
+  return setGroundState(state, groundAltFt, 'gear', true, gearNormalForceN, loadedGearStations);
 }
