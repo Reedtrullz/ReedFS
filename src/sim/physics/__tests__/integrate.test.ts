@@ -4,7 +4,9 @@ import { createInitialState, B737_800_SPEC } from '../../types';
 import type { Attitude, ControlInputs } from '../../types';
 import type { WindInfo } from '../../weather';
 import { eulerToQuat } from '../quaternion';
-import { KSEA_RUNWAY_ALT_FT } from '../../systems/ground';
+import { computeDerived } from '../derived';
+import { ktToMs } from '../units';
+import { GROUND_CONTACT_EPSILON_FT, KSEA_RUNWAY_ALT_FT } from '../../systems/ground';
 import { computeHeldKeyInputs } from '../../../input/keyboardControls';
 import { runFixedStepScenario, takeoffRollInputs } from '../../__tests__/scenarioHelpers';
 
@@ -17,6 +19,18 @@ const idle: ControlInputs = {
 function setAttitude(s: ReturnType<typeof createInitialState>, attitude: Attitude): void {
   s.attitude = attitude;
   s.quaternion = eulerToQuat(attitude.phi, attitude.theta, attitude.psi);
+}
+
+function runGearDownRotationAfterTakeoffRoll(): ReturnType<typeof createInitialState> {
+  const state = runFixedStepScenario({ seconds: 35, hz: 120, inputs: takeoffRollInputs() });
+  state.flightPhase = 'TAKEOFF';
+
+  return runFixedStepScenario({
+    state,
+    seconds: 10,
+    hz: 120,
+    inputs: takeoffRollInputs({ elevator: -1, gearLever: 'DOWN' }),
+  });
 }
 
 describe('integrate', () => {
@@ -131,6 +145,77 @@ describe('integrate', () => {
     expect(s.config.gearDown).toBe(true);
   });
 
+  it('does not create large positive vertical speed while weight-on-wheels from pitch alone', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.flightPhase = 'TAKEOFF';
+    state.position.alt = KSEA_RUNWAY_ALT_FT;
+    state.velocity.u = 90;
+    state.velocity.w = 0;
+    state.config.gearDown = true;
+    setAttitude(state, { ...state.attitude, theta: 10 * Math.PI / 180 });
+
+    integrate(state, takeoffRollInputs({ elevator: -1 }), B737_800_SPEC, 1 / 120);
+
+    const derived = computeDerived(state);
+    expect(state.position.alt).toBeLessThanOrEqual(KSEA_RUNWAY_ALT_FT + GROUND_CONTACT_EPSILON_FT);
+    expect(Math.abs(derived.vs)).toBeLessThan(300);
+  });
+
+  it('does not skip runway contact at 60 Hz when pitch projects one-frame altitude above the epsilon', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.flightPhase = 'TAKEOFF';
+    state.position.alt = KSEA_RUNWAY_ALT_FT;
+    state.velocity.u = 90;
+    state.velocity.w = 0;
+    state.config.gearDown = true;
+    setAttitude(state, { ...state.attitude, theta: 10 * Math.PI / 180 });
+
+    integrate(state, takeoffRollInputs({ elevator: -1 }), B737_800_SPEC, 1 / 60);
+
+    const derived = computeDerived(state);
+    expect(state.ground.weightOnWheels).toBe(true);
+    expect(state.position.alt).toBeLessThanOrEqual(KSEA_RUNWAY_ALT_FT + GROUND_CONTACT_EPSILON_FT);
+    expect(Math.abs(derived.vs)).toBeLessThan(300);
+  });
+
+  it('does not clamp vertical speed for an already-airborne aircraft above the runway', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.position.alt = KSEA_RUNWAY_ALT_FT + 1000;
+    state.ground = {
+      ...state.ground,
+      aglFt: 1000,
+      weightOnWheels: false,
+      normalForceN: 0,
+      onRunway: false,
+      contact: 'none',
+    };
+    state.velocity.u = 90;
+    state.velocity.w = 0;
+    state.config.gearDown = false;
+    setAttitude(state, { ...state.attitude, theta: 10 * Math.PI / 180 });
+
+    integrate(state, takeoffRollInputs({ gearLever: 'UP' }), B737_800_SPEC, 1 / 60);
+
+    const derived = computeDerived(state);
+    expect(state.ground.weightOnWheels).toBe(false);
+    expect(derived.vs).toBeGreaterThan(300);
+  });
+
+  it('does not climb like a rocket with gear down and flaps 5 after rotation', () => {
+    const climb = runGearDownRotationAfterTakeoffRoll();
+    const derived = computeDerived(climb);
+
+    expect(derived.vs).toBeLessThan(6000);
+  });
+
+  it('does not report negative AoA while climbing after rotation', () => {
+    const climb = runGearDownRotationAfterTakeoffRoll();
+    const derived = computeDerived(climb);
+
+    expect(derived.vs).toBeGreaterThan(0);
+    expect(derived.aoa).toBeGreaterThan(0);
+  });
+
   it('brake input decelerates the aircraft during ground roll', () => {
     const s = createInitialState(B737_800_SPEC);
     s.position.alt = KSEA_RUNWAY_ALT_FT;
@@ -210,6 +295,23 @@ describe('integrate', () => {
     expect(s.attitude.theta).toBeGreaterThan(0);
   });
 
+  it('does not lift off at 80 kt even with an extreme pitch attitude', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.flightPhase = 'TAKEOFF';
+    s.position.alt = KSEA_RUNWAY_ALT_FT;
+    s.velocity.u = ktToMs(80);
+    s.config.gearDown = true;
+    s.config.flapSetting = 5;
+    setAttitude(s, { ...s.attitude, theta: 15 * Math.PI / 180 });
+
+    for (let i = 0; i < 30; i++) {
+      integrate(s, takeoffRollInputs({ elevator: -1 }), B737_800_SPEC, 1 / 60);
+    }
+
+    expect(s.ground.weightOnWheels).toBe(true);
+    expect(s.position.alt).toBeCloseTo(KSEA_RUNWAY_ALT_FT, 1);
+  });
+
   it('held rotate does not over-rotate into a rocket attitude', () => {
     const s = runFixedStepScenario({ hz: 120, seconds: 30 });
     s.flightPhase = 'TAKEOFF';
@@ -224,6 +326,22 @@ describe('integrate', () => {
 
     expect(s.position.alt).toBeGreaterThan(KSEA_RUNWAY_ALT_FT + 50);
     expect(s.attitude.theta).toBeLessThanOrEqual(16 * Math.PI / 180);
+  });
+
+  it('holding rotate is not snapped to a hidden exact 15 degree attitude', () => {
+    const s = runFixedStepScenario({ hz: 120, seconds: 30 });
+    s.flightPhase = 'TAKEOFF';
+    const keyboardPitchUp: ControlInputs = {
+      ...takeoffRollInputs(),
+      ...computeHeldKeyInputs(new Set(['w'])),
+    };
+
+    for (let i = 0; i < 4 * 120; i++) {
+      integrate(s, keyboardPitchUp, B737_800_SPEC, 1 / 120);
+    }
+
+    const hiddenClampPitch = 15 * Math.PI / 180;
+    expect(Math.abs(s.attitude.theta - hiddenClampPitch)).toBeGreaterThan(0.05 * Math.PI / 180);
   });
 
   it('early climb remains recoverable after releasing rotate and raising gear', () => {

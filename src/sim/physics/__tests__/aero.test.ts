@@ -22,6 +22,7 @@ describe('computeAero', () => {
   it('at cruise, lift ≈ weight', () => {
     const s = createInitialState(B737_800_SPEC);
     s.velocity.u = 128.6; // ~250 kt
+    s.velocity.w = Math.tan(4 * Math.PI / 180) * s.velocity.u; // representative cruise AoA
     s.position.alt = 35000;
     s.engines[0].n1 = 90; s.engines[1].n1 = 90;
     s.engines[0].running = s.engines[1].running = true;

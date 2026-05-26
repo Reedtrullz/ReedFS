@@ -5,60 +5,49 @@ import { updateFuel } from '../systems/fuel';
 import { updateElectrical } from '../systems/electrical';
 import { updateHydraulic } from '../systems/hydraulic';
 import { updateAutopilot } from '../systems/autopilot';
-import { applyGroundContact, KSEA_RUNWAY_ALT_FT } from '../systems/ground';
+import { applyGroundContact, constrainRunwayNormalVelocity, GROUND_CONTACT_EPSILON_FT, KSEA_RUNWAY_ALT_FT } from '../systems/ground';
 import { computeLNAV } from '../systems/navigation';
 import { computeVNAV } from '../systems/vnav';
 import { geodeticToEcef, ecefToGeodetic, ecefToEnu, enuToEcef } from './geodesy';
-import { ftToM, mToFt } from './units';
-import { eulerToQuat, quatDerivative, quatNormalize, quatToEuler } from './quaternion';
+import { ftToM, ktToMs, mToFt } from './units';
+import { quatDerivative, quatNormalize, quatToEuler } from './quaternion';
 import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
 import type { FlightPlan } from '@shared/types/fmc';
 import type { WindInfo } from '../weather';
 
 const G = 9.80665;
 const TAKEOFF_ASSIST_MIN_HEIGHT_FT = 50;
-const EARLY_CLIMB_MIN_PITCH_RAD = 5 * Math.PI / 180;
-const EARLY_CLIMB_MAX_PITCH_RAD = 15 * Math.PI / 180;
-const MANUAL_ELEVATOR_EPSILON = 0.05;
+// Release only when the gear is almost unloaded and the aircraft has both
+// plausible 737 takeoff energy and a positive rotation attitude. This prevents
+// fake liftoff from pitch projection or low-speed over-rotation.
+const LIFTOFF_NORMAL_FORCE_FRACTION = 0.08;
+const MIN_LIFTOFF_SPEED_MPS = ktToMs(125);
+const MIN_LIFTOFF_PITCH_RAD = 3 * Math.PI / 180;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
-function syncPitchToQuaternion(state: AircraftState, theta: number): void {
-  state.attitude.theta = theta;
-  state.quaternion = eulerToQuat(state.attitude.phi, theta, state.attitude.psi);
-}
-
-function applyPlayableTakeoffAssist(state: AircraftState, inputs: ControlInputs): void {
+function applyPlayableTakeoffAssist(state: AircraftState): void {
   const heightAboveRunwayFt = state.position.alt - KSEA_RUNWAY_ALT_FT;
 
   if (state.flightPhase === 'TAKEOFF' && heightAboveRunwayFt >= TAKEOFF_ASSIST_MIN_HEIGHT_FT && !state.config.gearDown) {
     state.flightPhase = 'CLIMB';
   }
+}
 
-  const earlyClimb = state.flightPhase === 'TAKEOFF' || state.flightPhase === 'CLIMB';
-  if (!earlyClimb || heightAboveRunwayFt < 0) {
-    return;
-  }
+function estimateNormalForceN(state: AircraftState, aero: { lift: number; thrust: number; weight: number }): number {
+  const verticalThrustN = aero.thrust * Math.sin(state.attitude.theta);
+  return clamp(aero.weight - aero.lift - verticalThrustN, 0, aero.weight);
+}
 
-  if (state.attitude.theta > EARLY_CLIMB_MAX_PITCH_RAD) {
-    syncPitchToQuaternion(state, EARLY_CLIMB_MAX_PITCH_RAD);
-    state.angularVel.q = Math.min(0, state.angularVel.q);
-    return;
-  }
-
-  if (heightAboveRunwayFt < TAKEOFF_ASSIST_MIN_HEIGHT_FT || Math.abs(inputs.elevator) > MANUAL_ELEVATOR_EPSILON) {
-    return;
-  }
-
-  const theta = clamp(state.attitude.theta, EARLY_CLIMB_MIN_PITCH_RAD, EARLY_CLIMB_MAX_PITCH_RAD);
-  if (theta === state.attitude.theta && Math.abs(state.angularVel.q) < 0.01) {
-    return;
-  }
-
-  syncPitchToQuaternion(state, theta);
-  state.angularVel.q = 0;
+function shouldAllowLiftoff(state: AircraftState, normalForceN: number, weightN: number): boolean {
+  const speedMps = Math.hypot(state.velocity.u, state.velocity.v, state.velocity.w);
+  return (
+    normalForceN <= weightN * LIFTOFF_NORMAL_FORCE_FRACTION &&
+    speedMps >= MIN_LIFTOFF_SPEED_MPS &&
+    state.attitude.theta >= MIN_LIFTOFF_PITCH_RAD
+  );
 }
 
 export function integrate(
@@ -123,6 +112,14 @@ export function integrate(
   state.velocity.v += vdot * dt;
   state.velocity.w += wdot * dt;
 
+  const nearRunwaySurface = state.position.alt <= state.ground.groundAltFt + GROUND_CONTACT_EPSILON_FT;
+  const normalForceN = nearRunwaySurface ? estimateNormalForceN(state, aero) : 0;
+  const allowLiftoff = state.ground.weightOnWheels && nearRunwaySurface && shouldAllowLiftoff(state, normalForceN, aero.weight);
+
+  if (state.ground.weightOnWheels && nearRunwaySurface && !allowLiftoff) {
+    constrainRunwayNormalVelocity(state);
+  }
+
   // ── Position update via ECEF/ENU ──
   // Body→NED rotation for current attitude
   const { phi: ph, theta: th, psi: ps } = state.attitude;
@@ -152,14 +149,14 @@ export function integrate(
   // First playable slice: a flat KSEA runway contact solver. This is intentionally
   // applied after position integration as a post-solve constraint so the existing
   // free-flight equations and sign conventions remain unchanged.
-  const groundContact = applyGroundContact(state, inputs, dt);
+  const groundContact = applyGroundContact(state, inputs, dt, KSEA_RUNWAY_ALT_FT, { allowLiftoff, normalForceN });
 
   // ── Config ──
   state.config.flapSetting = inputs.flapLever;
   state.config.gearDown = groundContact.weightOnWheels ? true : inputs.gearLever === 'DOWN';
   state.config.spoilersDeployed = inputs.spoilers > 0.5;
   state.config.speedBrake = inputs.spoilers;
-  applyPlayableTakeoffAssist(state, inputs);
+  applyPlayableTakeoffAssist(state);
 
   // ── Autopilot (overwrites inputs for next frame) ──
   if (apState && apState.truth.autopilotStatus !== 'OFF') {

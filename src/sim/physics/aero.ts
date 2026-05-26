@@ -8,6 +8,25 @@ import type { WindInfo } from '../weather';
 
 const G = 9.80665;
 const MAX_ELEVATOR_DEFLECTION_RAD = 0.3;
+// Full keyboard/yoke aft input should rotate the aircraft but not keep adding
+// unlimited nose-up moment after the useful takeoff pitch range. This is force
+// shaping, not a hidden attitude clamp: the integrator still evolves q/theta.
+const NOSE_UP_ELEVATOR_FADE_START_RAD = 8 * Math.PI / 180;
+const NOSE_UP_ELEVATOR_FADE_END_RAD = 13 * Math.PI / 180;
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+function effectiveElevatorInput(input: number, pitchRad: number): number {
+  if (input >= 0) return input;
+  const authority = clamp(
+    (NOSE_UP_ELEVATOR_FADE_END_RAD - pitchRad) / (NOSE_UP_ELEVATOR_FADE_END_RAD - NOSE_UP_ELEVATOR_FADE_START_RAD),
+    0,
+    1,
+  );
+  return input * authority;
+}
 
 export interface AeroResult {
   thrust: number; drag: number; dragBodyX: number; lift: number; side: number; weight: number;
@@ -62,7 +81,7 @@ export function computeAero(
 
   // --- Moments ---
   const qHat = state.angularVel.q * c / (2 * Math.max(tasMs, 1));
-  const elevatorDeflectionRad = inputs.elevator * MAX_ELEVATOR_DEFLECTION_RAD;
+  const elevatorDeflectionRad = effectiveElevatorInput(inputs.elevator, state.attitude.theta) * MAX_ELEVATOR_DEFLECTION_RAD;
   const cm = aeroModel.cm0 + aeroModel.cmAlpha * aoa + aeroModel.cmElevator * elevatorDeflectionRad + aeroModel.cmq * qHat - aeroModel.cmFlap * state.config.flapSetting;
   const pitchMoment = q * S * c * cm;
 

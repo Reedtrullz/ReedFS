@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { createInitialState, B737_800_SPEC } from '../../types';
 import type { ControlInputs } from '../../types';
 import { applyGroundContact, KSEA_RUNWAY_ALT_FT } from '../ground';
+import { bodyToNed } from '../../physics/frames';
+import { eulerToQuat } from '../../physics/quaternion';
 
 const idle: ControlInputs = {
   elevator: 0,
@@ -79,6 +81,37 @@ describe('applyGroundContact', () => {
     expect(state.position.alt).toBe(KSEA_RUNWAY_ALT_FT);
   });
 
+  it('classifies gear-up impact using runway-normal sink rate, not body-axis w', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.position.alt = KSEA_RUNWAY_ALT_FT - 1;
+    state.config.gearDown = false;
+    state.attitude.theta = 10 * Math.PI / 180;
+    state.quaternion = eulerToQuat(state.attitude.phi, state.attitude.theta, state.attitude.psi);
+    state.velocity.u = 90;
+    state.velocity.w = Math.tan(state.attitude.theta) * state.velocity.u;
+    const gearUp: ControlInputs = { ...idle, gearLever: 'UP' };
+
+    const contact = applyGroundContact(state, gearUp, 1 / 60);
+
+    expect(bodyToNed(state.velocity, state.attitude).down).toBeCloseTo(0, 8);
+    expect(contact.contact).toBe('belly');
+  });
+
+  it('constrains runway-normal velocity instead of zeroing body vertical speed while pitched up', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.position.alt = KSEA_RUNWAY_ALT_FT;
+    state.velocity.u = 90;
+    state.velocity.w = 0;
+    state.attitude.theta = 10 * Math.PI / 180;
+    state.quaternion = eulerToQuat(state.attitude.phi, state.attitude.theta, state.attitude.psi);
+
+    applyGroundContact(state, idle, 1 / 120);
+
+    const ned = bodyToNed(state.velocity, state.attitude);
+    expect(ned.down).toBeCloseTo(0, 8);
+    expect(state.velocity.w).toBeGreaterThan(0);
+  });
+
   it('applies rolling and brake deceleration on the runway without reversing direction', () => {
     const state = createInitialState(B737_800_SPEC);
     state.position.alt = KSEA_RUNWAY_ALT_FT;
@@ -90,6 +123,27 @@ describe('applyGroundContact', () => {
 
     expect(state.velocity.u).toBeGreaterThanOrEqual(0);
     expect(state.velocity.u).toBeLessThan(20);
+  });
+
+  it('scales tire braking by normal force instead of applying full braking after gear unloads', () => {
+    const unloaded = createInitialState(B737_800_SPEC);
+    unloaded.position.alt = KSEA_RUNWAY_ALT_FT;
+    unloaded.velocity.u = 20;
+    unloaded.config.gearDown = true;
+    const braking: ControlInputs = { ...idle, brake: 1 };
+
+    applyGroundContact(unloaded, braking, 1, KSEA_RUNWAY_ALT_FT, { normalForceN: 0 });
+
+    expect(unloaded.velocity.u).toBeCloseTo(20, 9);
+
+    const loaded = createInitialState(B737_800_SPEC);
+    loaded.position.alt = KSEA_RUNWAY_ALT_FT;
+    loaded.velocity.u = 20;
+    loaded.config.gearDown = true;
+
+    applyGroundContact(loaded, braking, 1);
+
+    expect(loaded.velocity.u).toBeLessThan(unloaded.velocity.u);
   });
 
   it('prevents runaway nose-down attitude while still on runway contact', () => {
