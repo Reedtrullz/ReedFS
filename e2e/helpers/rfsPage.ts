@@ -16,11 +16,14 @@ export async function startRoll(page: Page) {
 }
 
 export async function cycleCameraTo(page: Page, label: 'COCKPIT' | 'TOWER' | 'CHASE') {
-  for (let i = 0; i < 3; i += 1) {
-    const button = page.getByRole('button', { name: new RegExp(`CAM: ${label}`, 'i') });
-    if ((await button.count()) > 0) return;
+  const targetCameraButton = page.getByRole('button', { name: new RegExp(`CAM: ${label}`, 'i') });
+
+  for (let i = 0; i < 4; i += 1) {
+    if ((await targetCameraButton.count()) > 0) return;
     await clickButton(page, /CAM:/i);
   }
+
+  if ((await targetCameraButton.count()) > 0) return;
 
   throw new Error(`Unable to cycle camera to ${label}`);
 }
