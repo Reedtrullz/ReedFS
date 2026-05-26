@@ -372,6 +372,38 @@ describe('integrate', () => {
     expect(s.attitude.theta).toBeGreaterThan(-5 * Math.PI / 180);
   });
 
+  it('transitions to climb on positive rate even if the gear remains down', () => {
+    const s = runFixedStepScenario({ hz: 120, seconds: 30 });
+    s.flightPhase = 'TAKEOFF';
+    const keyboardPitchUp: ControlInputs = {
+      ...takeoffRollInputs(),
+      ...computeHeldKeyInputs(new Set(['w'])),
+      gearLever: 'DOWN',
+    };
+
+    for (let i = 0; i < 8 * 120; i++) {
+      integrate(s, keyboardPitchUp, B737_800_SPEC, 1 / 120);
+    }
+
+    expect(s.position.alt).toBeGreaterThan(KSEA_RUNWAY_ALT_FT + 50);
+    expect(s.config.gearDown).toBe(true);
+    expect(s.flightPhase).toBe('CLIMB');
+  });
+
+  it('does not transition to climb while above the runway but descending', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.flightPhase = 'TAKEOFF';
+    s.position.alt = KSEA_RUNWAY_ALT_FT + 80;
+    s.ground = { ...s.ground, weightOnWheels: false, contact: 'none', onRunway: false, aglFt: 80, normalForceN: 0 };
+    s.config.gearDown = true;
+    s.velocity.u = 80;
+    s.velocity.w = 5;
+
+    integrate(s, takeoffRollInputs({ gearLever: 'DOWN' }), B737_800_SPEC, 1 / 120);
+
+    expect(s.flightPhase).toBe('TAKEOFF');
+  });
+
   it('roll input produces negative roll rate', () => {
     const s = createInitialState(B737_800_SPEC);
     s.position.alt = KSEA_RUNWAY_ALT_FT + 1000;

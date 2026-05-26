@@ -9,6 +9,7 @@ import { applyGroundContact, constrainRunwayNormalVelocity, GROUND_CONTACT_EPSIL
 import { computeLNAV } from '../systems/navigation';
 import { computeVNAV } from '../systems/vnav';
 import { geodeticToEcef, ecefToGeodetic, ecefToEnu, enuToEcef } from './geodesy';
+import { bodyToNed } from './frames';
 import { ftToM, ktToMs, mToFt } from './units';
 import { quatDerivative, quatNormalize, quatToEuler } from './quaternion';
 import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
@@ -28,10 +29,11 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
-function applyPlayableTakeoffAssist(state: AircraftState): void {
+function updateTakeoffPhase(state: AircraftState): void {
   const heightAboveRunwayFt = state.position.alt - KSEA_RUNWAY_ALT_FT;
+  const positiveRate = bodyToNed(state.velocity, state.attitude).down < -0.25;
 
-  if (state.flightPhase === 'TAKEOFF' && heightAboveRunwayFt >= TAKEOFF_ASSIST_MIN_HEIGHT_FT && !state.config.gearDown) {
+  if (state.flightPhase === 'TAKEOFF' && heightAboveRunwayFt >= TAKEOFF_ASSIST_MIN_HEIGHT_FT && !state.ground.weightOnWheels && positiveRate) {
     state.flightPhase = 'CLIMB';
   }
 }
@@ -156,7 +158,7 @@ export function integrate(
   state.config.gearDown = groundContact.weightOnWheels ? true : inputs.gearLever === 'DOWN';
   state.config.spoilersDeployed = inputs.spoilers > 0.5;
   state.config.speedBrake = inputs.spoilers;
-  applyPlayableTakeoffAssist(state);
+  updateTakeoffPhase(state);
 
   // ── Autopilot (overwrites inputs for next frame) ──
   if (apState && apState.truth.autopilotStatus !== 'OFF') {

@@ -34,6 +34,15 @@ describe('takeoffCueText', () => {
     expect(takeoffCueText(state, 155)).toBeNull();
   });
 
+  it('continues showing a gear-up cue in climb if gear remains down', () => {
+    const { state } = stateAtIas(170);
+    state.flightPhase = 'CLIMB';
+    state.position.alt += 300;
+    state.config.gearDown = true;
+
+    expect(takeoffCueText(state, 170)).toBe('GEAR UP');
+  });
+
   it('returns null outside takeoff phase', () => {
     const state = createInitialState(B737_800_SPEC);
     expect(takeoffCueText(state, 0)).toBeNull();

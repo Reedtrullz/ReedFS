@@ -5,6 +5,10 @@ export const ROTATE_SPEED_KT = 140;
 export const POSITIVE_RATE_ALT_FT = 50;
 
 export function takeoffCueText(state: AircraftState, iasKt: number): string | null {
+  if (state.flightPhase === 'CLIMB') {
+    return state.config.gearDown ? 'GEAR UP' : null;
+  }
+
   if (state.flightPhase !== 'TAKEOFF') {
     return null;
   }
