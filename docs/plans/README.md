@@ -9,7 +9,8 @@ Current source-of-truth documents:
 - `../roadmap.md` — prioritized necessary enhancements.
 - `../reviews/2026-05-26-comprehensive-gameplay-review.md` — latest comprehensive gameplay/realism/visual/cockpit audit.
 - `../reviews/templates/playability-dogfood-checklist.md` — browser dogfood checklist/report template for future playable claims.
-- `2026-05-26-rfs-comprehensive-usability-realism-plan.md` — current comprehensive implementation plan/status for usability, realism, aircraft visuals, cockpit, UI, and guidance; phases 0 through 5.5 are complete, Phase 6 remains pending.
+- `2026-05-26-rfs-comprehensive-usability-realism-plan.md` — current comprehensive implementation plan/status for usability, realism, aircraft visuals, cockpit, UI, and guidance; phases 0 through 5.5 are complete.
+- `2026-05-26-rfs-next-phases-release-hardening-and-realism.md` — next-phases execution plan for Phase 6 release hardening, deterministic visual proof, fixed timestep/worker prep, audio, and later gear/guidance/data/product phases.
 - `2026-05-25-rfs-foundation-stabilization.md` — completed stabilization record.
 
 Historical/target plans:
