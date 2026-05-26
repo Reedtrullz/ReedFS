@@ -146,6 +146,54 @@ describe('useSimStore', () => {
     expect(state.guidance.phase).toBe('takeoff-roll');
     expect(state.guidance.coachMessage).toMatch(/centerline|rotate|IAS/i);
   });
+
+  it('abortTakeoff rejects a running takeoff without pausing the braking rollout', () => {
+    useSimStore.getState().startTakeoffRoll();
+    useSimStore.getState().setApState(minimalApState());
+    useSimStore.setState((s) => ({
+      aircraft: {
+        ...s.aircraft,
+        velocity: { ...s.aircraft.velocity, u: 45 },
+      },
+    }));
+
+    useSimStore.getState().abortTakeoff();
+
+    const state = useSimStore.getState();
+    expect(state.status).toBe('running');
+    expect(state.apState).toBeNull();
+    expect(state.apCommands).toEqual({});
+    expect(state.aircraft.flightPhase).toBe('TAKEOFF');
+    expect(state.inputs).toEqual(expect.objectContaining({
+      throttle1: 0,
+      throttle2: 0,
+      brake: 1,
+      spoilers: 1,
+      elevator: 0,
+      gearLever: 'DOWN',
+    }));
+    expect(state.pilotInputs).toEqual(expect.objectContaining({ throttle1: 0, throttle2: 0, brake: 1, spoilers: 1 }));
+    expect(state.guidance.phase).toBe('rejected-takeoff');
+    expect(state.guidance.coachMessage).toMatch(/rejected takeoff|hold brakes|RESET/i);
+  });
+
+  it('keeps rejected-takeoff brakes latched across neutral input-manager frames', () => {
+    useSimStore.getState().startTakeoffRoll();
+    useSimStore.setState((s) => ({
+      aircraft: {
+        ...s.aircraft,
+        velocity: { ...s.aircraft.velocity, u: 45 },
+      },
+    }));
+    useSimStore.getState().abortTakeoff();
+
+    useSimStore.getState().applyInputActions({}, 1 / 60);
+
+    const state = useSimStore.getState();
+    expect(state.inputs).toEqual(expect.objectContaining({ throttle1: 0, throttle2: 0, brake: 1, spoilers: 1 }));
+    expect(state.guidance.phase).toBe('rejected-takeoff');
+    expect(state.guidance.coachMessage).toMatch(/rejected takeoff|hold brakes|RESET/i);
+  });
   it('pause → paused', () => { useSimStore.getState().start(); useSimStore.getState().pause(); expect(useSimStore.getState().status).toBe('paused'); });
   it('setInput partial updates pilot inputs and effective controls when AP is off', () => {
     useSimStore.getState().setInput({ throttle1: 0.8 });

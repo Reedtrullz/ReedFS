@@ -27,6 +27,7 @@ export function ControlsHelp() {
       <div>{labels.throttle} throttle</div>
       <div>{labels.trim} trim · {labels.brake} brake · {labels.flaps} flaps</div>
       <div>{labels.gear} gear after positive rate</div>
+      <div>ABORT button: idle thrust + brakes for rejected takeoff</div>
       <div>{labels.camera} camera modes</div>
       <div>{labels.overlay} overlay modes</div>
     </div>

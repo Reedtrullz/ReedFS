@@ -25,7 +25,7 @@ The completed baseline now includes:
 - Scenario-level takeoff/climb helpers and envelope tests exist.
 - Ground state, runway-normal contact, normal-force liftoff, and flight-phase decoupling are implemented.
 - Input dynamics, pilot/AP/effective-control separation, stabilizer trim, CG pitch moment, and data-backed aero/engine envelope work are implemented.
-- Aircraft visual contract, persistent renderer, visual animation state, Cesium runway layer, cockpit shell, overlay modes, PFD/FMA, cockpit interaction hooks, scenario/tutorial/checklist/coach flow, guidance state, active-leg route status, LNAV feedback, conservative VNAV/SPD/VS behavior, scenario persistence, controls settings, deterministic gusts, versioned B737 data, trim fixtures, and performance-card assertions are implemented.
+- Aircraft visual contract, persistent renderer, visual animation state, Cesium runway layer, cockpit shell, overlay modes, PFD/FMA, cockpit interaction hooks, scenario/tutorial/checklist/coach flow, guidance state, active-leg route status, LNAV feedback, conservative VNAV/SPD/VS behavior, rejected-takeoff abort flow, scenario persistence, controls settings, deterministic gusts, versioned B737 data, trim fixtures, and performance-card assertions are implemented.
 
 Completion records:
 
@@ -40,7 +40,7 @@ Remaining advanced scope:
 
 - Dynamic oleo spring-damper response beyond static station compression.
 - Tire side-load/cornering stiffness, asymmetric braking, anti-skid, and crosswind ground handling.
-- Rejected-takeoff and more detailed rollout/taxi scenarios.
+- More detailed rollout/taxi scenarios.
 - Explicit gear-up belly-contact behavior beyond current guarded/crash contact states.
 
 Suggested implementation files:

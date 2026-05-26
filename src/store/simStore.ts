@@ -70,6 +70,7 @@ export interface SimStore {
   tick: (timestamp: number) => void;
   start: () => void;
   startTakeoffRoll: () => void;
+  abortTakeoff: () => void;
   pause: () => void;
   resume: () => void;
   reset: () => void;
@@ -171,6 +172,16 @@ function controlPatchFromInputManager(
   }
 
   return patch;
+}
+
+function isRejectedTakeoffAbortLatched(status: SimStatus, aircraft: AircraftState, inputs: ControlInputs): boolean {
+  return status === 'running'
+    && aircraft.flightPhase === 'TAKEOFF'
+    && aircraft.ground.weightOnWheels
+    && inputs.throttle1 <= 0.2
+    && inputs.throttle2 <= 0.2
+    && inputs.brake >= 0.8
+    && inputs.spoilers >= 0.95;
 }
 
 const AP_OWNED_INPUT_KEYS = ['elevator', 'aileron', 'throttle1', 'throttle2'] as const;
@@ -354,7 +365,16 @@ export const useSimStore = create<SimStore>((set, get) => ({
     set((s) => {
       const previousInputManager = seedInputManagerFromLiveInputs(s.inputManager, s.pilotInputs, actions);
       const inputManager = updateInputManager(previousInputManager, actions, dt);
-      const inputPatch = controlPatchFromInputManager(previousInputManager, inputManager, actions);
+      let inputPatch = controlPatchFromInputManager(previousInputManager, inputManager, actions);
+      if (isRejectedTakeoffAbortLatched(s.status, s.aircraft, s.pilotInputs)) {
+        inputPatch = {
+          ...inputPatch,
+          throttle1: 0,
+          throttle2: 0,
+          brake: 1,
+          spoilers: 1,
+        };
+      }
       const trimChanged = inputManager.stabilizerTrimUnits !== s.aircraft.config.stabilizerTrimUnits;
       const aircraft = trimChanged ? structuredClone(s.aircraft) : s.aircraft;
       if (trimChanged) {
@@ -504,6 +524,38 @@ export const useSimStore = create<SimStore>((set, get) => ({
       guidance: syncGuidanceState(s.guidance, scenario, 'running', aircraft, controlsSlice.effectiveControls),
     };
   }),
+
+  abortTakeoff: () => set((s) => {
+    const aircraft = structuredClone(s.aircraft);
+    if (aircraft.ground.weightOnWheels) aircraft.flightPhase = 'TAKEOFF';
+    const pilotInputs: ControlInputs = {
+      ...s.pilotInputs,
+      throttle1: 0,
+      throttle2: 0,
+      brake: 1,
+      spoilers: 1,
+      elevator: 0,
+      gearLever: 'DOWN',
+    };
+    resetAutopilotPID();
+    const controlsSlice = composeControlsSlice(pilotInputs);
+    const scenario = scenarioById(s.selectedScenarioId);
+    return {
+      aircraft,
+      ...controlsSlice,
+      inputManager: createInputManagerState({
+        ...pilotInputs,
+        stabilizerTrimUnits: aircraft.config.stabilizerTrimUnits,
+      }),
+      apState: null,
+      apCommands: {},
+      status: 'running',
+      lastFrameTime: 0,
+      fixedStepAccumulatorSeconds: 0,
+      guidance: syncGuidanceState(s.guidance, scenario, 'running', aircraft, controlsSlice.effectiveControls),
+    };
+  }),
+
   pause: () => set((s) => {
     const scenario = scenarioById(s.selectedScenarioId);
     return {

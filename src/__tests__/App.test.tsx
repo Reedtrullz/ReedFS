@@ -31,11 +31,12 @@ class MockOscillatorNode {
 }
 vi.stubGlobal('OscillatorNode', MockOscillatorNode);
 
-const { mockSetInput, mockApplyInputActions, mockStart, mockStartTakeoffRoll, mockPause, mockResume, mockReset, mockSetScenario, mockSetTutorialStep, mockSetFlightPlan, mockSetApState } = vi.hoisted(() => ({
+const { mockSetInput, mockApplyInputActions, mockStart, mockStartTakeoffRoll, mockAbortTakeoff, mockPause, mockResume, mockReset, mockSetScenario, mockSetTutorialStep, mockSetFlightPlan, mockSetApState } = vi.hoisted(() => ({
   mockSetInput: vi.fn(),
   mockApplyInputActions: vi.fn(),
   mockStart: vi.fn(),
   mockStartTakeoffRoll: vi.fn(),
+  mockAbortTakeoff: vi.fn(),
   mockPause: vi.fn(),
   mockResume: vi.fn(),
   mockReset: vi.fn(),
@@ -164,6 +165,7 @@ vi.mock('../store/simStore', () => {
     tick: vi.fn(),
     start: mockStart,
     startTakeoffRoll: mockStartTakeoffRoll,
+    abortTakeoff: mockAbortTakeoff,
     pause: mockPause,
     resume: mockResume,
     reset: mockReset,
@@ -488,6 +490,19 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: 'START ROLL' }));
 
     expect(mockStartTakeoffRoll).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows ABORT during a running rollout and calls abortTakeoff without pausing', () => {
+    const store = useSimStore.getState();
+    store.status = 'running';
+    store.aircraft.flightPhase = 'TAKEOFF';
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'ABORT' }));
+
+    expect(mockAbortTakeoff).toHaveBeenCalledTimes(1);
+    expect(mockPause).not.toHaveBeenCalled();
   });
 
   it('starts audio only from the explicit AUDIO control', async () => {

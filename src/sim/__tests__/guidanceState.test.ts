@@ -84,6 +84,26 @@ describe('guidanceState', () => {
       controls: takeoffControls,
     }).phase).toBe('takeoff-roll');
 
+    const rejectedAircraft = structuredClone(rollingAircraft);
+    rejectedAircraft.velocity.u = 45;
+    const rejected = buildGuidanceState({
+      scenario: KSEA_TUTORIAL_SCENARIO,
+      status: 'running',
+      aircraft: rejectedAircraft,
+      controls: { ...configuredInputs, throttle1: 0, throttle2: 0, brake: 1, spoilers: 1 },
+    });
+    expect(rejected.phase).toBe('rejected-takeoff');
+    expect(rejected.coachMessage).toMatch(/rejected takeoff|hold brakes|RESET/i);
+
+    const rejectedStopped = structuredClone(rejectedAircraft);
+    rejectedStopped.velocity.u = 0;
+    expect(buildGuidanceState({
+      scenario: KSEA_TUTORIAL_SCENARIO,
+      status: 'running',
+      aircraft: rejectedStopped,
+      controls: { ...configuredInputs, throttle1: 0, throttle2: 0, brake: 1, spoilers: 1 },
+    }).phase).toBe('rejected-takeoff');
+
     const rotatingAircraft = structuredClone(rollingAircraft);
     rotatingAircraft.velocity.u = 75;
     expect(buildGuidanceState({

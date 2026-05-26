@@ -131,6 +131,7 @@ Known guidance follow-up:
 
 - `GroundState` carries per-station nose/left-main/right-main gear data: body-axis station position, static load fraction, compression, normal force, brake capability, steerability, and steering angle.
 - `ground.ts` distributes normal force across gear stations, computes rolling friction and brake force from loaded stations, fades nosewheel steering out as speed rises, damps lateral scrub, and records touchdown sink rate.
+- `simStore.abortTakeoff()` gives the player a rejected-takeoff control path: idle both throttles, full brakes/spoilers, AP disconnected, sim kept running for the braking rollout, and guidance moves to `rejected-takeoff`.
 - `applyGroundContact()` remains a post-solve runway constraint: it prevents sink-through, constrains runway-normal velocity, damps first-contact angular rates, applies tire rollout forces, and leaves airborne/free-flight equations untouched.
 - `aero.ts` applies a conservative ground-effect model below one wingspan AGL: modest lift increase plus induced-drag relief, without changing the wind/air-relative velocity contract.
 - `integrate.ts` transitions APPROACH/DESCENT to LANDED on gear touchdown and keeps TAKEOFF->CLIMB gated on positive rate away from the runway.

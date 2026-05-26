@@ -62,6 +62,9 @@ export function coachMessageForState(
     return 'Checklist complete. Press START ROLL when ready.';
   }
 
+  const rejectedTakeoff = aircraft.flightPhase === 'TAKEOFF' && controls.brake >= 0.8 && throttle <= 0.2 && controls.spoilers >= 0.95;
+  if (rejectedTakeoff) return 'Rejected takeoff: hold brakes, keep centerline, and use RESET once stopped.';
+
   if (aircraft.ground.weightOnWheels && scenario) {
     const firstIncomplete = buildTakeoffChecklist(scenario, aircraft, controls).find((item) => !item.complete);
     if (firstIncomplete) return `${firstIncomplete.label}: ${firstIncomplete.detail}.`;

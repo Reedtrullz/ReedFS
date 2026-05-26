@@ -9,7 +9,7 @@ import {
   type TutorialState,
 } from './tutorialState';
 
-export type GuidancePhase = 'preflight' | 'takeoff-roll' | 'rotation' | 'positive-rate' | 'climb';
+export type GuidancePhase = 'preflight' | 'takeoff-roll' | 'rotation' | 'rejected-takeoff' | 'positive-rate' | 'climb';
 
 export interface GuidanceNotice {
   id: string;
@@ -52,6 +52,13 @@ export function deriveGuidancePhase(
   }
 
   const speedKt = Math.max(0, aircraft.velocity.u) * MS_TO_KT;
+  const rejectedTakeoff = status === 'running'
+    && aircraft.flightPhase === 'TAKEOFF'
+    && controls.brake >= 0.8
+    && Math.max(controls.throttle1, controls.throttle2) <= 0.2
+    && controls.spoilers >= 0.95;
+  if (rejectedTakeoff) return 'rejected-takeoff';
+
   if (speedKt >= ROTATION_SPEED_KT || aircraft.attitude.theta >= ROTATION_PITCH_RAD) return 'rotation';
 
   const takeoffThrust = Math.max(controls.throttle1, controls.throttle2) >= 0.9;

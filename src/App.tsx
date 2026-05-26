@@ -72,6 +72,7 @@ export function App() {
   useAudioLoop(audioEnabled);
 
   const startTakeoffRoll = useSimStore((s) => s.startTakeoffRoll);
+  const abortTakeoff = useSimStore((s) => s.abortTakeoff);
   const pause = useSimStore((s) => s.pause);
   const resume = useSimStore((s) => s.resume);
   const reset = useSimStore((s) => s.reset);
@@ -266,7 +267,10 @@ export function App() {
             {status === 'paused' && <button onClick={resume} style={btnStyle}>RESUME</button>}
           </>
         ) : (
-          <button onClick={pause} style={btnStyle}>PAUSE</button>
+          <>
+            <button onClick={abortTakeoff} style={abortBtnStyle}>ABORT</button>
+            <button onClick={pause} style={btnStyle}>PAUSE</button>
+          </>
         )}
         <button onClick={reset} style={btnStyle}>RESET</button>
         <button
@@ -310,4 +314,12 @@ export function App() {
 const btnStyle: React.CSSProperties = {
   background: 'rgba(0,255,0,0.2)', color: '#0f0', border: '1px solid #0f0',
   padding: '8px 16px', fontFamily: 'monospace', cursor: 'pointer', fontSize: 14,
+};
+
+const abortBtnStyle: React.CSSProperties = {
+  ...btnStyle,
+  background: 'rgba(255,80,80,0.24)',
+  color: '#ff7777',
+  border: '1px solid #ff7777',
+  fontWeight: 800,
 };
