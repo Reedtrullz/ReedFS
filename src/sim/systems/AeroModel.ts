@@ -1,18 +1,22 @@
-export interface AeroModel {
-  cl0: number;
+export interface FlapPolar {
+  detent: number;
+  alphaZeroLiftRad: number;
   clAlpha: number;
-  flapClIncrements: number[];
-  flapDetents: number[];
+  clMax: number;
   cd0: number;
-  cdFlap: number;
-  cdGear: number;
-  cdSpeedBrake: number;
-  oswaldEfficiency: number;
+  k: number;
+  deltaCm: number;
+  stallDragRise: number;
+}
+
+export interface AeroModel {
+  flapPolars: FlapPolar[];
+  gearCd: number;
+  speedBrakeCd: number;
   cm0: number;
   cmAlpha: number;
   cmElevator: number;
   cmq: number;
-  cmFlap: number;
   clBeta: number;
   clAileron: number;
   clp: number;
@@ -22,23 +26,23 @@ export interface AeroModel {
 }
 
 export const B737_AERO: AeroModel = {
-  // Tuned for the current playable 737-like envelope: positive cruise AoA,
-  // less self-flying lift at zero AoA, stronger dirty-configuration drag, and
-  // enough neutral pitch trim that releasing rotate does not dump the nose.
-  cl0: 0.35,
-  clAlpha: 5.73,
-  flapClIncrements: [0, 0.4, 0.4, 0.4, 0.7, 0.7, 1.0, 1.3, 1.6],
-  flapDetents: [0, 1, 2, 5, 10, 15, 25, 30, 40],
-  cd0: 0.018,
-  cdFlap: 0.025,
-  cdGear: 0.06,
-  cdSpeedBrake: 0.04,
-  oswaldEfficiency: 0.8,
+  // Flap polars are intentionally broad B737-ish values, not certification data.
+  // They give the physics a finite CLmax, more drag with high-lift devices, and
+  // flap-specific pitch moments so takeoff/climb tuning has real envelopes.
+  flapPolars: [
+    { detent: 0, alphaZeroLiftRad: -0.065, clAlpha: 5.5, clMax: 1.55, cd0: 0.020, k: 0.045, deltaCm: 0.0, stallDragRise: 0.55 },
+    { detent: 1, alphaZeroLiftRad: -0.075, clAlpha: 5.55, clMax: 1.65, cd0: 0.022, k: 0.047, deltaCm: -0.005, stallDragRise: 0.60 },
+    { detent: 5, alphaZeroLiftRad: -0.140, clAlpha: 5.45, clMax: 2.05, cd0: 0.030, k: 0.052, deltaCm: -0.020, stallDragRise: 0.75 },
+    { detent: 15, alphaZeroLiftRad: -0.160, clAlpha: 5.30, clMax: 2.25, cd0: 0.058, k: 0.072, deltaCm: -0.060, stallDragRise: 0.95 },
+    { detent: 30, alphaZeroLiftRad: -0.190, clAlpha: 5.10, clMax: 2.45, cd0: 0.095, k: 0.095, deltaCm: -0.110, stallDragRise: 1.20 },
+    { detent: 40, alphaZeroLiftRad: -0.200, clAlpha: 5.00, clMax: 2.55, cd0: 0.125, k: 0.115, deltaCm: -0.145, stallDragRise: 1.35 },
+  ],
+  gearCd: 0.06,
+  speedBrakeCd: 0.04,
   cm0: 0.08,
   cmAlpha: -1.2,
   cmElevator: -1.2,
   cmq: -36,
-  cmFlap: 0.005,
   clBeta: -0.08,
   clAileron: 0.06,
   clp: -0.4,

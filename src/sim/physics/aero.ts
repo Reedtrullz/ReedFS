@@ -2,7 +2,7 @@ import type { AircraftState, AircraftSpec, ControlInputs } from '../types';
 import { isaAtAltitude } from './atmosphere';
 import { lbfToN } from './units';
 import { computeAirRelativeVelocity } from '../systems/environment';
-import type { AeroModel } from '../systems/AeroModel';
+import type { AeroModel, FlapPolar } from '../systems/AeroModel';
 import { B737_AERO } from '../systems/AeroModel';
 import type { WindInfo } from '../weather';
 
@@ -26,6 +26,42 @@ function effectiveElevatorInput(input: number, pitchRad: number): number {
     1,
   );
   return input * authority;
+}
+
+function flapPolarForSetting(aeroModel: AeroModel, flapSetting: number): FlapPolar {
+  for (let i = aeroModel.flapPolars.length - 1; i >= 0; i -= 1) {
+    if (flapSetting >= aeroModel.flapPolars[i].detent) {
+      return aeroModel.flapPolars[i];
+    }
+  }
+
+  return aeroModel.flapPolars[0];
+}
+
+function liftCoefficientAtAoA(aoa: number, mach: number, polar: FlapPolar): { cl: number; stallFraction: number } {
+  const machFactor = mach > 0.6 ? 1 + 0.3 * (mach - 0.6) : 1;
+  const linearCl = polar.clAlpha * (aoa - polar.alphaZeroLiftRad) * machFactor;
+  const negativeClMax = polar.clMax * 0.75;
+
+  if (linearCl > polar.clMax) {
+    const excess = linearCl - polar.clMax;
+    const stallFraction = clamp(excess / polar.clMax, 0, 2);
+    return {
+      cl: Math.max(polar.clMax * 0.65, polar.clMax - excess * 0.35),
+      stallFraction,
+    };
+  }
+
+  if (linearCl < -negativeClMax) {
+    const excess = Math.abs(linearCl) - negativeClMax;
+    const stallFraction = clamp(excess / negativeClMax, 0, 2);
+    return {
+      cl: Math.min(-negativeClMax * 0.65, -negativeClMax + excess * 0.35),
+      stallFraction,
+    };
+  }
+
+  return { cl: linearCl, stallFraction: 0 };
 }
 
 export interface AeroResult {
@@ -52,15 +88,12 @@ export function computeAero(
   const mach = tasMs / atmo.speedOfSound;
 
   // --- Lift ---
-  const cl0 = aeroModel.cl0, clAlpha = aeroModel.clAlpha;
-  const clFlap = flapClIncrement(aeroModel, state.config.flapSetting);
-  const clMach = mach > 0.6 ? 1 + 0.3 * (mach - 0.6) : 1;
-  const cl = (cl0 + clAlpha * aoa + clFlap) * clMach;
+  const polar = flapPolarForSetting(aeroModel, state.config.flapSetting);
+  const { cl, stallFraction } = liftCoefficientAtAoA(aoa, mach, polar);
 
   // --- Drag ---
-  const cd0 = aeroModel.cd0 + (state.config.flapSetting > 0 ? aeroModel.cdFlap : 0) + (state.config.gearDown ? aeroModel.cdGear : 0) + state.config.speedBrake * aeroModel.cdSpeedBrake;
-  const ar = b * b / S, e = aeroModel.oswaldEfficiency, k = 1 / (Math.PI * ar * e);
-  const cd = cd0 + k * cl * cl;
+  const cd0 = polar.cd0 + (state.config.gearDown ? aeroModel.gearCd : 0) + state.config.speedBrake * aeroModel.speedBrakeCd;
+  const cd = cd0 + polar.k * cl * cl + polar.stallDragRise * stallFraction * stallFraction;
 
   // --- Side force ---
   const cyBeta = -0.9, cyRudder = 0.15;
@@ -82,7 +115,7 @@ export function computeAero(
   // --- Moments ---
   const qHat = state.angularVel.q * c / (2 * Math.max(tasMs, 1));
   const elevatorDeflectionRad = effectiveElevatorInput(inputs.elevator, state.attitude.theta) * MAX_ELEVATOR_DEFLECTION_RAD;
-  const cm = aeroModel.cm0 + aeroModel.cmAlpha * aoa + aeroModel.cmElevator * elevatorDeflectionRad + aeroModel.cmq * qHat - aeroModel.cmFlap * state.config.flapSetting;
+  const cm = aeroModel.cm0 + polar.deltaCm + aeroModel.cmAlpha * aoa + aeroModel.cmElevator * elevatorDeflectionRad + aeroModel.cmq * qHat;
   const pitchMoment = q * S * c * cm;
 
   const pHat = state.angularVel.p * b / (2 * Math.max(tasMs, 1));
@@ -94,13 +127,4 @@ export function computeAero(
   const yawMoment = q * S * b * cn;
 
   return { thrust, drag, dragBodyX, lift, side, weight, rollMoment, pitchMoment, yawMoment };
-}
-
-function flapClIncrement(aeroModel: AeroModel, d: number): number {
-  for (let i = aeroModel.flapDetents.length - 1; i >= 0; i--) {
-    if (d >= aeroModel.flapDetents[i]) {
-      return aeroModel.flapClIncrements[i];
-    }
-  }
-  return 0;
 }

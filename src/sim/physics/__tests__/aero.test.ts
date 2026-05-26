@@ -10,6 +10,14 @@ const cruise: ControlInputs = {
   flapLever: 0, gearLever: 'UP', spoilers: 0, brake: 0,
 };
 
+function stateAtAoA(aoaDeg: number, speedMs = 90) {
+  const s = createInitialState(B737_800_SPEC);
+  const aoaRad = aoaDeg * Math.PI / 180;
+  s.velocity.u = speedMs * Math.cos(aoaRad);
+  s.velocity.w = speedMs * Math.sin(aoaRad);
+  return s;
+}
+
 describe('computeAero', () => {
   it('at rest, thrust and lift near zero', () => {
     const s = createInitialState(B737_800_SPEC);
@@ -42,6 +50,54 @@ describe('computeAero', () => {
     const flap = computeAero(s, { ...cruise, throttle1: 0, throttle2: 0 }, B737_800_SPEC);
     expect(flap.lift).toBeGreaterThan(clean.lift);
     expect(flap.drag).toBeGreaterThan(clean.drag);
+  });
+
+  it('clean lift rises in the linear range but saturates near stall', () => {
+    const low = computeAero(stateAtAoA(2), { ...cruise, throttle1: 0, throttle2: 0 }, B737_800_SPEC);
+    const mid = computeAero(stateAtAoA(8), { ...cruise, throttle1: 0, throttle2: 0 }, B737_800_SPEC);
+    const nearStall = computeAero(stateAtAoA(14), { ...cruise, throttle1: 0, throttle2: 0 }, B737_800_SPEC);
+    const postStall = computeAero(stateAtAoA(24), { ...cruise, throttle1: 0, throttle2: 0 }, B737_800_SPEC);
+
+    expect(mid.lift).toBeGreaterThan(low.lift);
+    expect(nearStall.lift).toBeGreaterThan(mid.lift);
+    expect(postStall.lift).toBeLessThan(nearStall.lift * 1.05);
+    expect(postStall.drag).toBeGreaterThan(nearStall.drag * 1.5);
+  });
+
+  it('drag increases across flap detents and with landing gear', () => {
+    const base = stateAtAoA(5, 75);
+    base.config.gearDown = false;
+    const clean = computeAero(base, { ...cruise, throttle1: 0, throttle2: 0, gearLever: 'UP' }, B737_800_SPEC);
+
+    const flaps5State = stateAtAoA(5, 75);
+    flaps5State.config.flapSetting = 5;
+    flaps5State.config.gearDown = false;
+    const flaps5 = computeAero(flaps5State, { ...cruise, throttle1: 0, throttle2: 0, flapLever: 5, gearLever: 'UP' }, B737_800_SPEC);
+
+    const flaps30State = stateAtAoA(5, 75);
+    flaps30State.config.flapSetting = 30;
+    flaps30State.config.gearDown = false;
+    const flaps30 = computeAero(flaps30State, { ...cruise, throttle1: 0, throttle2: 0, flapLever: 30, gearLever: 'UP' }, B737_800_SPEC);
+
+    flaps30State.config.gearDown = true;
+    const dirtyGear = computeAero(flaps30State, { ...cruise, throttle1: 0, throttle2: 0, flapLever: 30, gearLever: 'DOWN' }, B737_800_SPEC);
+
+    expect(flaps5.drag).toBeGreaterThan(clean.drag);
+    expect(flaps30.drag).toBeGreaterThan(flaps5.drag);
+    expect(dirtyGear.drag).toBeGreaterThan(flaps30.drag * 1.2);
+  });
+
+  it('gear-down flaps-5 climb has materially worse lift-to-drag than clean climb', () => {
+    const cleanState = stateAtAoA(5, 90);
+    cleanState.config.gearDown = false;
+    const clean = computeAero(cleanState, { ...cruise, throttle1: 0, throttle2: 0, gearLever: 'UP' }, B737_800_SPEC);
+
+    const dirtyState = stateAtAoA(5, 90);
+    dirtyState.config.flapSetting = 5;
+    dirtyState.config.gearDown = true;
+    const dirty = computeAero(dirtyState, { ...cruise, throttle1: 0, throttle2: 0, flapLever: 5, gearLever: 'DOWN' }, B737_800_SPEC);
+
+    expect(dirty.lift / dirty.drag).toBeLessThan((clean.lift / clean.drag) * 0.8);
   });
 
   it('orders elevator pitch moments by nose-up command in takeoff configuration', () => {

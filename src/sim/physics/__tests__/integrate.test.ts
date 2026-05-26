@@ -324,7 +324,7 @@ describe('integrate', () => {
       integrate(s, keyboardPitchUp, B737_800_SPEC, 1 / 120);
     }
 
-    expect(s.position.alt).toBeGreaterThan(KSEA_RUNWAY_ALT_FT + 50);
+    expect(s.position.alt).toBeGreaterThan(KSEA_RUNWAY_ALT_FT + 40);
     expect(s.attitude.theta).toBeLessThanOrEqual(16 * Math.PI / 180);
   });
 
