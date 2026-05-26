@@ -2,6 +2,7 @@ import { defineConfig, devices, type PlaywrightTestConfig } from '@playwright/te
 
 export default defineConfig({
   testDir: './e2e',
+  snapshotPathTemplate: '{testDir}/{testFilePath}-snapshots/{arg}{ext}',
   timeout: 30_000,
   expect: {
     timeout: 5_000,

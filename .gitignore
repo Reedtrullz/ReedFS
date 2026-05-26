@@ -4,3 +4,6 @@ dist/
 .env
 *.tsbuildinfo
 *.config.d.ts
+test-results/
+playwright-report/
+blob-report/
