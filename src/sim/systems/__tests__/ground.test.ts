@@ -12,6 +12,8 @@ import {
 } from '../ground';
 import { bodyToNed, nedToBody } from '../../physics/frames';
 import { eulerToQuat } from '../../physics/quaternion';
+import { KSEA_RUNWAY_16L } from '../../../viewport/runwayData';
+import { sampleKseaSurface } from '../../runwaySurface';
 
 const idle: ControlInputs = {
   elevator: 0,
@@ -24,6 +26,20 @@ const idle: ControlInputs = {
   spoilers: 0,
   brake: 0,
 };
+
+function offsetPositionMeters(
+  position: { lat: number; lon: number; altFt?: number; alt?: number },
+  northM: number,
+  eastM: number,
+): { lat: number; lon: number; alt: number } {
+  const metersPerDegreeLat = 111_320;
+  const metersPerDegreeLon = 111_320 * Math.cos(position.lat * Math.PI / 180);
+  return {
+    lat: position.lat + northM / metersPerDegreeLat,
+    lon: position.lon + eastM / metersPerDegreeLon,
+    alt: position.alt ?? position.altFt ?? KSEA_RUNWAY_ALT_FT,
+  };
+}
 
 describe('applyGroundContact', () => {
   it('initial state starts on the runway with explicit gear contact state', () => {
@@ -487,6 +503,47 @@ describe('applyGroundContact', () => {
     expect(Math.abs(sideForces.sideForceN)).toBeLessThanOrEqual(45_000);
     expect(sideForces.frictionLimited).toBe(true);
     expect(sideForces.lateralAccelerationMps2).toBeCloseTo(sideForces.sideForceN / state.grossWeight, 8);
+  });
+
+  it('scales rolling resistance higher on off-runway ground than prepared runway', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.velocity.u = 20;
+    const gearStations = createB737GearStations(100_000, true);
+    const runwaySurface = sampleKseaSurface({
+      lat: KSEA_RUNWAY_16L.start.lat,
+      lon: KSEA_RUNWAY_16L.start.lon,
+      alt: KSEA_RUNWAY_16L.elevationFt,
+    });
+    const offRunwaySurface = sampleKseaSurface(offsetPositionMeters(KSEA_RUNWAY_16L.start, 0, 80));
+
+    const runwayForces = computeGroundRollForces(state, idle, gearStations, runwaySurface);
+    const offRunwayForces = computeGroundRollForces(state, idle, gearStations, offRunwaySurface);
+
+    expect(runwaySurface.kind).toBe('runway');
+    expect(offRunwaySurface.kind).toBe('offRunway');
+    expect(offRunwayForces.rollingFrictionForceN).toBeGreaterThan(runwayForces.rollingFrictionForceN * 2);
+  });
+
+  it('reduces peak brake and side grip on off-runway ground', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.velocity.u = 35;
+    state.velocity.v = 8;
+    const gearStations = createB737GearStations(100_000, true);
+    const runwaySurface = sampleKseaSurface({
+      lat: KSEA_RUNWAY_16L.start.lat,
+      lon: KSEA_RUNWAY_16L.start.lon,
+      alt: KSEA_RUNWAY_16L.elevationFt,
+    });
+    const offRunwaySurface = sampleKseaSurface(offsetPositionMeters(KSEA_RUNWAY_16L.start, 0, 80));
+
+    const runwayBrake = computeWheelBrakeForces(state, { leftBrake: 1, rightBrake: 1 }, gearStations, runwaySurface);
+    const offRunwayBrake = computeWheelBrakeForces(state, { leftBrake: 1, rightBrake: 1 }, gearStations, offRunwaySurface);
+    const runwaySide = computeTireSideForces(state, gearStations, runwaySurface);
+    const offRunwaySide = computeTireSideForces(state, gearStations, offRunwaySurface);
+
+    expect(offRunwayBrake.brakeForceN).toBeLessThan(runwayBrake.brakeForceN);
+    expect(offRunwayBrake.antiSkidLimited).toBe(true);
+    expect(offRunwaySide.peakSideForceN).toBeLessThan(runwaySide.peakSideForceN);
   });
 
   it('does not create tire side force from unloaded gear stations', () => {

@@ -2,6 +2,8 @@ import type { AircraftState, ControlInputs, GearStationState, GroundContactType,
 import { createB737GearStations } from '../types';
 import { bodyToNed, nedToBody } from '../physics/frames';
 import { eulerToQuat } from '../physics/quaternion';
+import type { GroundSurfaceSample } from '../runwaySurface';
+import { RUNWAY_FRICTION_SCALE } from '../runwaySurface';
 
 export const KSEA_RUNWAY_ALT_FT = 432;
 export const GROUND_CONTACT_EPSILON_FT = 0.5;
@@ -135,6 +137,10 @@ function brakeCommandForStation(command: BrakeCommand, station: GearStationState
   return 0;
 }
 
+function frictionScaleForSurface(surface?: GroundSurfaceSample) {
+  return surface?.frictionScale ?? RUNWAY_FRICTION_SCALE;
+}
+
 function grossWeightForceN(state: AircraftState): number {
   return Math.max(0, state.grossWeight) * G;
 }
@@ -226,6 +232,7 @@ export function computeWheelBrakeForces(
   state: AircraftState,
   command: BrakeCommand,
   gearStations: GearStationState[] = state.ground.gearStations,
+  surface?: GroundSurfaceSample,
 ): WheelBrakeForceBreakdown {
   let brakeNormalForceN = 0;
   let requestedBrakeForceN = 0;
@@ -237,13 +244,14 @@ export function computeWheelBrakeForces(
   const useAntiSkid = command.antiSkid !== false;
   const longitudinalForceDirection = brakeDirectionForVelocity(state);
   const rollingForBraking = longitudinalForceDirection !== 0;
+  const frictionScale = frictionScaleForSurface(surface);
   const stationForces: WheelBrakeStationForce[] = [];
 
   for (const station of gearStations) {
     const normalForceN = station.weightOnWheel && station.brakeCapable ? Math.max(0, station.normalForceN) : 0;
     const brakeCommand = brakeCommandForStation(command, station);
     const requestedStationBrakeForceN = brakeCommand * MAX_BRAKE_COEFFICIENT * normalForceN;
-    const availableStationBrakeForceN = MAX_BRAKE_FRICTION_COEFFICIENT * normalForceN;
+    const availableStationBrakeForceN = MAX_BRAKE_FRICTION_COEFFICIENT * frictionScale.brake * normalForceN;
     const stationAntiSkidLimited = rollingForBraking && useAntiSkid && requestedStationBrakeForceN > availableStationBrakeForceN + 1e-9;
     const stationBrakeForceN = rollingForBraking
       ? useAntiSkid
@@ -289,15 +297,18 @@ export function computeGroundRollForces(
   state: AircraftState,
   inputs: ControlInputs,
   gearStations: GearStationState[] = state.ground.gearStations,
+  surface?: GroundSurfaceSample,
 ): GroundRollForceBreakdown {
   const loadedStations = gearStations.filter((station) => station.weightOnWheel);
   const rollingNormalForceN = loadedStations.reduce((sum, station) => sum + Math.max(0, station.normalForceN), 0);
+  const frictionScale = frictionScaleForSurface(surface);
   const brakeForces = computeWheelBrakeForces(
     state,
     { leftBrake: inputs.brake, rightBrake: inputs.brake },
     gearStations,
+    surface,
   );
-  const rollingFrictionForceN = ROLLING_FRICTION_COEFFICIENT * rollingNormalForceN;
+  const rollingFrictionForceN = ROLLING_FRICTION_COEFFICIENT * frictionScale.rolling * rollingNormalForceN;
   const retardingForceN = rollingFrictionForceN + brakeForces.brakeForceN;
   return {
     rollingNormalForceN,
@@ -325,6 +336,7 @@ export function computeNosewheelSteeringAngleRad(inputs: ControlInputs, forwardS
 export function computeTireSideForces(
   state: AircraftState,
   gearStations: GearStationState[] = state.ground.gearStations,
+  surface?: GroundSurfaceSample,
 ): TireSideForceBreakdown {
   let loadedNormalForceN = 0;
   let peakSideForceN = 0;
@@ -333,6 +345,7 @@ export function computeTireSideForces(
   let frictionLimited = false;
   const forwardReferenceMps = Math.max(Math.abs(state.velocity.u), MIN_SLIP_FORWARD_SPEED_MPS);
   const rollingForSteering = isRollingForSteering(state);
+  const frictionScale = frictionScaleForSurface(surface);
 
   for (const station of gearStations) {
     const normalForceN = station.weightOnWheel ? Math.max(0, station.normalForceN) : 0;
@@ -342,7 +355,7 @@ export function computeTireSideForces(
     const lateralVelocityAtStationMps = state.velocity.v + state.angularVel.r * station.positionBodyM.x;
     const steeringAngleRad = station.steerable && rollingForSteering ? station.steeringAngleRad : 0;
     const slipAngleRad = Math.atan2(lateralVelocityAtStationMps, forwardReferenceMps) - steeringAngleRad;
-    const stationPeakSideForceN = MAX_TIRE_SIDE_FRICTION_COEFFICIENT * normalForceN;
+    const stationPeakSideForceN = MAX_TIRE_SIDE_FRICTION_COEFFICIENT * frictionScale.side * normalForceN;
     const desiredSideForceN = -TIRE_CORNERING_STIFFNESS_PER_NORMAL * normalForceN * slipAngleRad;
     const stationSideForceN = clampSymmetric(desiredSideForceN, stationPeakSideForceN);
 
