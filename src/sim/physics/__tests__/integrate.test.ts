@@ -55,9 +55,41 @@ function offsetPositionMeters(
   };
 }
 
+function ksea16LHeadingRad(): number {
+  return KSEA_RUNWAY_16L.headingDeg * Math.PI / 180;
+}
+
 function setRunwayHeading(state: ReturnType<typeof createInitialState>): void {
-  const headingRad = KSEA_RUNWAY_16L.headingDeg * Math.PI / 180;
-  setAttitude(state, { ...state.attitude, psi: headingRad });
+  setAttitude(state, { ...state.attitude, psi: ksea16LHeadingRad() });
+}
+
+function ksea16LHeadingDeltaRad(state: ReturnType<typeof createInitialState>): number {
+  return normalizeAngleRad(state.attitude.psi - ksea16LHeadingRad());
+}
+
+function ksea16LPositionMeters(
+  alongTrackM: number,
+  lateralOffsetM: number,
+  altFt = KSEA_RUNWAY_ALT_FT,
+): { lat: number; lon: number; alt: number } {
+  const headingRad = ksea16LHeadingRad();
+  return offsetPositionMeters(
+    { ...KSEA_RUNWAY_16L.start, alt: altFt },
+    alongTrackM * Math.cos(headingRad) - lateralOffsetM * Math.sin(headingRad),
+    alongTrackM * Math.sin(headingRad) + lateralOffsetM * Math.cos(headingRad),
+  );
+}
+
+function ksea16LRunwayCoordinatesM(state: ReturnType<typeof createInitialState>): { alongTrackM: number; lateralOffsetM: number } {
+  const metersPerDegreeLat = 111_320;
+  const metersPerDegreeLon = 111_320 * Math.cos(KSEA_RUNWAY_16L.start.lat * Math.PI / 180);
+  const northM = (state.position.lat - KSEA_RUNWAY_16L.start.lat) * metersPerDegreeLat;
+  const eastM = (state.position.lon - KSEA_RUNWAY_16L.start.lon) * metersPerDegreeLon;
+  const headingRad = ksea16LHeadingRad();
+  return {
+    alongTrackM: northM * Math.cos(headingRad) + eastM * Math.sin(headingRad),
+    lateralOffsetM: -northM * Math.sin(headingRad) + eastM * Math.cos(headingRad),
+  };
 }
 
 function airborneTakeoffConfigState(trimUnits: number): ReturnType<typeof createInitialState> {
@@ -243,6 +275,123 @@ describe('integrate', () => {
     expect(offRunway.ground.onRunway).toBe(false);
     expect(offRunway.velocity.u).toBeGreaterThanOrEqual(-0.1);
     expect(offRunway.velocity.u).toBeLessThan(runway.velocity.u);
+  });
+
+  it('taxi rudder pedals steer at low speed while remaining on prepared KSEA 16L pavement', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.flightPhase = 'TAXI';
+    state.position = ksea16LPositionMeters(120, 0);
+    setRunwayHeading(state);
+    state.velocity.u = ktToMs(12);
+    state.config.gearDown = true;
+    const taxiTurn: ControlInputs = { ...idle, rudder: 1, gearLever: 'DOWN' };
+
+    for (let i = 0; i < 6 * 120; i += 1) {
+      integrate(state, taxiTurn, B737_800_SPEC, 1 / 120);
+    }
+
+    const runwayCoordinates = ksea16LRunwayCoordinatesM(state);
+    expect(ksea16LHeadingDeltaRad(state)).toBeGreaterThan(degToRad(5));
+    expect(state.ground.contact).toBe('gear');
+    expect(state.ground.weightOnWheels).toBe(true);
+    expect(state.ground.onRunway).toBe(true);
+    expect(Math.abs(runwayCoordinates.lateralOffsetM)).toBeLessThan(KSEA_RUNWAY_16L.widthM / 2);
+    expect(state.position.alt).toBeCloseTo(KSEA_RUNWAY_ALT_FT, 1);
+  });
+
+  it('touches down from a crosswind approach into a damped on-runway KSEA 16L rollout', () => {
+    const state = createInitialState(B737_800_SPEC);
+    const approachPitchRad = 2 * Math.PI / 180;
+    const targetSinkRateMps = 1.5;
+    const crosswind: WindInfo = { dir: (KSEA_RUNWAY_16L.headingDeg + 90) % 360, speed: 8 };
+    setAttitude(state, { phi: 0, theta: approachPitchRad, psi: ksea16LHeadingRad() });
+    state.flightPhase = 'APPROACH';
+    state.position = ksea16LPositionMeters(400, -5, KSEA_RUNWAY_ALT_FT + 1.2);
+    state.ground = {
+      ...state.ground,
+      aglFt: 1.2,
+      weightOnWheels: false,
+      normalForceN: 0,
+      lastTouchdownSinkRateMps: 0,
+      onRunway: false,
+      contact: 'none',
+      gearStations: createB737GearStations(0, false),
+    };
+    state.config.gearDown = true;
+    state.config.flapSetting = 30;
+    state.velocity.u = ktToMs(118);
+    state.velocity.v = ktToMs(5);
+    state.velocity.w = (targetSinkRateMps + Math.sin(approachPitchRad) * state.velocity.u) / Math.cos(approachPitchRad);
+
+    const rollout: ControlInputs = {
+      ...idle,
+      flapLever: 30,
+      gearLever: 'DOWN',
+      spoilers: 1,
+      brake: 0.7,
+    };
+
+    let touchedDown = false;
+    let touchdownOnRunway = false;
+    let touchdownSideVelocityMps = 0;
+    let touchdownSinkRateMps = 0;
+    for (let i = 0; i < 10 * 120; i += 1) {
+      const sideVelocityBeforeStepMps = Math.abs(state.velocity.v);
+      const wasAirborne = !state.ground.weightOnWheels;
+      integrate(state, rollout, B737_800_SPEC, 1 / 120, null, null, crosswind);
+      if (!touchedDown && wasAirborne && state.ground.weightOnWheels) {
+        touchedDown = true;
+        touchdownOnRunway = state.ground.onRunway;
+        touchdownSideVelocityMps = sideVelocityBeforeStepMps;
+        touchdownSinkRateMps = state.ground.lastTouchdownSinkRateMps;
+      }
+    }
+
+    const runwayCoordinates = ksea16LRunwayCoordinatesM(state);
+    expect(touchedDown).toBe(true);
+    expect(touchdownOnRunway).toBe(true);
+    expect(touchdownSinkRateMps).toBeGreaterThan(0.5);
+    expect(touchdownSideVelocityMps).toBeGreaterThan(ktToMs(4));
+    expect(state.flightPhase).toBe('LANDED');
+    expect(state.ground.contact).toBe('gear');
+    expect(state.ground.weightOnWheels).toBe(true);
+    expect(state.ground.onRunway).toBe(true);
+    expect(Math.abs(state.velocity.v)).toBeLessThan(touchdownSideVelocityMps * 0.35);
+    expect(Math.abs(runwayCoordinates.lateralOffsetM)).toBeLessThan(KSEA_RUNWAY_16L.widthM / 2);
+  });
+
+  it('rollout braking substantially reduces KSEA 16L groundspeed without reversing', () => {
+    const createRollingState = () => {
+      const state = createInitialState(B737_800_SPEC);
+      state.flightPhase = 'LANDED';
+      state.position = ksea16LPositionMeters(700, 0);
+      setRunwayHeading(state);
+      state.velocity.u = ktToMs(100);
+      state.config.gearDown = true;
+      return state;
+    };
+    const braked = createRollingState();
+    const coasting = createRollingState();
+    const initialAlongTrackM = ksea16LRunwayCoordinatesM(braked).alongTrackM;
+    const initialGroundspeedKt = computeDerived(braked).gs;
+    const braking: ControlInputs = { ...idle, brake: 1, spoilers: 1, gearLever: 'DOWN' };
+    const noBrakes: ControlInputs = { ...idle, gearLever: 'DOWN' };
+
+    for (let i = 0; i < 10 * 120; i += 1) {
+      integrate(braked, braking, B737_800_SPEC, 1 / 120);
+      integrate(coasting, noBrakes, B737_800_SPEC, 1 / 120);
+    }
+
+    const brakedGroundspeedKt = computeDerived(braked).gs;
+    const coastingGroundspeedKt = computeDerived(coasting).gs;
+    const brakedDistanceM = ksea16LRunwayCoordinatesM(braked).alongTrackM - initialAlongTrackM;
+    const coastingDistanceM = ksea16LRunwayCoordinatesM(coasting).alongTrackM - initialAlongTrackM;
+    expect(braked.ground.onRunway).toBe(true);
+    expect(braked.ground.weightOnWheels).toBe(true);
+    expect(braked.velocity.u).toBeGreaterThanOrEqual(0);
+    expect(brakedGroundspeedKt).toBeLessThan(initialGroundspeedKt * 0.35);
+    expect(coastingGroundspeedKt).toBeGreaterThan(brakedGroundspeedKt + 30);
+    expect(brakedDistanceM).toBeLessThan(coastingDistanceM - 100);
   });
 
   it('keeps full-throttle takeoff roll on the runway before rotation speed', () => {
