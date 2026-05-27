@@ -4,8 +4,12 @@ export interface RunwayGeoPoint {
   altFt: number;
 }
 
+export type SupportedAirport = 'KSEA' | 'KPDX';
+
+const FT_TO_M = 0.3048;
+
 export interface RunwayReference {
-  airport: 'KSEA';
+  airport: SupportedAirport;
   id: string;
   oppositeId: string;
   label: string;
@@ -52,8 +56,48 @@ export const KSEA_RUNWAY_16R: RunwayReference = {
   widthM: 46,
 };
 
+export const KPDX_RUNWAY_10L: RunwayReference = {
+  airport: 'KPDX',
+  id: '10L',
+  oppositeId: '28R',
+  label: '10L/28R',
+  start: { lat: 45.596537, lon: -122.600062, altFt: 29 },
+  headingDeg: 119,
+  elevationFt: 29,
+  lengthM: 9825 * FT_TO_M,
+  widthM: 150 * FT_TO_M,
+};
+
+export const KPDX_RUNWAY_10R: RunwayReference = {
+  airport: 'KPDX',
+  id: '10R',
+  oppositeId: '28L',
+  label: '10R/28L',
+  start: { lat: 45.595155, lon: -122.62151, altFt: 22 },
+  headingDeg: 119,
+  elevationFt: 22,
+  lengthM: 11000 * FT_TO_M,
+  widthM: 150 * FT_TO_M,
+};
+
+export const KPDX_RUNWAY_03: RunwayReference = {
+  airport: 'KPDX',
+  id: '03',
+  oppositeId: '21',
+  label: '03/21',
+  start: { lat: 45.582405, lon: -122.616856, altFt: 22 },
+  headingDeg: 45,
+  elevationFt: 22,
+  lengthM: 6000 * FT_TO_M,
+  widthM: 150 * FT_TO_M,
+};
+
 export const KSEA_RUNWAYS: RunwayReference[] = [KSEA_RUNWAY_16L, KSEA_RUNWAY_16C, KSEA_RUNWAY_16R];
+export const KPDX_RUNWAYS: RunwayReference[] = [KPDX_RUNWAY_10L, KPDX_RUNWAY_10R, KPDX_RUNWAY_03];
+export const SUPPORTED_RUNWAYS: RunwayReference[] = [...KSEA_RUNWAYS, ...KPDX_RUNWAYS];
 
 export function runwayByAirportAndId(airport: string, runwayId: string): RunwayReference | undefined {
-  return KSEA_RUNWAYS.find((runway) => runway.airport === airport && runway.id === runwayId);
+  return SUPPORTED_RUNWAYS.find(
+    (runway) => runway.airport === airport && (runway.id === runwayId || runway.oppositeId === runwayId),
+  );
 }
