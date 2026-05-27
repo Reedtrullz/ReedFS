@@ -8,15 +8,38 @@
 
 **Tech Stack:** TypeScript strict, Vitest, React Testing Library, Zustand store, RFMS shared `ThrustMode` types.
 
+## Status
+
+Completed in the current repository state. This file now serves as the current status record plus the historical implementation plan below.
+
+Implementation commits/messages:
+
+- `docs: add n1 autothrottle plan`
+- `feat: add n1 autothrottle law`
+- `feat: expose n1 thrust mode in mcp`
+- `test: prove n1 autothrottle integration`
+
+Current behavior:
+
+- `autopilot.ts` implements a conservative phase-based N1 target mode: TAKEOFF 92%, CLIMB 88%, CRUISE or altitude above 18,000 ft 72%, DESCENT/APPROACH/LANDED 55%, and otherwise 20%.
+- N1 mode is separate from the SPEED airspeed-hold law; it commands throttle from target N1 versus average current engine N1.
+- N1 mode respects `boeing.autothrottleArm` and emits no throttle commands when A/T is unarmed.
+- N1 throttle commands are symmetric, rate-limited, AP-owned throttle commands.
+- `RfsMCP` exposes clickable SPD and N1 thrust buttons because both command laws now exist, and it keeps Boeing `speedMode` and `n1` flags mutually exclusive.
+- `RfsPFD` displays `N1` from `apState.truth.thrustActive` as honest FMA truth.
+- `advanceSimulationStep()` and store ticks feed N1 commands into `effectiveControls` before engine integration.
+- Manual AP disconnect/override clears stale `boeing.n1` along with `boeing.speedMode`.
+- This slice intentionally did not add VNAV/LVL CHG/FMA lifecycle controls.
+
 ---
 
-## Baseline before this plan
+## Baseline before this plan (historical)
 
 - `ThrustMode` already includes `N1` in RFMS shared types.
 - `RfsPFD` displays `apState.truth.thrustActive`, so it can display `N1` once the truth state uses it.
 - `RfsMCP` has only a clickable `SPD` thrust button; `boeing.n1` is always cleared and there is no N1 button.
 - `computeAutopilotCommands()` only commands throttles for `truth.thrustActive === 'SPEED'`.
-- Roadmap P2 still lists `Autothrottle N1 behavior in addition to SPEED behavior` as remaining.
+- Roadmap P2 still listed N1 thrust mode as remaining before this plan was implemented.
 
 ## Design constraints
 
@@ -486,7 +509,7 @@ git -c commit.gpgsign=false commit -m "test: prove n1 autothrottle integration"
 - `docs/roadmap.md`
   - Add N1 autothrottle to the completed baseline/guidance list.
   - Add this plan to completion records.
-  - Remove `Autothrottle N1 behavior in addition to SPEED behavior.` from P2 remaining scope.
+  - Remove the previous roadmap claim that N1 thrust mode was remaining P2 scope.
   - Keep RFMS route edits/route modification UI and RFMS FMA lifecycle integration as remaining P2 scope.
   - Update P2 rationale to mention SPEED and conservative N1 thrust modes are in place, while full RFMS/FMA lifecycle remains.
 - `docs/architecture.md`
@@ -501,11 +524,7 @@ git -c commit.gpgsign=false commit -m "test: prove n1 autothrottle integration"
 
 **Verification searches:**
 
-```text
-Autothrottle N1 behavior in addition to SPEED behavior
-N1 behavior in addition to SPEED
-clickable VNAV/N1 controls unless their availability and command laws are implemented
-```
+Search current roadmap, architecture, plan index, and this status record for stale wording that still treats N1 thrust mode as pending. Current-state docs must not contradict completed N1 support. Historical plan text may remain only when clearly marked historical.
 
 Current roadmap/architecture/plan index must not contradict N1 support. Historical plan text may remain if clearly historical.
 
