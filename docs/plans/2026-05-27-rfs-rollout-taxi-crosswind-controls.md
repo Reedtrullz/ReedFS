@@ -4,9 +4,11 @@
 
 **Goal:** Finish the next P1 ground-handling slice by adding deterministic rollout/taxi/crosswind landing regressions and player-facing differential brake controls without weakening the existing KSEA runway/off-runway surface contract.
 
-**Architecture:** Keep the existing `brake` input as symmetric braking for backward compatibility, then add optional/explicit left/right brake channels that ground physics converts into per-main-gear brake commands. Keyboard/input layers expose left/right brake as momentary controls; `Space` remains symmetric braking. Scenario tests must set KSEA runway heading and position explicitly so they test landing/rollout behavior rather than accidental off-runway drift.
+**Architecture:** The existing `brake` input remains symmetric braking for backward compatibility, and optional `leftBrake`/`rightBrake` channels now feed per-main-gear brake commands. Keyboard/input layers expose left/right brake as momentary controls; `Space` remains symmetric braking, `Z` is left brake, and `X` is right brake. Scenario tests set KSEA runway heading and position explicitly so they test landing/rollout behavior rather than accidental off-runway drift.
 
 **Tech Stack:** TypeScript strict, Vitest, React, Zustand, RFS 6-DOF physics, KSEA surface sampler, Node 22 via nvm.
+
+**Implementation status (2026-05-27):** Tasks 1-4 are complete. Task 1 landed as `7f74e8c test: expand rollout and crosswind landing regressions`; Task 2 landed as `fdeeeff feat: support differential brake physics`; Task 3 landed as `067d0f6 feat: expose differential brake controls`; Task 4 is this docs/status pass. Current behavior keeps symmetric `brake`/`Space` working, supports optional `leftBrake`/`rightBrake` channels exposed as momentary `Z`/`X` controls, combines per-side brake commands as `max(global brake, side brake)`, clears side brakes on release/blur/visibility/cleanup, and restores missing or stale side-specific brakes as zero. Differential braking is tied to actual rolling direction, cannot yaw a parked aircraft, and reverses yaw sign while rolling backward. Final CI/deploy verification is still governed by the "Final verification before reporting" section and is not marked complete here because this task does not push or wait for GitHub Actions.
 
 ---
 
@@ -42,7 +44,10 @@ source ~/.nvm/nvm.sh && nvm use 22 >/dev/null
 - `GroundState.onRunway` means prepared KSEA runway, not generic ground contact.
 - Off-runway `gear`/`belly`/`crashed` contact remains explicit ground contact.
 - Rudder pedals are not a tiller; do not increase current 7° pedal steering authority.
+- `ControlInputs` supports optional `leftBrake`/`rightBrake` in addition to symmetric `brake`; `brakeCommandFromInputs()` combines each side as `max(global brake, side brake)`.
+- `Space` is symmetric brake, `Z` is left brake, and `X` is right brake. Side brakes are momentary and must clear on release/blur/visibility/cleanup; stored snapshots must restore side-specific brakes as zero.
 - Differential brakes must not yaw a parked aircraft in place. Existing stopped differential brake safeguards in `computeWheelBrakeForces()` must remain true.
+- Reverse rolling must reverse the differential-brake yaw sign through the actual rolling direction.
 - Symmetric `brake` must continue to work and must be equivalent to applying equal left/right brakes.
 
 ## Dependency map
@@ -272,11 +277,7 @@ Run:
 git diff --check
 ```
 
-Use search tools for stale phrases:
-
-- `Player-facing differential brake controls if desired`
-- `differential brake controls if desired`
-- `Remaining advanced scope`
+Use search tools to confirm no matches remain for old pending differential-brake wording or the old P1 advanced-scope heading.
 
 **Step 3: Commit**
 

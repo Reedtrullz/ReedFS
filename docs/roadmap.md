@@ -25,7 +25,7 @@ The completed baseline now includes:
 - Scenario-level takeoff/climb helpers and envelope tests exist.
 - Ground state, KSEA prepared-runway/off-runway surface sampling, runway-normal contact, off-runway friction scaling, normal-force liftoff, and flight-phase decoupling are implemented.
 - Input dynamics, pilot/AP/effective-control separation, stabilizer trim, CG pitch moment, and data-backed aero/engine envelope work are implemented.
-- Aircraft visual contract, persistent renderer, visual animation state, Cesium runway layer, cockpit shell, overlay modes, PFD/FMA, cockpit interaction hooks, scenario/tutorial/checklist/coach flow, guidance state, active-leg route status, LNAV feedback, conservative VNAV/SPD/VS behavior, rejected-takeoff abort flow, scenario persistence, controls settings, deterministic gusts, versioned B737 data, trim fixtures, and performance-card assertions are implemented.
+- Aircraft visual contract, persistent renderer, visual animation state, Cesium runway layer, cockpit shell, overlay modes, PFD/FMA, cockpit interaction hooks, scenario/tutorial/checklist/coach flow, guidance state, active-leg route status, LNAV feedback, conservative VNAV/SPD/VS behavior, rejected-takeoff abort flow, scenario persistence, controls settings, deterministic gusts, rollout/taxi/crosswind landing regressions, player differential brake controls, versioned B737 data, trim fixtures, and performance-card assertions are implemented.
 
 Completion records:
 
@@ -33,16 +33,17 @@ Completion records:
 - `docs/plans/2026-05-26-rfs-comprehensive-usability-realism-plan.md`
 - `docs/plans/2026-05-27-rfs-advanced-gear-tire-ground-handling.md`
 - `docs/plans/2026-05-27-rfs-surface-aware-ground-handling.md`
+- `docs/plans/2026-05-27-rfs-rollout-taxi-crosswind-controls.md`
 
 ## P1 — Finish gear/tire ground model and takeoff/landing realism
 
-Why this remains: the current pass establishes runway-normal contact, prepared-runway/off-runway KSEA surface sampling, off-runway rolling/brake/side friction scaling, normal-force liftoff, phase semantics, normal-force-scaled tire side-load/cornering stiffness, anti-skid brake limiting, asymmetric brake-force helpers, dynamic oleo spring/damper compression loads, rudder-pedal-limited nosewheel steering, first deterministic crosswind/weathercocking takeoff-roll regressions, and gear-up runway-tangent belly/crash slide deceleration/damping. RFS still needs deeper rollout/taxi and landing scenarios before touchdown, rollout, taxi, and crosswind handling can feel fully like an airliner.
+Why this remains: the current pass establishes runway-normal contact, prepared-runway/off-runway KSEA surface sampling, off-runway rolling/brake/side friction scaling, normal-force liftoff, phase semantics, normal-force-scaled tire side-load/cornering stiffness, anti-skid brake limiting, asymmetric brake-force helpers, dynamic oleo spring/damper compression loads, rudder-pedal-limited nosewheel steering, deterministic crosswind/weathercocking takeoff-roll regressions, KSEA 16L low-speed taxi, crosswind approach/touchdown/rollout and rollout-braking regressions, player-facing side-specific differential brake controls, and gear-up runway-tangent belly/crash slide deceleration/damping. RFS still needs deeper ground-handling tuning and broader contact/surface coverage before touchdown, rollout, taxi, and crosswind handling can feel fully like an airliner.
 
-Remaining advanced scope:
+Remaining P1 scope:
 
-- More detailed rollout/taxi and crosswind landing scenarios.
-- Player-facing differential brake controls if desired.
-- Broader terrain mesh collision and non-KSEA airport surface coverage beyond the current KSEA runway/off-runway rectangle model.
+- Deeper rollout, taxi, touchdown, braking, and crosswind tuning beyond the current deterministic guard scenarios.
+- Broader terrain mesh collision.
+- Non-KSEA airport surface coverage beyond the current KSEA runway/off-runway rectangle model.
 
 Suggested implementation files:
 
@@ -57,6 +58,8 @@ Acceptance tests:
 - Parked aircraft rests on gear without sinking or bouncing uncontrollably.
 - Brake input reduces groundspeed on rollout.
 - Nosewheel steering changes heading during taxi at low speed.
+- Symmetric brake remains yaw-neutral; side-specific brakes yaw only while rolling and reverse yaw sign when rolling backward.
+- KSEA 16L taxi, crosswind approach/touchdown/rollout, and rollout-braking sanity scenarios remain deterministic.
 - Rotation produces liftoff only after realistic speed/angle combination.
 - Touchdown compresses gear and damps vertical velocity.
 - Gear-up belly/crash contact remains explicit, damps runway-tangent slide without reversing, and preserves hard `crashed` state across fixed-step updates.
@@ -169,8 +172,8 @@ Acceptance tests:
 
 Scope:
 
-- Deterministic gusts now perturb air-relative velocity without mutating ground velocity, and fixed-step scenario regressions cover direct-crosswind weathercocking takeoff rolls.
-- Remaining: cloud/visibility rendering tied to parsed METAR layers, QNH/temperature effects for pressure/density altitude, and crosswind landing/rollout scenarios.
+- Deterministic gusts now perturb air-relative velocity without mutating ground velocity, and fixed-step scenario regressions cover direct-crosswind weathercocking takeoff rolls plus crosswind approach/touchdown/rollout.
+- Remaining: cloud/visibility rendering tied to parsed METAR layers and QNH/temperature effects for pressure/density altitude. Deeper crosswind landing/rollout feel tuning remains part of P1 ground handling, not missing weather plumbing.
 
 Acceptance tests:
 

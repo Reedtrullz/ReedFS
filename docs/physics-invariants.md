@@ -104,11 +104,16 @@ Current contract:
 - Gear-up angular damping is timestep-scaled retention per second, not a per-tick multiplier.
 - A high runway-normal sink-rate impact that enters `crashed` must remain `crashed` while the gear-up aircraft stays in ground contact.
 - Surface friction scaling must never mutate wind/air-relative velocity; it only changes ground-contact tire/brake/side forces and leaves the ground-relative velocity contract intact.
+- `ControlInputs.brake` remains the symmetric brake channel; optional `leftBrake`/`rightBrake` side channels default to zero for older callers and restored snapshots.
+- `brakeCommandFromInputs()` must combine commands per side as `max(global brake, side brake)`, preserving symmetric braking while allowing player differential braking.
+- Differential-brake force and yaw must be tied to actual rolling direction: side-specific brakes cannot yaw a parked aircraft, and reverse rolling reverses the yaw sign.
+- Momentary player side brakes must clear on release, blur, visibility change, and cleanup so stale side-specific brake values cannot survive into a new control state.
 
 Regression coverage:
 
-- `src/sim/systems/__tests__/ground.test.ts`
-- `src/sim/physics/__tests__/integrate.test.ts`
+- `src/sim/systems/__tests__/ground.test.ts` covers side-specific brake commands, symmetric-brake equivalence, stopped-aircraft guards, and reverse-rolling yaw sign.
+- `src/sim/physics/__tests__/integrate.test.ts` covers KSEA 16L low-speed taxi steering, crosswind approach/touchdown/rollout, and rollout braking sanity.
+- `src/input/__tests__/keyboardControls.test.ts`, `src/input/__tests__/InputManager.test.ts`, `src/input/__tests__/controlBindings.test.ts`, `src/store/__tests__/simStore.test.ts`, `src/components/__tests__/ControlsSettings.test.tsx`, and `src/__tests__/App.test.tsx` cover differential brake input/UI/store behavior and cleanup.
 
 ## Drag polarity
 

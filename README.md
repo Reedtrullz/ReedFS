@@ -11,13 +11,13 @@ The simulator now has a stabilized flight-model foundation plus the first gamepl
 
 - Quaternion attitude is authoritative; Euler attitude is mirrored only for compatibility and display boundaries.
 - Body/NED frame transforms, gravity signs, air-relative wind, signed drag, and physics regressions are covered by tests.
-- Ground contact now has explicit ground state, per-gear station loads, dynamic oleo spring/damper compression, runway-normal constraints, tire braking/rolling friction, anti-skid brake limiting, asymmetric brake-force helpers, normal-force-scaled tire side-loads, rudder-pedal-limited nosewheel steering, crosswind/weathercocking scenario regressions, gear-up runway-tangent belly/crash slide damping, touchdown damping, ground effect, normal-force liftoff gating, and phase handling. It also samples KSEA runway rectangles, distinguishes prepared-runway contact from off-runway ground contact, and treats `GroundState.onRunway` as prepared-runway surface status rather than generic ground contact; off-runway gear/belly/crashed contact stays explicit, with higher rolling resistance and reduced brake/side grip while preserving ground-relative velocity and runway-normal constraints.
-- Pilot inputs, autopilot commands, and effective controls are separated in the store; input dynamics, stabilizer trim, CG pitch moment, and AP-owned axes have regression coverage.
+- Ground contact now has explicit ground state, per-gear station loads, dynamic oleo spring/damper compression, runway-normal constraints, tire braking/rolling friction, anti-skid brake limiting, symmetric and side-specific brake commands for player differential braking, asymmetric brake-force helpers, normal-force-scaled tire side-loads, rudder-pedal-limited nosewheel steering, low-speed taxi, rollout braking, crosswind/weathercocking, and crosswind approach/touchdown/rollout scenario regressions, gear-up runway-tangent belly/crash slide damping, touchdown damping, ground effect, normal-force liftoff gating, and phase handling. It also samples KSEA runway rectangles, distinguishes prepared-runway contact from off-runway ground contact, and treats `GroundState.onRunway` as prepared-runway surface status rather than generic ground contact; off-runway gear/belly/crashed contact stays explicit, with higher rolling resistance and reduced brake/side grip while preserving ground-relative velocity and runway-normal constraints.
+- Pilot inputs, autopilot commands, and effective controls are separated in the store; input dynamics, stabilizer trim, CG pitch moment, and AP-owned axes have regression coverage. `ControlInputs` keeps `brake` as symmetric braking and accepts optional `leftBrake`/`rightBrake` side channels; `Space` applies symmetric brakes, `Z` applies left brake, and `X` applies right brake as momentary controls that clear on key release, blur, visibility change, and cleanup, while old saved snapshots restore side-specific brakes as zero.
 - The aircraft renderer uses a persistent named visual contract with animated control surfaces/gear, Cesium-native runway references, and chase/cockpit camera management.
 - The default player view has scenario/tutorial/checklist/coach flow, readable PFD/FMA, MCP controls, route status, active-leg LNAV feedback, and conservative VNAV/SPD/VS behavior that does not advertise unsupported modes.
 - CI enforces lint, typecheck, tests, and production build before publish/deploy.
 
-The next major enhancements are the prioritized realism/product phases documented in `docs/roadmap.md`, including deeper rollout/taxi/crosswind landing scenarios, guidance fidelity, worker timing, flight-model data quality, and product polish.
+The next major enhancements are the prioritized realism/product phases documented in `docs/roadmap.md`, including deeper ground-handling tuning, broader terrain mesh collision and non-KSEA surface support, guidance fidelity, worker timing, flight-model data quality, and product polish.
 
 ## Stack
 
@@ -163,6 +163,8 @@ Important contracts:
 - Position, ground speed, and vertical speed use ground-relative velocity transformed through NED.
 - `quatDerivative()` uses `dq/dt = 0.5 * q ⊗ ω` for body-axis rates.
 - Longitudinal drag uses signed `dragBodyX`, not always `-drag`.
+- Symmetric `brake` remains supported; optional `leftBrake`/`rightBrake` combine per side as `max(brake, sideBrake)`.
+- Differential braking is tied to actual rolling direction: side brakes cannot yaw a parked aircraft, and reverse rolling reverses the yaw sign.
 
 See `docs/physics-invariants.md` for the regression checklist.
 
@@ -241,5 +243,6 @@ Do not claim a deploy is complete until the GitHub Actions run is completed/succ
 - `docs/reviews/templates/playability-dogfood-checklist.md` — browser dogfood checklist for future playable/deployed claims.
 - `docs/plans/2026-05-26-rfs-comprehensive-usability-realism-plan.md` — current implementation plan/status for gameplay, cockpit, visuals, and guidance work.
 - `docs/plans/2026-05-27-rfs-surface-aware-ground-handling.md` — completed/current status record for KSEA runway/off-runway surface sampling and prepared-runway `onRunway` semantics.
+- `docs/plans/2026-05-27-rfs-rollout-taxi-crosswind-controls.md` — completed/current status record for rollout/taxi/crosswind landing regressions and player differential brake controls.
 - `docs/plans/2026-05-25-rfs-foundation-stabilization.md` — completed stabilization record.
 - `docs/plans/phase-*.md` — historical/future implementation plans; check each file's status note before treating it as current.

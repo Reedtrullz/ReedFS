@@ -62,6 +62,8 @@ The system order is intentional:
 
 `B737_800_SPEC` is loaded from the versioned data module `src/sim/data/aircraft/b737-800.v1.ts`; the exported data version pins the mass, geometry, propulsion, inertia, fuel, CG, and baseline performance numbers used by the runtime. `src/sim/data/performance/b737TrimFixtures.ts` and `src/sim/physics/trimSolver.ts` provide the first level-flight pitch-trim fixture and solver guard for future coefficient tuning. `src/sim/data/performance/b737PerformanceCards.ts` pins scenario-specific V-speeds plus clean-climb and approach envelopes that are asserted against current physics.
 
+`ControlInputs` keeps `brake` as the backward-compatible symmetric brake channel and adds optional `leftBrake`/`rightBrake` side channels. Ground physics treats missing side-specific brake fields as zero, so stored snapshots from older versions restore without stale differential braking.
+
 Quaternion is authoritative. `integrate()` updates quaternion from body rates, normalizes it, then mirrors Euler angles from the normalized quaternion.
 
 ## Coordinate and velocity contracts
@@ -114,7 +116,7 @@ RFS bridges RFMS-compatible avionics state into native physics and player-facing
 - `vnav.ts` reports VNAV availability, unavailable reasons, altitude targets, target vertical speed, speed constraints, and the conservative VNAV_PTH -> ALT* -> ALT_HOLD path lifecycle for actionable altitude constraints.
 - `GuidanceState` combines scenario phase, tutorial, checklist, coach messages, and alerts for the player-facing flow; route status and AP truth remain adjacent store-owned state used by `RouteStatus`, `RfsPFD`, and the servo laws.
 - `scenarioPersistence.ts` saves cloneable scenario snapshots to `localStorage`, and `ScenarioPanel` exposes SAVE/LOAD controls with visible ignored/corrupt-save feedback. Running saves restore as paused so training loops do not surprise-resume.
-- `controlBindings.ts`, `ControlsHelp`, and collapsed-by-default `ControlsSettings` provide a validated, visible keyboard/gamepad binding model for repeated play without covering primary instruments unless expanded.
+- `controlBindings.ts`, `ControlsHelp`, and collapsed-by-default `ControlsSettings` provide a validated, visible keyboard/gamepad binding model for repeated play without covering primary instruments unless expanded; `Space` remains symmetric brakes while `Z`/`X` are momentary left/right brake controls that clear on release, blur, visibility change, and cleanup.
 
 Known guidance follow-up:
 
@@ -127,13 +129,13 @@ Known guidance follow-up:
 - `environment.ts` converts METAR wind to NED then to body axes, and layers deterministic seeded gust perturbations onto air-relative velocity only.
 - `computeAirRelativeVelocity()` subtracts wind/gust from ground-relative body velocity and returns a new object.
 - Wind/gust never mutate `state.velocity`; position, GS, and VS remain ground-relative while TAS/IAS/AoA/beta use the perturbed air-relative vector.
-- Fixed-step scenario tests can inject deterministic wind to assert crosswind takeoff/weathercocking behavior without changing the wind contract.
+- Fixed-step scenario tests can inject deterministic wind to assert crosswind takeoff/weathercocking and crosswind approach/touchdown/rollout behavior without changing the wind contract.
 
 ## Ground model architecture
 
 - `GroundState` carries per-station nose/left-main/right-main gear data: body-axis station position, static load fraction, compression, normal force, brake capability, steerability, and steering angle.
 - `runwaySurface.ts` classifies the current geodetic position against KSEA runway rectangles and returns either prepared `runway` contact data or `offRunway` ground data with rolling/brake/side friction scales.
-- `ground.ts` distributes normal force across gear stations, computes dynamic oleo spring/damper compression loads, rolling friction, anti-skid-limited symmetric/asymmetric brake forces, and normal-force-scaled tire side forces from loaded stations, scales those rolling/brake/side forces by the sampled surface, limits current rudder-pedal nosewheel steering to B737 pedal-scale authority while fading it out as speed rises, prevents stationary steering from creating motion, adds gear-up runway-tangent belly/crash slide deceleration and angular damping, and records touchdown sink rate.
+- `ground.ts` distributes normal force across gear stations, computes dynamic oleo spring/damper compression loads, rolling friction, anti-skid-limited symmetric/asymmetric brake forces, and normal-force-scaled tire side forces from loaded stations, scales those rolling/brake/side forces by the sampled surface, limits current rudder-pedal nosewheel steering to B737 pedal-scale authority while fading it out as speed rises, prevents stationary steering from creating motion, adds gear-up runway-tangent belly/crash slide deceleration and angular damping, and records touchdown sink rate. `brakeCommandFromInputs()` clamps `brake`/`leftBrake`/`rightBrake` and commands each main gear with `max(global brake, side brake)`, so symmetric braking remains yaw-neutral while side-specific brakes can yaw only when the aircraft is actually rolling; stopped side-brake commands produce no active brake force/yaw, and reverse rolling reverses yaw sign through the rolling direction.
 - `simStore.abortTakeoff()` gives the player a rejected-takeoff control path: idle both throttles, full brakes/spoilers, AP disconnected, sim kept running for the braking rollout, and guidance moves to `rejected-takeoff`.
 - `applyGroundContact()` remains a post-solve ground constraint: it prevents sink-through at the sampled KSEA ground elevation, constrains runway-normal velocity, treats `GroundState.onRunway` as prepared-runway surface status rather than generic ground contact, keeps off-runway `gear`, `belly`, or `crashed` contact explicit instead of making the aircraft silently airborne outside a runway rectangle, damps first-contact angular rates, applies tire rollout forces for gear contact, applies runway-tangent belly/crash slide damping for gear-up contact, and leaves airborne/free-flight equations untouched.
 - `aero.ts` applies a conservative ground-effect model below one wingspan AGL: modest lift increase plus induced-drag relief, without changing the wind/air-relative velocity contract.
@@ -180,7 +182,7 @@ push master
 
 These are intentional gaps, not regressions:
 
-1. Advanced gear/tire model details: dynamic oleo spring/damper compression loads, normal-force-scaled tire side-load/cornering stiffness, anti-skid brake limiting, asymmetric brake-force helpers, gear-up runway-tangent belly/crash slide damping, and KSEA prepared-runway/off-runway surface sampling with friction scaling are now in the ground model; remaining gaps include broader crosswind scenario coverage, player-facing differential brake controls if desired, broader terrain mesh collision, and non-KSEA airport surface coverage beyond the current KSEA runway/off-runway rectangle model.
+1. Advanced gear/tire model details: dynamic oleo spring/damper compression loads, normal-force-scaled tire side-load/cornering stiffness, anti-skid brake limiting, asymmetric brake-force helpers, rollout/taxi/crosswind landing regressions, player-facing differential brake controls, gear-up runway-tangent belly/crash slide damping, and KSEA prepared-runway/off-runway surface sampling with friction scaling are now in the ground model; remaining gaps are deeper ground-handling tuning, broader terrain mesh collision, and non-KSEA airport surface coverage beyond the current KSEA runway/off-runway rectangle model.
 2. Worker physics: codec and worker entry scaffolding exist, and `VITE_RFS_WORKER_PHYSICS` is parsed as an experimental/default-off runtime flag for future wiring. The active runtime still uses main-thread physics; no `simStore` tick migration or runtime Worker bridge is enabled yet.
 3. Advanced flight guidance: RFMS route edits and wiring turn-anticipation/VNAV lifecycle metrics into live AP truth/FMA updates beyond the current conservative target laws.
 4. Data-driven flight model: the B737-800 baseline spec is versioned, but validated aircraft coefficient tables and trim/response tests remain future work.
