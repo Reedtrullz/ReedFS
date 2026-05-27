@@ -1,5 +1,5 @@
 import type { GeoPosition } from './types';
-import { KSEA_RUNWAYS, type RunwayReference } from '../viewport/runwayData';
+import { KSEA_RUNWAYS, SUPPORTED_RUNWAYS, type RunwayReference, type SupportedAirport } from '../viewport/runwayData';
 
 export type GroundSurfaceKind = 'runway' | 'offRunway';
 
@@ -14,6 +14,7 @@ export interface GroundSurfaceSample {
   onRunway: boolean;
   groundAltFt: number;
   frictionScale: GroundSurfaceFrictionScale;
+  airport?: SupportedAirport;
   runwayId?: string;
   alongTrackM?: number;
   lateralOffsetM?: number;
@@ -60,8 +61,26 @@ function isWithinRunwayRectangle(runway: RunwayReference, alongTrackM: number, l
   );
 }
 
-export function sampleKseaSurface(position: GeoPosition): GroundSurfaceSample {
-  for (const runway of KSEA_RUNWAYS) {
+function nearestRunwayByFootprintDistance(position: GeoPosition, runways: readonly RunwayReference[]): RunwayReference | undefined {
+  let nearestRunway: RunwayReference | undefined;
+  let nearestDistanceSq = Number.POSITIVE_INFINITY;
+
+  for (const runway of runways) {
+    const { alongTrackM, lateralOffsetM } = runwayCoordinates(position, runway);
+    const clampedAlongTrackM = Math.max(0, Math.min(runway.lengthM, alongTrackM));
+    const alongDistanceM = alongTrackM - clampedAlongTrackM;
+    const distanceSq = alongDistanceM * alongDistanceM + lateralOffsetM * lateralOffsetM;
+    if (distanceSq < nearestDistanceSq) {
+      nearestDistanceSq = distanceSq;
+      nearestRunway = runway;
+    }
+  }
+
+  return nearestRunway;
+}
+
+function sampleRunwaySurface(position: GeoPosition, runways: readonly RunwayReference[]): GroundSurfaceSample {
+  for (const runway of runways) {
     const { alongTrackM, lateralOffsetM } = runwayCoordinates(position, runway);
     if (isWithinRunwayRectangle(runway, alongTrackM, lateralOffsetM)) {
       return {
@@ -69,6 +88,7 @@ export function sampleKseaSurface(position: GeoPosition): GroundSurfaceSample {
         onRunway: true,
         groundAltFt: runway.elevationFt,
         frictionScale: RUNWAY_FRICTION_SCALE,
+        airport: runway.airport,
         runwayId: runway.id,
         alongTrackM,
         lateralOffsetM,
@@ -76,10 +96,21 @@ export function sampleKseaSurface(position: GeoPosition): GroundSurfaceSample {
     }
   }
 
+  const nearestRunway = nearestRunwayByFootprintDistance(position, runways);
+
   return {
     kind: 'offRunway',
     onRunway: false,
-    groundAltFt: KSEA_FALLBACK_ELEVATION_FT,
+    groundAltFt: nearestRunway?.elevationFt ?? KSEA_FALLBACK_ELEVATION_FT,
     frictionScale: OFF_RUNWAY_FRICTION_SCALE,
+    airport: nearestRunway?.airport,
   };
+}
+
+export function sampleSupportedAirportSurface(position: GeoPosition): GroundSurfaceSample {
+  return sampleRunwaySurface(position, SUPPORTED_RUNWAYS);
+}
+
+export function sampleKseaSurface(position: GeoPosition): GroundSurfaceSample {
+  return sampleRunwaySurface(position, KSEA_RUNWAYS);
 }

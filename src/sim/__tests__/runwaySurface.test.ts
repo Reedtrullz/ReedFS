@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { KSEA_RUNWAY_16L } from '../../viewport/runwayData';
+import { KPDX_RUNWAY_10R, KSEA_RUNWAY_16L, type RunwayReference } from '../../viewport/runwayData';
 import { KSEA_TUTORIAL_SCENARIO } from '../scenarios';
-import { createInitialState, B737_800_SPEC } from '../types';
-import { sampleKseaSurface } from '../runwaySurface';
+import { createInitialState, B737_800_SPEC, type GeoPosition } from '../types';
+import { OFF_RUNWAY_FRICTION_SCALE, sampleKseaSurface, sampleSupportedAirportSurface } from '../runwaySurface';
 
 function offsetPositionMeters(
   position: { lat: number; lon: number; altFt?: number; alt?: number },
@@ -18,13 +18,17 @@ function offsetPositionMeters(
   };
 }
 
+function geoPositionForRunwayStart(runway: RunwayReference): GeoPosition {
+  return {
+    lat: runway.start.lat,
+    lon: runway.start.lon,
+    alt: runway.elevationFt,
+  };
+}
+
 describe('sampleKseaSurface', () => {
   it('classifies a runway threshold position as prepared runway', () => {
-    const sample = sampleKseaSurface({
-      lat: KSEA_RUNWAY_16L.start.lat,
-      lon: KSEA_RUNWAY_16L.start.lon,
-      alt: KSEA_RUNWAY_16L.elevationFt,
-    });
+    const sample = sampleKseaSurface(geoPositionForRunwayStart(KSEA_RUNWAY_16L));
 
     expect(sample.kind).toBe('runway');
     expect(sample.onRunway).toBe(true);
@@ -65,6 +69,14 @@ describe('sampleKseaSurface', () => {
     expect(sample.onRunway).toBe(false);
   });
 
+  it('does not classify a KPDX runway threshold as KSEA runway surface', () => {
+    const sample = sampleKseaSurface(geoPositionForRunwayStart(KPDX_RUNWAY_10R));
+
+    expect(sample.kind).toBe('offRunway');
+    expect(sample.onRunway).toBe(false);
+    expect(sample.runwayId).toBeUndefined();
+  });
+
   it('classifies scenario start positions as prepared runway', () => {
     const tutorialSurface = sampleKseaSurface(KSEA_TUTORIAL_SCENARIO.position);
 
@@ -81,5 +93,71 @@ describe('sampleKseaSurface', () => {
     expect(surface.onRunway).toBe(true);
     expect(defaultState.ground.onRunway).toBe(true);
     expect(defaultState.ground.groundAltFt).toBe(surface.groundAltFt);
+  });
+});
+
+describe('sampleSupportedAirportSurface', () => {
+  it('classifies a KPDX runway threshold position as prepared runway', () => {
+    const sample = sampleSupportedAirportSurface(geoPositionForRunwayStart(KPDX_RUNWAY_10R));
+
+    expect(sample.kind).toBe('runway');
+    expect(sample.onRunway).toBe(true);
+    expect(sample.airport).toBe('KPDX');
+    expect(sample.runwayId).toBe('10R');
+    expect(sample.groundAltFt).toBe(KPDX_RUNWAY_10R.elevationFt);
+  });
+
+  it('classifies a KPDX point beyond runway width as off-runway ground', () => {
+    const headingRad = KPDX_RUNWAY_10R.headingDeg * Math.PI / 180;
+    const lateralOffsetM = KPDX_RUNWAY_10R.widthM / 2 + 50;
+    const offRunwayPosition = offsetPositionMeters(
+      geoPositionForRunwayStart(KPDX_RUNWAY_10R),
+      -Math.sin(headingRad) * lateralOffsetM,
+      Math.cos(headingRad) * lateralOffsetM,
+    );
+
+    const sample = sampleSupportedAirportSurface(offRunwayPosition);
+
+    expect(sample.kind).toBe('offRunway');
+    expect(sample.onRunway).toBe(false);
+    expect(sample.runwayId).toBeUndefined();
+    expect(sample.groundAltFt).toBe(KPDX_RUNWAY_10R.elevationFt);
+    expect(sample.frictionScale).toEqual(OFF_RUNWAY_FRICTION_SCALE);
+  });
+
+  it('uses the KPDX 10R fallback elevation near the departure end when laterally off-runway', () => {
+    const headingRad = KPDX_RUNWAY_10R.headingDeg * Math.PI / 180;
+    const alongTrackM = KPDX_RUNWAY_10R.lengthM - 250;
+    const lateralOffsetM = KPDX_RUNWAY_10R.widthM / 2 + 75;
+    const offRunwayPosition = offsetPositionMeters(
+      geoPositionForRunwayStart(KPDX_RUNWAY_10R),
+      Math.cos(headingRad) * alongTrackM - Math.sin(headingRad) * lateralOffsetM,
+      Math.sin(headingRad) * alongTrackM + Math.cos(headingRad) * lateralOffsetM,
+    );
+
+    const sample = sampleSupportedAirportSurface(offRunwayPosition);
+
+    expect(sample.kind).toBe('offRunway');
+    expect(sample.onRunway).toBe(false);
+    expect(sample.runwayId).toBeUndefined();
+    expect(sample.airport).toBe('KPDX');
+    expect(sample.groundAltFt).toBe(KPDX_RUNWAY_10R.elevationFt);
+    expect(sample.frictionScale).toEqual(OFF_RUNWAY_FRICTION_SCALE);
+  });
+
+  it('matches KSEA wrapper classification fields for a KSEA threshold position', () => {
+    const kseaThresholdPosition = geoPositionForRunwayStart(KSEA_RUNWAY_16L);
+
+    const supportedSample = sampleSupportedAirportSurface(kseaThresholdPosition);
+    const kseaSample = sampleKseaSurface(kseaThresholdPosition);
+
+    expect(supportedSample.kind).toBe(kseaSample.kind);
+    expect(supportedSample.onRunway).toBe(kseaSample.onRunway);
+    expect(supportedSample.runwayId).toBe(kseaSample.runwayId);
+    expect(supportedSample.groundAltFt).toBe(kseaSample.groundAltFt);
+    expect(supportedSample.frictionScale).toEqual(kseaSample.frictionScale);
+    expect(supportedSample.alongTrackM).toBeCloseTo(kseaSample.alongTrackM ?? 0, 6);
+    expect(supportedSample.lateralOffsetM).toBeCloseTo(kseaSample.lateralOffsetM ?? 0, 6);
+    expect(supportedSample.airport).toBe('KSEA');
   });
 });
