@@ -94,7 +94,9 @@ Ground contact is a post-solve constraint, not an alternate wind/velocity frame.
 Current contract:
 
 - `state.velocity` remains ground-relative body velocity throughout ground contact.
-- `sampleKseaSurface()` classifies KSEA runway rectangles as prepared runway and off-rectangle KSEA ground as off-runway ground with separate rolling/brake/side friction scales.
+- `sampleSupportedAirportSurface()` classifies supported KSEA/KPDX prepared runway rectangles as prepared runway and off-rectangle supported-airport ground as `offRunway` with separate rolling/brake/side friction scales. Current KPDX coverage is the 10L/28R, 10R/28L, and 03/21 runway rectangles.
+- `sampleKseaSurface()` remains a KSEA-only compatibility wrapper for existing KSEA-specific callers and tests.
+- Off-runway fallback elevation comes from the nearest supported runway footprint/reference; this is not terrain mesh collision, arbitrary airport support, or full non-runway airport surface modeling.
 - `GroundState.onRunway` means prepared runway surface, not merely any ground contact.
 - Off-runway ground contact may still be `contact: 'gear'`, `belly`, or `crashed`; it must not silently become airborne just because it is outside the runway rectangle.
 - Gear-down contact may load nose/left-main/right-main gear stations; gear-up `belly`/`crashed` contact must not set `weightOnWheels` or leave gear station loads active.
@@ -112,7 +114,8 @@ Current contract:
 Regression coverage:
 
 - `src/sim/systems/__tests__/ground.test.ts` covers side-specific brake commands, symmetric-brake equivalence, stopped-aircraft guards, and reverse-rolling yaw sign.
-- `src/sim/physics/__tests__/integrate.test.ts` covers KSEA 16L low-speed taxi steering, crosswind approach/touchdown/rollout, and rollout braking sanity.
+- `src/viewport/__tests__/runwayData.test.ts` and `src/sim/__tests__/runwaySurface.test.ts` cover the KSEA/KPDX runway catalog, generic sampler, KSEA wrapper compatibility, and KPDX off-runway fallback behavior.
+- `src/sim/physics/__tests__/integrate.test.ts` covers KSEA 16L low-speed taxi steering, KPDX prepared-runway and off-runway integration, KPDX takeoff-to-climb elevation handling, crosswind approach/touchdown/rollout, and rollout braking sanity.
 - `src/input/__tests__/keyboardControls.test.ts`, `src/input/__tests__/InputManager.test.ts`, `src/input/__tests__/controlBindings.test.ts`, `src/store/__tests__/simStore.test.ts`, `src/components/__tests__/ControlsSettings.test.tsx`, and `src/__tests__/App.test.tsx` cover differential brake input/UI/store behavior and cleanup.
 
 ## Drag polarity

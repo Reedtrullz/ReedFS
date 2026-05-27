@@ -16,7 +16,7 @@ Relevant files:
 
 - `src/sim/systems/ground.ts` already has station loads, dynamic oleo spring/damper compression, rolling/brake deceleration, nosewheel steering, touchdown damping, gear-up runway-tangent belly/crash slide damping, and runway-normal velocity constraint.
 - `src/sim/systems/__tests__/ground.test.ts` is the primary regression target for ground-system contracts.
-- `docs/roadmap.md` now lists rollout/taxi/crosswind landing regressions and player-facing differential brake controls as completed in the P1 ground-handling sequence; remaining advanced P1 ground/tire gaps are deeper tuning, broader terrain mesh collision, and non-KSEA airport surface coverage beyond the current KSEA runway/off-runway rectangle model.
+- `docs/roadmap.md` now lists rollout/taxi/crosswind landing regressions, player-facing differential brake controls, and supported KSEA/KPDX runway rectangle sampling as completed in the P1 ground-handling sequence; remaining advanced P1 ground/tire gaps are deeper tuning, broader terrain mesh collision, additional airports beyond KSEA/KPDX, and richer airport surface modeling outside prepared runway rectangles.
 
 Required command prefix for all test/build work:
 

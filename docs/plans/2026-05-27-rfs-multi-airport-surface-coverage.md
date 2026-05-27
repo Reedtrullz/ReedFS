@@ -4,9 +4,11 @@
 
 **Goal:** Extend the prepared-runway/off-runway surface model beyond KSEA by adding KPDX runway geometry and a generic supported-airport surface sampler while preserving the existing KSEA wrapper and physics contracts.
 
-**Architecture:** Keep runway geometry as static TypeScript data in `src/viewport/runwayData.ts`, expose a generic supported runway list, and update `src/sim/runwaySurface.ts` so one pure sampler can classify any supported runway. `integrate()` should call the generic sampler, not a KSEA-only helper, while `sampleKseaSurface()` remains as a compatibility wrapper for existing tests/callers.
+**Architecture:** Runway geometry stays as static TypeScript data in `src/viewport/runwayData.ts`, exposed through a generic supported runway list. `src/sim/runwaySurface.ts` uses one pure sampler to classify supported runways; `integrate()` calls the generic sampler, not a KSEA-only helper, while `sampleKseaSurface()` remains as a compatibility wrapper for existing tests/callers.
 
 **Tech Stack:** TypeScript strict, Vitest, RFS 6-DOF ground physics, KSEA/KPDX runway catalog, Node 22 via nvm.
+
+**Implementation status:** Complete through Task 4. Runtime ground contact now samples supported KSEA/KPDX runway rectangles through the generic sampler; remaining P1 surface scope is broader terrain mesh collision, richer airport surfaces outside prepared runway rectangles, and additional airports beyond KSEA/KPDX.
 
 ---
 
@@ -14,11 +16,16 @@
 
 Relevant current state:
 
-- `src/viewport/runwayData.ts` only exports KSEA runway references.
-- `src/sim/runwaySurface.ts` imports `KSEA_RUNWAYS` and exports `sampleKseaSurface()`.
-- `src/sim/physics/integrate.ts` calls `sampleKseaSurface(state.position)` for pre-integration near-ground estimation and post-integration ground contact.
+- `src/viewport/runwayData.ts` exports KSEA and KPDX runway references through `SUPPORTED_RUNWAYS`.
+- KPDX runway coverage is limited to prepared runway rectangles for 10L/28R, 10R/28L, and 03/21.
+- `src/sim/runwaySurface.ts` exports `sampleSupportedAirportSurface(position)` for supported runways and preserves `sampleKseaSurface(position)` as a KSEA-only compatibility wrapper.
+- `GroundSurfaceSample` includes optional `airport` metadata along with prepared-runway `runwayId` when applicable.
+- Off-runway fallback elevation uses the nearest supported runway footprint/reference and remains simplified; it is not terrain mesh collision or full airport surface coverage.
+- `src/sim/physics/integrate.ts` calls `sampleSupportedAirportSurface()` for pre-integration near-ground/liftoff checks and post-integration ground contact.
+- `updateTakeoffPhase()` uses current/sampled `state.ground.groundAltFt` instead of a KSEA-only elevation constant.
 - `GroundState.onRunway` means prepared-runway surface status, not generic ground contact.
 - Existing KSEA behavior, default-state alignment, surface friction scales, and KSEA 16L tests must not regress.
+- Regression coverage now includes runwayData catalog tests, KPDX/generic sampler tests, KPDX runway/off-runway integration tests, and a KPDX takeoff-to-climb elevation test.
 
 Data source for this slice:
 
@@ -52,6 +59,8 @@ source ~/.nvm/nvm.sh && nvm use 22 >/dev/null
 ---
 
 ## Task 1: Expand runway catalog with KPDX references
+
+**Status:** Complete; `src/viewport/runwayData.ts` exports KSEA/KPDX catalogs, `SUPPORTED_RUNWAYS`, and primary/opposite runway lookup for supported airports.
 
 **Objective:** Add KPDX runways to the static runway catalog without changing KSEA behavior.
 
@@ -133,6 +142,8 @@ git commit -m "feat: add kpdx runway references"
 
 ## Task 2: Generalize surface sampler beyond KSEA
 
+**Status:** Complete; `sampleSupportedAirportSurface()` samples `SUPPORTED_RUNWAYS`, `GroundSurfaceSample.airport` identifies KSEA/KPDX samples when known, and `sampleKseaSurface()` remains KSEA-only.
+
 **Objective:** Add a pure generic surface sampler that supports KSEA and KPDX while preserving `sampleKseaSurface()` behavior.
 
 **Files:**
@@ -201,6 +212,8 @@ git commit -m "feat: generalize runway surface sampler"
 
 ## Task 3: Wire generic sampler into integration and scenario validation
 
+**Status:** Complete; `integrate()` uses `sampleSupportedAirportSurface()` for near-ground/liftoff checks and post-integration contact, and takeoff phase height uses current `state.ground.groundAltFt`.
+
 **Objective:** Ensure runtime ground contact uses the generic supported-airport sampler, and scenario initialization can validate non-KSEA runway starts.
 
 **Files:**
@@ -268,6 +281,8 @@ If `src/sim/scenarios.ts` or `src/sim/__tests__/scenarios.test.ts` are unchanged
 ---
 
 ## Task 4: Update docs and roadmap status
+
+**Status:** Complete; current-source docs and roadmap now describe KSEA/KPDX supported-airport runway sampling without claiming terrain mesh collision or arbitrary airport support.
 
 **Objective:** Sync current-state docs after KPDX runway surface coverage is implemented.
 

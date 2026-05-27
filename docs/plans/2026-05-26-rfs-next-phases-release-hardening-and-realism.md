@@ -1508,7 +1508,7 @@ git commit -m "feat: complete rfs release hardening"
 
 # Phase 7: Gear/tire ground model and takeoff/landing realism
 
-Status note: the core Phase 7 ground-model tasks have been superseded/executed through `docs/plans/2026-05-27-rfs-advanced-gear-tire-ground-handling.md` and `docs/plans/2026-05-27-rfs-surface-aware-ground-handling.md`. The current repo has gear station loads, rolling/brake forces, pedal-scale nosewheel steering, dynamic oleo loads, crosswind/weathercocking regressions, gear-up runway-tangent belly/crash slide damping, and KSEA runway/off-runway surface sampling with friction scaling. Use `docs/roadmap.md` for remaining P1 scope: deeper rollout/taxi/crosswind landing scenarios, optional player-facing differential brakes, broader terrain mesh collision, and non-KSEA airport surface coverage.
+Status note: the core Phase 7 ground-model tasks have been superseded/executed through `docs/plans/2026-05-27-rfs-advanced-gear-tire-ground-handling.md`, `docs/plans/2026-05-27-rfs-surface-aware-ground-handling.md`, and `docs/plans/2026-05-27-rfs-multi-airport-surface-coverage.md`. The current repo has gear station loads, rolling/brake forces, pedal-scale nosewheel steering, dynamic oleo loads, crosswind/weathercocking regressions, gear-up runway-tangent belly/crash slide damping, and supported KSEA/KPDX runway rectangle sampling with friction scaling. Use `docs/roadmap.md` for remaining P1 scope: deeper rollout/taxi/crosswind landing scenarios, broader terrain mesh collision, additional airports beyond KSEA/KPDX, and richer airport surface modeling outside prepared runway rectangles.
 
 Use parent-direct execution for tasks touching `types.ts`, `ground.ts`, and `integrate.ts` together.
 
