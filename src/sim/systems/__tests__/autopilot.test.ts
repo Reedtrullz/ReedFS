@@ -101,6 +101,95 @@ describe('computeAutopilotCommands SPEED', () => {
   });
 });
 
+describe('computeAutopilotCommands N1', () => {
+  it('resolves a takeoff N1 target for N1 thrust mode', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.flightPhase = 'TAKEOFF';
+    const ap = makeAp('HDG_SEL', 'ALT_HOLD', 'N1');
+    ap.boeing.autothrottleArm = true;
+
+    const targets = resolveAutopilotTargets(s, ap);
+
+    expect(targets.targetN1Percent).toBeGreaterThan(85);
+    expect(targets.targetN1Percent).toBeLessThanOrEqual(95);
+  });
+
+  it('advances throttle toward target N1 without using SPEED error', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.flightPhase = 'TAKEOFF';
+    s.velocity.u = 220;
+    s.engines[0].n1 = 35;
+    s.engines[1].n1 = 35;
+    const ap = makeAp('HDG_SEL', 'ALT_HOLD', 'N1');
+    ap.boeing.autothrottleArm = true;
+    const targets = resolveAutopilotTargets(s, ap);
+
+    const commands = computeAutopilotCommands(
+      s,
+      ap,
+      targets.targetHeadingRad,
+      targets.targetAltFt,
+      100,
+      1 / 60,
+      targets.targetVerticalSpeedFpm,
+      targets.targetN1Percent,
+    );
+
+    expect(commands.throttle1).toBeGreaterThan(0);
+    expect(commands.throttle1).toBeLessThan(0.15);
+    expect(commands.throttle2).toBe(commands.throttle1);
+  });
+
+  it('reduces throttle below the base cruise N1 throttle when actual N1 is above target', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.flightPhase = 'CRUISE';
+    s.engines[0].n1 = 95;
+    s.engines[1].n1 = 95;
+    const ap = makeAp('HDG_SEL', 'ALT_HOLD', 'N1');
+    ap.boeing.autothrottleArm = true;
+    const targets = resolveAutopilotTargets(s, ap);
+
+    const commands = computeAutopilotCommands(
+      s,
+      ap,
+      targets.targetHeadingRad,
+      targets.targetAltFt,
+      targets.targetSpeedKt,
+      1,
+      targets.targetVerticalSpeedFpm,
+      targets.targetN1Percent,
+    );
+
+    expect(commands.throttle1).toBeLessThan(0.6);
+    expect(commands.throttle2).toBe(commands.throttle1);
+  });
+
+  it('does not command N1 throttles when autothrottle is not armed even with an explicit target', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.flightPhase = 'TAKEOFF';
+    s.engines[0].n1 = 35;
+    s.engines[1].n1 = 35;
+    const ap = makeAp('HDG_SEL', 'ALT_HOLD', 'N1');
+    ap.boeing.autothrottleArm = false;
+
+    const targets = resolveAutopilotTargets(s, ap);
+    const commands = computeAutopilotCommands(
+      s,
+      ap,
+      targets.targetHeadingRad,
+      targets.targetAltFt,
+      targets.targetSpeedKt,
+      1 / 60,
+      targets.targetVerticalSpeedFpm,
+      92,
+    );
+
+    expect(targets.targetN1Percent).toBeUndefined();
+    expect(commands.throttle1).toBeUndefined();
+    expect(commands.throttle2).toBeUndefined();
+  });
+});
+
 describe('computeAutopilotCommands VS', () => {
   it('commands nose-up elevator when selected VS is above current VS', () => {
     const s = createInitialState(B737_800_SPEC);

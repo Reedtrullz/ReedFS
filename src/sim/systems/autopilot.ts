@@ -17,9 +17,15 @@ export interface AutopilotTargets {
   targetAltFt: number;
   targetSpeedKt: number;
   targetVerticalSpeedFpm?: number;
+  targetN1Percent?: number;
 }
 
 const DEFAULT_TARGET_SPEED_KT = 250;
+const N1_TAKEOFF_LIMIT_PERCENT = 92;
+const N1_CLIMB_LIMIT_PERCENT = 88;
+const N1_CRUISE_LIMIT_PERCENT = 72;
+const N1_APPROACH_LIMIT_PERCENT = 55;
+const N1_IDLE_LIMIT_PERCENT = 20;
 const ELEVATOR_RATE_LIMIT_PER_SEC = 1.5;
 const THROTTLE_RATE_LIMIT_PER_SEC = 1.5;
 const MAX_VS_ELEVATOR = 0.35;
@@ -48,6 +54,10 @@ function clampSigned(value: number): number {
 
 function clamp01(value: number): number {
   return clamp(value, 0, 1);
+}
+
+function throttleForTargetN1(targetN1Percent: number): number {
+  return clamp01((targetN1Percent - 20) / 80);
 }
 
 function rateLimit(current: number, target: number, maxDelta: number): number {
@@ -112,6 +122,16 @@ export function isAutopilotEngaged(apState: AutopilotState | null | undefined): 
   return Boolean(apState && apState.truth.autopilotStatus !== 'OFF');
 }
 
+export function computeN1TargetPercent(state: AircraftState): number {
+  if (state.flightPhase === 'TAKEOFF') return N1_TAKEOFF_LIMIT_PERCENT;
+  if (state.flightPhase === 'CLIMB') return N1_CLIMB_LIMIT_PERCENT;
+  if (state.flightPhase === 'CRUISE' || state.position.alt > 18_000) return N1_CRUISE_LIMIT_PERCENT;
+  if (state.flightPhase === 'DESCENT' || state.flightPhase === 'APPROACH' || state.flightPhase === 'LANDED') {
+    return N1_APPROACH_LIMIT_PERCENT;
+  }
+  return N1_IDLE_LIMIT_PERCENT;
+}
+
 export function resolveAutopilotTargets(
   state: AircraftState,
   apState: AutopilotState,
@@ -123,6 +143,7 @@ export function resolveAutopilotTargets(
   const selectedSpeed = finiteOrUndefined(apState.boeing.speed);
   let targetSpeed = selectedSpeed ?? DEFAULT_TARGET_SPEED_KT;
   let targetVerticalSpeed: number | undefined;
+  let targetN1Percent: number | undefined;
   let activeLegNav: NavOutput | null | undefined;
   const validActiveLegIndex = validActiveLegIndexOrNull(activeLegIndex);
 
@@ -188,11 +209,16 @@ export function resolveAutopilotTargets(
     }
   }
 
+  if (apState.truth.thrustActive === 'N1' && apState.boeing.autothrottleArm) {
+    targetN1Percent = computeN1TargetPercent(state);
+  }
+
   return {
     targetHeadingRad: targetHeading,
     targetAltFt: targetAlt,
     targetSpeedKt: targetSpeed,
     targetVerticalSpeedFpm: targetVerticalSpeed,
+    targetN1Percent,
   };
 }
 
@@ -204,6 +230,7 @@ export function computeAutopilotCommands(
   targetSpeedKt: number,
   dt: number,
   targetVerticalSpeedFpm?: number,
+  targetN1Percent?: number,
 ): AutopilotCommands {
   if (!isAutopilotEngaged(apState)) return {};
 
@@ -242,6 +269,15 @@ export function computeAutopilotCommands(
     throttleCommand.value = clamped;
     commands.throttle1 = clamped;
     commands.throttle2 = clamped;
+  } else if (t.thrustActive === 'N1' && apState.boeing.autothrottleArm && targetN1Percent !== undefined) {
+    const avgN1 = (state.engines[0].n1 + state.engines[1].n1) / 2;
+    const baseThrottle = throttleForTargetN1(targetN1Percent);
+    const n1Correction = clamp((targetN1Percent - avgN1) * 0.01, -0.15, 0.15);
+    const desired = clamp01(baseThrottle + n1Correction);
+    const clamped = rateLimit(throttleCommand.value, desired, THROTTLE_RATE_LIMIT_PER_SEC * Math.max(0, dt));
+    throttleCommand.value = clamped;
+    commands.throttle1 = clamped;
+    commands.throttle2 = clamped;
   }
 
   return commands;
@@ -264,6 +300,7 @@ export function computeAutopilotCommandsForState(
     targets.targetSpeedKt,
     dt,
     targets.targetVerticalSpeedFpm,
+    targets.targetN1Percent,
   );
 }
 
