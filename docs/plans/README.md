@@ -16,6 +16,7 @@ Current source-of-truth documents:
 - `2026-05-27-rfs-rollout-taxi-crosswind-controls.md` — completed/current status record for rollout/taxi/crosswind landing regressions, optional side-specific brake channels, and `Space`/`Z`/`X` player brake controls.
 - `2026-05-27-rfs-multi-airport-surface-coverage.md` — completed/current status record for supported KSEA/KPDX prepared-runway rectangles, the generic runtime sampler, KPDX regressions, and KSEA wrapper compatibility.
 - `2026-05-27-rfs-lnav-turn-anticipation.md` — completed/current status record for bounded LNAV turn-anticipation sequencing and AP/route-status integration proof.
+- `2026-05-27-rfs-n1-autothrottle.md` — active implementation plan for conservative Boeing-style N1 autothrottle behavior, MCP/FMA affordance, and simulation/store integration proof.
 - `2026-05-25-rfs-foundation-stabilization.md` — completed stabilization record.
 
 Historical/target plans:
