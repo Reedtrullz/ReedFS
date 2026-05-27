@@ -34,12 +34,12 @@ Completion records:
 
 ## P1 — Finish gear/tire ground model and takeoff/landing realism
 
-Why this remains: the current pass establishes runway-normal contact, normal-force liftoff, and phase semantics, but RFS still needs detailed gear/tire/brake behavior before touchdown, rollout, taxi, and crosswind handling can feel like an airliner.
+Why this remains: the current pass establishes runway-normal contact, normal-force liftoff, phase semantics, and normal-force-scaled tire side-load/cornering stiffness. RFS still needs detailed gear/brake behavior before touchdown, rollout, taxi, and crosswind handling can feel like an airliner.
 
 Remaining advanced scope:
 
 - Dynamic oleo spring-damper response beyond static station compression.
-- Tire side-load/cornering stiffness, asymmetric braking, anti-skid, and crosswind ground handling.
+- Asymmetric braking, anti-skid, and expanded crosswind runway/taxi scenario coverage.
 - More detailed rollout/taxi scenarios.
 - Explicit gear-up belly-contact behavior beyond current guarded/crash contact states.
 

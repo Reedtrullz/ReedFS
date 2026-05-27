@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { createInitialState, B737_800_SPEC, createB737GearStations } from '../../types';
 import type { ControlInputs } from '../../types';
-import { applyGroundContact, computeGroundRollForces, computeNosewheelSteeringAngleRad, KSEA_RUNWAY_ALT_FT } from '../ground';
+import {
+  applyGroundContact,
+  computeGroundRollForces,
+  computeNosewheelSteeringAngleRad,
+  computeTireSideForces,
+  KSEA_RUNWAY_ALT_FT,
+} from '../ground';
 import { bodyToNed } from '../../physics/frames';
 import { eulerToQuat } from '../../physics/quaternion';
 
@@ -215,6 +221,78 @@ describe('applyGroundContact', () => {
     applyGroundContact(state, idle, 1);
 
     expect(Math.abs(state.velocity.v)).toBeLessThan(3);
+  });
+
+  it('computes tire side force that opposes lateral skid and is friction limited', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.velocity.u = 35;
+    state.velocity.v = 8;
+    const gearStations = createB737GearStations(100_000, true);
+
+    const sideForces = computeTireSideForces(state, gearStations);
+
+    expect(sideForces.loadedNormalForceN).toBeCloseTo(100_000, 6);
+    expect(sideForces.sideForceN).toBeLessThan(0);
+    expect(Math.abs(sideForces.sideForceN)).toBeLessThanOrEqual(45_000);
+    expect(sideForces.frictionLimited).toBe(true);
+    expect(sideForces.lateralAccelerationMps2).toBeCloseTo(sideForces.sideForceN / state.grossWeight, 8);
+  });
+
+  it('does not create tire side force from unloaded gear stations', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.velocity.u = 35;
+    state.velocity.v = 8;
+    const unloadedGearStations = createB737GearStations(100_000, false);
+
+    const sideForces = computeTireSideForces(state, unloadedGearStations);
+
+    expect(sideForces.loadedNormalForceN).toBe(0);
+    expect(sideForces.sideForceN).toBe(0);
+    expect(sideForces.yawMomentNm).toBe(0);
+    expect(sideForces.frictionLimited).toBe(false);
+  });
+
+  it('uses tire side force to reduce lateral velocity on loaded wheels without crossing zero', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.position.alt = KSEA_RUNWAY_ALT_FT;
+    state.velocity.u = 25;
+    state.velocity.v = 2;
+    state.config.gearDown = true;
+
+    applyGroundContact(state, idle, 1, KSEA_RUNWAY_ALT_FT, { normalForceN: state.grossWeight * 9.80665 });
+
+    expect(state.velocity.v).toBeGreaterThanOrEqual(0);
+    expect(state.velocity.v).toBeLessThan(2);
+  });
+
+  it('does not generate side motion from steering input while stopped', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.position.alt = KSEA_RUNWAY_ALT_FT;
+    state.velocity.u = 0;
+    state.velocity.v = 0;
+    state.angularVel.r = 0;
+    state.config.gearDown = true;
+    const steeringWhileStopped: ControlInputs = { ...idle, rudder: 1 };
+
+    applyGroundContact(state, steeringWhileStopped, 1, KSEA_RUNWAY_ALT_FT, { normalForceN: state.grossWeight * 9.80665 });
+
+    expect(state.velocity.v).toBe(0);
+    expect(state.angularVel.r).toBe(0);
+  });
+
+  it('treats held steering as neutral for stopped lateral-scrub zero crossing', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.position.alt = KSEA_RUNWAY_ALT_FT;
+    state.velocity.u = 0;
+    state.velocity.v = 2;
+    state.angularVel.r = 0;
+    state.config.gearDown = true;
+    const steeringWhileStopped: ControlInputs = { ...idle, rudder: 1 };
+
+    applyGroundContact(state, steeringWhileStopped, 1, KSEA_RUNWAY_ALT_FT, { normalForceN: state.grossWeight * 9.80665 });
+
+    expect(state.velocity.v).toBeGreaterThanOrEqual(0);
+    expect(state.velocity.v).toBeLessThan(2);
   });
 
   it('computes rolling friction and brake force from gear station loads', () => {

@@ -17,9 +17,13 @@ const MAX_GROUND_ROLL_RAD = 0.2;
 const MAX_NOSEWHEEL_STEERING_RAD = 45 * Math.PI / 180;
 const STEERING_FADE_START_MPS = 30;
 const STEERING_FADE_END_MPS = 70;
-const LATERAL_SCRUB_DAMPING_PER_SECOND = 0.9;
 const TOUCHDOWN_MIN_SINK_RATE_MPS = 0.25;
 const TOUCHDOWN_ANGULAR_DAMPING = 0.35;
+const TIRE_CORNERING_STIFFNESS_PER_NORMAL = 3.2;
+const MAX_TIRE_SIDE_FRICTION_COEFFICIENT = 0.45;
+const MIN_SLIP_FORWARD_SPEED_MPS = 2;
+// Mirrors the current B737-800 yaw inertia so ground.ts can stay spec-agnostic for this pure tire helper.
+const APPROX_B737_YAW_INERTIA_KGM2 = 4_610_000;
 
 export type GroundContactResult = GroundState;
 
@@ -37,12 +41,34 @@ export interface GroundRollForceBreakdown {
   accelerationMps2: number;
 }
 
+export interface TireSideForceBreakdown {
+  loadedNormalForceN: number;
+  peakSideForceN: number;
+  sideForceN: number;
+  yawMomentNm: number;
+  lateralAccelerationMps2: number;
+  yawAccelerationRadps2: number;
+  frictionLimited: boolean;
+}
+
 function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value));
 }
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+function clampSymmetric(value: number, limit: number): number {
+  return clamp(value, -limit, limit);
+}
+
 function hasBreakawayThrustCommand(inputs: ControlInputs): boolean {
   return Math.max(inputs.throttle1, inputs.throttle2) > BREAKAWAY_THROTTLE;
+}
+
+function isRollingForSteering(state: AircraftState): boolean {
+  return Math.abs(state.velocity.u) > STOP_EPSILON_MPS;
 }
 
 function grossWeightForceN(state: AircraftState): number {
@@ -121,6 +147,50 @@ export function computeNosewheelSteeringAngleRad(inputs: ControlInputs, forwardS
   return clamp01(Math.abs(inputs.rudder)) * Math.sign(inputs.rudder) * MAX_NOSEWHEEL_STEERING_RAD * fade;
 }
 
+export function computeTireSideForces(
+  state: AircraftState,
+  gearStations: GearStationState[] = state.ground.gearStations,
+): TireSideForceBreakdown {
+  let loadedNormalForceN = 0;
+  let peakSideForceN = 0;
+  let sideForceN = 0;
+  let yawMomentNm = 0;
+  let frictionLimited = false;
+  const forwardReferenceMps = Math.max(Math.abs(state.velocity.u), MIN_SLIP_FORWARD_SPEED_MPS);
+  const rollingForSteering = isRollingForSteering(state);
+
+  for (const station of gearStations) {
+    const normalForceN = station.weightOnWheel ? Math.max(0, station.normalForceN) : 0;
+    if (normalForceN <= 0) continue;
+
+    loadedNormalForceN += normalForceN;
+    const lateralVelocityAtStationMps = state.velocity.v + state.angularVel.r * station.positionBodyM.x;
+    const steeringAngleRad = station.steerable && rollingForSteering ? station.steeringAngleRad : 0;
+    const slipAngleRad = Math.atan2(lateralVelocityAtStationMps, forwardReferenceMps) - steeringAngleRad;
+    const stationPeakSideForceN = MAX_TIRE_SIDE_FRICTION_COEFFICIENT * normalForceN;
+    const desiredSideForceN = -TIRE_CORNERING_STIFFNESS_PER_NORMAL * normalForceN * slipAngleRad;
+    const stationSideForceN = clampSymmetric(desiredSideForceN, stationPeakSideForceN);
+
+    if (Math.abs(desiredSideForceN) > stationPeakSideForceN + 1e-9) {
+      frictionLimited = true;
+    }
+
+    peakSideForceN += stationPeakSideForceN;
+    sideForceN += stationSideForceN;
+    yawMomentNm += station.positionBodyM.x * stationSideForceN;
+  }
+
+  return {
+    loadedNormalForceN,
+    peakSideForceN,
+    sideForceN,
+    yawMomentNm,
+    lateralAccelerationMps2: sideForceN / Math.max(1, state.grossWeight),
+    yawAccelerationRadps2: yawMomentNm / APPROX_B737_YAW_INERTIA_KGM2,
+    frictionLimited,
+  };
+}
+
 function wheelBaseM(gearStations: GearStationState[]): number {
   const nose = gearStations.find((station) => station.id === 'nose');
   const mains = gearStations.filter((station) => station.id === 'leftMain' || station.id === 'rightMain');
@@ -136,10 +206,37 @@ function applyTouchdownDamping(state: AircraftState, sinkRateMps: number): void 
   state.angularVel.r *= TOUCHDOWN_ANGULAR_DAMPING;
 }
 
+function applyTireSideForces(
+  state: AircraftState,
+  dt: number,
+  gearStations: GearStationState[],
+): void {
+  const tireSideForces = computeTireSideForces(state, gearStations);
+  const previousLateralVelocity = state.velocity.v;
+  const lateralDelta = tireSideForces.lateralAccelerationMps2 * Math.max(0, dt);
+  const nextLateralVelocity = previousLateralVelocity + lateralDelta;
+  const effectiveNeutralSteering = !isRollingForSteering(state)
+    || gearStations.every((station) => Math.abs(station.steeringAngleRad) < 1e-6);
+  const forceOpposesSlip = previousLateralVelocity !== 0
+    && Math.sign(tireSideForces.sideForceN) === -Math.sign(previousLateralVelocity);
+
+  if (
+    effectiveNeutralSteering &&
+    forceOpposesSlip &&
+    nextLateralVelocity !== 0 &&
+    Math.sign(nextLateralVelocity) !== Math.sign(previousLateralVelocity)
+  ) {
+    state.velocity.v = 0;
+  } else {
+    state.velocity.v = nextLateralVelocity;
+  }
+
+  state.angularVel.r += tireSideForces.yawAccelerationRadps2 * Math.max(0, dt);
+}
+
 function applyNosewheelSteering(
   state: AircraftState,
   inputs: ControlInputs,
-  dt: number,
   gearStations: GearStationState[],
 ): GearStationState[] {
   const steeringAngleRad = computeNosewheelSteeringAngleRad(inputs, state.velocity.u);
@@ -151,8 +248,6 @@ function applyNosewheelSteering(
     state.angularVel.r = (speed / wheelBaseM(nextStations)) * Math.tan(steeringAngleRad);
   }
 
-  const damping = Math.max(0, 1 - Math.max(0, dt) * LATERAL_SCRUB_DAMPING_PER_SECOND);
-  state.velocity.v *= damping;
   return nextStations;
 }
 
@@ -234,7 +329,8 @@ export function applyGroundContact(
 
   stabilizeGroundAttitude(state);
   applyTouchdownDamping(state, touchdownSinkRateMps ?? 0);
-  loadedGearStations = applyNosewheelSteering(state, inputs, dt, loadedGearStations);
+  loadedGearStations = applyNosewheelSteering(state, inputs, loadedGearStations);
+  applyTireSideForces(state, dt, loadedGearStations);
   applyLongitudinalGroundDecel(state, inputs, dt, loadedGearStations);
   constrainRunwayNormalVelocity(state);
 
