@@ -138,6 +138,14 @@ function brakeCommandForStation(command: BrakeCommand, station: GearStationState
   return 0;
 }
 
+export function brakeCommandFromInputs(inputs: ControlInputs): BrakeCommand {
+  const symmetricBrake = clamp01(inputs.brake);
+  return {
+    leftBrake: Math.max(symmetricBrake, clamp01(inputs.leftBrake ?? 0)),
+    rightBrake: Math.max(symmetricBrake, clamp01(inputs.rightBrake ?? 0)),
+  };
+}
+
 function frictionScaleForSurface(surface?: GroundSurfaceSample) {
   return surface?.frictionScale ?? RUNWAY_FRICTION_SCALE;
 }
@@ -306,7 +314,7 @@ export function computeGroundRollForces(
   const frictionScale = frictionScaleForSurface(surface);
   const brakeForces = computeWheelBrakeForces(
     state,
-    { leftBrake: inputs.brake, rightBrake: inputs.brake },
+    brakeCommandFromInputs(inputs),
     gearStations,
     surface,
   );

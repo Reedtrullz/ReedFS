@@ -654,6 +654,98 @@ describe('applyGroundContact', () => {
     expect(forces.accelerationMps2).toBeCloseTo(forces.retardingForceN / 10_000, 8);
   });
 
+  it('uses side-specific brake controls to create yaw while rolling forward', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.velocity.u = 10;
+    const gearStations = createB737GearStations(100_000, true);
+
+    const forces = computeGroundRollForces(
+      state,
+      { ...idle, brake: 0, leftBrake: 1, rightBrake: 0 },
+      gearStations,
+    );
+
+    expect(forces.brakeForceN).toBeGreaterThan(0);
+    expect(forces.yawMomentNm).toBeLessThan(0);
+    expect(forces.yawAccelerationRadps2).toBeLessThan(0);
+  });
+
+  it('loads only the commanded main station for side-specific wheel braking', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.velocity.u = 10;
+    const gearStations = createB737GearStations(100_000, true);
+
+    const forces = computeWheelBrakeForces(state, { leftBrake: 1, rightBrake: 0 }, gearStations);
+    const nose = forces.stationForces.find((station) => station.stationId === 'nose');
+    const leftMain = forces.stationForces.find((station) => station.stationId === 'leftMain');
+    const rightMain = forces.stationForces.find((station) => station.stationId === 'rightMain');
+
+    expect(nose?.brakeCommand).toBe(0);
+    expect(nose?.brakeForceN).toBe(0);
+    expect(leftMain?.brakeCommand).toBe(1);
+    expect(leftMain?.brakeForceN).toBeGreaterThan(0);
+    expect(rightMain?.brakeCommand).toBe(0);
+    expect(rightMain?.brakeForceN).toBe(0);
+    expect(forces.leftBrakeForceN).toBeGreaterThan(0);
+    expect(forces.rightBrakeForceN).toBe(0);
+  });
+
+  it('keeps legacy symmetric brake equivalent to full left and right brake controls', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.velocity.u = 10;
+    const gearStations = createB737GearStations(100_000, true);
+
+    const legacyBrake = computeGroundRollForces(state, { ...idle, brake: 1 }, gearStations);
+    const sideSpecificBrakes = computeGroundRollForces(
+      state,
+      { ...idle, brake: 0, leftBrake: 1, rightBrake: 1 },
+      gearStations,
+    );
+
+    expect(sideSpecificBrakes.brakeForceN).toBeCloseTo(legacyBrake.brakeForceN, 8);
+    expect(sideSpecificBrakes.retardingForceN).toBeCloseTo(legacyBrake.retardingForceN, 8);
+    expect(legacyBrake.yawMomentNm).toBeCloseTo(0, 8);
+    expect(sideSpecificBrakes.yawMomentNm).toBeCloseTo(0, 8);
+  });
+
+  it('does not apply active differential brake force or yaw while stopped', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.velocity.u = 0;
+    const gearStations = createB737GearStations(100_000, true);
+
+    const forces = computeGroundRollForces(
+      state,
+      { ...idle, brake: 0, leftBrake: 1, rightBrake: 0 },
+      gearStations,
+    );
+
+    expect(forces.brakeForceN).toBe(0);
+    expect(forces.yawMomentNm).toBe(0);
+    expect(forces.yawAccelerationRadps2).toBe(0);
+  });
+
+  it('reverses side-specific brake yaw direction while rolling backward', () => {
+    const state = createInitialState(B737_800_SPEC);
+    const gearStations = createB737GearStations(100_000, true);
+
+    state.velocity.u = 10;
+    const forwardLeftBrake = computeGroundRollForces(
+      state,
+      { ...idle, brake: 0, leftBrake: 1, rightBrake: 0 },
+      gearStations,
+    );
+    state.velocity.u = -10;
+    const reverseLeftBrake = computeGroundRollForces(
+      state,
+      { ...idle, brake: 0, leftBrake: 1, rightBrake: 0 },
+      gearStations,
+    );
+
+    expect(forwardLeftBrake.yawMomentNm).toBeLessThan(0);
+    expect(reverseLeftBrake.yawMomentNm).toBeGreaterThan(0);
+    expect(Math.abs(reverseLeftBrake.yawMomentNm)).toBeCloseTo(Math.abs(forwardLeftBrake.yawMomentNm), 8);
+  });
+
   it('keeps brake yaw moment neutral for symmetric left/right braking', () => {
     const state = createInitialState(B737_800_SPEC);
     state.velocity.u = 10;

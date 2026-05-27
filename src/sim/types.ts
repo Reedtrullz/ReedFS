@@ -90,6 +90,8 @@ export interface ControlInputs {
   gearLever: 'UP' | 'DOWN';
   spoilers: number;   // 0 to 1
   brake: number;      // 0 to 1
+  leftBrake?: number;  // 0 to 1, optional side-specific override combined with brake
+  rightBrake?: number; // 0 to 1, optional side-specific override combined with brake
 }
 
 export type AutopilotCommands = Partial<Pick<ControlInputs, 'elevator' | 'aileron' | 'throttle1' | 'throttle2'>>;
