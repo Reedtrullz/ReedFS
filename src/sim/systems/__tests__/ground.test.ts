@@ -6,6 +6,7 @@ import {
   computeGroundRollForces,
   computeNosewheelSteeringAngleRad,
   computeTireSideForces,
+  computeWheelBrakeForces,
   KSEA_RUNWAY_ALT_FT,
 } from '../ground';
 import { bodyToNed } from '../../physics/frames';
@@ -298,6 +299,7 @@ describe('applyGroundContact', () => {
   it('computes rolling friction and brake force from gear station loads', () => {
     const state = createInitialState(B737_800_SPEC);
     state.grossWeight = 10_000;
+    state.velocity.u = 20;
     const gearStations = createB737GearStations(100_000, true);
     const braking: ControlInputs = { ...idle, brake: 1 };
 
@@ -308,6 +310,75 @@ describe('applyGroundContact', () => {
     expect(forces.brakeForceN).toBeGreaterThan(forces.rollingFrictionForceN);
     expect(forces.brakeForceN).toBeLessThan(100_000 * (6 / 9.80665));
     expect(forces.accelerationMps2).toBeCloseTo(forces.retardingForceN / 10_000, 8);
+  });
+
+  it('keeps brake yaw moment neutral for symmetric left/right braking', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.velocity.u = 10;
+    const gearStations = createB737GearStations(100_000, true);
+
+    const forces = computeWheelBrakeForces(state, { leftBrake: 0.7, rightBrake: 0.7 }, gearStations);
+
+    expect(forces.leftBrakeForceN).toBeCloseTo(forces.rightBrakeForceN, 8);
+    expect(forces.yawMomentNm).toBeCloseTo(0, 8);
+  });
+
+  it('creates opposite yaw moments for left-only and right-only braking while rolling forward', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.velocity.u = 10;
+    const gearStations = createB737GearStations(100_000, true);
+
+    const leftOnly = computeWheelBrakeForces(state, { leftBrake: 1, rightBrake: 0 }, gearStations);
+    const rightOnly = computeWheelBrakeForces(state, { leftBrake: 0, rightBrake: 1 }, gearStations);
+
+    expect(leftOnly.leftBrakeForceN).toBeGreaterThan(0);
+    expect(leftOnly.rightBrakeForceN).toBe(0);
+    expect(rightOnly.leftBrakeForceN).toBe(0);
+    expect(rightOnly.rightBrakeForceN).toBeGreaterThan(0);
+    expect(leftOnly.yawMomentNm).toBeLessThan(0);
+    expect(rightOnly.yawMomentNm).toBeGreaterThan(0);
+    expect(Math.abs(leftOnly.yawMomentNm)).toBeCloseTo(Math.abs(rightOnly.yawMomentNm), 8);
+  });
+
+  it('reverses asymmetric brake yaw direction while rolling backward', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.velocity.u = -10;
+    const gearStations = createB737GearStations(100_000, true);
+
+    const leftOnly = computeWheelBrakeForces(state, { leftBrake: 1, rightBrake: 0 }, gearStations);
+    const rightOnly = computeWheelBrakeForces(state, { leftBrake: 0, rightBrake: 1 }, gearStations);
+
+    expect(leftOnly.leftBrakeForceN).toBeGreaterThan(0);
+    expect(rightOnly.rightBrakeForceN).toBeGreaterThan(0);
+    expect(leftOnly.yawMomentNm).toBeGreaterThan(0);
+    expect(rightOnly.yawMomentNm).toBeLessThan(0);
+    expect(Math.abs(leftOnly.yawMomentNm)).toBeCloseTo(Math.abs(rightOnly.yawMomentNm), 8);
+  });
+
+  it('does not create asymmetric brake yaw while stopped', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.velocity.u = 0;
+    const gearStations = createB737GearStations(100_000, true);
+
+    const leftOnly = computeWheelBrakeForces(state, { leftBrake: 1, rightBrake: 0 }, gearStations);
+    const rightOnly = computeWheelBrakeForces(state, { leftBrake: 0, rightBrake: 1 }, gearStations);
+
+    expect(leftOnly.brakeForceN).toBe(0);
+    expect(leftOnly.yawMomentNm).toBe(0);
+    expect(rightOnly.brakeForceN).toBe(0);
+    expect(rightOnly.yawMomentNm).toBe(0);
+  });
+
+  it('anti-skid caps brake force to tire friction on loaded brake-capable wheels', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.velocity.u = 20;
+    const gearStations = createB737GearStations(100_000, true);
+
+    const forces = computeWheelBrakeForces(state, { leftBrake: 1, rightBrake: 1 }, gearStations);
+
+    expect(forces.antiSkidLimited).toBe(true);
+    expect(forces.brakeForceN).toBeLessThan(forces.requestedBrakeForceN);
+    expect(forces.brakeForceN).toBeCloseTo(90_000 * 0.55, 6);
   });
 
   it('applies brake deceleration from loaded brake-capable stations without reversing direction', () => {
@@ -321,7 +392,7 @@ describe('applyGroundContact', () => {
     applyGroundContact(state, braking, 1, KSEA_RUNWAY_ALT_FT, { normalForceN: 100_000 });
 
     expect(state.velocity.u).toBeGreaterThanOrEqual(0);
-    expect(state.velocity.u).toBeCloseTo(14.1366, 3);
+    expect(state.velocity.u).toBeCloseTo(14.6931, 3);
   });
 
   it('applies rolling and brake deceleration on the runway without reversing direction', () => {

@@ -28,6 +28,8 @@ source ~/.nvm/nvm.sh && nvm use 22 >/dev/null
 
 ## Task 1 [PARENT-DIRECT]: Add tire side-force/cornering stiffness helper
 
+**Status:** Complete in `07e97ed feat: add tire side-load ground handling`.
+
 **Objective:** Replace the current fixed lateral scrub damping with a normal-force-scaled tire side-force model that opposes lateral slip and exposes yaw moment for crosswind/taxi handling.
 
 **Files:**
@@ -82,13 +84,15 @@ git commit -m "feat: add tire side-load ground handling"
 
 ## Task 2 [PARENT-DIRECT]: Add asymmetric braking and anti-skid pure helpers
 
+**Status:** Complete in the current follow-up after `07e97ed`; implemented as `ground.ts` pure-helper `BrakeCommand`/`computeWheelBrakeForces()` behavior without changing `ControlInputs` or player-facing UI.
+
 **Objective:** Prepare directional braking realism without changing the current keyboard/gamepad UI.
 
 **Files:**
 
-- Modify: `src/sim/types.ts`
 - Modify: `src/sim/systems/ground.ts`
 - Modify: `src/sim/systems/__tests__/ground.test.ts`
+- No `src/sim/types.ts` change was required because Task 2 used a ground-system-local brake command type rather than extending player controls.
 
 **Test first:**
 
@@ -102,7 +106,7 @@ git commit -m "feat: add tire side-load ground handling"
 
 ## Task 3: Update docs and roadmap status
 
-**Objective:** Keep current-state docs honest after the tire side-load slice lands.
+**Objective:** Keep current-state docs honest after the tire side-load and brake-force slices land.
 
 **Files:**
 

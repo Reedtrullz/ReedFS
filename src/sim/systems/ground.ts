@@ -9,6 +9,7 @@ const G = 9.80665;
 
 const ROLLING_FRICTION_COEFFICIENT = 0.35 / G;
 const MAX_BRAKE_COEFFICIENT = 6.0 / G;
+const MAX_BRAKE_FRICTION_COEFFICIENT = 0.55;
 const STOP_EPSILON_MPS = 0.05;
 const BREAKAWAY_THROTTLE = 0.05;
 const MIN_GROUND_PITCH_RAD = 0;
@@ -39,6 +40,36 @@ export interface GroundRollForceBreakdown {
   brakeForceN: number;
   retardingForceN: number;
   accelerationMps2: number;
+  yawMomentNm: number;
+  yawAccelerationRadps2: number;
+  antiSkidLimited: boolean;
+}
+
+export interface BrakeCommand {
+  leftBrake: number;
+  rightBrake: number;
+  antiSkid?: boolean;
+}
+
+export interface WheelBrakeStationForce {
+  stationId: GearStationState['id'];
+  brakeCommand: number;
+  normalForceN: number;
+  requestedBrakeForceN: number;
+  brakeForceN: number;
+  antiSkidLimited: boolean;
+}
+
+export interface WheelBrakeForceBreakdown {
+  brakeNormalForceN: number;
+  requestedBrakeForceN: number;
+  leftBrakeForceN: number;
+  rightBrakeForceN: number;
+  brakeForceN: number;
+  yawMomentNm: number;
+  yawAccelerationRadps2: number;
+  antiSkidLimited: boolean;
+  stationForces: WheelBrakeStationForce[];
 }
 
 export interface TireSideForceBreakdown {
@@ -69,6 +100,19 @@ function hasBreakawayThrustCommand(inputs: ControlInputs): boolean {
 
 function isRollingForSteering(state: AircraftState): boolean {
   return Math.abs(state.velocity.u) > STOP_EPSILON_MPS;
+}
+
+function brakeDirectionForVelocity(state: AircraftState): number {
+  if (state.velocity.u > STOP_EPSILON_MPS) return -1;
+  if (state.velocity.u < -STOP_EPSILON_MPS) return 1;
+  return 0;
+}
+
+function brakeCommandForStation(command: BrakeCommand, station: GearStationState): number {
+  if (!station.brakeCapable) return 0;
+  if (station.id === 'leftMain') return clamp01(command.leftBrake);
+  if (station.id === 'rightMain') return clamp01(command.rightBrake);
+  return 0;
 }
 
 function grossWeightForceN(state: AircraftState): number {
@@ -113,6 +157,69 @@ export function constrainRunwayNormalVelocity(state: AircraftState): void {
   state.velocity = nedToBody({ ...ned, down: 0 }, state.attitude);
 }
 
+export function computeWheelBrakeForces(
+  state: AircraftState,
+  command: BrakeCommand,
+  gearStations: GearStationState[] = state.ground.gearStations,
+): WheelBrakeForceBreakdown {
+  let brakeNormalForceN = 0;
+  let requestedBrakeForceN = 0;
+  let leftBrakeForceN = 0;
+  let rightBrakeForceN = 0;
+  let brakeForceN = 0;
+  let yawMomentNm = 0;
+  let antiSkidLimited = false;
+  const useAntiSkid = command.antiSkid !== false;
+  const longitudinalForceDirection = brakeDirectionForVelocity(state);
+  const rollingForBraking = longitudinalForceDirection !== 0;
+  const stationForces: WheelBrakeStationForce[] = [];
+
+  for (const station of gearStations) {
+    const normalForceN = station.weightOnWheel && station.brakeCapable ? Math.max(0, station.normalForceN) : 0;
+    const brakeCommand = brakeCommandForStation(command, station);
+    const requestedStationBrakeForceN = brakeCommand * MAX_BRAKE_COEFFICIENT * normalForceN;
+    const availableStationBrakeForceN = MAX_BRAKE_FRICTION_COEFFICIENT * normalForceN;
+    const stationAntiSkidLimited = rollingForBraking && useAntiSkid && requestedStationBrakeForceN > availableStationBrakeForceN + 1e-9;
+    const stationBrakeForceN = rollingForBraking
+      ? useAntiSkid
+        ? Math.min(requestedStationBrakeForceN, availableStationBrakeForceN)
+        : requestedStationBrakeForceN
+      : 0;
+
+    if (normalForceN > 0) {
+      brakeNormalForceN += normalForceN;
+    }
+    requestedBrakeForceN += requestedStationBrakeForceN;
+    brakeForceN += stationBrakeForceN;
+    if (station.id === 'leftMain') leftBrakeForceN += stationBrakeForceN;
+    if (station.id === 'rightMain') rightBrakeForceN += stationBrakeForceN;
+    if (stationAntiSkidLimited) antiSkidLimited = true;
+
+    const longitudinalForceN = stationBrakeForceN * longitudinalForceDirection;
+    yawMomentNm += -station.positionBodyM.y * longitudinalForceN;
+    stationForces.push({
+      stationId: station.id,
+      brakeCommand,
+      normalForceN,
+      requestedBrakeForceN: requestedStationBrakeForceN,
+      brakeForceN: stationBrakeForceN,
+      antiSkidLimited: stationAntiSkidLimited,
+    });
+  }
+
+  return {
+    brakeNormalForceN,
+    requestedBrakeForceN,
+    leftBrakeForceN,
+    rightBrakeForceN,
+    brakeForceN,
+    yawMomentNm,
+    yawAccelerationRadps2: yawMomentNm / APPROX_B737_YAW_INERTIA_KGM2,
+    antiSkidLimited,
+    stationForces,
+  };
+}
+
 export function computeGroundRollForces(
   state: AircraftState,
   inputs: ControlInputs,
@@ -120,20 +227,23 @@ export function computeGroundRollForces(
 ): GroundRollForceBreakdown {
   const loadedStations = gearStations.filter((station) => station.weightOnWheel);
   const rollingNormalForceN = loadedStations.reduce((sum, station) => sum + Math.max(0, station.normalForceN), 0);
-  const brakeNormalForceN = loadedStations
-    .filter((station) => station.brakeCapable)
-    .reduce((sum, station) => sum + Math.max(0, station.normalForceN), 0);
-  const brake = clamp01(inputs.brake);
+  const brakeForces = computeWheelBrakeForces(
+    state,
+    { leftBrake: inputs.brake, rightBrake: inputs.brake },
+    gearStations,
+  );
   const rollingFrictionForceN = ROLLING_FRICTION_COEFFICIENT * rollingNormalForceN;
-  const brakeForceN = brake * MAX_BRAKE_COEFFICIENT * brakeNormalForceN;
-  const retardingForceN = rollingFrictionForceN + brakeForceN;
+  const retardingForceN = rollingFrictionForceN + brakeForces.brakeForceN;
   return {
     rollingNormalForceN,
-    brakeNormalForceN,
+    brakeNormalForceN: brakeForces.brakeNormalForceN,
     rollingFrictionForceN,
-    brakeForceN,
+    brakeForceN: brakeForces.brakeForceN,
     retardingForceN,
     accelerationMps2: retardingForceN / Math.max(1, state.grossWeight),
+    yawMomentNm: brakeForces.yawMomentNm,
+    yawAccelerationRadps2: brakeForces.yawAccelerationRadps2,
+    antiSkidLimited: brakeForces.antiSkidLimited,
   };
 }
 
@@ -267,6 +377,7 @@ function applyLongitudinalGroundDecel(
 
   const forces = computeGroundRollForces(state, inputs, gearStations);
   const decel = forces.accelerationMps2 * Math.max(0, dt);
+  state.angularVel.r += forces.yawAccelerationRadps2 * Math.max(0, dt);
 
   if (speed > 0) {
     state.velocity.u = Math.max(0, speed - decel);
