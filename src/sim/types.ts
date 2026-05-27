@@ -253,12 +253,14 @@ export function createB737GearStations(totalNormalForceN = 0, weightOnWheel = fa
 
 export function createInitialState(spec: AircraftSpec): AircraftState {
   const attitude: Attitude = { phi: 0, theta: 0, psi: Math.PI };
+  const initialLat = 47.45;
+  const initialLon = -122.301;
   const initialAltFt = 432;
   const zeroFuelWeight = spec.emptyWeight;
   const grossWeight = zeroFuelWeight + spec.maxFuel;
 
   return {
-    position: { lat: 47.45, lon: -122.31, alt: initialAltFt },
+    position: { lat: initialLat, lon: initialLon, alt: initialAltFt },
     velocity: { u: 0, v: 0, w: 0 },
     attitude, // facing south (180°)
     quaternion: eulerToQuat(attitude.phi, attitude.theta, attitude.psi),

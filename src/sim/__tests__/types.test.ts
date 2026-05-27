@@ -6,7 +6,7 @@ describe('createInitialState', () => {
   it('returns parked at KSEA with full fuel', () => {
     const s = createInitialState(B737_800_SPEC);
     expect(s.position.lat).toBeCloseTo(47.45);
-    expect(s.position.lon).toBeCloseTo(-122.31);
+    expect(s.position.lon).toBeCloseTo(-122.301);
     expect(s.flightPhase).toBe('PARKED');
     expect(s.fuel.totalFuel).toBe(B737_800_SPEC.maxFuel);
     expect(s.engines[0].running).toBe(false);

@@ -73,10 +73,13 @@ describe('sampleKseaSurface', () => {
     expect(tutorialSurface.runwayId).toBe(KSEA_TUTORIAL_SCENARIO.runway.runway);
   });
 
-  it('documents the legacy default initial state mismatch until Task 2 aligns it', () => {
+  it('classifies the default initial state consistently with its ground state', () => {
     const defaultState = createInitialState(B737_800_SPEC);
+    const surface = sampleKseaSurface(defaultState.position);
 
-    expect(sampleKseaSurface(defaultState.position).onRunway).toBe(false);
+    expect(surface.kind).toBe('runway');
+    expect(surface.onRunway).toBe(true);
     expect(defaultState.ground.onRunway).toBe(true);
+    expect(defaultState.ground.groundAltFt).toBe(surface.groundAltFt);
   });
 });
