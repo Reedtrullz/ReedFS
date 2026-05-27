@@ -14,9 +14,9 @@
 
 Relevant files:
 
-- `src/sim/systems/ground.ts` already has station loads, rolling/brake deceleration, nosewheel steering, touchdown damping, and runway-normal velocity constraint.
+- `src/sim/systems/ground.ts` already has station loads, dynamic oleo spring/damper compression, rolling/brake deceleration, nosewheel steering, touchdown damping, and runway-normal velocity constraint.
 - `src/sim/systems/__tests__/ground.test.ts` is the primary regression target for ground-system contracts.
-- `docs/roadmap.md` now lists advanced P1 ground/tire gaps: dynamic oleo response, tire cornering stiffness/side-loads, asymmetric braking, anti-skid, crosswind ground handling, rollout/taxi scenarios, and gear-up belly-contact handling.
+- `docs/roadmap.md` now lists remaining advanced P1 ground/tire gaps: crosswind ground handling, rollout/taxi scenarios, optional player-facing differential brake controls, non-runway surfaces, and gear-up belly-contact handling.
 
 Required command prefix for all test/build work:
 
@@ -121,6 +121,33 @@ source ~/.nvm/nvm.sh && nvm use 22 >/dev/null && npm run check
 ```
 
 Expected: PASS.
+
+---
+
+## Task 4 [PARENT-DIRECT]: Add dynamic oleo strut spring/damper loads
+
+**Status:** Complete in the current follow-up after `8c04058`; implemented as `ground.ts` pure-helper `computeOleoStrutLoads()` behavior wired into gear contact.
+
+**Objective:** Move beyond purely static station compression by giving loaded gear stations tested spring/damper normal loads during runway penetration and touchdown sink-rate events, while preserving the post-solve runway-normal constraint and existing ground-force consumers.
+
+**Files:**
+
+- Modify: `src/sim/systems/ground.ts`
+- Modify: `src/sim/systems/__tests__/ground.test.ts`
+- Modify docs after the slice lands: `README.md`, `docs/architecture.md`, `docs/roadmap.md`
+
+**Test first:**
+
+- Oleo spring compression increases a station's compression and normal force when the aircraft penetrates the runway plane.
+- Oleo damping adds transient normal force for positive runway-normal sink rate but not for upward/rebound motion.
+- `applyGroundContact()` reports dynamic station loads on touchdown without breaking static load distribution for settled ground contact.
+
+**Constraints:**
+
+- Keep body axes x-forward/y-right/z-down and NED down-positive.
+- Compute dynamic loads only for gear stations carrying weight; airborne or belly/crash contact must still clear gear station load.
+- Preserve runway-normal velocity constraint and no-reversal braking/side-load safeguards.
+- Avoid player-facing UI/control changes in this slice.
 
 ---
 

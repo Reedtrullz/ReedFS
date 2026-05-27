@@ -130,7 +130,7 @@ Known guidance follow-up:
 ## Ground model architecture
 
 - `GroundState` carries per-station nose/left-main/right-main gear data: body-axis station position, static load fraction, compression, normal force, brake capability, steerability, and steering angle.
-- `ground.ts` distributes normal force across gear stations, computes rolling friction, anti-skid-limited symmetric/asymmetric brake forces, and normal-force-scaled tire side forces from loaded stations, fades nosewheel steering out as speed rises, prevents stationary steering from creating motion, and records touchdown sink rate.
+- `ground.ts` distributes normal force across gear stations, computes dynamic oleo spring/damper compression loads, rolling friction, anti-skid-limited symmetric/asymmetric brake forces, and normal-force-scaled tire side forces from loaded stations, fades nosewheel steering out as speed rises, prevents stationary steering from creating motion, and records touchdown sink rate.
 - `simStore.abortTakeoff()` gives the player a rejected-takeoff control path: idle both throttles, full brakes/spoilers, AP disconnected, sim kept running for the braking rollout, and guidance moves to `rejected-takeoff`.
 - `applyGroundContact()` remains a post-solve runway constraint: it prevents sink-through, constrains runway-normal velocity, damps first-contact angular rates, applies tire rollout forces, and leaves airborne/free-flight equations untouched.
 - `aero.ts` applies a conservative ground-effect model below one wingspan AGL: modest lift increase plus induced-drag relief, without changing the wind/air-relative velocity contract.
@@ -177,7 +177,7 @@ push master
 
 These are intentional gaps, not regressions:
 
-1. Advanced gear/tire model details: normal-force-scaled tire side-load/cornering stiffness, anti-skid brake limiting, and asymmetric brake-force helpers are now in the ground model; remaining gaps include dynamic oleo spring/damper response, broader crosswind scenario coverage, player-facing differential brake controls if desired, and non-runway surface support beyond the current station/load/friction/brake/side-load/steering/touchdown model.
+1. Advanced gear/tire model details: dynamic oleo spring/damper compression loads, normal-force-scaled tire side-load/cornering stiffness, anti-skid brake limiting, and asymmetric brake-force helpers are now in the ground model; remaining gaps include broader crosswind scenario coverage, player-facing differential brake controls if desired, and non-runway surface support beyond the current station/load/friction/brake/side-load/steering/touchdown model.
 2. Worker physics: codec and worker entry scaffolding exist, and `VITE_RFS_WORKER_PHYSICS` is parsed as an experimental/default-off runtime flag for future wiring. The active runtime still uses main-thread physics; no `simStore` tick migration or runtime Worker bridge is enabled yet.
 3. Advanced flight guidance: RFMS route edits and wiring turn-anticipation/VNAV lifecycle metrics into live AP truth/FMA updates beyond the current conservative target laws.
 4. Data-driven flight model: the B737-800 baseline spec is versioned, but validated aircraft coefficient tables and trim/response tests remain future work.

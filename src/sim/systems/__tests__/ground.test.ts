@@ -5,6 +5,7 @@ import {
   applyGroundContact,
   computeGroundRollForces,
   computeNosewheelSteeringAngleRad,
+  computeOleoStrutLoads,
   computeTireSideForces,
   computeWheelBrakeForces,
   KSEA_RUNWAY_ALT_FT,
@@ -68,6 +69,118 @@ describe('applyGroundContact', () => {
     expect(contact.gearStations.every((station) => station.weightOnWheel)).toBe(true);
     expect(contact.gearStations.map((station) => station.normalForceN)).toEqual([12_000, 54_000, 54_000]);
     expect(contact.gearStations.reduce((sum, station) => sum + station.normalForceN, 0)).toBeCloseTo(120_000, 6);
+  });
+
+  it('computes oleo spring load from runway penetration', () => {
+    const baseStations = createB737GearStations(100_000, true);
+
+    const loads = computeOleoStrutLoads(baseStations, {
+      totalStaticNormalForceN: 100_000,
+      groundPenetrationM: 0.1,
+      runwayDownMps: 0,
+    });
+
+    const baseLeftMain = baseStations.find((station) => station.id === 'leftMain');
+    const loadedLeftMain = loads.gearStations.find((station) => station.id === 'leftMain');
+    expect(loadedLeftMain?.compressionM).toBeGreaterThan(baseLeftMain?.compressionM ?? 0);
+    expect(loadedLeftMain?.normalForceN).toBeGreaterThan(baseLeftMain?.normalForceN ?? 0);
+    expect(loads.springForceN).toBeGreaterThan(100_000);
+    expect(loads.dampingForceN).toBe(0);
+    expect(loads.totalNormalForceN).toBeCloseTo(
+      loads.gearStations.reduce((sum, station) => sum + station.normalForceN, 0),
+      8,
+    );
+  });
+
+  it('computes oleo damping for touchdown sink rate but not rebound', () => {
+    const baseStations = createB737GearStations(100_000, true);
+
+    const settled = computeOleoStrutLoads(baseStations, {
+      totalStaticNormalForceN: 100_000,
+      groundPenetrationM: 0,
+      runwayDownMps: 0,
+    });
+    const touchdown = computeOleoStrutLoads(baseStations, {
+      totalStaticNormalForceN: 100_000,
+      groundPenetrationM: 0,
+      runwayDownMps: 3,
+    });
+    const rebound = computeOleoStrutLoads(baseStations, {
+      totalStaticNormalForceN: 100_000,
+      groundPenetrationM: 0,
+      runwayDownMps: -3,
+    });
+
+    expect(touchdown.dampingForceN).toBeGreaterThan(0);
+    expect(touchdown.totalNormalForceN).toBeGreaterThan(settled.totalNormalForceN);
+    expect(rebound.dampingForceN).toBe(0);
+    expect(rebound.totalNormalForceN).toBeCloseTo(settled.totalNormalForceN, 8);
+  });
+
+  it('computes oleo penetration and damping loads when residual static normal is zero', () => {
+    const unloadedButContacting = createB737GearStations(0, true);
+
+    const loads = computeOleoStrutLoads(unloadedButContacting, {
+      totalStaticNormalForceN: 0,
+      referenceWeightN: 100_000,
+      groundPenetrationM: 0.1,
+      runwayDownMps: 3,
+    });
+
+    expect(loads.springForceN).toBeGreaterThan(0);
+    expect(loads.dampingForceN).toBeGreaterThan(0);
+    expect(loads.totalNormalForceN).toBeGreaterThan(0);
+    expect(loads.gearStations.some((station) => station.normalForceN > 0)).toBe(true);
+  });
+
+  it('reports dynamic oleo station loads on touchdown without changing settled static loads', () => {
+    const staticState = createInitialState(B737_800_SPEC);
+    staticState.position.alt = KSEA_RUNWAY_ALT_FT;
+    staticState.velocity.w = 0;
+    staticState.config.gearDown = true;
+
+    const settled = applyGroundContact(staticState, idle, 1 / 60, KSEA_RUNWAY_ALT_FT, { normalForceN: 100_000 });
+
+    expect(settled.normalForceN).toBeCloseTo(100_000, 6);
+    expect(settled.gearStations.map((station) => station.normalForceN)).toEqual([10_000, 45_000, 45_000]);
+
+    const touchdownState = createInitialState(B737_800_SPEC);
+    touchdownState.ground = {
+      ...touchdownState.ground,
+      weightOnWheels: false,
+      normalForceN: 0,
+      onRunway: false,
+      contact: 'none',
+      gearStations: createB737GearStations(0, false),
+    };
+    touchdownState.position.alt = KSEA_RUNWAY_ALT_FT - 1;
+    touchdownState.velocity.w = 3;
+    touchdownState.config.gearDown = true;
+
+    const touchdown = applyGroundContact(touchdownState, idle, 1 / 60, KSEA_RUNWAY_ALT_FT, { normalForceN: 100_000 });
+
+    expect(touchdown.normalForceN).toBeGreaterThan(100_000);
+    expect(touchdown.gearStations.reduce((sum, station) => sum + station.normalForceN, 0)).toBeCloseTo(touchdown.normalForceN, 6);
+    expect(touchdown.gearStations.find((station) => station.id === 'leftMain')?.compressionM)
+      .toBeGreaterThan(settled.gearStations.find((station) => station.id === 'leftMain')?.compressionM ?? 0);
+
+    const zeroResidualState = createInitialState(B737_800_SPEC);
+    zeroResidualState.ground = {
+      ...zeroResidualState.ground,
+      weightOnWheels: false,
+      normalForceN: 0,
+      onRunway: false,
+      contact: 'none',
+      gearStations: createB737GearStations(0, false),
+    };
+    zeroResidualState.position.alt = KSEA_RUNWAY_ALT_FT - 1;
+    zeroResidualState.velocity.w = 3;
+    zeroResidualState.config.gearDown = true;
+
+    const zeroResidualTouchdown = applyGroundContact(zeroResidualState, idle, 1 / 60, KSEA_RUNWAY_ALT_FT, { normalForceN: 0 });
+
+    expect(zeroResidualTouchdown.normalForceN).toBeGreaterThan(0);
+    expect(zeroResidualTouchdown.gearStations.some((station) => station.normalForceN > 0)).toBe(true);
   });
 
   it('clears gear station weight and force when airborne', () => {

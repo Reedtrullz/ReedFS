@@ -6,6 +6,7 @@ import { eulerToQuat } from '../physics/quaternion';
 export const KSEA_RUNWAY_ALT_FT = 432;
 export const GROUND_CONTACT_EPSILON_FT = 0.5;
 const G = 9.80665;
+const FT_TO_M = 0.3048;
 
 const ROLLING_FRICTION_COEFFICIENT = 0.35 / G;
 const MAX_BRAKE_COEFFICIENT = 6.0 / G;
@@ -20,6 +21,7 @@ const STEERING_FADE_START_MPS = 30;
 const STEERING_FADE_END_MPS = 70;
 const TOUCHDOWN_MIN_SINK_RATE_MPS = 0.25;
 const TOUCHDOWN_ANGULAR_DAMPING = 0.35;
+const OLEO_DAMPING_RATIO = 0.35;
 const TIRE_CORNERING_STIFFNESS_PER_NORMAL = 3.2;
 const MAX_TIRE_SIDE_FRICTION_COEFFICIENT = 0.45;
 const MIN_SLIP_FORWARD_SPEED_MPS = 2;
@@ -80,6 +82,20 @@ export interface TireSideForceBreakdown {
   lateralAccelerationMps2: number;
   yawAccelerationRadps2: number;
   frictionLimited: boolean;
+}
+
+export interface OleoStrutLoadOptions {
+  totalStaticNormalForceN: number;
+  referenceWeightN?: number;
+  groundPenetrationM: number;
+  runwayDownMps: number;
+}
+
+export interface OleoStrutLoadBreakdown {
+  totalNormalForceN: number;
+  springForceN: number;
+  dampingForceN: number;
+  gearStations: GearStationState[];
 }
 
 function clamp01(value: number): number {
@@ -155,6 +171,51 @@ function setGroundState(
 export function constrainRunwayNormalVelocity(state: AircraftState): void {
   const ned = bodyToNed(state.velocity, state.attitude);
   state.velocity = nedToBody({ ...ned, down: 0 }, state.attitude);
+}
+
+export function computeOleoStrutLoads(
+  gearStations: GearStationState[],
+  options: OleoStrutLoadOptions,
+): OleoStrutLoadBreakdown {
+  const totalStaticNormalForceN = Math.max(0, options.totalStaticNormalForceN);
+  const referenceWeightN = Math.max(totalStaticNormalForceN, Math.max(0, options.referenceWeightN ?? 0));
+  const groundPenetrationM = Math.max(0, options.groundPenetrationM);
+  const compressionRateMps = Math.max(0, options.runwayDownMps);
+  let springForceN = 0;
+  let dampingForceN = 0;
+
+  const loadedGearStations = gearStations.map((station) => {
+    const staticStationForceN = station.weightOnWheel ? totalStaticNormalForceN * station.staticLoadFraction : 0;
+    const referenceStationForceN = station.weightOnWheel ? referenceWeightN * station.staticLoadFraction : 0;
+    if (!station.weightOnWheel || (staticStationForceN <= 0 && groundPenetrationM <= 0 && compressionRateMps <= 0)) {
+      return { ...station, compressionM: 0, normalForceN: 0 };
+    }
+
+    const staticCompressionM = staticStationForceN / station.springStiffnessNPerM;
+    const compressionM = clamp(staticCompressionM + groundPenetrationM, 0, station.maxCompressionM);
+    const stationSpringForceN = station.springStiffnessNPerM * compressionM;
+    const effectiveStationMassKg = Math.max(referenceStationForceN, stationSpringForceN) / G;
+    const criticalDampingNPerMps = 2 * Math.sqrt(station.springStiffnessNPerM * effectiveStationMassKg);
+    const stationDampingForceN = OLEO_DAMPING_RATIO * criticalDampingNPerMps * compressionRateMps;
+    const normalForceN = stationSpringForceN + stationDampingForceN;
+
+    springForceN += stationSpringForceN;
+    dampingForceN += stationDampingForceN;
+
+    return {
+      ...station,
+      compressionM,
+      normalForceN,
+      weightOnWheel: station.weightOnWheel,
+    };
+  });
+
+  return {
+    totalNormalForceN: springForceN + dampingForceN,
+    springForceN,
+    dampingForceN,
+    gearStations: loadedGearStations,
+  };
 }
 
 export function computeWheelBrakeForces(
@@ -433,8 +494,16 @@ export function applyGroundContact(
     return setGroundState(state, groundAltFt, contact, false, options.normalForceN ?? grossWeightForceN(state));
   }
 
-  const gearNormalForceN = options.normalForceN ?? grossWeightForceN(state);
-  let loadedGearStations = createB737GearStations(gearNormalForceN, true);
+  const staticGearNormalForceN = options.normalForceN ?? grossWeightForceN(state);
+  const groundPenetrationM = Math.max(0, (groundAltFt - state.position.alt) * FT_TO_M);
+  const oleoLoads = computeOleoStrutLoads(createB737GearStations(staticGearNormalForceN, true), {
+    totalStaticNormalForceN: staticGearNormalForceN,
+    referenceWeightN: grossWeightForceN(state),
+    groundPenetrationM,
+    runwayDownMps,
+  });
+  const gearNormalForceN = oleoLoads.totalNormalForceN;
+  let loadedGearStations = oleoLoads.gearStations;
   state.position.alt = groundAltFt;
   state.config.gearDown = true;
 
