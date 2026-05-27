@@ -8,11 +8,13 @@
 
 **Tech Stack:** TypeScript strict, Vitest, RFS 6-DOF physics, Zustand store integration through the existing `integrate()` heartbeat.
 
+**Implementation status (2026-05-27):** Tasks 1-6 are complete. Tasks 1-5 landed as `ebe0fd2 feat: add ksea surface sampler`, `6f4e7c9 fix: align default state with sampled runway`, `48c8034 feat: scale ground forces by surface`, `3c15f0a feat: report off-runway ground contact`, and `733152a feat: wire surface sampling into ground contact`; Task 6 is this docs/status pass. Final CI/deploy verification is still governed by the "Final verification before reporting" section and is not marked complete here because this task does not push or wait for GitHub Actions.
+
 ---
 
 ## Scope and non-goals
 
-This plan addresses the remaining P1 roadmap item: non-runway surface handling beyond the current flat KSEA runway model.
+At plan start, this plan addressed the remaining P1 roadmap item: non-runway surface handling beyond the then-current flat KSEA runway model.
 
 In scope:
 

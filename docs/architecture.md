@@ -34,7 +34,7 @@ src/App.tsx
         4. updateHydraulic(state, dt)
         5. computeAero(state, effectiveControls, spec, B737_AERO, wind)
         6. integrate angular rates, quaternion, velocity, and position
-        7. update ground/contact state and flight phase
+        7. sample KSEA runway/off-runway surface, then update ground/contact state and flight phase
       -> recompute routeStatus / activeLegIndex
       -> rebuild GuidanceState from aircraft, scenario, status, and effective controls
       -> commit next Zustand aircraft/control/guidance snapshot
@@ -44,6 +44,7 @@ The system order is intentional:
 
 - Engine and fuel update before aero so thrust and mass are current.
 - Aero receives wind as an input and computes air-relative values without mutating state.
+- Surface sampling and friction scaling are ground-contact-only concerns: they may change tire/brake/side forces, but they must not mutate wind inputs or air-relative velocity.
 - Pilot inputs, AP commands, and effective controls are separate store fields; AP can own elevator/aileron/throttle without mutating pilot-authored inputs.
 - Route status is store-owned and computed before and after integration so LNAV/VNAV use the active leg instead of hardcoded waypoint fallbacks.
 
@@ -131,9 +132,10 @@ Known guidance follow-up:
 ## Ground model architecture
 
 - `GroundState` carries per-station nose/left-main/right-main gear data: body-axis station position, static load fraction, compression, normal force, brake capability, steerability, and steering angle.
-- `ground.ts` distributes normal force across gear stations, computes dynamic oleo spring/damper compression loads, rolling friction, anti-skid-limited symmetric/asymmetric brake forces, and normal-force-scaled tire side forces from loaded stations, limits current rudder-pedal nosewheel steering to B737 pedal-scale authority while fading it out as speed rises, prevents stationary steering from creating motion, adds gear-up runway-tangent belly/crash slide deceleration and angular damping, and records touchdown sink rate.
+- `runwaySurface.ts` classifies the current geodetic position against KSEA runway rectangles and returns either prepared `runway` contact data or `offRunway` ground data with rolling/brake/side friction scales.
+- `ground.ts` distributes normal force across gear stations, computes dynamic oleo spring/damper compression loads, rolling friction, anti-skid-limited symmetric/asymmetric brake forces, and normal-force-scaled tire side forces from loaded stations, scales those rolling/brake/side forces by the sampled surface, limits current rudder-pedal nosewheel steering to B737 pedal-scale authority while fading it out as speed rises, prevents stationary steering from creating motion, adds gear-up runway-tangent belly/crash slide deceleration and angular damping, and records touchdown sink rate.
 - `simStore.abortTakeoff()` gives the player a rejected-takeoff control path: idle both throttles, full brakes/spoilers, AP disconnected, sim kept running for the braking rollout, and guidance moves to `rejected-takeoff`.
-- `applyGroundContact()` remains a post-solve runway constraint: it prevents sink-through, constrains runway-normal velocity, damps first-contact angular rates, applies tire rollout forces for gear contact, applies runway-tangent belly/crash slide damping for gear-up contact, and leaves airborne/free-flight equations untouched.
+- `applyGroundContact()` remains a post-solve ground constraint: it prevents sink-through at the sampled KSEA ground elevation, constrains runway-normal velocity, treats `GroundState.onRunway` as prepared-runway surface status rather than generic ground contact, keeps off-runway `gear`, `belly`, or `crashed` contact explicit instead of making the aircraft silently airborne outside a runway rectangle, damps first-contact angular rates, applies tire rollout forces for gear contact, applies runway-tangent belly/crash slide damping for gear-up contact, and leaves airborne/free-flight equations untouched.
 - `aero.ts` applies a conservative ground-effect model below one wingspan AGL: modest lift increase plus induced-drag relief, without changing the wind/air-relative velocity contract.
 - `integrate.ts` transitions APPROACH/DESCENT to LANDED on gear touchdown and keeps TAKEOFF->CLIMB gated on positive rate away from the runway.
 
@@ -178,7 +180,7 @@ push master
 
 These are intentional gaps, not regressions:
 
-1. Advanced gear/tire model details: dynamic oleo spring/damper compression loads, normal-force-scaled tire side-load/cornering stiffness, anti-skid brake limiting, asymmetric brake-force helpers, and gear-up runway-tangent belly/crash slide damping are now in the ground model; remaining gaps include broader crosswind scenario coverage, player-facing differential brake controls if desired, and non-runway surface support beyond the current station/load/friction/brake/side-load/steering/touchdown/belly-slide model.
+1. Advanced gear/tire model details: dynamic oleo spring/damper compression loads, normal-force-scaled tire side-load/cornering stiffness, anti-skid brake limiting, asymmetric brake-force helpers, gear-up runway-tangent belly/crash slide damping, and KSEA prepared-runway/off-runway surface sampling with friction scaling are now in the ground model; remaining gaps include broader crosswind scenario coverage, player-facing differential brake controls if desired, broader terrain mesh collision, and non-KSEA airport surface coverage beyond the current KSEA runway/off-runway rectangle model.
 2. Worker physics: codec and worker entry scaffolding exist, and `VITE_RFS_WORKER_PHYSICS` is parsed as an experimental/default-off runtime flag for future wiring. The active runtime still uses main-thread physics; no `simStore` tick migration or runtime Worker bridge is enabled yet.
 3. Advanced flight guidance: RFMS route edits and wiring turn-anticipation/VNAV lifecycle metrics into live AP truth/FMA updates beyond the current conservative target laws.
 4. Data-driven flight model: the B737-800 baseline spec is versioned, but validated aircraft coefficient tables and trim/response tests remain future work.

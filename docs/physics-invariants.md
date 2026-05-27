@@ -87,19 +87,23 @@ Regression coverage:
 - `src/sim/physics/__tests__/derived.test.ts`
 - `src/store/__tests__/simStore.test.ts`
 
-## Ground and runway contact
+## Ground and runway/off-runway contact
 
-Runway contact is a post-solve constraint, not an alternate wind/velocity frame.
+Ground contact is a post-solve constraint, not an alternate wind/velocity frame.
 
 Current contract:
 
 - `state.velocity` remains ground-relative body velocity throughout ground contact.
+- `sampleKseaSurface()` classifies KSEA runway rectangles as prepared runway and off-rectangle KSEA ground as off-runway ground with separate rolling/brake/side friction scales.
+- `GroundState.onRunway` means prepared runway surface, not merely any ground contact.
+- Off-runway ground contact may still be `contact: 'gear'`, `belly`, or `crashed`; it must not silently become airborne just because it is outside the runway rectangle.
 - Gear-down contact may load nose/left-main/right-main gear stations; gear-up `belly`/`crashed` contact must not set `weightOnWheels` or leave gear station loads active.
 - Runway-normal velocity is constrained in NED `down`, not by blindly zeroing body-axis `w` while pitched or rolled.
 - Gear-up belly/crash slide damping acts on runway-tangent NED `north/east` velocity and then converts back to body axes.
 - Belly/crash slide damping must clamp low-speed runway-tangent velocity at zero instead of reversing motion.
 - Gear-up angular damping is timestep-scaled retention per second, not a per-tick multiplier.
-- A high runway-normal sink-rate impact that enters `crashed` must remain `crashed` while the gear-up aircraft stays on runway contact.
+- A high runway-normal sink-rate impact that enters `crashed` must remain `crashed` while the gear-up aircraft stays in ground contact.
+- Surface friction scaling must never mutate wind/air-relative velocity; it only changes ground-contact tire/brake/side forces and leaves the ground-relative velocity contract intact.
 
 Regression coverage:
 
@@ -137,13 +141,14 @@ Regression coverage:
 4. `updateHydraulic()`
 5. `computeAero()`
 6. Physics integration
-7. `updateAutopilot()` for next-frame inputs
+7. Surface sampling, ground/contact constraint, and flight-phase updates
 
 Reasoning:
 
 - Engine state must be current before thrust is computed.
 - Fuel burn and gross weight must be current before accelerations are computed.
-- Autopilot writes control commands for the next tick, avoiding same-frame hidden feedback.
+- Autopilot commands are composed upstream before `integrate()`; the legacy AP parameters accepted by `integrate()` are intentionally ignored.
+- Surface sampling happens after position integration for the contact solve, while the pre-integration sample is used only for near-ground normal-force/liftoff checks.
 
 ## Required verification before claiming a physics change works
 

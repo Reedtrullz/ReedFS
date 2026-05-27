@@ -23,7 +23,7 @@ The completed baseline now includes:
 - Longitudinal drag is signed against air-relative flow.
 - Physics regressions are covered by unit tests.
 - Scenario-level takeoff/climb helpers and envelope tests exist.
-- Ground state, runway-normal contact, normal-force liftoff, and flight-phase decoupling are implemented.
+- Ground state, KSEA prepared-runway/off-runway surface sampling, runway-normal contact, off-runway friction scaling, normal-force liftoff, and flight-phase decoupling are implemented.
 - Input dynamics, pilot/AP/effective-control separation, stabilizer trim, CG pitch moment, and data-backed aero/engine envelope work are implemented.
 - Aircraft visual contract, persistent renderer, visual animation state, Cesium runway layer, cockpit shell, overlay modes, PFD/FMA, cockpit interaction hooks, scenario/tutorial/checklist/coach flow, guidance state, active-leg route status, LNAV feedback, conservative VNAV/SPD/VS behavior, rejected-takeoff abort flow, scenario persistence, controls settings, deterministic gusts, versioned B737 data, trim fixtures, and performance-card assertions are implemented.
 
@@ -31,16 +31,18 @@ Completion records:
 
 - `docs/plans/2026-05-25-rfs-foundation-stabilization.md`
 - `docs/plans/2026-05-26-rfs-comprehensive-usability-realism-plan.md`
+- `docs/plans/2026-05-27-rfs-advanced-gear-tire-ground-handling.md`
+- `docs/plans/2026-05-27-rfs-surface-aware-ground-handling.md`
 
 ## P1 — Finish gear/tire ground model and takeoff/landing realism
 
-Why this remains: the current pass establishes runway-normal contact, normal-force liftoff, phase semantics, normal-force-scaled tire side-load/cornering stiffness, anti-skid brake limiting, asymmetric brake-force helpers, dynamic oleo spring/damper compression loads, rudder-pedal-limited nosewheel steering, first deterministic crosswind/weathercocking takeoff-roll regressions, and gear-up runway-tangent belly/crash slide deceleration/damping. RFS still needs deeper rollout/taxi and landing scenarios before touchdown, rollout, taxi, and crosswind handling can feel fully like an airliner.
+Why this remains: the current pass establishes runway-normal contact, prepared-runway/off-runway KSEA surface sampling, off-runway rolling/brake/side friction scaling, normal-force liftoff, phase semantics, normal-force-scaled tire side-load/cornering stiffness, anti-skid brake limiting, asymmetric brake-force helpers, dynamic oleo spring/damper compression loads, rudder-pedal-limited nosewheel steering, first deterministic crosswind/weathercocking takeoff-roll regressions, and gear-up runway-tangent belly/crash slide deceleration/damping. RFS still needs deeper rollout/taxi and landing scenarios before touchdown, rollout, taxi, and crosswind handling can feel fully like an airliner.
 
 Remaining advanced scope:
 
 - More detailed rollout/taxi and crosswind landing scenarios.
 - Player-facing differential brake controls if desired.
-- Non-runway surface friction/terrain handling beyond the current KSEA runway model.
+- Broader terrain mesh collision and non-KSEA airport surface coverage beyond the current KSEA runway/off-runway rectangle model.
 
 Suggested implementation files:
 

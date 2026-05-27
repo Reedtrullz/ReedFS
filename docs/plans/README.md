@@ -12,7 +12,7 @@ Current source-of-truth documents:
 - `2026-05-26-rfs-comprehensive-usability-realism-plan.md` — current comprehensive implementation plan/status for usability, realism, aircraft visuals, cockpit, UI, and guidance; phases 0 through 5.5 are complete.
 - `2026-05-26-rfs-next-phases-release-hardening-and-realism.md` — next-phases execution plan for Phase 6 release hardening, deterministic visual proof, fixed timestep/worker prep, audio, and later gear/guidance/data/product phases.
 - `2026-05-27-rfs-advanced-gear-tire-ground-handling.md` — current P1 follow-up plan/status for tire side-load/cornering stiffness, asymmetric braking/anti-skid groundwork, dynamic oleo loads, crosswind/weathercocking runway guards, and gear-up runway-tangent belly/crash slide behavior.
-- `2026-05-27-rfs-surface-aware-ground-handling.md` — next implementation plan for KSEA runway/off-runway surface sampling, off-runway friction scaling, and prepared-runway `onRunway` semantics.
+- `2026-05-27-rfs-surface-aware-ground-handling.md` — completed/current status record for KSEA runway/off-runway surface sampling, off-runway friction scaling, and prepared-runway `onRunway` semantics.
 - `2026-05-25-rfs-foundation-stabilization.md` — completed stabilization record.
 
 Historical/target plans:
