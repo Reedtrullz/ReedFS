@@ -37,7 +37,7 @@ const targetDisplayStyle: React.CSSProperties = {
 
 type McpTarget = 'speed' | 'heading' | 'altitude' | 'verticalSpeed';
 
-type EnabledMcpMode = 'HDG_SEL' | 'LNAV' | 'ALT_HOLD' | 'VS' | 'SPEED' | 'OFF';
+type EnabledMcpMode = 'HDG_SEL' | 'LNAV' | 'ALT_HOLD' | 'VS' | 'SPEED' | 'N1' | 'OFF';
 
 export function createDefaultAutopilotState(): AutopilotState {
   return {
@@ -181,11 +181,10 @@ function applyMcpMode(apState: AutopilotState, mode: EnabledMcpMode): void {
     if (mode === 'VS' && !Number.isFinite(apState.boeing.verticalSpeed)) {
       apState.boeing.verticalSpeed = 0;
     }
-  } else if (mode === 'SPEED') {
-    const thrust: ThrustMode = mode;
-    apState.truth.thrustActive = thrust;
-    apState.boeing.speedMode = true;
-    apState.boeing.n1 = false;
+  } else if (mode === 'SPEED' || mode === 'N1') {
+    apState.truth.thrustActive = mode as ThrustMode;
+    apState.boeing.speedMode = mode === 'SPEED';
+    apState.boeing.n1 = mode === 'N1';
     apState.boeing.autothrottleArm = true;
   }
 }
@@ -287,6 +286,12 @@ export function RfsMCP() {
           style={thrActive === 'SPEED' ? activeStyle : btnStyle}
         >
           SPD
+        </button>
+        <button
+          onClick={() => toggleMode('N1')}
+          style={thrActive === 'N1' ? activeStyle : btnStyle}
+        >
+          N1
         </button>
         <button onClick={() => toggleMode('OFF')} style={btnStyle}>
           OFF

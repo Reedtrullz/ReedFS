@@ -24,6 +24,39 @@ describe('RfsMCP', () => {
     expect(ap?.boeing.speedMode).toBe(true);
   });
 
+  it('first N1 click creates AP state and honestly engages N1', () => {
+    render(<RfsMCP />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'N1' }));
+
+    const ap = useSimStore.getState().apState;
+    expect(ap).not.toBeNull();
+    expect(ap?.truth.autopilotStatus).toBe('CMD_A');
+    expect(ap?.truth.thrustActive).toBe('N1');
+    expect(ap?.boeing.autothrottleArm).toBe(true);
+    expect(ap?.boeing.n1).toBe(true);
+    expect(ap?.boeing.speedMode).toBe(false);
+  });
+
+  it('switches between SPD and N1 without leaving conflicting Boeing thrust flags', () => {
+    render(<RfsMCP />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'SPD' }));
+    fireEvent.click(screen.getByRole('button', { name: 'N1' }));
+
+    let ap = useSimStore.getState().apState;
+    expect(ap?.truth.thrustActive).toBe('N1');
+    expect(ap?.boeing.n1).toBe(true);
+    expect(ap?.boeing.speedMode).toBe(false);
+
+    fireEvent.click(screen.getByRole('button', { name: 'SPD' }));
+
+    ap = useSimStore.getState().apState;
+    expect(ap?.truth.thrustActive).toBe('SPEED');
+    expect(ap?.boeing.n1).toBe(false);
+    expect(ap?.boeing.speedMode).toBe(true);
+  });
+
   it('first VS click creates AP state and engages VS with a safe zero-fpm default', () => {
     render(<RfsMCP />);
 

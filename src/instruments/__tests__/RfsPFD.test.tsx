@@ -91,4 +91,16 @@ describe('RfsPFD', () => {
     expect(screen.getByText('VNAV')).toBeTruthy();
     expect(screen.getByText('CMD_A')).toBeTruthy();
   });
+
+  it('shows N1 as an honest FMA thrust mode when truth state is N1', () => {
+    const ap = apStateWithModes();
+    ap.truth.thrustActive = 'N1';
+    ap.boeing.n1 = true;
+    ap.boeing.speedMode = false;
+    useSimStore.getState().setApState(ap);
+
+    render(<RfsPFD />);
+
+    expect(screen.getByText('N1')).toBeTruthy();
+  });
 });
