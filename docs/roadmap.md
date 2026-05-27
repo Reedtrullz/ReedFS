@@ -34,12 +34,12 @@ Completion records:
 
 ## P1 — Finish gear/tire ground model and takeoff/landing realism
 
-Why this remains: the current pass establishes runway-normal contact, normal-force liftoff, phase semantics, normal-force-scaled tire side-load/cornering stiffness, anti-skid brake limiting, asymmetric brake-force helpers, and dynamic oleo spring/damper compression loads. RFS still needs deeper runway/taxi scenarios before touchdown, rollout, taxi, and crosswind handling can feel like an airliner.
+Why this remains: the current pass establishes runway-normal contact, normal-force liftoff, phase semantics, normal-force-scaled tire side-load/cornering stiffness, anti-skid brake limiting, asymmetric brake-force helpers, dynamic oleo spring/damper compression loads, rudder-pedal-limited nosewheel steering, and first deterministic crosswind/weathercocking takeoff-roll regressions. RFS still needs deeper rollout/taxi and landing scenarios before touchdown, rollout, taxi, and crosswind handling can feel fully like an airliner.
 
 Remaining advanced scope:
 
-- Expanded crosswind runway/taxi scenario coverage and player-facing differential brake controls if desired.
-- More detailed rollout/taxi scenarios.
+- More detailed rollout/taxi and crosswind landing scenarios.
+- Player-facing differential brake controls if desired.
 - Explicit gear-up belly-contact behavior beyond current guarded/crash contact states.
 
 Suggested implementation files:
@@ -167,8 +167,8 @@ Acceptance tests:
 
 Scope:
 
-- Deterministic gusts now perturb air-relative velocity without mutating ground velocity.
-- Remaining: crosswind runway tests, cloud/visibility rendering tied to parsed METAR layers, and QNH/temperature effects for pressure/density altitude.
+- Deterministic gusts now perturb air-relative velocity without mutating ground velocity, and fixed-step scenario regressions cover direct-crosswind weathercocking takeoff rolls.
+- Remaining: cloud/visibility rendering tied to parsed METAR layers, QNH/temperature effects for pressure/density altitude, and crosswind landing/rollout scenarios.
 
 Acceptance tests:
 

@@ -126,11 +126,12 @@ Known guidance follow-up:
 - `environment.ts` converts METAR wind to NED then to body axes, and layers deterministic seeded gust perturbations onto air-relative velocity only.
 - `computeAirRelativeVelocity()` subtracts wind/gust from ground-relative body velocity and returns a new object.
 - Wind/gust never mutate `state.velocity`; position, GS, and VS remain ground-relative while TAS/IAS/AoA/beta use the perturbed air-relative vector.
+- Fixed-step scenario tests can inject deterministic wind to assert crosswind takeoff/weathercocking behavior without changing the wind contract.
 
 ## Ground model architecture
 
 - `GroundState` carries per-station nose/left-main/right-main gear data: body-axis station position, static load fraction, compression, normal force, brake capability, steerability, and steering angle.
-- `ground.ts` distributes normal force across gear stations, computes dynamic oleo spring/damper compression loads, rolling friction, anti-skid-limited symmetric/asymmetric brake forces, and normal-force-scaled tire side forces from loaded stations, fades nosewheel steering out as speed rises, prevents stationary steering from creating motion, and records touchdown sink rate.
+- `ground.ts` distributes normal force across gear stations, computes dynamic oleo spring/damper compression loads, rolling friction, anti-skid-limited symmetric/asymmetric brake forces, and normal-force-scaled tire side forces from loaded stations, limits current rudder-pedal nosewheel steering to B737 pedal-scale authority while fading it out as speed rises, prevents stationary steering from creating motion, and records touchdown sink rate.
 - `simStore.abortTakeoff()` gives the player a rejected-takeoff control path: idle both throttles, full brakes/spoilers, AP disconnected, sim kept running for the braking rollout, and guidance moves to `rejected-takeoff`.
 - `applyGroundContact()` remains a post-solve runway constraint: it prevents sink-through, constrains runway-normal velocity, damps first-contact angular rates, applies tire rollout forces, and leaves airborne/free-flight equations untouched.
 - `aero.ts` applies a conservative ground-effect model below one wingspan AGL: modest lift increase plus induced-drag relief, without changing the wind/air-relative velocity contract.

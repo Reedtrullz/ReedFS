@@ -1,6 +1,7 @@
 import type { AircraftState, ControlInputs } from '../types';
 import { B737_800_SPEC, createInitialState } from '../types';
 import { integrate } from '../physics/integrate';
+import type { WindInfo } from '../weather';
 
 export function takeoffRollInputs(overrides: Partial<ControlInputs> = {}): ControlInputs {
   return {
@@ -22,6 +23,7 @@ export function runFixedStepScenario(options: {
   hz: number;
   state?: AircraftState;
   inputs?: ControlInputs;
+  wind?: WindInfo | null;
   mutateInputs?: (state: AircraftState, inputs: ControlInputs, elapsedSeconds: number) => void;
 }): AircraftState {
   const state = options.state ?? createInitialState(B737_800_SPEC);
@@ -29,7 +31,7 @@ export function runFixedStepScenario(options: {
   const dt = 1 / options.hz;
   for (let i = 0; i < options.seconds * options.hz; i += 1) {
     options.mutateInputs?.(state, inputs, i * dt);
-    integrate(state, inputs, B737_800_SPEC, dt);
+    integrate(state, inputs, B737_800_SPEC, dt, null, null, options.wind ?? null);
   }
   return state;
 }

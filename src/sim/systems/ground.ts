@@ -16,7 +16,7 @@ const BREAKAWAY_THROTTLE = 0.05;
 const MIN_GROUND_PITCH_RAD = 0;
 const MAX_GROUND_PITCH_RAD = 0.35;
 const MAX_GROUND_ROLL_RAD = 0.2;
-const MAX_NOSEWHEEL_STEERING_RAD = 45 * Math.PI / 180;
+const MAX_RUDDER_PEDAL_NOSEWHEEL_STEERING_RAD = 7 * Math.PI / 180;
 const STEERING_FADE_START_MPS = 30;
 const STEERING_FADE_END_MPS = 70;
 const TOUCHDOWN_MIN_SINK_RATE_MPS = 0.25;
@@ -315,7 +315,7 @@ export function computeNosewheelSteeringAngleRad(inputs: ControlInputs, forwardS
     : speed >= STEERING_FADE_END_MPS
       ? 0
       : (STEERING_FADE_END_MPS - speed) / (STEERING_FADE_END_MPS - STEERING_FADE_START_MPS);
-  return clamp01(Math.abs(inputs.rudder)) * Math.sign(inputs.rudder) * MAX_NOSEWHEEL_STEERING_RAD * fade;
+  return clamp01(Math.abs(inputs.rudder)) * Math.sign(inputs.rudder) * MAX_RUDDER_PEDAL_NOSEWHEEL_STEERING_RAD * fade;
 }
 
 export function computeTireSideForces(

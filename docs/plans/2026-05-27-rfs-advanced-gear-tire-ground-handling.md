@@ -151,6 +151,36 @@ Expected: PASS.
 
 ---
 
+## Task 5 [PARENT-DIRECT]: Add crosswind runway/taxi scenario coverage and weathercocking guards
+
+**Status:** Complete in the current follow-up after `43f339c`; implemented with wind-capable fixed-step scenario helpers, crosswind/weathercocking regressions, and B737 pedal-scale nosewheel steering limits.
+
+**Objective:** Lock down crosswind ground behavior with deterministic scenario tests before deeper rollout/taxi tuning. The current `rudder` input represents rudder pedals, not a separate tiller, so nosewheel steering must stay in a realistic pedal-authority range during crosswind takeoff rolls while still permitting low-speed taxi turns.
+
+**Files:**
+
+- Modify: `src/sim/systems/ground.ts`
+- Modify: `src/sim/systems/__tests__/ground.test.ts`
+- Modify: `src/sim/__tests__/scenarioHelpers.ts`
+- Modify: `src/sim/physics/__tests__/integrate.test.ts`
+- Modify docs after the slice lands: `README.md`, `docs/architecture.md`, `docs/roadmap.md`
+
+**Test first:**
+
+- Full rudder-pedal nosewheel steering at taxi speed is limited to B737 pedal-scale authority rather than tiller-scale 45-degree authority, and fades out at takeoff speed.
+- Fixed-step scenario helper can run deterministic wind/crosswind cases without mutating ground velocity through the wind helper.
+- Opposite direct crosswinds create symmetric weathercock heading tendencies into the wind during a takeoff roll.
+- A modest counter-rudder crosswind takeoff roll remains bounded in heading/lateral drift instead of spinning across the runway due to excessive nosewheel steering.
+
+**Constraints:**
+
+- Keep `ControlInputs.rudder` as rudder-pedal input; do not add tiller or differential-brake UI in this slice.
+- Preserve the wind contract: wind affects air-relative velocity only and never destructively mutates ground-relative `state.velocity`.
+- Preserve stopped-aircraft safeguards: held rudder while stopped must not create lateral motion or yaw in place.
+- Avoid broad aero retuning; this slice is a ground/runway behavior guard.
+
+---
+
 ## Final verification before reporting
 
 Run the full gate:

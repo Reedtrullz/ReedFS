@@ -304,9 +304,11 @@ describe('applyGroundContact', () => {
     expect(Math.abs(state.angularVel.r)).toBeLessThan(0.2);
   });
 
-  it('maps rudder command to nosewheel steering at taxi speed and fades it out at takeoff speed', () => {
-    expect(computeNosewheelSteeringAngleRad({ ...idle, rudder: 1 }, 5)).toBeGreaterThan(0.6);
-    expect(computeNosewheelSteeringAngleRad({ ...idle, rudder: -1 }, 5)).toBeLessThan(-0.6);
+  it('limits rudder-pedal nosewheel steering to pedal authority and fades it out at takeoff speed', () => {
+    const fullPedalSteeringRad = 7 * Math.PI / 180;
+
+    expect(computeNosewheelSteeringAngleRad({ ...idle, rudder: 1 }, 5)).toBeCloseTo(fullPedalSteeringRad, 8);
+    expect(computeNosewheelSteeringAngleRad({ ...idle, rudder: -1 }, 5)).toBeCloseTo(-fullPedalSteeringRad, 8);
     expect(computeNosewheelSteeringAngleRad({ ...idle, rudder: 1 }, 80)).toBe(0);
   });
 
@@ -320,7 +322,8 @@ describe('applyGroundContact', () => {
     const contact = applyGroundContact(state, taxiRight, 1 / 2);
 
     const nose = contact.gearStations.find((station) => station.id === 'nose');
-    expect(nose?.steeringAngleRad).toBeGreaterThan(0.6);
+    expect(nose?.steeringAngleRad).toBeGreaterThan(0.1);
+    expect(nose?.steeringAngleRad).toBeLessThan(0.13);
     expect(state.angularVel.r).toBeGreaterThan(0);
     expect(state.angularVel.r).toBeLessThan(0.5);
   });

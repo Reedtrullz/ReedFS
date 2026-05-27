@@ -22,6 +22,24 @@ function setAttitude(s: ReturnType<typeof createInitialState>, attitude: Attitud
   s.quaternion = eulerToQuat(attitude.phi, attitude.theta, attitude.psi);
 }
 
+function normalizeAngleRad(angleRad: number): number {
+  return Math.atan2(Math.sin(angleRad), Math.cos(angleRad));
+}
+
+function runwayHeadingDeltaRad(state: ReturnType<typeof createInitialState>): number {
+  return normalizeAngleRad(state.attitude.psi - Math.PI);
+}
+
+function runwayLateralDisplacementM(state: ReturnType<typeof createInitialState>): number {
+  const initialPosition = createInitialState(B737_800_SPEC).position;
+  const metersPerDegreeLon = 111_320 * Math.cos(initialPosition.lat * Math.PI / 180);
+  return (state.position.lon - initialPosition.lon) * metersPerDegreeLon;
+}
+
+function degToRad(deg: number): number {
+  return deg * Math.PI / 180;
+}
+
 function airborneTakeoffConfigState(trimUnits: number): ReturnType<typeof createInitialState> {
   const state = createInitialState(B737_800_SPEC);
   const aoaRad = 5 * Math.PI / 180;
@@ -502,6 +520,44 @@ describe('integrate', () => {
     integrate(s, takeoffRollInputs({ gearLever: 'DOWN' }), B737_800_SPEC, 1 / 120);
 
     expect(s.flightPhase).toBe('TAKEOFF');
+  });
+
+  it('direct crosswinds weathercock takeoff rolls symmetrically into the wind', () => {
+    const eastCrosswind = runFixedStepScenario({
+      hz: 120,
+      seconds: 20,
+      inputs: takeoffRollInputs(),
+      wind: { dir: 90, speed: 20 },
+    });
+    const westCrosswind = runFixedStepScenario({
+      hz: 120,
+      seconds: 20,
+      inputs: takeoffRollInputs(),
+      wind: { dir: 270, speed: 20 },
+    });
+
+    const eastDelta = runwayHeadingDeltaRad(eastCrosswind);
+    const westDelta = runwayHeadingDeltaRad(westCrosswind);
+
+    expect(eastDelta).toBeLessThan(-degToRad(2));
+    expect(westDelta).toBeGreaterThan(degToRad(2));
+    expect(Math.abs(Math.abs(eastDelta) - Math.abs(westDelta))).toBeLessThan(degToRad(2));
+    expect(eastCrosswind.ground.weightOnWheels).toBe(true);
+    expect(westCrosswind.ground.weightOnWheels).toBe(true);
+  });
+
+  it('bounded counter-rudder keeps a crosswind takeoff roll from spinning across the runway', () => {
+    const state = runFixedStepScenario({
+      hz: 120,
+      seconds: 20,
+      inputs: takeoffRollInputs({ rudder: -0.1 }),
+      wind: { dir: 270, speed: 20 },
+    });
+
+    expect(Math.abs(runwayHeadingDeltaRad(state))).toBeLessThan(degToRad(25));
+    expect(Math.abs(runwayLateralDisplacementM(state))).toBeLessThan(120);
+    expect(state.velocity.u).toBeGreaterThan(40);
+    expect(state.ground.weightOnWheels).toBe(true);
   });
 
   it('roll input produces negative roll rate', () => {
