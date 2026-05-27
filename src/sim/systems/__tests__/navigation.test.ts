@@ -176,6 +176,121 @@ describe('computeRouteStatus', () => {
     expect(status.nextWaypointIdent).toBe('DEST');
   });
 
+  it('sequences to the next leg inside the bounded turn-anticipation gate before the waypoint', () => {
+    const fp = makePlan([
+      { ident: 'ORIG', lat: 47.0, lon: -122.0, discontinuity: false },
+      { ident: 'MID', lat: 47.2, lon: -122.0, discontinuity: false },
+      { ident: 'DEST', lat: 47.2, lon: -121.8, discontinuity: false },
+    ]);
+    const state = makeState(47.185, -122.0, 128.6);
+
+    const status = computeRouteStatus(state, fp, 0, { captureRadiusM: 100 });
+
+    expect(status.lnavAvailable).toBe(true);
+    expect(status.sequenced).toBe(true);
+    expect(status.activeLegIndex).toBe(1);
+    expect(status.fromIdent).toBe('MID');
+    expect(status.nextWaypointIdent).toBe('DEST');
+    expect(status.desiredTrackDegTrue).toBeCloseTo(90, 0);
+  });
+
+  it('does not turn-anticipate with vertical-only velocity', () => {
+    const fp = makePlan([
+      { ident: 'ORIG', lat: 47.0, lon: -122.0, discontinuity: false },
+      { ident: 'MID', lat: 47.2, lon: -122.0, discontinuity: false },
+      { ident: 'DEST', lat: 47.2, lon: -121.8, discontinuity: false },
+    ]);
+    const state = makeState(47.185, -122.0, 0);
+    state.velocity.u = 0;
+    state.velocity.v = 0;
+    state.velocity.w = 128.6;
+
+    const status = computeRouteStatus(state, fp, 0, { captureRadiusM: 100 });
+
+    expect(status.activeLegIndex).toBe(0);
+    expect(status.sequenced).toBe(false);
+    expect(status.nextWaypointIdent).toBe('MID');
+  });
+
+  it('does not turn-anticipate when the aircraft is outside the bounded lead gate', () => {
+    const fp = makePlan([
+      { ident: 'ORIG', lat: 47.0, lon: -122.0, discontinuity: false },
+      { ident: 'MID', lat: 47.2, lon: -122.0, discontinuity: false },
+      { ident: 'DEST', lat: 47.2, lon: -121.8, discontinuity: false },
+    ]);
+    const state = makeState(47.14, -122.0, 128.6);
+
+    const status = computeRouteStatus(state, fp, 0, { captureRadiusM: 100 });
+
+    expect(status.lnavAvailable).toBe(true);
+    expect(status.sequenced).toBe(false);
+    expect(status.activeLegIndex).toBe(0);
+    expect(status.nextWaypointIdent).toBe('MID');
+  });
+
+  it('bounds turn anticipation so short legs do not sequence immediately after the from waypoint', () => {
+    const fp = makePlan([
+      { ident: 'ORIG', lat: 47.0, lon: -122.0, discontinuity: false },
+      { ident: 'MID', lat: 47.01, lon: -122.0, discontinuity: false },
+      { ident: 'DEST', lat: 47.01, lon: -121.99, discontinuity: false },
+    ]);
+    const state = makeState(47.004, -122.0, 128.6);
+
+    const status = computeRouteStatus(state, fp, 0, { captureRadiusM: 50 });
+
+    expect(status.sequenced).toBe(false);
+    expect(status.activeLegIndex).toBe(0);
+    expect(status.nextWaypointIdent).toBe('MID');
+  });
+
+  it('does not turn-anticipate for straight-through route geometry', () => {
+    const fp = makePlan([
+      { ident: 'ORIG', lat: 47.0, lon: -122.0, discontinuity: false },
+      { ident: 'MID', lat: 47.2, lon: -122.0, discontinuity: false },
+      { ident: 'DEST', lat: 47.4, lon: -122.0, discontinuity: false },
+    ]);
+    const state = makeState(47.185, -122.0, 128.6);
+
+    const status = computeRouteStatus(state, fp, 0, { captureRadiusM: 100 });
+
+    expect(status.sequenced).toBe(false);
+    expect(status.activeLegIndex).toBe(0);
+    expect(status.nextWaypointIdent).toBe('MID');
+  });
+
+  it('does not turn-anticipate without usable forward speed', () => {
+    const fp = makePlan([
+      { ident: 'ORIG', lat: 47.0, lon: -122.0, discontinuity: false },
+      { ident: 'MID', lat: 47.2, lon: -122.0, discontinuity: false },
+      { ident: 'DEST', lat: 47.2, lon: -121.8, discontinuity: false },
+    ]);
+    const state = makeState(47.185, -122.0, 0);
+
+    const status = computeRouteStatus(state, fp, 0, { captureRadiusM: 100 });
+
+    expect(status.sequenced).toBe(false);
+    expect(status.activeLegIndex).toBe(0);
+    expect(status.nextWaypointIdent).toBe('MID');
+  });
+
+  it('does not turn-anticipate when turn anticipation is disabled for deterministic diagnostics', () => {
+    const fp = makePlan([
+      { ident: 'ORIG', lat: 47.0, lon: -122.0, discontinuity: false },
+      { ident: 'MID', lat: 47.2, lon: -122.0, discontinuity: false },
+      { ident: 'DEST', lat: 47.2, lon: -121.8, discontinuity: false },
+    ]);
+    const state = makeState(47.185, -122.0, 128.6);
+
+    const status = computeRouteStatus(state, fp, 0, {
+      captureRadiusM: 100,
+      turnAnticipationEnabled: false,
+    });
+
+    expect(status.sequenced).toBe(false);
+    expect(status.activeLegIndex).toBe(0);
+    expect(status.nextWaypointIdent).toBe('MID');
+  });
+
   it('reports distance, desired track, and ETA to the active next waypoint', () => {
     const fp = makePlan([
       { ident: 'ORIG', lat: 47.0, lon: -122.0, discontinuity: false },

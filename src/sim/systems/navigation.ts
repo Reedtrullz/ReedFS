@@ -6,6 +6,7 @@ const M_PER_NM = 1852;
 const DEFAULT_CAPTURE_RADIUS_M = 0.5 * M_PER_NM;
 const LEG_COMPLETE_RADIUS_M = 0.1 * M_PER_NM;
 const STANDARD_LNAV_BANK_RAD = 25 * Math.PI / 180;
+const MAX_TURN_ANTICIPATION_LEG_FRACTION = 0.5;
 const GRAVITY_MPS2 = 9.80665;
 
 export interface NavOutput {
@@ -46,6 +47,7 @@ export interface RouteStatusSnapshot {
 
 export interface RouteStatusOptions {
   captureRadiusM?: number;
+  turnAnticipationEnabled?: boolean;
 }
 
 interface RouteLeg {
@@ -65,6 +67,8 @@ interface RouteValidationResult {
   legs: RouteLeg[];
   unavailableReason: string | null;
 }
+
+type SequencingReason = 'capture' | 'passed' | 'turnAnticipation' | null;
 
 function isFiniteNumber(value: number | undefined): value is number {
   return typeof value === 'number' && Number.isFinite(value);
@@ -203,13 +207,55 @@ function positionRelativeToLegM(leg: RouteLeg, lat: number, lon: number): { alon
   return { alongTrackM, crossTrackM, legLengthM };
 }
 
-function shouldSequenceLeg(state: AircraftState, leg: RouteLeg, captureRadiusM: number): boolean {
+function computeLegTurnAngleRad(leg: RouteLeg, nextLeg: RouteLeg | undefined): number | null {
+  if (!nextLeg || leg.fromLat === null || leg.fromLon === null) return null;
+  const desiredTrackRad = bearingRad(leg.fromLat, leg.fromLon, leg.toLat, leg.toLon);
+  const nextDesiredTrackRad = bearingRad(
+    nextLeg.fromLat ?? leg.toLat,
+    nextLeg.fromLon ?? leg.toLon,
+    nextLeg.toLat,
+    nextLeg.toLon,
+  );
+  return normalizeSignedRad(nextDesiredTrackRad - desiredTrackRad);
+}
+
+function turnAnticipationLeadM(
+  state: AircraftState,
+  leg: RouteLeg,
+  nextLeg: RouteLeg | undefined,
+): number | null {
+  const horizontalSpeedMps = Math.hypot(state.velocity.u, state.velocity.v);
+  const rawLeadM = computeTurnAnticipationDistanceM(
+    horizontalSpeedMps > 1 ? horizontalSpeedMps : null,
+    computeLegTurnAngleRad(leg, nextLeg),
+  );
+  return rawLeadM !== null && Number.isFinite(rawLeadM) && rawLeadM > 0 ? rawLeadM : null;
+}
+
+function sequencingReasonForLeg(
+  state: AircraftState,
+  leg: RouteLeg,
+  nextLeg: RouteLeg | undefined,
+  captureRadiusM: number,
+  turnAnticipationEnabled: boolean,
+): SequencingReason {
   const distanceToWaypointM = distanceM(state.position.lat, state.position.lon, leg.toLat, leg.toLon);
-  if (distanceToWaypointM <= captureRadiusM) return true;
+  if (distanceToWaypointM <= captureRadiusM) return 'capture';
 
   const relative = positionRelativeToLegM(leg, state.position.lat, state.position.lon);
-  if (!relative) return false;
-  return relative.alongTrackM >= relative.legLengthM;
+  if (!relative) return null;
+  if (relative.alongTrackM >= relative.legLengthM) return 'passed';
+
+  if (!turnAnticipationEnabled || !nextLeg) return null;
+  if (relative.alongTrackM < 0 || relative.alongTrackM >= relative.legLengthM) return null;
+
+  const rawLeadM = turnAnticipationLeadM(state, leg, nextLeg);
+  if (rawLeadM === null) return null;
+
+  const boundedLeadM = Math.min(rawLeadM, relative.legLengthM * MAX_TURN_ANTICIPATION_LEG_FRACTION);
+  if (!Number.isFinite(boundedLeadM) || boundedLeadM <= captureRadiusM) return null;
+
+  return distanceToWaypointM <= boundedLeadM ? 'turnAnticipation' : null;
 }
 
 export function createNoRouteStatus(
@@ -261,10 +307,19 @@ export function computeRouteStatus(
 
   const legs = route.legs;
   const captureRadiusM = options.captureRadiusM ?? DEFAULT_CAPTURE_RADIUS_M;
+  const turnAnticipationEnabled = options.turnAnticipationEnabled ?? true;
   let legIndex = Math.max(0, Math.min(activeLegIndex ?? 0, legs.length - 1));
   let sequenced = false;
 
-  while (legIndex < legs.length - 1 && shouldSequenceLeg(state, legs[legIndex], captureRadiusM)) {
+  while (legIndex < legs.length - 1) {
+    const reason = sequencingReasonForLeg(
+      state,
+      legs[legIndex],
+      legs[legIndex + 1],
+      captureRadiusM,
+      turnAnticipationEnabled,
+    );
+    if (!reason) break;
     legIndex += 1;
     sequenced = true;
   }
