@@ -262,6 +262,41 @@ describe('applyGroundContact', () => {
     expect(state.position.alt).toBe(KSEA_RUNWAY_ALT_FT);
   });
 
+  it('reports off-runway gear contact without pretending it is prepared runway', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.position = offsetPositionMeters(KSEA_RUNWAY_16L.start, 0, 80);
+    state.position.alt = KSEA_RUNWAY_ALT_FT;
+    state.config.gearDown = true;
+    const offRunwaySurface = sampleKseaSurface(state.position);
+
+    const contact = applyGroundContact(state, idle, 1 / 60, KSEA_RUNWAY_ALT_FT, {
+      surface: offRunwaySurface,
+    });
+
+    expect(offRunwaySurface.kind).toBe('offRunway');
+    expect(contact.contact).toBe('gear');
+    expect(contact.weightOnWheels).toBe(true);
+    expect(contact.onRunway).toBe(false);
+  });
+
+  it('reports off-runway gear-up belly contact without setting onRunway', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.position = offsetPositionMeters(KSEA_RUNWAY_16L.start, 0, 80);
+    state.position.alt = KSEA_RUNWAY_ALT_FT - 1;
+    state.config.gearDown = false;
+    const gearUp: ControlInputs = { ...idle, gearLever: 'UP' };
+    const offRunwaySurface = sampleKseaSurface(state.position);
+
+    const contact = applyGroundContact(state, gearUp, 1 / 60, KSEA_RUNWAY_ALT_FT, {
+      surface: offRunwaySurface,
+    });
+
+    expect(offRunwaySurface.kind).toBe('offRunway');
+    expect(contact.contact).toBe('belly');
+    expect(contact.weightOnWheels).toBe(false);
+    expect(contact.onRunway).toBe(false);
+  });
+
   it('decelerates a gear-up belly slide without treating it as weight-on-wheels', () => {
     const state = createInitialState(B737_800_SPEC);
     state.position.alt = KSEA_RUNWAY_ALT_FT - 1;

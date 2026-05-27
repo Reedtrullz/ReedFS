@@ -39,6 +39,7 @@ export type GroundContactResult = GroundState;
 export interface GroundContactOptions {
   normalForceN?: number;
   allowLiftoff?: boolean;
+  surface?: GroundSurfaceSample;
 }
 
 export interface GroundRollForceBreakdown {
@@ -153,6 +154,7 @@ function setGroundState(
   normalForceN: number,
   gearStationsOverride?: GearStationState[],
   touchdownSinkRateMps?: number,
+  onRunway = contact !== 'none',
 ): GroundState {
   const aglFt = Math.max(0, state.position.alt - groundAltFt);
   const gearStations = gearStationsOverride ?? createB737GearStations(
@@ -170,7 +172,7 @@ function setGroundState(
     weightOnWheels,
     normalForceN,
     lastTouchdownSinkRateMps,
-    onRunway: contact !== 'none',
+    onRunway: contact !== 'none' && onRunway,
     contact,
     gearStations,
   };
@@ -425,8 +427,9 @@ function applyTireSideForces(
   state: AircraftState,
   dt: number,
   gearStations: GearStationState[],
+  surface?: GroundSurfaceSample,
 ): void {
-  const tireSideForces = computeTireSideForces(state, gearStations);
+  const tireSideForces = computeTireSideForces(state, gearStations, surface);
   const previousLateralVelocity = state.velocity.v;
   const lateralDelta = tireSideForces.lateralAccelerationMps2 * Math.max(0, dt);
   const nextLateralVelocity = previousLateralVelocity + lateralDelta;
@@ -471,6 +474,7 @@ function applyLongitudinalGroundDecel(
   inputs: ControlInputs,
   dt: number,
   gearStations: GearStationState[],
+  surface?: GroundSurfaceSample,
 ): void {
   const speed = state.velocity.u;
   const breakawayThrust = hasBreakawayThrustCommand(inputs);
@@ -480,7 +484,7 @@ function applyLongitudinalGroundDecel(
     return;
   }
 
-  const forces = computeGroundRollForces(state, inputs, gearStations);
+  const forces = computeGroundRollForces(state, inputs, gearStations, surface);
   const decel = forces.accelerationMps2 * Math.max(0, dt);
   state.angularVel.r += forces.yawAccelerationRadps2 * Math.max(0, dt);
 
@@ -517,6 +521,7 @@ export function applyGroundContact(
   const atOrBelowGround = state.position.alt <= groundAltFt + GROUND_CONTACT_EPSILON_FT;
   const runwayDownMps = bodyToNed(state.velocity, state.attitude).down;
   const touchdownSinkRateMps = !state.ground.weightOnWheels && runwayDownMps > 0 ? runwayDownMps : undefined;
+  const surfaceOnRunway = options.surface?.onRunway ?? true;
 
   if (!atOrBelowGround) {
     return setGroundState(state, groundAltFt, 'none', false, 0);
@@ -536,7 +541,16 @@ export function applyGroundContact(
     state.position.alt = groundAltFt;
     applyGearUpContactDamping(state, contact, dt);
     constrainRunwayNormalVelocity(state);
-    return setGroundState(state, groundAltFt, contact, false, options.normalForceN ?? grossWeightForceN(state));
+    return setGroundState(
+      state,
+      groundAltFt,
+      contact,
+      false,
+      options.normalForceN ?? grossWeightForceN(state),
+      undefined,
+      undefined,
+      surfaceOnRunway,
+    );
   }
 
   const staticGearNormalForceN = options.normalForceN ?? grossWeightForceN(state);
@@ -555,9 +569,18 @@ export function applyGroundContact(
   stabilizeGroundAttitude(state);
   applyTouchdownDamping(state, touchdownSinkRateMps ?? 0);
   loadedGearStations = applyNosewheelSteering(state, inputs, loadedGearStations);
-  applyTireSideForces(state, dt, loadedGearStations);
-  applyLongitudinalGroundDecel(state, inputs, dt, loadedGearStations);
+  applyTireSideForces(state, dt, loadedGearStations, options.surface);
+  applyLongitudinalGroundDecel(state, inputs, dt, loadedGearStations, options.surface);
   constrainRunwayNormalVelocity(state);
 
-  return setGroundState(state, groundAltFt, 'gear', true, gearNormalForceN, loadedGearStations, touchdownSinkRateMps);
+  return setGroundState(
+    state,
+    groundAltFt,
+    'gear',
+    true,
+    gearNormalForceN,
+    loadedGearStations,
+    touchdownSinkRateMps,
+    surfaceOnRunway,
+  );
 }
