@@ -55,4 +55,36 @@ describe('InputManager', () => {
     expect(state.elevator).toBeLessThan(0);
     expect(state.elevator).toBeCloseTo(-0.3, 8);
   });
+
+  it('propagates side-specific brakes momentarily and resets them when released', () => {
+    const pressed = updateInputManager(
+      createInputManagerState(),
+      { leftBrake: 1, rightBrake: 0.5 },
+      1 / 60,
+    );
+
+    expect(pressed.leftBrake).toBe(1);
+    expect(pressed.rightBrake).toBe(0.5);
+    expect(inputManagerStateToControlInputs(pressed)).toEqual(expect.objectContaining({
+      brake: 0,
+      leftBrake: 1,
+      rightBrake: 0.5,
+    }));
+
+    const released = updateInputManager(pressed, {}, 1 / 60);
+
+    expect(released.leftBrake).toBe(0);
+    expect(released.rightBrake).toBe(0);
+    expect(inputManagerStateToControlInputs(released)).toEqual(expect.objectContaining({
+      leftBrake: 0,
+      rightBrake: 0,
+    }));
+  });
+
+  it('merges side-specific brake actions with max/clamped semantics', () => {
+    expect(mergeInputActions(
+      { leftBrake: 0.25, rightBrake: 0.4 },
+      { leftBrake: 0.75, rightBrake: 2 },
+    )).toEqual({ leftBrake: 0.75, rightBrake: 1 });
+  });
 });

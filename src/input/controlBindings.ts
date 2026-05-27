@@ -4,6 +4,7 @@ export type ControlBindingId =
   | 'rudder'
   | 'throttle'
   | 'brake'
+  | 'differentialBrake'
   | 'gear'
   | 'flaps'
   | 'trim'
@@ -57,6 +58,13 @@ export const DEFAULT_CONTROL_BINDINGS: ControlBinding[] = [
     keyboard: ['Space'],
     gamepad: [],
     description: 'Wheel braking on the ground.',
+  },
+  {
+    id: 'differentialBrake',
+    label: 'Differential brake',
+    keyboard: ['Z/X'],
+    gamepad: [],
+    description: 'Momentary left/right wheel braking for low-speed runway steering.',
   },
   {
     id: 'gear',

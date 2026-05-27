@@ -22,6 +22,8 @@ describe('ControlsSettings', () => {
     expect(screen.getByText(/Gamepad left stick Y/)).toBeTruthy();
     expect(screen.getByText('Overlay')).toBeTruthy();
     expect(screen.getByText(/OVL button/)).toBeTruthy();
+    expect(screen.getByText('Differential brake')).toBeTruthy();
+    expect(screen.getByText(/Z\/X/)).toBeTruthy();
   });
 
   it('shows validation problems for duplicate bindings', () => {

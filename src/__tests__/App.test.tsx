@@ -160,8 +160,8 @@ vi.mock('../store/simStore', () => {
       coachMessage: 'Checklist complete. Press START ROLL when ready.',
       alerts: [],
     },
-    inputs: { elevator: 0, aileron: 0, rudder: 0, throttle1: 0, throttle2: 0, flapLever: 0, gearLever: 'DOWN' as const, spoilers: 0, brake: 0 },
-    effectiveControls: { elevator: 0, aileron: 0, rudder: 0, throttle1: 0, throttle2: 0, flapLever: 0, gearLever: 'DOWN' as const, spoilers: 0, brake: 0 },
+    inputs: { elevator: 0, aileron: 0, rudder: 0, throttle1: 0, throttle2: 0, flapLever: 0, gearLever: 'DOWN' as const, spoilers: 0, brake: 0, leftBrake: 0, rightBrake: 0 },
+    effectiveControls: { elevator: 0, aileron: 0, rudder: 0, throttle1: 0, throttle2: 0, flapLever: 0, gearLever: 'DOWN' as const, spoilers: 0, brake: 0, leftBrake: 0, rightBrake: 0 },
     tick: vi.fn(),
     start: mockStart,
     startTakeoffRoll: mockStartTakeoffRoll,
@@ -331,7 +331,7 @@ vi.mock('../viewport/CesiumViewport', async (importOriginal) => {
   };
 });
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import ThreeToCesium from 'three-to-cesium';
 import { App } from '../App';
 import { useSimStore } from '../store/simStore';
@@ -396,6 +396,131 @@ describe('App', () => {
 
     expect(mockSetFlightPlan).toHaveBeenCalledTimes(1);
     expect(mockSetFlightPlan).toHaveBeenCalledWith(expect.objectContaining({ origin: 'KSEA', destination: 'KPDX' }));
+  });
+
+  it('tracks Z/X differential brake keys in the live input path and clears them on blur and cleanup', () => {
+    const rafCallbacks: FrameRequestCallback[] = [];
+    const requestAnimationFrameSpy = vi
+      .spyOn(globalThis, 'requestAnimationFrame')
+      .mockImplementation((callback: FrameRequestCallback): number => {
+        rafCallbacks.push(callback);
+        return rafCallbacks.length;
+      });
+    const cancelAnimationFrameSpy = vi
+      .spyOn(globalThis, 'cancelAnimationFrame')
+      .mockImplementation(() => undefined);
+
+    const flushRaf = (timestamp: number) => {
+      const pendingCallbacks = rafCallbacks.splice(0);
+      act(() => {
+        pendingCallbacks.forEach((callback) => callback(timestamp));
+      });
+    };
+
+    try {
+      const view = render(<App />);
+      mockApplyInputActions.mockClear();
+      mockSetInput.mockClear();
+
+      fireEvent.keyDown(window, { key: 'z' });
+      fireEvent.keyDown(window, { key: 'x' });
+      flushRaf(1000);
+
+      expect(mockApplyInputActions).toHaveBeenCalledWith(
+        expect.objectContaining({ leftBrake: 1, rightBrake: 1 }),
+        expect.any(Number),
+      );
+
+      fireEvent.blur(window);
+      const blurClear = mockSetInput.mock.calls.at(-1)?.[0];
+      expect(blurClear).toEqual(expect.objectContaining({
+        rudder: 0,
+        brake: 0,
+        leftBrake: 0,
+        rightBrake: 0,
+      }));
+      expect(blurClear).not.toHaveProperty('elevator');
+      expect(blurClear).not.toHaveProperty('aileron');
+
+      mockApplyInputActions.mockClear();
+      flushRaf(1016);
+      const clearedActions = mockApplyInputActions.mock.calls.at(-1)?.[0];
+      expect(clearedActions).not.toHaveProperty('leftBrake');
+      expect(clearedActions).not.toHaveProperty('rightBrake');
+
+      mockSetInput.mockClear();
+      view.unmount();
+      const cleanupClear = mockSetInput.mock.calls.at(-1)?.[0];
+      expect(cleanupClear).toEqual(expect.objectContaining({
+        rudder: 0,
+        brake: 0,
+        leftBrake: 0,
+        rightBrake: 0,
+      }));
+      expect(cleanupClear).not.toHaveProperty('elevator');
+      expect(cleanupClear).not.toHaveProperty('aileron');
+    } finally {
+      requestAnimationFrameSpy.mockRestore();
+      cancelAnimationFrameSpy.mockRestore();
+    }
+  });
+
+  it('clears held Z/X differential brakes when the document becomes hidden', () => {
+    const rafCallbacks: FrameRequestCallback[] = [];
+    const requestAnimationFrameSpy = vi
+      .spyOn(globalThis, 'requestAnimationFrame')
+      .mockImplementation((callback: FrameRequestCallback): number => {
+        rafCallbacks.push(callback);
+        return rafCallbacks.length;
+      });
+    const cancelAnimationFrameSpy = vi
+      .spyOn(globalThis, 'cancelAnimationFrame')
+      .mockImplementation(() => undefined);
+    const visibilityStateSpy = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+
+    const flushRaf = (timestamp: number) => {
+      const pendingCallbacks = rafCallbacks.splice(0);
+      act(() => {
+        pendingCallbacks.forEach((callback) => callback(timestamp));
+      });
+    };
+
+    try {
+      render(<App />);
+      mockApplyInputActions.mockClear();
+      mockSetInput.mockClear();
+
+      fireEvent.keyDown(window, { key: 'z' });
+      fireEvent.keyDown(window, { key: 'x' });
+      flushRaf(1000);
+
+      expect(mockApplyInputActions).toHaveBeenCalledWith(
+        expect.objectContaining({ leftBrake: 1, rightBrake: 1 }),
+        expect.any(Number),
+      );
+
+      mockSetInput.mockClear();
+      fireEvent(document, new Event('visibilitychange'));
+      const visibilityClear = mockSetInput.mock.calls.at(-1)?.[0];
+      expect(visibilityClear).toEqual(expect.objectContaining({
+        rudder: 0,
+        brake: 0,
+        leftBrake: 0,
+        rightBrake: 0,
+      }));
+      expect(visibilityClear).not.toHaveProperty('elevator');
+      expect(visibilityClear).not.toHaveProperty('aileron');
+
+      mockApplyInputActions.mockClear();
+      flushRaf(1016);
+      const clearedActions = mockApplyInputActions.mock.calls.at(-1)?.[0];
+      expect(clearedActions).not.toHaveProperty('leftBrake');
+      expect(clearedActions).not.toHaveProperty('rightBrake');
+    } finally {
+      visibilityStateSpy.mockRestore();
+      requestAnimationFrameSpy.mockRestore();
+      cancelAnimationFrameSpy.mockRestore();
+    }
   });
 
   it('LOAD PLAN does not engage VNAV on the default route when no VNAV constraint exists', () => {

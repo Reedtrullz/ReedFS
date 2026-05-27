@@ -13,6 +13,7 @@ describe('controlBindings', () => {
       'rudder',
       'throttle',
       'brake',
+      'differentialBrake',
       'gear',
       'flaps',
       'trim',
@@ -27,6 +28,19 @@ describe('controlBindings', () => {
     expect(labels.pitch).toContain('W/S');
     expect(labels.throttle).toContain('ArrowUp/ArrowDown');
     expect(labels.throttle).toContain('Gamepad RT/LT');
+    expect(labels.differentialBrake).toContain('Z/X');
+  });
+
+  it('validates defaults without duplicate keys and exposes a differential brake row', () => {
+    const result = validateControlBindings(DEFAULT_CONTROL_BINDINGS);
+    const differentialBrake = DEFAULT_CONTROL_BINDINGS.find((binding) => binding.id === 'differentialBrake');
+
+    expect(result).toEqual({ ok: true });
+    expect(differentialBrake).toEqual(expect.objectContaining({
+      label: 'Differential brake',
+      keyboard: ['Z/X'],
+      description: expect.stringMatching(/left\/right|side/i),
+    }));
   });
 
   it('rejects duplicate keyboard assignments inside the editable model', () => {

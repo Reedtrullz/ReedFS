@@ -18,6 +18,10 @@ export interface InputActions {
   yaw?: number;
   /** Wheel brake intent, 0 released to 1 full braking. */
   brake?: number;
+  /** Left wheel brake intent, 0 released to 1 full braking. Combined with symmetric brake by the ground model. */
+  leftBrake?: number;
+  /** Right wheel brake intent, 0 released to 1 full braking. Combined with symmetric brake by the ground model. */
+  rightBrake?: number;
   /** Immediate latched throttle lever increment/decrement. */
   throttleDelta?: number;
   /** Continuous throttle lever rate intent, -1 decrease to +1 increase. */
@@ -37,11 +41,13 @@ export interface InputManagerState {
   throttle: number;
   stabilizerTrimUnits: number;
   brake: number;
+  leftBrake: number;
+  rightBrake: number;
 }
 
 export type InputManagedControlInputs = Pick<
   ControlInputs,
-  'elevator' | 'aileron' | 'rudder' | 'throttle1' | 'throttle2' | 'brake'
+  'elevator' | 'aileron' | 'rudder' | 'throttle1' | 'throttle2' | 'brake' | 'leftBrake' | 'rightBrake'
 >;
 
 function finiteOrUndefined(value: number | undefined): number | undefined {
@@ -116,7 +122,15 @@ export function createInputManagerState(initial: Partial<InputManagerState & Con
     throttle: clamp01(initial.throttle ?? throttleFromEngines ?? 0),
     stabilizerTrimUnits: clampTrim(initial.stabilizerTrimUnits ?? 0),
     brake: clamp01(initial.brake ?? 0),
+    leftBrake: clamp01(initial.leftBrake ?? 0),
+    rightBrake: clamp01(initial.rightBrake ?? 0),
   };
+}
+
+function mergeBrake(current: number | undefined, next: number | undefined): number | undefined {
+  const nextValue = finiteOrUndefined(next);
+  if (nextValue === undefined) return current;
+  return Math.max(current ?? 0, clamp01(nextValue));
 }
 
 export function mergeInputActions(...actions: Array<InputActions | null | undefined>): InputActions {
@@ -124,6 +138,8 @@ export function mergeInputActions(...actions: Array<InputActions | null | undefi
   let roll: number | undefined;
   let yaw: number | undefined;
   let brake: number | undefined;
+  let leftBrake: number | undefined;
+  let rightBrake: number | undefined;
   let throttleDelta: number | undefined;
   let throttleRate: number | undefined;
   let throttleTarget: number | undefined;
@@ -135,7 +151,9 @@ export function mergeInputActions(...actions: Array<InputActions | null | undefi
     pitch = mergeAxis(pitch, action.pitch);
     roll = mergeAxis(roll, action.roll);
     yaw = mergeAxis(yaw, action.yaw);
-    brake = Math.max(brake ?? 0, clamp01(finiteOrUndefined(action.brake) ?? 0));
+    brake = mergeBrake(brake, action.brake);
+    leftBrake = mergeBrake(leftBrake, action.leftBrake);
+    rightBrake = mergeBrake(rightBrake, action.rightBrake);
     throttleDelta = sumDefined(throttleDelta, action.throttleDelta);
     throttleRate = sumDefined(throttleRate, action.throttleRate);
     throttleTarget = lastDefined(throttleTarget, action.throttleTarget);
@@ -148,6 +166,8 @@ export function mergeInputActions(...actions: Array<InputActions | null | undefi
   if (roll !== undefined) merged.roll = roll;
   if (yaw !== undefined) merged.yaw = yaw;
   if (brake !== undefined && brake > 0) merged.brake = brake;
+  if (leftBrake !== undefined && leftBrake > 0) merged.leftBrake = leftBrake;
+  if (rightBrake !== undefined && rightBrake > 0) merged.rightBrake = rightBrake;
   if (throttleDelta !== undefined) merged.throttleDelta = throttleDelta;
   if (throttleRate !== undefined) merged.throttleRate = clampSigned(throttleRate);
   if (throttleTarget !== undefined) merged.throttleTarget = clamp01(throttleTarget);
@@ -196,6 +216,8 @@ export function updateInputManager(state: InputManagerState, actions: InputActio
     throttle: clamp01(throttle),
     stabilizerTrimUnits: clampTrim(stabilizerTrimUnits),
     brake: clamp01(actions.brake ?? 0),
+    leftBrake: clamp01(actions.leftBrake ?? 0),
+    rightBrake: clamp01(actions.rightBrake ?? 0),
   };
 }
 
@@ -208,5 +230,7 @@ export function inputManagerStateToControlInputs(state: InputManagerState): Inpu
     throttle1: throttle,
     throttle2: throttle,
     brake: clamp01(state.brake),
+    leftBrake: clamp01(state.leftBrake),
+    rightBrake: clamp01(state.rightBrake),
   };
 }

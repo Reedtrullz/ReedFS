@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { ControlInputs } from '../../sim/types';
-import { applyDiscreteKeyInput, computeHeldKeyInputs, shouldIgnoreKeyboardEvent } from '../keyboardControls';
+import {
+  applyDiscreteKeyInput,
+  computeHeldKeyActions,
+  computeHeldKeyInputs,
+  shouldIgnoreKeyboardEvent,
+} from '../keyboardControls';
 
 const inputs: ControlInputs = {
   elevator: 0,
@@ -29,7 +34,21 @@ describe('keyboardControls', () => {
       aileron: 0.5,
       rudder: -0.5,
       brake: 1,
+      leftBrake: 0,
+      rightBrake: 0,
     });
+  });
+
+  it('maps Z to the left-brake action only', () => {
+    expect(computeHeldKeyActions(new Set(['z']))).toEqual({ leftBrake: 1 });
+  });
+
+  it('maps X to the right-brake action only', () => {
+    expect(computeHeldKeyActions(new Set(['x']))).toEqual({ rightBrake: 1 });
+  });
+
+  it('keeps Space mapped to symmetric brake action', () => {
+    expect(computeHeldKeyActions(new Set([' ']))).toEqual({ brake: 1 });
   });
 
   it('increments throttle instead of jumping straight to full power', () => {

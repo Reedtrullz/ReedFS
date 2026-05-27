@@ -6,6 +6,11 @@ import type { AutopilotCommands } from '../../sim/types';
 import { KSEA_RUNWAY_ALT_FT } from '../../sim/systems/ground';
 import { KSEA_LIGHT_PATTERN_SCENARIO, KSEA_TUTORIAL_SCENARIO } from '../../sim/scenarios';
 import { createKseaKpdxFlight } from '../../sim/flightPlanLoader';
+import {
+  SCENARIO_SAVE_KEY,
+  createScenarioSnapshot,
+  type ScenarioPersistenceStorage,
+} from '../scenarioPersistence';
 
 function minimalApState(): AutopilotState {
   return {
@@ -99,6 +104,15 @@ function shortRoutePlan(): FlightPlan {
   };
 }
 
+function memoryScenarioStorage(): ScenarioPersistenceStorage {
+  const entries = new Map<string, string>();
+  return {
+    getItem: (key: string) => entries.get(key) ?? null,
+    removeItem: (key: string) => { entries.delete(key); },
+    setItem: (key: string, value: string) => { entries.set(key, value); },
+  };
+}
+
 describe('useSimStore', () => {
   beforeEach(() => useSimStore.getState().reset());
 
@@ -145,6 +159,20 @@ describe('useSimStore', () => {
     expect(state.aircraft.flightPhase).toBe('TAKEOFF');
     expect(state.guidance.phase).toBe('takeoff-roll');
     expect(state.guidance.coachMessage).toMatch(/centerline|rotate|IAS/i);
+  });
+
+  it('startTakeoffRoll clears stale side-specific brake commands', () => {
+    useSimStore.getState().setInput({ leftBrake: 1, rightBrake: 1 });
+
+    useSimStore.getState().startTakeoffRoll();
+
+    const state = useSimStore.getState();
+    expect(state.inputs.leftBrake).toBe(0);
+    expect(state.inputs.rightBrake).toBe(0);
+    expect(state.pilotInputs.leftBrake).toBe(0);
+    expect(state.pilotInputs.rightBrake).toBe(0);
+    expect(state.inputManager.leftBrake).toBe(0);
+    expect(state.inputManager.rightBrake).toBe(0);
   });
 
   it('abortTakeoff rejects a running takeoff without pausing the braking rollout', () => {
@@ -260,6 +288,60 @@ describe('useSimStore', () => {
     expect(useSimStore.getState().inputs.throttle1).toBeCloseTo(0.85, 8);
     expect(useSimStore.getState().inputs.throttle2).toBeCloseTo(0.85, 8);
   });
+  it('side-specific brake actions update pilot/effective controls without disconnecting AP axes', () => {
+    useSimStore.getState().setApState(minimalApState());
+    const apCommands: AutopilotCommands = { elevator: -0.5, aileron: 0.25, throttle1: 0.7, throttle2: 0.7 };
+    useSimStore.setState((s) => {
+      const effectiveControls = { ...s.pilotInputs, ...apCommands };
+      return { apCommands, effectiveControls, inputs: effectiveControls };
+    });
+
+    useSimStore.getState().applyInputActions({ leftBrake: 1 }, 1 / 60);
+
+    const braked = useSimStore.getState();
+    expect(braked.apState?.truth.autopilotStatus).toBe('CMD_A');
+    expect(braked.apCommands).toEqual(apCommands);
+    expect(braked.pilotInputs.leftBrake).toBe(1);
+    expect(braked.effectiveControls.leftBrake).toBe(1);
+    expect(braked.effectiveControls.elevator).toBe(apCommands.elevator);
+    expect(braked.effectiveControls.aileron).toBe(apCommands.aileron);
+    expect(braked.effectiveControls.throttle1).toBe(apCommands.throttle1);
+
+    useSimStore.getState().applyInputActions({}, 1 / 60);
+
+    const released = useSimStore.getState();
+    expect(released.apState?.truth.autopilotStatus).toBe('CMD_A');
+    expect(released.apCommands).toEqual(apCommands);
+    expect(released.pilotInputs.leftBrake).toBe(0);
+    expect(released.effectiveControls.leftBrake).toBe(0);
+    expect(released.effectiveControls.elevator).toBe(apCommands.elevator);
+  });
+
+  it('loadScenarioState clears stale persisted side-specific brake commands while preserving symmetric brake', () => {
+    const storage = memoryScenarioStorage();
+    useSimStore.getState().setInput({ brake: 0.4 });
+    const snapshot = createScenarioSnapshot(useSimStore.getState());
+    snapshot.pilotInputs.leftBrake = 1;
+    snapshot.pilotInputs.rightBrake = 0.75;
+    snapshot.inputManager.leftBrake = 1;
+    snapshot.inputManager.rightBrake = 0.75;
+    storage.setItem(SCENARIO_SAVE_KEY, JSON.stringify(snapshot));
+
+    useSimStore.getState().setInput({ brake: 0, leftBrake: 0, rightBrake: 0 });
+    useSimStore.getState().loadScenarioState(storage);
+
+    const restored = useSimStore.getState();
+    expect(restored.pilotInputs.brake).toBe(0.4);
+    expect(restored.pilotInputs.leftBrake).toBe(0);
+    expect(restored.pilotInputs.rightBrake).toBe(0);
+    expect(restored.effectiveControls.brake).toBe(0.4);
+    expect(restored.effectiveControls.leftBrake).toBe(0);
+    expect(restored.effectiveControls.rightBrake).toBe(0);
+    expect(restored.inputs).toBe(restored.effectiveControls);
+    expect(restored.inputManager.leftBrake).toBe(0);
+    expect(restored.inputManager.rightBrake).toBe(0);
+  });
+
   it('tick advances simTime when running', () => { useSimStore.getState().start(); const b = useSimStore.getState().aircraft.simTime; useSimStore.getState().tick(performance.now()); expect(useSimStore.getState().aircraft.simTime).toBeGreaterThanOrEqual(b); });
 
   it('splits a long frame into fixed simulation steps', () => {

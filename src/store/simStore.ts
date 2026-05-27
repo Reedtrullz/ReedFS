@@ -91,7 +91,16 @@ const defaultInputs: ControlInputs = {
   throttle1: 0, throttle2: 0,
   flapLever: 0, gearLever: 'DOWN',
   spoilers: 0, brake: 0,
+  leftBrake: 0, rightBrake: 0,
 };
+
+function normalizeControlInputs(inputs: ControlInputs): ControlInputs {
+  return {
+    ...inputs,
+    leftBrake: 0,
+    rightBrake: 0,
+  };
+}
 
 function cloneWind(wind: WindInfo): WindInfo {
   return { ...wind };
@@ -117,6 +126,8 @@ function syncInputManagerWithInputPartial(
   if (partial.aileron !== undefined) next.aileron = 0;
   if (partial.rudder !== undefined) next.rudder = 0;
   if (partial.brake !== undefined) next.brake = 0;
+  if (partial.leftBrake !== undefined) next.leftBrake = 0;
+  if (partial.rightBrake !== undefined) next.rightBrake = 0;
 
   if (partial.throttle1 !== undefined && partial.throttle2 !== undefined) {
     next.throttle = Math.max(partial.throttle1, partial.throttle2);
@@ -151,6 +162,10 @@ function seedInputManagerFromLiveInputs(
   else if (inputManager.rudder !== inputs.rudder) seed.rudder = 0;
   if (actions.brake !== undefined) seed.brake = inputs.brake;
   else if (inputManager.brake !== inputs.brake) seed.brake = 0;
+  if (actions.leftBrake !== undefined) seed.leftBrake = inputs.leftBrake ?? 0;
+  else if (inputManager.leftBrake !== (inputs.leftBrake ?? 0)) seed.leftBrake = 0;
+  if (actions.rightBrake !== undefined) seed.rightBrake = inputs.rightBrake ?? 0;
+  else if (inputManager.rightBrake !== (inputs.rightBrake ?? 0)) seed.rightBrake = 0;
   if (inputActionsIncludeThrottle(actions)) seed.throttle = Math.max(inputs.throttle1, inputs.throttle2);
   return createInputManagerState(seed);
 }
@@ -166,6 +181,8 @@ function controlPatchFromInputManager(
   if (actions.roll !== undefined || previous.aileron !== next.aileron) patch.aileron = next.aileron;
   if (actions.yaw !== undefined || previous.rudder !== next.rudder) patch.rudder = next.rudder;
   if (actions.brake !== undefined || previous.brake !== next.brake) patch.brake = next.brake;
+  if (actions.leftBrake !== undefined || previous.leftBrake !== next.leftBrake) patch.leftBrake = next.leftBrake;
+  if (actions.rightBrake !== undefined || previous.rightBrake !== next.rightBrake) patch.rightBrake = next.rightBrake;
   if (inputActionsChangedThrottle(actions, previous, next)) {
     patch.throttle1 = next.throttle;
     patch.throttle2 = next.throttle;
@@ -284,7 +301,7 @@ function restoreSnapshotSlice(snapshot: ScenarioSnapshot): Partial<SimStore> {
   const aircraft = structuredClone(snapshot.aircraft);
   const apState = structuredClone(snapshot.apState);
   const apCommands = structuredClone(snapshot.apCommands);
-  const pilotInputs = structuredClone(snapshot.pilotInputs);
+  const pilotInputs = normalizeControlInputs(structuredClone(snapshot.pilotInputs));
   const flightPlan = structuredClone(snapshot.flightPlan);
   const activeLegIndex = snapshot.activeLegIndex;
   const controlsSlice = composeControlsSlice(pilotInputs, apCommands, apState);
@@ -299,7 +316,11 @@ function restoreSnapshotSlice(snapshot: ScenarioSnapshot): Partial<SimStore> {
     selectedScenarioId: scenario.id,
     aircraft,
     ...controlsSlice,
-    inputManager: structuredClone(snapshot.inputManager),
+    inputManager: createInputManagerState({
+      ...structuredClone(snapshot.inputManager),
+      leftBrake: 0,
+      rightBrake: 0,
+    }),
     status: restoredStatus,
     lastFrameTime: 0,
     fixedStepAccumulatorSeconds: 0,
@@ -503,6 +524,8 @@ export const useSimStore = create<SimStore>((set, get) => ({
       flapLever: aircraft.config.flapSetting,
       gearLever: 'DOWN',
       brake: 0,
+      leftBrake: 0,
+      rightBrake: 0,
       elevator: 0,
     };
     resetAutopilotPID();
@@ -533,6 +556,8 @@ export const useSimStore = create<SimStore>((set, get) => ({
       throttle1: 0,
       throttle2: 0,
       brake: 1,
+      leftBrake: 0,
+      rightBrake: 0,
       spoilers: 1,
       elevator: 0,
       gearLever: 'DOWN',

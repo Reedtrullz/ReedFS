@@ -92,7 +92,7 @@ export function App() {
     const onKey = (e: KeyboardEvent) => {
       if (shouldIgnoreKeyboardEvent(e)) return;
       const key = e.key.toLowerCase();
-      if (['w', 's', 'a', 'd', 'q', 'e', ' '].includes(key)) {
+      if (['w', 's', 'a', 'd', 'q', 'e', ' ', 'z', 'x'].includes(key)) {
         if (key === ' ') e.preventDefault();
         keys.add(key);
         return;
@@ -121,6 +121,7 @@ export function App() {
 
     const clearHeldKeys = () => {
       keys.clear();
+      setInput({ rudder: 0, brake: 0, leftBrake: 0, rightBrake: 0 });
     };
 
     const onVisibilityChange = () => {
@@ -136,8 +137,7 @@ export function App() {
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', clearHeldKeys);
       document.removeEventListener('visibilitychange', onVisibilityChange);
-      keys.clear();
-      setInput({ elevator: 0, aileron: 0, rudder: 0, brake: 0 });
+      clearHeldKeys();
     };
   }, [setInput]);
 

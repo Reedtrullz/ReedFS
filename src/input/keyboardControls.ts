@@ -48,6 +48,8 @@ export function computeHeldKeyInputs(keys: ReadonlySet<string>): Partial<Control
     aileron: (keys.has('a') ? -0.5 : 0) + (keys.has('d') ? 0.5 : 0),
     rudder: (keys.has('q') ? -0.5 : 0) + (keys.has('e') ? 0.5 : 0),
     brake: keys.has(' ') ? 1 : 0,
+    leftBrake: keys.has('z') ? 1 : 0,
+    rightBrake: keys.has('x') ? 1 : 0,
   };
 }
 
@@ -58,6 +60,8 @@ export function computeHeldKeyActions(keys: ReadonlySet<string>): InputActions {
   if (heldInputs.aileron !== undefined && heldInputs.aileron !== 0) actions.roll = heldInputs.aileron;
   if (heldInputs.rudder !== undefined && heldInputs.rudder !== 0) actions.yaw = heldInputs.rudder;
   if (heldInputs.brake !== undefined && heldInputs.brake !== 0) actions.brake = heldInputs.brake;
+  if (heldInputs.leftBrake !== undefined && heldInputs.leftBrake !== 0) actions.leftBrake = heldInputs.leftBrake;
+  if (heldInputs.rightBrake !== undefined && heldInputs.rightBrake !== 0) actions.rightBrake = heldInputs.rightBrake;
   return actions;
 }
 
