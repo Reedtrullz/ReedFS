@@ -286,6 +286,31 @@ describe('resolveAutopilotTargets LNAV', () => {
     expect(signedInterceptRad).toBeGreaterThan(-30 * Math.PI / 180);
   });
 
+  it('uses the anticipated active leg before overflying a route turn', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.position.lat = 47.185;
+    s.position.lon = -122.0;
+    s.attitude.psi = 0;
+    s.velocity.u = 128.6;
+    const ap = makeAp('LNAV', 'ALT_HOLD', 'SPEED');
+    const fp: FlightPlan = {
+      origin: 'ORIG',
+      destination: 'DEST',
+      flightNumber: 'TST124',
+      route: 'ORIG MID DEST',
+      waypoints: [
+        { ident: 'ORIG', lat: 47.0, lon: -122.0, discontinuity: false },
+        { ident: 'MID', lat: 47.2, lon: -122.0, discontinuity: false },
+        { ident: 'DEST', lat: 47.2, lon: -121.8, discontinuity: false },
+      ],
+    };
+
+    const targets = resolveAutopilotTargets(s, ap, fp, 0);
+
+    expect(targets.targetHeadingRad).toBeGreaterThan(60 * Math.PI / 180);
+    expect(targets.targetHeadingRad).toBeLessThan(90 * Math.PI / 180);
+  });
+
   it('uses the active route leg to target the next waypoint instead of the from waypoint', () => {
     const s = createInitialState(B737_800_SPEC);
     s.position.lat = 47.1;
