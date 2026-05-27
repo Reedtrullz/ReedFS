@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { integrate } from '../integrate';
 import { createInitialState, B737_800_SPEC, createB737GearStations } from '../../types';
-import type { Attitude, ControlInputs } from '../../types';
+import type { Attitude, ControlInputs, GeoPosition } from '../../types';
 import type { WindInfo } from '../../weather';
 import { eulerToQuat } from '../quaternion';
 import { computeDerived } from '../derived';
@@ -10,7 +10,8 @@ import { GROUND_CONTACT_EPSILON_FT, KSEA_RUNWAY_ALT_FT } from '../../systems/gro
 import { computeHeldKeyInputs } from '../../../input/keyboardControls';
 import { runFixedStepScenario, takeoffRollInputs } from '../../__tests__/scenarioHelpers';
 import { createAircraftStateForScenario, KSEA_TUTORIAL_SCENARIO } from '../../scenarios';
-import { KSEA_RUNWAY_16L } from '../../../viewport/runwayData';
+import { KPDX_RUNWAY_10R, KSEA_RUNWAY_16L, type RunwayReference } from '../../../viewport/runwayData';
+import { bodyToNed } from '../frames';
 
 const idle: ControlInputs = {
   elevator: 0, aileron: 0, rudder: 0,
@@ -53,6 +54,10 @@ function offsetPositionMeters(
     lon: position.lon + eastM / metersPerDegreeLon,
     alt: position.alt ?? position.altFt ?? KSEA_RUNWAY_ALT_FT,
   };
+}
+
+function geoPositionForRunwayStart(runway: RunwayReference): GeoPosition {
+  return { lat: runway.start.lat, lon: runway.start.lon, alt: runway.elevationFt };
 }
 
 function ksea16LHeadingRad(): number {
@@ -245,6 +250,75 @@ describe('integrate', () => {
     expect(state.ground.contact).toBe('gear');
     expect(state.ground.weightOnWheels).toBe(true);
     expect(state.ground.onRunway).toBe(false);
+  });
+
+  it('keeps a gear-down aircraft on prepared KPDX runway surface', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.position = geoPositionForRunwayStart(KPDX_RUNWAY_10R);
+    setAttitude(state, { ...state.attitude, psi: degToRad(KPDX_RUNWAY_10R.headingDeg) });
+    state.config.gearDown = true;
+    state.velocity.u = 0;
+    state.velocity.v = 0;
+    state.velocity.w = 0;
+
+    integrate(state, idle, B737_800_SPEC, 1 / 60);
+
+    expect(state.ground.contact).toBe('gear');
+    expect(state.ground.weightOnWheels).toBe(true);
+    expect(state.ground.onRunway).toBe(true);
+    expect(state.ground.groundAltFt).toBeCloseTo(KPDX_RUNWAY_10R.elevationFt, 6);
+  });
+
+  it('keeps KPDX off-runway gear contact explicit without marking prepared runway', () => {
+    const state = createInitialState(B737_800_SPEC);
+    const headingRad = degToRad(KPDX_RUNWAY_10R.headingDeg);
+    const lateralOffsetM = KPDX_RUNWAY_10R.widthM / 2 + 50;
+    state.position = offsetPositionMeters(
+      geoPositionForRunwayStart(KPDX_RUNWAY_10R),
+      -Math.sin(headingRad) * lateralOffsetM,
+      Math.cos(headingRad) * lateralOffsetM,
+    );
+    setAttitude(state, { ...state.attitude, psi: headingRad });
+    state.config.gearDown = true;
+    state.velocity.u = 0;
+    state.velocity.v = 0;
+    state.velocity.w = 0;
+
+    integrate(state, idle, B737_800_SPEC, 1 / 60);
+
+    expect(state.ground.contact).toBe('gear');
+    expect(state.ground.weightOnWheels).toBe(true);
+    expect(state.ground.onRunway).toBe(false);
+    expect(state.ground.groundAltFt).toBeCloseTo(KPDX_RUNWAY_10R.elevationFt, 6);
+  });
+
+  it('transitions from KPDX takeoff to climb using current ground elevation', () => {
+    const state = createInitialState(B737_800_SPEC);
+    const groundAltFt = KPDX_RUNWAY_10R.elevationFt;
+    state.flightPhase = 'TAKEOFF';
+    state.position = { ...geoPositionForRunwayStart(KPDX_RUNWAY_10R), alt: groundAltFt + 80 };
+    setAttitude(state, { phi: 0, theta: degToRad(5), psi: degToRad(KPDX_RUNWAY_10R.headingDeg) });
+    state.ground = {
+      ...state.ground,
+      aglFt: 80,
+      groundAltFt,
+      weightOnWheels: false,
+      normalForceN: 0,
+      onRunway: false,
+      contact: 'none',
+    };
+    state.config.gearDown = true;
+    state.velocity.u = ktToMs(150);
+    state.velocity.v = 0;
+    state.velocity.w = -2;
+
+    expect(bodyToNed(state.velocity, state.attitude).down).toBeLessThan(-0.25);
+
+    integrate(state, idle, B737_800_SPEC, 1 / 120);
+
+    expect(state.ground.weightOnWheels).toBe(false);
+    expect(state.ground.groundAltFt).toBeCloseTo(groundAltFt, 6);
+    expect(state.flightPhase).toBe('CLIMB');
   });
 
   it('off-runway rollout decelerates faster than prepared-runway rollout without reversing', () => {

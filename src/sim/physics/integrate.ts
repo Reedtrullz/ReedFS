@@ -4,7 +4,7 @@ import { updateEngines } from '../systems/engine';
 import { updateFuel } from '../systems/fuel';
 import { updateElectrical } from '../systems/electrical';
 import { updateHydraulic } from '../systems/hydraulic';
-import { applyGroundContact, constrainRunwayNormalVelocity, GROUND_CONTACT_EPSILON_FT, KSEA_RUNWAY_ALT_FT } from '../systems/ground';
+import { applyGroundContact, constrainRunwayNormalVelocity, GROUND_CONTACT_EPSILON_FT } from '../systems/ground';
 import { geodeticToEcef, ecefToGeodetic, ecefToEnu, enuToEcef } from './geodesy';
 import { bodyToNed } from './frames';
 import { ftToM, ktToMs, mToFt } from './units';
@@ -12,7 +12,7 @@ import { quatDerivative, quatNormalize, quatToEuler } from './quaternion';
 import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
 import type { FlightPlan } from '@shared/types/fmc';
 import type { WindInfo } from '../weather';
-import { sampleKseaSurface } from '../runwaySurface';
+import { sampleSupportedAirportSurface } from '../runwaySurface';
 
 const G = 9.80665;
 const TAKEOFF_ASSIST_MIN_HEIGHT_FT = 50;
@@ -28,7 +28,7 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 function updateTakeoffPhase(state: AircraftState): void {
-  const heightAboveRunwayFt = state.position.alt - KSEA_RUNWAY_ALT_FT;
+  const heightAboveRunwayFt = state.position.alt - state.ground.groundAltFt;
   const positiveRate = bodyToNed(state.velocity, state.attitude).down < -0.25;
 
   if (state.flightPhase === 'TAKEOFF' && heightAboveRunwayFt >= TAKEOFF_ASSIST_MIN_HEIGHT_FT && !state.ground.weightOnWheels && positiveRate) {
@@ -127,7 +127,7 @@ export function integrate(
   state.velocity.v += vdot * dt;
   state.velocity.w += wdot * dt;
 
-  const preIntegrationSurface = sampleKseaSurface(state.position);
+  const preIntegrationSurface = sampleSupportedAirportSurface(state.position);
   const nearRunwaySurface = state.position.alt <= preIntegrationSurface.groundAltFt + GROUND_CONTACT_EPSILON_FT;
   const normalForceN = nearRunwaySurface ? estimateNormalForceN(state, aero) : 0;
   const allowLiftoff = state.ground.weightOnWheels && nearRunwaySurface && shouldAllowLiftoff(state, normalForceN, aero.weight);
@@ -162,10 +162,10 @@ export function integrate(
   state.position.alt = geo.alt * mToFt(1);
 
   // ── Ground contact constraint ──
-  // First surface-aware slice: sample KSEA runway rectangles and use the
-  // resulting ground surface as a post-solve constraint so free-flight equations
-  // and wind/velocity sign conventions remain unchanged.
-  const groundSurface = sampleKseaSurface(state.position);
+  // Sample supported-airport runway/off-runway rectangles and use the resulting
+  // ground surface as a post-solve constraint so free-flight equations and
+  // wind/velocity sign conventions remain unchanged.
+  const groundSurface = sampleSupportedAirportSurface(state.position);
   const groundContact = applyGroundContact(state, controls, dt, groundSurface.groundAltFt, {
     allowLiftoff,
     normalForceN,
