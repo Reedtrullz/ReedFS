@@ -15,6 +15,7 @@ Current source-of-truth documents:
 - `2026-05-27-rfs-surface-aware-ground-handling.md` — completed/current status record for the original KSEA-only surface-aware ground-handling slice, off-runway friction scaling, and prepared-runway `onRunway` semantics.
 - `2026-05-27-rfs-rollout-taxi-crosswind-controls.md` — completed/current status record for rollout/taxi/crosswind landing regressions, optional side-specific brake channels, and `Space`/`Z`/`X` player brake controls.
 - `2026-05-27-rfs-multi-airport-surface-coverage.md` — completed/current status record for supported KSEA/KPDX prepared-runway rectangles, the generic runtime sampler, KPDX regressions, and KSEA wrapper compatibility.
+- `2026-05-27-rfs-lnav-turn-anticipation.md` — active implementation plan for bounded LNAV turn-anticipation sequencing and AP/route-status integration proof.
 - `2026-05-25-rfs-foundation-stabilization.md` — completed stabilization record.
 
 Historical/target plans:
