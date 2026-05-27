@@ -21,6 +21,10 @@ const STEERING_FADE_START_MPS = 30;
 const STEERING_FADE_END_MPS = 70;
 const TOUCHDOWN_MIN_SINK_RATE_MPS = 0.25;
 const TOUCHDOWN_ANGULAR_DAMPING = 0.35;
+const BELLY_SLIDE_DECEL_MPS2 = 4.0;
+const CRASH_SLIDE_DECEL_MPS2 = 9.0;
+const BELLY_CONTACT_ANGULAR_RETENTION_PER_SECOND = 0.7;
+const CRASH_CONTACT_ANGULAR_RETENTION_PER_SECOND = 0.25;
 const OLEO_DAMPING_RATIO = 0.35;
 const TIRE_CORNERING_STIFFNESS_PER_NORMAL = 3.2;
 const MAX_TIRE_SIDE_FRICTION_COEFFICIENT = 0.45;
@@ -377,6 +381,33 @@ function applyTouchdownDamping(state: AircraftState, sinkRateMps: number): void 
   state.angularVel.r *= TOUCHDOWN_ANGULAR_DAMPING;
 }
 
+function applyRunwayTangentSlideDecel(state: AircraftState, decelMps2: number, dt: number): void {
+  const runwayVelocity = bodyToNed(state.velocity, state.attitude);
+  const slideSpeedMps = Math.hypot(runwayVelocity.north, runwayVelocity.east);
+  if (slideSpeedMps <= 0) return;
+
+  const nextSlideSpeedMps = Math.max(0, slideSpeedMps - decelMps2 * Math.max(0, dt));
+  const scale = nextSlideSpeedMps / slideSpeedMps;
+  state.velocity = nedToBody({
+    ...runwayVelocity,
+    north: runwayVelocity.north * scale,
+    east: runwayVelocity.east * scale,
+  }, state.attitude);
+}
+
+function applyGearUpContactDamping(state: AircraftState, contact: GroundContactType, dt: number): void {
+  const crashed = contact === 'crashed';
+  applyRunwayTangentSlideDecel(state, crashed ? CRASH_SLIDE_DECEL_MPS2 : BELLY_SLIDE_DECEL_MPS2, dt);
+
+  const angularRetentionPerSecond = crashed
+    ? CRASH_CONTACT_ANGULAR_RETENTION_PER_SECOND
+    : BELLY_CONTACT_ANGULAR_RETENTION_PER_SECOND;
+  const angularDamping = Math.pow(angularRetentionPerSecond, Math.max(0, dt));
+  state.angularVel.p *= angularDamping;
+  state.angularVel.q *= angularDamping;
+  state.angularVel.r *= angularDamping;
+}
+
 function applyTireSideForces(
   state: AircraftState,
   dt: number,
@@ -488,8 +519,9 @@ export function applyGroundContact(
   }
 
   if (!gearAvailableForContact) {
-    const contact: GroundContactType = runwayDownMps > 5 ? 'crashed' : 'belly';
+    const contact: GroundContactType = state.ground.contact === 'crashed' || runwayDownMps > 5 ? 'crashed' : 'belly';
     state.position.alt = groundAltFt;
+    applyGearUpContactDamping(state, contact, dt);
     constrainRunwayNormalVelocity(state);
     return setGroundState(state, groundAltFt, contact, false, options.normalForceN ?? grossWeightForceN(state));
   }

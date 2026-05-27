@@ -10,7 +10,7 @@ import {
   computeWheelBrakeForces,
   KSEA_RUNWAY_ALT_FT,
 } from '../ground';
-import { bodyToNed } from '../../physics/frames';
+import { bodyToNed, nedToBody } from '../../physics/frames';
 import { eulerToQuat } from '../../physics/quaternion';
 
 const idle: ControlInputs = {
@@ -244,6 +244,140 @@ describe('applyGroundContact', () => {
     expect(['belly', 'crashed']).toContain(contact.contact);
     expect(state.ground).toEqual(contact);
     expect(state.position.alt).toBe(KSEA_RUNWAY_ALT_FT);
+  });
+
+  it('decelerates a gear-up belly slide without treating it as weight-on-wheels', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.position.alt = KSEA_RUNWAY_ALT_FT - 1;
+    state.velocity.u = 70;
+    state.velocity.v = 5;
+    state.velocity.w = 2;
+    state.config.gearDown = false;
+    const gearUp: ControlInputs = { ...idle, gearLever: 'UP' };
+    const initialSlideSpeed = Math.hypot(state.velocity.u, state.velocity.v);
+
+    const contact = applyGroundContact(state, gearUp, 1, KSEA_RUNWAY_ALT_FT);
+
+    expect(contact.contact).toBe('belly');
+    expect(contact.weightOnWheels).toBe(false);
+    expect(contact.gearStations.every((station) => !station.weightOnWheel)).toBe(true);
+    expect(Math.hypot(state.velocity.u, state.velocity.v)).toBeLessThan(initialSlideSpeed);
+    expect(Math.hypot(state.velocity.u, state.velocity.v)).toBeGreaterThan(0);
+  });
+
+  it('clamps gear-up belly slide deceleration at zero instead of reversing low-speed motion', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.position.alt = KSEA_RUNWAY_ALT_FT - 1;
+    state.velocity.u = 1;
+    state.velocity.v = 0.2;
+    state.velocity.w = 1;
+    state.config.gearDown = false;
+    const gearUp: ControlInputs = { ...idle, gearLever: 'UP' };
+
+    const contact = applyGroundContact(state, gearUp, 1, KSEA_RUNWAY_ALT_FT);
+
+    expect(contact.contact).toBe('belly');
+    expect(state.velocity.u).toBe(0);
+    expect(state.velocity.v).toBe(0);
+  });
+
+  it('clamps low-speed gear-up belly slide using runway-tangent velocity while pitched', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.position.alt = KSEA_RUNWAY_ALT_FT - 1;
+    state.attitude.theta = 10 * Math.PI / 180;
+    state.quaternion = eulerToQuat(state.attitude.phi, state.attitude.theta, state.attitude.psi);
+    state.velocity = nedToBody({ north: -1, east: 0, down: 1 }, state.attitude);
+    state.config.gearDown = false;
+    const gearUp: ControlInputs = { ...idle, gearLever: 'UP' };
+
+    const contact = applyGroundContact(state, gearUp, 1, KSEA_RUNWAY_ALT_FT);
+    const runwayVelocity = bodyToNed(state.velocity, state.attitude);
+
+    expect(contact.contact).toBe('belly');
+    expect(Math.hypot(runwayVelocity.north, runwayVelocity.east)).toBeCloseTo(0, 8);
+    expect(runwayVelocity.down).toBeCloseTo(0, 8);
+  });
+
+  it('damps a hard gear-up crash more aggressively than a lower-energy belly slide', () => {
+    const belly = createInitialState(B737_800_SPEC);
+    belly.position.alt = KSEA_RUNWAY_ALT_FT - 1;
+    belly.velocity.u = 70;
+    belly.velocity.w = 2;
+    belly.angularVel.p = 0.4;
+    belly.angularVel.q = -0.3;
+    belly.angularVel.r = 0.2;
+    belly.config.gearDown = false;
+
+    const crash = createInitialState(B737_800_SPEC);
+    crash.position.alt = KSEA_RUNWAY_ALT_FT - 1;
+    crash.velocity.u = 70;
+    crash.velocity.w = 8;
+    crash.angularVel.p = 0.4;
+    crash.angularVel.q = -0.3;
+    crash.angularVel.r = 0.2;
+    crash.config.gearDown = false;
+    const gearUp: ControlInputs = { ...idle, gearLever: 'UP' };
+
+    const bellyContact = applyGroundContact(belly, gearUp, 1, KSEA_RUNWAY_ALT_FT);
+    const crashContact = applyGroundContact(crash, gearUp, 1, KSEA_RUNWAY_ALT_FT);
+
+    expect(bellyContact.contact).toBe('belly');
+    expect(crashContact.contact).toBe('crashed');
+    expect(crash.velocity.u).toBeLessThan(belly.velocity.u);
+    expect(Math.abs(crash.angularVel.p)).toBeLessThan(Math.abs(belly.angularVel.p));
+    expect(Math.abs(crash.angularVel.q)).toBeLessThan(Math.abs(belly.angularVel.q));
+    expect(Math.abs(crash.angularVel.r)).toBeLessThan(Math.abs(belly.angularVel.r));
+  });
+
+  it('applies gear-up angular damping as a timestep-scaled rate', () => {
+    const oneSecond = createInitialState(B737_800_SPEC);
+    oneSecond.position.alt = KSEA_RUNWAY_ALT_FT - 1;
+    oneSecond.velocity.w = 1;
+    oneSecond.angularVel.p = 0.4;
+    oneSecond.config.gearDown = false;
+
+    const fixedStep = createInitialState(B737_800_SPEC);
+    fixedStep.position.alt = KSEA_RUNWAY_ALT_FT - 1;
+    fixedStep.velocity.w = 1;
+    fixedStep.angularVel.p = 0.4;
+    fixedStep.config.gearDown = false;
+    const gearUp: ControlInputs = { ...idle, gearLever: 'UP' };
+
+    applyGroundContact(oneSecond, gearUp, 1, KSEA_RUNWAY_ALT_FT);
+    for (let i = 0; i < 60; i += 1) {
+      applyGroundContact(fixedStep, gearUp, 1 / 60, KSEA_RUNWAY_ALT_FT);
+    }
+
+    expect(oneSecond.ground.contact).toBe('belly');
+    expect(fixedStep.ground.contact).toBe('belly');
+    expect(fixedStep.angularVel.p).toBeCloseTo(oneSecond.angularVel.p, 5);
+  });
+
+  it('persists hard gear-up crash contact across fixed-step slide damping', () => {
+    const belly = createInitialState(B737_800_SPEC);
+    belly.position.alt = KSEA_RUNWAY_ALT_FT - 1;
+    belly.velocity.u = 70;
+    belly.velocity.w = 2;
+    belly.angularVel.p = 0.4;
+    belly.config.gearDown = false;
+
+    const crash = createInitialState(B737_800_SPEC);
+    crash.position.alt = KSEA_RUNWAY_ALT_FT - 1;
+    crash.velocity.u = 70;
+    crash.velocity.w = 8;
+    crash.angularVel.p = 0.4;
+    crash.config.gearDown = false;
+    const gearUp: ControlInputs = { ...idle, gearLever: 'UP' };
+
+    for (let i = 0; i < 60; i += 1) {
+      applyGroundContact(belly, gearUp, 1 / 60, KSEA_RUNWAY_ALT_FT);
+      applyGroundContact(crash, gearUp, 1 / 60, KSEA_RUNWAY_ALT_FT);
+    }
+
+    expect(belly.ground.contact).toBe('belly');
+    expect(crash.ground.contact).toBe('crashed');
+    expect(crash.velocity.u).toBeLessThan(belly.velocity.u);
+    expect(Math.abs(crash.angularVel.p)).toBeLessThan(Math.abs(belly.angularVel.p));
   });
 
   it('classifies gear-up impact using runway-normal sink rate, not body-axis w', () => {

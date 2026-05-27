@@ -34,13 +34,12 @@ Completion records:
 
 ## P1 — Finish gear/tire ground model and takeoff/landing realism
 
-Why this remains: the current pass establishes runway-normal contact, normal-force liftoff, phase semantics, normal-force-scaled tire side-load/cornering stiffness, anti-skid brake limiting, asymmetric brake-force helpers, dynamic oleo spring/damper compression loads, rudder-pedal-limited nosewheel steering, and first deterministic crosswind/weathercocking takeoff-roll regressions. RFS still needs deeper rollout/taxi and landing scenarios before touchdown, rollout, taxi, and crosswind handling can feel fully like an airliner.
+Why this remains: the current pass establishes runway-normal contact, normal-force liftoff, phase semantics, normal-force-scaled tire side-load/cornering stiffness, anti-skid brake limiting, asymmetric brake-force helpers, dynamic oleo spring/damper compression loads, rudder-pedal-limited nosewheel steering, first deterministic crosswind/weathercocking takeoff-roll regressions, and gear-up runway-tangent belly/crash slide deceleration/damping. RFS still needs deeper rollout/taxi and landing scenarios before touchdown, rollout, taxi, and crosswind handling can feel fully like an airliner.
 
 Remaining advanced scope:
 
 - More detailed rollout/taxi and crosswind landing scenarios.
 - Player-facing differential brake controls if desired.
-- Explicit gear-up belly-contact behavior beyond current guarded/crash contact states.
 
 Suggested implementation files:
 

@@ -14,9 +14,9 @@
 
 Relevant files:
 
-- `src/sim/systems/ground.ts` already has station loads, dynamic oleo spring/damper compression, rolling/brake deceleration, nosewheel steering, touchdown damping, and runway-normal velocity constraint.
+- `src/sim/systems/ground.ts` already has station loads, dynamic oleo spring/damper compression, rolling/brake deceleration, nosewheel steering, touchdown damping, gear-up belly/crash slide damping, and runway-normal velocity constraint.
 - `src/sim/systems/__tests__/ground.test.ts` is the primary regression target for ground-system contracts.
-- `docs/roadmap.md` now lists remaining advanced P1 ground/tire gaps: crosswind ground handling, rollout/taxi scenarios, optional player-facing differential brake controls, non-runway surfaces, and gear-up belly-contact handling.
+- `docs/roadmap.md` now lists remaining advanced P1 ground/tire gaps: deeper rollout/taxi and crosswind landing scenarios, optional player-facing differential brake controls, and non-runway surfaces.
 
 Required command prefix for all test/build work:
 
@@ -178,6 +178,33 @@ Expected: PASS.
 - Preserve the wind contract: wind affects air-relative velocity only and never destructively mutates ground-relative `state.velocity`.
 - Preserve stopped-aircraft safeguards: held rudder while stopped must not create lateral motion or yaw in place.
 - Avoid broad aero retuning; this slice is a ground/runway behavior guard.
+
+---
+
+## Task 6 [PARENT-DIRECT]: Add gear-up belly/crash slide behavior
+
+**Status:** Complete in the current follow-up after `41e67ff`; implemented with deterministic gear-up runway-tangent belly/crash slide deceleration, no-reverse low-speed clamping, and stronger hard-crash angular damping.
+
+**Objective:** Move gear-up contact beyond a marker-only `belly`/`crashed` state by applying deterministic slide deceleration and angular damping when the fuselage contacts the runway without usable landing gear. The behavior should remain conservative: prevent sink-through, avoid reversing horizontal velocity, and distinguish hard crash contact from lower-energy belly slide.
+
+**Files:**
+
+- Modify: `src/sim/systems/ground.ts`
+- Modify: `src/sim/systems/__tests__/ground.test.ts`
+- Modify docs after the slice lands: `README.md`, `docs/architecture.md`, `docs/roadmap.md`
+
+**Test first:**
+
+- Gear-up belly contact below the runway reduces horizontal slide speed while preserving explicit `belly` contact state.
+- Belly-slide deceleration clamps at zero instead of reversing low-speed ground-relative velocity.
+- Hard gear-up crash contact from high runway-normal sink rate decelerates and damps angular rates more aggressively than a lower-energy belly slide, and remains `crashed` across fixed-step slide updates.
+
+**Constraints:**
+
+- Keep body axes x-forward/y-right/z-down and NED down-positive.
+- Continue classifying gear-up contact using runway-normal sink rate, not body-axis `w` alone.
+- Do not treat gear-up belly/crash contact as `weightOnWheels`; gear station loads should remain cleared.
+- Do not add aircraft damage UI, crash reset flow, or player-facing controls in this slice.
 
 ---
 
