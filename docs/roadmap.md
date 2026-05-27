@@ -26,6 +26,7 @@ The completed baseline now includes:
 - Ground state, supported KSEA/KPDX prepared-runway/off-runway rectangle sampling, runway-normal contact, off-runway friction scaling, normal-force liftoff, and flight-phase decoupling are implemented.
 - Input dynamics, pilot/AP/effective-control separation, stabilizer trim, CG pitch moment, and data-backed aero/engine envelope work are implemented.
 - Aircraft visual contract, persistent renderer, visual animation state, Cesium runway layer, cockpit shell, overlay modes, PFD/FMA, cockpit interaction hooks, scenario/tutorial/checklist/coach flow, guidance state, active-leg route status, LNAV feedback, conservative VNAV/SPD/VS behavior, rejected-takeoff abort flow, scenario persistence, controls settings, deterministic gusts, rollout/taxi/crosswind landing regressions, player differential brake controls, versioned B737 data, trim fixtures, and performance-card assertions are implemented.
+- LNAV now sequences active route legs at capture radius, passed-waypoint geometry, or bounded turn-anticipation gates; AP LNAV consumes the route-status active leg with a capped cross-track intercept.
 
 Completion records:
 
@@ -35,6 +36,7 @@ Completion records:
 - `docs/plans/2026-05-27-rfs-surface-aware-ground-handling.md`
 - `docs/plans/2026-05-27-rfs-rollout-taxi-crosswind-controls.md`
 - `docs/plans/2026-05-27-rfs-multi-airport-surface-coverage.md`
+- `docs/plans/2026-05-27-rfs-lnav-turn-anticipation.md`
 
 ## P1 — Finish gear/tire ground model and takeoff/landing realism
 
@@ -67,12 +69,11 @@ Acceptance tests:
 
 ## P2 — Advanced flight guidance and RFMS integration
 
-Why this follows the current guidance pass: active-leg state, route feedback, and honest VNAV/SPD/VS are now in place, but advanced LNAV/VNAV needs the aircraft energy model and selectable cockpit controls to be more complete.
+Why this follows the current guidance pass: active-leg state, route feedback, capped LNAV cross-track intercept, bounded turn-anticipation sequencing, and honest VNAV/SPD/VS are now in place, but remaining RFMS editing, N1 autothrottle, and FMA lifecycle work still need fuller avionics integration and selectable cockpit controls.
 
 Remaining scope:
 
 - RFMS-backed route edits and route modification UI.
-- Use turn anticipation metrics to advance LNAV guidance before leg transitions.
 - Autothrottle N1 behavior in addition to SPEED behavior.
 - RFMS Flight Mode Annunciator lifecycle integration beyond current truth-mode display.
 
@@ -87,8 +88,8 @@ Suggested implementation files:
 
 Acceptance tests:
 
-- Active waypoint advances only when the aircraft passes the sequencing gate.
-- LNAV flies toward a desired track from an offset intercept.
+- Active waypoint/leg advances at capture radius, passed-waypoint geometry, or bounded turn-anticipation gates.
+- LNAV consumes the active route leg and a capped cross-track intercept when flying toward a desired track from an offset intercept.
 - HDG SEL honors selected heading independent of loaded route.
 - VNAV computes and tracks an altitude path over distance.
 - FMA modes reflect the same state used by the servo laws.

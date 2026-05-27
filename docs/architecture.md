@@ -110,9 +110,9 @@ RFS bridges RFMS-compatible avionics state into native physics and player-facing
 - `RfsMCP.tsx` edits RFMS-compatible selected speed/heading/altitude/vertical-speed targets, creates a default AP state on first valid mode/target click, and keeps unsupported modes hidden.
 - `RfsPFD.tsx` renders readable speed/altitude tapes, attitude/heading, and an FMA row from the same truth modes the servo laws use.
 - `App.tsx` can load the KSEA -> OLM -> BTG -> KPDX sample route. LOAD PLAN applies the safe LNAV + SPEED + ALT_HOLD defaults only in the stopped/PARKED preflight state; during a running takeoff it stores the route without auto-commanding AP modes.
-- `navigation.ts` validates route coordinates/discontinuities, computes store-owned active-leg status including signed cross-track/along-track metrics, estimates next-leg turn angle/anticipation distance, and sequences the active leg.
+- `navigation.ts` validates route geometry, computes cross-track/along-track/desired-track/turn metrics, and sequences legs on capture radius, passed-waypoint geometry, or a bounded turn-anticipation gate.
 - `RouteStatus.tsx` exposes active leg, next waypoint, DTG, track, ETA, and LNAV unavailable reasons.
-- `autopilot.ts` maps active RFMS truth modes to AP-owned control commands. LNAV uses the store-owned active route leg plus a capped cross-track intercept law; VNAV uses the active route leg constraints. Invalid route status does not fall back to waypoint 0.
+- `autopilot.ts` maps active RFMS truth modes to AP-owned control commands. AP LNAV consumes the store-owned/route-status active leg, uses a capped cross-track intercept law, and does not fall back to invalid routes; VNAV uses the active route leg constraints.
 - `vnav.ts` reports VNAV availability, unavailable reasons, altitude targets, target vertical speed, speed constraints, and the conservative VNAV_PTH -> ALT* -> ALT_HOLD path lifecycle for actionable altitude constraints.
 - `GuidanceState` combines scenario phase, tutorial, checklist, coach messages, and alerts for the player-facing flow; route status and AP truth remain adjacent store-owned state used by `RouteStatus`, `RfsPFD`, and the servo laws.
 - `scenarioPersistence.ts` saves cloneable scenario snapshots to `localStorage`, and `ScenarioPanel` exposes SAVE/LOAD controls with visible ignored/corrupt-save feedback. Running saves restore as paused so training loops do not surprise-resume.
@@ -120,7 +120,7 @@ RFS bridges RFMS-compatible avionics state into native physics and player-facing
 
 Known guidance follow-up:
 
-- Use turn anticipation metrics to advance LNAV guidance before leg transitions and add RFMS-backed route edits.
+- Add RFMS-backed route edits and route modification UI.
 - Wire VNAV path lifecycle transitions into live AP truth/FMA updates once a gated VNAV MCP control is exposed.
 
 ## Weather architecture
@@ -184,6 +184,6 @@ These are intentional gaps, not regressions:
 
 1. Advanced gear/tire model details: dynamic oleo spring/damper compression loads, normal-force-scaled tire side-load/cornering stiffness, anti-skid brake limiting, asymmetric brake-force helpers, rollout/taxi/crosswind landing regressions, player-facing differential brake controls, gear-up runway-tangent belly/crash slide damping, and supported KSEA/KPDX prepared-runway/off-runway rectangle sampling with friction scaling are now in the ground model; remaining gaps are deeper ground-handling tuning, broader terrain mesh collision, additional airports beyond KSEA/KPDX, and richer airport surface coverage outside prepared runway rectangles.
 2. Worker physics: codec and worker entry scaffolding exist, and `VITE_RFS_WORKER_PHYSICS` is parsed as an experimental/default-off runtime flag for future wiring. The active runtime still uses main-thread physics; no `simStore` tick migration or runtime Worker bridge is enabled yet.
-3. Advanced flight guidance: RFMS route edits and wiring turn-anticipation/VNAV lifecycle metrics into live AP truth/FMA updates beyond the current conservative target laws.
+3. Advanced flight guidance: RFMS route edits, N1 autothrottle behavior, and wiring VNAV lifecycle metrics into live AP truth/FMA updates beyond the current conservative target laws remain future work.
 4. Data-driven flight model: the B737-800 baseline spec is versioned, but validated aircraft coefficient tables and trim/response tests remain future work.
 5. Audio immersion: explicit Web Audio startup and deterministic mapping are in place; richer engine/cockpit/airframe sound layers remain future work.

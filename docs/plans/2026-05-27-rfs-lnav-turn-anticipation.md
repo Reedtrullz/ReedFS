@@ -8,14 +8,27 @@
 
 **Tech Stack:** TypeScript strict, Vitest, Zustand store, RFMS shared flight-plan types.
 
+## Status
+
+Completed in commits:
+
+- `812c036 docs: add lnav turn anticipation plan`
+- `3d0c879 feat: anticipate lnav route turns`
+- `d7cf668 test: prove lnav turn anticipation integration`
+- `docs: document lnav turn anticipation` (this docs/status commit)
+
+Current behavior: `computeRouteStatus()` sequences route legs on capture radius, passed-waypoint geometry, or a bounded turn-anticipation gate; `advanceSimulationStep()` and AP LNAV consume the anticipated active leg through route status.
+
+The implementation tasks below are retained as a historical execution record; current architecture and roadmap status are documented in `docs/architecture.md` and `docs/roadmap.md`.
+
 ---
 
-## Current baseline
+## Baseline before this plan
 
-- `computeRouteStatus()` validates route geometry, builds legs, sequences only when inside capture radius or already past the to-waypoint, and exposes turn metrics as informational fields.
-- `resolveAutopilotTargets()` recomputes route status for the active leg and uses the returned desired track for LNAV.
-- `advanceSimulationStep()` computes `routeBeforeTick`, passes `routeBeforeTick.activeLegIndex` into AP command generation, integrates, recomputes route status, and stores `routeStatus.activeLegIndex`.
-- Roadmap P2 still lists: "Use turn anticipation metrics to advance LNAV guidance before leg transitions."
+- Before this plan, `computeRouteStatus()` validated route geometry, built legs, sequenced only when inside capture radius or already past the to-waypoint, and exposed turn metrics as informational fields.
+- Before this plan, `resolveAutopilotTargets()` recomputed route status for the active leg and used the returned desired track for LNAV.
+- Before this plan, `advanceSimulationStep()` computed `routeBeforeTick`, passed `routeBeforeTick.activeLegIndex` into AP command generation, integrated, recomputed route status, and stored `routeStatus.activeLegIndex`.
+- At plan start, roadmap P2 still listed turn-anticipation guidance sequencing as pending.
 
 ## Design constraints
 
