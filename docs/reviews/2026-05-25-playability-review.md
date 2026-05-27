@@ -505,4 +505,4 @@ If the next session is implementation, start with this narrow TDD slice:
 
 ## Bottom line
 
-The current app is a strong technical prototype but not yet a playable simulator. The blocking issue is not that the UI needs polish; it is that the player-facing start mode depends on ground/runway/takeoff mechanics that do not exist yet. Implement the ground model and phase-aware takeoff first, then controls/camera/HUD, then AP/route polish.
+At review time, the app was a strong technical prototype but not yet a playable simulator. The blocking issue was not that the UI needed polish; it was that the player-facing start mode depended on ground/runway/takeoff mechanics that did not exist yet. The current repo has since implemented the ground model and phase-aware takeoff foundation; keep this bottom line as historical evidence and use `docs/roadmap.md` for remaining work.

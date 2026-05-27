@@ -147,7 +147,7 @@ Evidence:
 
 Root cause:
 
-The current ground solver is a post-solve altitude clamp, not a normal-force/weight-on-wheels model. Once the aircraft leaves or retracts the gear, there is no safe crash/belly-contact/terrain guard. The camera then follows invalid below-ground states.
+At review time, the ground solver was a post-solve altitude clamp, not a normal-force/weight-on-wheels model. Once the aircraft left or retracted the gear, there was no safe crash/belly-contact/terrain guard. The camera then followed invalid below-ground states. Current repo state has since added explicit gear contact, normal-force liftoff, and gear-up belly/crash runway contact; keep this section as historical evidence.
 
 Fix:
 

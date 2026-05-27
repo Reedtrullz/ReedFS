@@ -2,9 +2,9 @@
 
 > **For Hermes:** Use subagent-driven-development skill for review, but execute cross-cutting physics edits directly in the parent session.
 
-**Goal:** Continue the P1 roadmap by making RFS ground handling less arcade-like through tested tire side-load behavior, then prepare follow-up anti-skid/asymmetric-braking work.
+**Goal:** Continue the P1 roadmap by making RFS ground handling less arcade-like through tested tire side-load behavior, anti-skid/asymmetric brake helpers, dynamic oleo loads, crosswind/weathercocking guards, and gear-up runway-tangent belly/crash slide behavior.
 
-**Architecture:** Keep physics conventions unchanged: body axes x-forward/y-right/z-down, NED down-positive, and store velocity ground-relative. Extend the existing `src/sim/systems/ground.ts` post-solve runway model with pure tire-force helpers first, then apply those forces only while gear stations carry weight. Avoid UI changes in this slice; no player-facing control mapping changes until the pure ground model is proven.
+**Architecture:** Keep physics conventions unchanged: body axes x-forward/y-right/z-down, NED down-positive, and store velocity ground-relative. Extend the existing `src/sim/systems/ground.ts` post-solve runway model with pure helpers first, then apply gear/tire/brake forces only while gear stations carry weight and apply fuselage slide damping only to runway-tangent ground-relative velocity during gear-up belly/crash contact. Avoid UI changes in this slice; no player-facing control mapping changes until the pure ground model is proven.
 
 **Tech Stack:** TypeScript strict, Vitest, RFS 6-DOF physics, Zustand store integration through existing `integrate()` ground-contact call.
 
@@ -14,7 +14,7 @@
 
 Relevant files:
 
-- `src/sim/systems/ground.ts` already has station loads, dynamic oleo spring/damper compression, rolling/brake deceleration, nosewheel steering, touchdown damping, gear-up belly/crash slide damping, and runway-normal velocity constraint.
+- `src/sim/systems/ground.ts` already has station loads, dynamic oleo spring/damper compression, rolling/brake deceleration, nosewheel steering, touchdown damping, gear-up runway-tangent belly/crash slide damping, and runway-normal velocity constraint.
 - `src/sim/systems/__tests__/ground.test.ts` is the primary regression target for ground-system contracts.
 - `docs/roadmap.md` now lists remaining advanced P1 ground/tire gaps: deeper rollout/taxi and crosswind landing scenarios, optional player-facing differential brake controls, and non-runway surfaces.
 
@@ -183,7 +183,7 @@ Expected: PASS.
 
 ## Task 6 [PARENT-DIRECT]: Add gear-up belly/crash slide behavior
 
-**Status:** Complete in the current follow-up after `41e67ff`; implemented with deterministic gear-up runway-tangent belly/crash slide deceleration, no-reverse low-speed clamping, and stronger hard-crash angular damping.
+**Status:** Complete in `d4d2699 feat: add gear-up belly slide damping`; implemented with deterministic gear-up runway-tangent belly/crash slide deceleration, no-reverse low-speed clamping, timestep-scaled angular damping, and persistent hard-crash contact.
 
 **Objective:** Move gear-up contact beyond a marker-only `belly`/`crashed` state by applying deterministic slide deceleration and angular damping when the fuselage contacts the runway without usable landing gear. The behavior should remain conservative: prevent sink-through, avoid reversing horizontal velocity, and distinguish hard crash contact from lower-energy belly slide.
 
@@ -196,8 +196,8 @@ Expected: PASS.
 **Test first:**
 
 - Gear-up belly contact below the runway reduces horizontal slide speed while preserving explicit `belly` contact state.
-- Belly-slide deceleration clamps at zero instead of reversing low-speed ground-relative velocity.
-- Hard gear-up crash contact from high runway-normal sink rate decelerates and damps angular rates more aggressively than a lower-energy belly slide, and remains `crashed` across fixed-step slide updates.
+- Belly-slide deceleration clamps runway-tangent ground-relative velocity at zero instead of reversing low-speed motion.
+- Hard gear-up crash contact from high runway-normal sink rate decelerates and damps angular rates more aggressively than a lower-energy belly slide, uses timestep-scaled damping, and remains `crashed` across fixed-step slide updates.
 
 **Constraints:**
 

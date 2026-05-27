@@ -1,6 +1,6 @@
 # RFS Physics Invariants
 
-This checklist captures the flight-model contracts that were stabilized in the foundation pass. Use it before changing `src/sim/physics/*`, `src/sim/systems/environment.ts`, or `src/store/simStore.ts`.
+This checklist captures the flight-model contracts that were stabilized in the foundation and ground-model passes. Use it before changing `src/sim/physics/*`, `src/sim/systems/environment.ts`, `src/sim/systems/ground.ts`, or `src/store/simStore.ts`.
 
 ## Axes and signs
 
@@ -87,6 +87,25 @@ Regression coverage:
 - `src/sim/physics/__tests__/derived.test.ts`
 - `src/store/__tests__/simStore.test.ts`
 
+## Ground and runway contact
+
+Runway contact is a post-solve constraint, not an alternate wind/velocity frame.
+
+Current contract:
+
+- `state.velocity` remains ground-relative body velocity throughout ground contact.
+- Gear-down contact may load nose/left-main/right-main gear stations; gear-up `belly`/`crashed` contact must not set `weightOnWheels` or leave gear station loads active.
+- Runway-normal velocity is constrained in NED `down`, not by blindly zeroing body-axis `w` while pitched or rolled.
+- Gear-up belly/crash slide damping acts on runway-tangent NED `north/east` velocity and then converts back to body axes.
+- Belly/crash slide damping must clamp low-speed runway-tangent velocity at zero instead of reversing motion.
+- Gear-up angular damping is timestep-scaled retention per second, not a per-tick multiplier.
+- A high runway-normal sink-rate impact that enters `crashed` must remain `crashed` while the gear-up aircraft stays on runway contact.
+
+Regression coverage:
+
+- `src/sim/systems/__tests__/ground.test.ts`
+- `src/sim/physics/__tests__/integrate.test.ts`
+
 ## Drag polarity
 
 Drag must oppose air-relative flow, not always point backward in body X.
@@ -132,7 +151,7 @@ At minimum:
 
 ```bash
 source ~/.nvm/nvm.sh && nvm use 22
-npm run test -- src/sim/physics/__tests__/integrate.test.ts src/sim/physics/__tests__/aero.test.ts src/sim/physics/__tests__/derived.test.ts src/sim/systems/__tests__/environment.test.ts
+npm run test -- src/sim/physics/__tests__/integrate.test.ts src/sim/physics/__tests__/aero.test.ts src/sim/physics/__tests__/derived.test.ts src/sim/systems/__tests__/environment.test.ts src/sim/systems/__tests__/ground.test.ts
 npm run check
 ```
 

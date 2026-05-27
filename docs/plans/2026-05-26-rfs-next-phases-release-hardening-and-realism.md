@@ -1508,6 +1508,8 @@ git commit -m "feat: complete rfs release hardening"
 
 # Phase 7: Gear/tire ground model and takeoff/landing realism
 
+Status note: the core Phase 7 ground-model tasks have been superseded/executed through `docs/plans/2026-05-27-rfs-advanced-gear-tire-ground-handling.md`. The current repo has gear station loads, rolling/brake forces, pedal-scale nosewheel steering, dynamic oleo loads, crosswind/weathercocking regressions, and gear-up runway-tangent belly/crash slide damping. Use `docs/roadmap.md` for remaining P1 scope: deeper rollout/taxi/crosswind landing scenarios, optional player-facing differential brakes, and non-runway surface handling.
+
 Use parent-direct execution for tasks touching `types.ts`, `ground.ts`, and `integrate.ts` together.
 
 ## Task 7.1 [PARENT-DIRECT]: Add gear station data model

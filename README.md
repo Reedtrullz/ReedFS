@@ -50,7 +50,7 @@ src/
       geodesy.ts                   WGS84/ECEF/ENU helpers
     systems/
       environment.ts               Pure wind -> air-relative body velocity helpers
-      ground.ts                    Gear stations, runway contact, tire forces, taxi steering, touchdown/rollout
+      ground.ts                    Gear stations, runway contact, tire forces, taxi steering, touchdown/rollout, belly/crash slide
       engine.ts fuel.ts            Engine spool/fuel burn systems
       electrical.ts hydraulic.ts   Simplified aircraft systems
       navigation.ts vnav.ts        Route validation, active-leg LNAV, conservative VNAV targets

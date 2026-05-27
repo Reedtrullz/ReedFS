@@ -40,6 +40,7 @@ Remaining advanced scope:
 
 - More detailed rollout/taxi and crosswind landing scenarios.
 - Player-facing differential brake controls if desired.
+- Non-runway surface friction/terrain handling beyond the current KSEA runway model.
 
 Suggested implementation files:
 
@@ -56,7 +57,7 @@ Acceptance tests:
 - Nosewheel steering changes heading during taxi at low speed.
 - Rotation produces liftoff only after realistic speed/angle combination.
 - Touchdown compresses gear and damps vertical velocity.
-- Gear-up belly contact is explicitly handled or prevented.
+- Gear-up belly/crash contact remains explicit, damps runway-tangent slide without reversing, and preserves hard `crashed` state across fixed-step updates.
 
 ## P2 — Advanced flight guidance and RFMS integration
 
