@@ -1,6 +1,6 @@
 # RFS Physics Invariants
 
-This checklist captures the flight-model contracts that were stabilized in the foundation and ground-model passes. Use it before changing `src/sim/physics/*`, `src/sim/systems/environment.ts`, `src/sim/systems/ground.ts`, or `src/store/simStore.ts`.
+This checklist captures the flight-model contracts that were stabilized in the foundation and ground-model passes. Use it before changing `src/sim/physics/*`, `src/sim/systems/environment.ts`, `src/sim/systems/ground.ts`, `src/sim/systems/autopilot.ts`, or `src/store/simStore.ts`.
 
 ## Axes and signs
 
@@ -155,8 +155,14 @@ Reasoning:
 
 - Engine state must be current before thrust is computed.
 - Fuel burn and gross weight must be current before accelerations are computed.
-- Autopilot commands are composed upstream before `integrate()`; the legacy AP parameters accepted by `integrate()` are intentionally ignored.
+- Autopilot commands are composed upstream before `integrate()`; the legacy AP parameters accepted by `integrate()` are intentionally ignored. This includes AP-owned SPEED/N1 throttle commands, so N1 autothrottle output must be present in `effectiveControls` before `updateEngines()` runs.
 - Surface sampling happens after position integration for the contact solve, while the pre-integration sample is used only for near-ground normal-force/liftoff checks.
+
+Autopilot/control regression coverage:
+
+- `src/sim/systems/__tests__/autopilot.test.ts` covers SPEED and conservative N1 target/command laws, including A/T-arm gating.
+- `src/sim/__tests__/simulationStep.test.ts` covers AP commands being composed into effective controls before engine integration.
+- `src/store/__tests__/simStore.test.ts` covers pilot/AP/effective-control separation and stale AP mode flag cleanup on manual override.
 
 ## Required verification before claiming a physics change works
 
