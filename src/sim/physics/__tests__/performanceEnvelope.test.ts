@@ -5,8 +5,10 @@ import {
 } from '../../data/performance/b737TakeoffProfiles';
 import { B737_800_SPEC, createInitialState, type AircraftState } from '../../types';
 import { takeoffRollInputs } from '../../__tests__/scenarioHelpers';
+import { KSEA_RUNWAY_16L } from '../../../viewport/runwayData';
 import { computeDerived } from '../derived';
 import { integrate } from '../integrate';
+import { eulerToQuat } from '../quaternion';
 import { radToDeg } from '../units';
 
 const HZ = 120;
@@ -48,7 +50,13 @@ function createProfileState(profile: TakeoffEnvelope): AircraftState {
   const remainingFuelKg = fuelLoadKg - centerFuelKg;
   const wingFuelKg = Math.min(remainingFuelKg / 2, B737_800_SPEC.fuelCapacity.left);
 
-  state.position.alt = profile.fieldElevationFt;
+  state.position = {
+    lat: KSEA_RUNWAY_16L.start.lat,
+    lon: KSEA_RUNWAY_16L.start.lon,
+    alt: profile.fieldElevationFt,
+  };
+  state.attitude = { ...state.attitude, psi: KSEA_RUNWAY_16L.headingDeg * Math.PI / 180 };
+  state.quaternion = eulerToQuat(state.attitude.phi, state.attitude.theta, state.attitude.psi);
   state.ground = {
     ...state.ground,
     aglFt: 0,
