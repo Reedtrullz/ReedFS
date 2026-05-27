@@ -12,6 +12,7 @@ import { quatDerivative, quatNormalize, quatToEuler } from './quaternion';
 import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
 import type { FlightPlan } from '@shared/types/fmc';
 import type { WindInfo } from '../weather';
+import { sampleKseaSurface } from '../runwaySurface';
 
 const G = 9.80665;
 const TAKEOFF_ASSIST_MIN_HEIGHT_FT = 50;
@@ -126,7 +127,8 @@ export function integrate(
   state.velocity.v += vdot * dt;
   state.velocity.w += wdot * dt;
 
-  const nearRunwaySurface = state.position.alt <= state.ground.groundAltFt + GROUND_CONTACT_EPSILON_FT;
+  const preIntegrationSurface = sampleKseaSurface(state.position);
+  const nearRunwaySurface = state.position.alt <= preIntegrationSurface.groundAltFt + GROUND_CONTACT_EPSILON_FT;
   const normalForceN = nearRunwaySurface ? estimateNormalForceN(state, aero) : 0;
   const allowLiftoff = state.ground.weightOnWheels && nearRunwaySurface && shouldAllowLiftoff(state, normalForceN, aero.weight);
 
@@ -160,10 +162,15 @@ export function integrate(
   state.position.alt = geo.alt * mToFt(1);
 
   // ── Ground contact constraint ──
-  // First playable slice: a flat KSEA runway contact solver. This is intentionally
-  // applied after position integration as a post-solve constraint so the existing
-  // free-flight equations and sign conventions remain unchanged.
-  const groundContact = applyGroundContact(state, controls, dt, KSEA_RUNWAY_ALT_FT, { allowLiftoff, normalForceN });
+  // First surface-aware slice: sample KSEA runway rectangles and use the
+  // resulting ground surface as a post-solve constraint so free-flight equations
+  // and wind/velocity sign conventions remain unchanged.
+  const groundSurface = sampleKseaSurface(state.position);
+  const groundContact = applyGroundContact(state, controls, dt, groundSurface.groundAltFt, {
+    allowLiftoff,
+    normalForceN,
+    surface: groundSurface,
+  });
 
   // ── Config ──
   state.config.flapSetting = controls.flapLever;

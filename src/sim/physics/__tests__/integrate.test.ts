@@ -10,6 +10,7 @@ import { GROUND_CONTACT_EPSILON_FT, KSEA_RUNWAY_ALT_FT } from '../../systems/gro
 import { computeHeldKeyInputs } from '../../../input/keyboardControls';
 import { runFixedStepScenario, takeoffRollInputs } from '../../__tests__/scenarioHelpers';
 import { createAircraftStateForScenario, KSEA_TUTORIAL_SCENARIO } from '../../scenarios';
+import { KSEA_RUNWAY_16L } from '../../../viewport/runwayData';
 
 const idle: ControlInputs = {
   elevator: 0, aileron: 0, rudder: 0,
@@ -38,6 +39,25 @@ function runwayLateralDisplacementM(state: ReturnType<typeof createInitialState>
 
 function degToRad(deg: number): number {
   return deg * Math.PI / 180;
+}
+
+function offsetPositionMeters(
+  position: { lat: number; lon: number; altFt?: number; alt?: number },
+  northM: number,
+  eastM: number,
+): { lat: number; lon: number; alt: number } {
+  const metersPerDegreeLat = 111_320;
+  const metersPerDegreeLon = 111_320 * Math.cos(position.lat * Math.PI / 180);
+  return {
+    lat: position.lat + northM / metersPerDegreeLat,
+    lon: position.lon + eastM / metersPerDegreeLon,
+    alt: position.alt ?? position.altFt ?? KSEA_RUNWAY_ALT_FT,
+  };
+}
+
+function setRunwayHeading(state: ReturnType<typeof createInitialState>): void {
+  const headingRad = KSEA_RUNWAY_16L.headingDeg * Math.PI / 180;
+  setAttitude(state, { ...state.attitude, psi: headingRad });
 }
 
 function airborneTakeoffConfigState(trimUnits: number): ReturnType<typeof createInitialState> {
@@ -178,6 +198,51 @@ describe('integrate', () => {
     expect(s.position.alt).toBeGreaterThanOrEqual(KSEA_RUNWAY_ALT_FT - 0.01);
     expect(s.velocity.w).toBeGreaterThanOrEqual(0);
     expect(s.velocity.w).toBeLessThan(0.1);
+  });
+
+  it('marks ground contact off-runway when the aircraft is outside the prepared runway rectangle', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.position = offsetPositionMeters(KSEA_RUNWAY_16L.start, 0, 80);
+    state.position.alt = KSEA_RUNWAY_ALT_FT;
+    setRunwayHeading(state);
+    state.config.gearDown = true;
+    state.velocity.u = 10;
+
+    integrate(state, idle, B737_800_SPEC, 1 / 60);
+
+    expect(state.ground.contact).toBe('gear');
+    expect(state.ground.weightOnWheels).toBe(true);
+    expect(state.ground.onRunway).toBe(false);
+  });
+
+  it('off-runway rollout decelerates faster than prepared-runway rollout without reversing', () => {
+    const runway = createInitialState(B737_800_SPEC);
+    runway.position = {
+      lat: KSEA_RUNWAY_16L.start.lat,
+      lon: KSEA_RUNWAY_16L.start.lon,
+      alt: KSEA_RUNWAY_ALT_FT,
+    };
+    setRunwayHeading(runway);
+    runway.velocity.u = ktToMs(60);
+    runway.config.gearDown = true;
+
+    const offRunway = createInitialState(B737_800_SPEC);
+    offRunway.position = offsetPositionMeters(KSEA_RUNWAY_16L.start, 0, 80);
+    offRunway.position.alt = KSEA_RUNWAY_ALT_FT;
+    setRunwayHeading(offRunway);
+    offRunway.velocity.u = ktToMs(60);
+    offRunway.config.gearDown = true;
+
+    const braking: ControlInputs = { ...idle, brake: 0.5, spoilers: 1, gearLever: 'DOWN' };
+    for (let i = 0; i < 5 * 120; i += 1) {
+      integrate(runway, braking, B737_800_SPEC, 1 / 120);
+      integrate(offRunway, braking, B737_800_SPEC, 1 / 120);
+    }
+
+    expect(runway.ground.onRunway).toBe(true);
+    expect(offRunway.ground.onRunway).toBe(false);
+    expect(offRunway.velocity.u).toBeGreaterThanOrEqual(-0.1);
+    expect(offRunway.velocity.u).toBeLessThan(runway.velocity.u);
   });
 
   it('keeps full-throttle takeoff roll on the runway before rotation speed', () => {
