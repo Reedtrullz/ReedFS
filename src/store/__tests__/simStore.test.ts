@@ -554,6 +554,65 @@ describe('useSimStore', () => {
     expect(state.inputs).toBe(state.effectiveControls);
   });
 
+  it('tick stores N1 autothrottle commands and effective throttle while running', () => {
+    const ap = minimalApState();
+    ap.truth.autopilotStatus = 'CMD_A';
+    ap.truth.thrustActive = 'N1';
+    ap.boeing.autothrottleArm = true;
+    ap.boeing.n1 = true;
+    ap.boeing.speedMode = false;
+
+    useSimStore.setState((s) => ({
+      aircraft: {
+        ...s.aircraft,
+        flightPhase: 'TAKEOFF',
+        engines: [
+          { ...s.aircraft.engines[0], n1: 0 },
+          { ...s.aircraft.engines[1], n1: 0 },
+        ],
+      },
+    }));
+    useSimStore.getState().setApState(ap);
+    expect(useSimStore.getState().apCommands).toEqual({});
+    expect(useSimStore.getState().pilotInputs.throttle1).toBe(0);
+    useSimStore.getState().start();
+    useSimStore.getState().tick(1000);
+
+    const state = useSimStore.getState();
+    expect(state.apCommands.throttle1).toBeGreaterThan(0);
+    expect(state.effectiveControls.throttle1).toBe(state.apCommands.throttle1);
+    expect(state.inputs).toBe(state.effectiveControls);
+    expect(state.pilotInputs.throttle1).toBe(0);
+    expect(state.aircraft.engines[0].n1).toBeGreaterThan(0);
+  });
+
+  it('manual throttle override disconnects AP and clears stale N1 Boeing flag', () => {
+    const ap = minimalApState();
+    ap.truth.autopilotStatus = 'CMD_A';
+    ap.truth.thrustActive = 'N1';
+    ap.boeing.autothrottleArm = true;
+    ap.boeing.n1 = true;
+    ap.boeing.speedMode = true;
+
+    useSimStore.getState().setApState(ap);
+    useSimStore.setState((s) => ({
+      apCommands: { throttle1: 0.25, throttle2: 0.25 },
+      effectiveControls: { ...s.pilotInputs, throttle1: 0.25, throttle2: 0.25 },
+      inputs: { ...s.pilotInputs, throttle1: 0.25, throttle2: 0.25 },
+    }));
+
+    useSimStore.getState().setInput({ throttle1: 0.7, throttle2: 0.7 });
+
+    const state = useSimStore.getState();
+    expect(state.apState?.truth.thrustActive).toBe('OFF');
+    expect(state.apState?.truth.lateralActive).toBe('OFF');
+    expect(state.apState?.truth.verticalActive).toBe('OFF');
+    expect(state.apState?.truth.autopilotStatus).toBe('OFF');
+    expect(state.apState?.boeing.n1).toBe(false);
+    expect(state.apState?.boeing.speedMode).toBe(false);
+    expect(state.apCommands).toEqual({});
+  });
+
   it('manual input override disconnects AP and makes pilot controls effective deterministically', () => {
     useSimStore.getState().setApState(minimalApState());
     useSimStore.setState((s) => {

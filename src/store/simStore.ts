@@ -262,6 +262,7 @@ function disconnectAutopilot(apState: AutopilotState | null): AutopilotState | n
     cmdB: false,
     cwsA: false,
     cwsB: false,
+    n1: false,
     speedMode: false,
     lnav: false,
     vnav: false,

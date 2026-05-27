@@ -105,6 +105,24 @@ function lnavAutopilotState(): AutopilotState {
   };
 }
 
+function n1AutopilotState(): AutopilotState {
+  const state = lnavAutopilotState();
+  return {
+    ...state,
+    boeing: {
+      ...state.boeing,
+      autothrottleArm: true,
+      n1: true,
+      speedMode: false,
+    },
+    truth: {
+      ...state.truth,
+      thrustActive: 'N1',
+      autopilotStatus: 'CMD_A',
+    },
+  };
+}
+
 beforeEach(() => resetAutopilotPID());
 
 describe('advanceSimulationStep', () => {
@@ -202,5 +220,41 @@ describe('advanceSimulationStep', () => {
 
     expect(result.apCommands.aileron).toBeGreaterThan(0);
     expect(result.activeLegIndex).toBe(1);
+  });
+
+  it('feeds N1 autothrottle commands into effective controls before engine integration', () => {
+    const aircraft = createInitialState(B737_800_SPEC);
+    aircraft.flightPhase = 'TAKEOFF';
+    aircraft.engines[0].n1 = 0;
+    aircraft.engines[1].n1 = 0;
+    const pilotInputs = tutorialControls();
+    const apState = n1AutopilotState();
+    const guidance = buildGuidanceState({
+      scenario: KSEA_TUTORIAL_SCENARIO,
+      status: 'running',
+      aircraft,
+      controls: pilotInputs,
+    });
+
+    const result = advanceSimulationStep({
+      aircraft,
+      spec: B737_800_SPEC,
+      pilotInputs,
+      apState,
+      flightPlan: null,
+      activeLegIndex: null,
+      routeStatus: createNoRouteStatus(),
+      wind: null,
+      dt: 1 / 60,
+      status: 'running',
+      selectedScenarioId: KSEA_TUTORIAL_SCENARIO.id,
+      guidance,
+    });
+
+    expect(result.apCommands.throttle1).toBeGreaterThan(0);
+    expect(result.controls.effectiveControls.throttle1).toBe(result.apCommands.throttle1);
+    expect(result.controls.pilotInputs.throttle1).toBe(0);
+    expect(result.controls.inputs).toBe(result.controls.effectiveControls);
+    expect(result.aircraft.engines[0].n1).toBeGreaterThan(0);
   });
 });
