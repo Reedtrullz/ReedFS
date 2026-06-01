@@ -12,10 +12,10 @@ export default defineConfig({
     },
   },
   server: {
-    headers: {
-      'Cross-Origin-Opener-Policy': 'same-origin',
-      'Cross-Origin-Embedder-Policy': 'require-corp',
-    },
+    // NOTE: Do NOT add COOP/COEP headers (Cross-Origin-Opener-Policy /
+    // Cross-Origin-Embedder-Policy). They block Cesium Ion's cross-origin
+    // tile requests to api.cesium.com and assets.ion.cesium.com.
+    // SharedArrayBuffer is not currently required by any RFS subsystem.
   },
   build: {
     target: 'esnext',
