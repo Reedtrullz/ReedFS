@@ -191,13 +191,15 @@ describe('computeAutopilotCommands N1', () => {
 });
 
 describe('computeAutopilotCommands VS', () => {
-  it('commands nose-up elevator when selected VS is above current VS', () => {
+  it('commands bounded nose-up elevator on first VS engagement frame', () => {
     const s = createInitialState(B737_800_SPEC);
+    s.position.alt = 20000;
     s.velocity.u = 128.6;
     s.velocity.w = 0;
     s.attitude.theta = 0;
     const ap = makeAp('HDG_SEL', 'VS', 'OFF');
     ap.boeing.verticalSpeed = 1000;
+    ap.boeing.altitude = 30000; // prevent altitude capture from blending VS
 
     const targets = resolveAutopilotTargets(s, ap);
     const commands = computeAutopilotCommands(
@@ -211,6 +213,7 @@ describe('computeAutopilotCommands VS', () => {
     );
 
     expect(targets.targetVerticalSpeedFpm).toBe(1000);
+    // First VS engagement should not full-deflect the elevator; derivative kick must be bounded.
     expect(commands.elevator).toBeLessThan(0);
     expect(commands.elevator).toBeGreaterThan(-0.5);
   });
