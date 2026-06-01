@@ -18,8 +18,6 @@ let throttleLimited = 0; // rate-limited throttle output
 const PITCH_MIN_DEG = -10;
 const PITCH_MAX_DEG = 20;
 const BANK_MAX_DEG = 30;
-const VS_TARGET_MAX_FPM = 3000;
-const PITCH_ADJUST_RATE_DEG_PER_SEC = 3;
 const THROTTLE_RATE_PER_SEC = 1.5;
 
 // ── Helpers ─────────────────────────────────────────────────────────────
