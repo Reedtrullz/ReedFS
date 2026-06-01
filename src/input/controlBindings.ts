@@ -83,7 +83,7 @@ export const DEFAULT_CONTROL_BINDINGS: ControlBinding[] = [
   {
     id: 'trim',
     label: 'Trim',
-    keyboard: ['[ / ]'],
+    keyboard: ['8 / 9'],
     gamepad: ['Gamepad D-pad up/down'],
     description: 'Stabilizer trim for hands-off pitch force reduction.',
   },
