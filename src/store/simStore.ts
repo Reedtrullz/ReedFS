@@ -400,9 +400,10 @@ export const useSimStore = create<SimStore>((set, get) => ({
   applyInputActions: (actions, dt) =>
     set((s) => {
       const previousInputManager = seedInputManagerFromLiveInputs(s.inputManager, s.pilotInputs, actions);
-      const inputManager = updateInputManager(previousInputManager, actions, dt);
+      let inputManager = updateInputManager(previousInputManager, actions, dt);
       let inputPatch = controlPatchFromInputManager(previousInputManager, inputManager, actions);
-      if (isRejectedTakeoffAbortLatched(s.status, s.aircraft, s.pilotInputs)) {
+      const rejectedTakeoffAbort = isRejectedTakeoffAbortLatched(s.status, s.aircraft, s.pilotInputs);
+      if (rejectedTakeoffAbort) {
         inputPatch = {
           ...inputPatch,
           throttle1: 0,
@@ -411,6 +412,18 @@ export const useSimStore = create<SimStore>((set, get) => ({
           spoilers: 1,
         };
       }
+
+      const apOwnsThrust = s.apState != null && (s.apState.truth.thrustActive === 'SPEED' || s.apState.truth.thrustActive === 'N1');
+      if (!rejectedTakeoffAbort && apOwnsThrust && (inputPatch.throttle1 !== undefined || inputPatch.throttle2 !== undefined)) {
+        inputPatch = { ...inputPatch };
+        delete inputPatch.throttle1;
+        delete inputPatch.throttle2;
+        inputManager = createInputManagerState({
+          ...inputManager,
+          throttle: Math.max(s.pilotInputs.throttle1, s.pilotInputs.throttle2),
+        });
+      }
+
       const trimChanged = inputManager.stabilizerTrimUnits !== s.aircraft.config.stabilizerTrimUnits;
       const aircraft = trimChanged ? structuredClone(s.aircraft) : s.aircraft;
       if (trimChanged) {

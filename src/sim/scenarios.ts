@@ -75,39 +75,6 @@ export const ENVA_TUTORIAL_SCENARIO: FlightScenario = {
   ],
 };
 
-export const ENVA_LANDING_SCENARIO: FlightScenario = {
-  id: 'enva-landing',
-  name: 'ENVA Approach & Landing',
-  description: 'Lightweight 737-800 set up on a ~10-mile final for ENVA runway 27 heading west into the fjord.',
-  position: { lat: 63.44, lon: 11.10, alt: 3_000 },
-  runway: { airport: ENVA_RUNWAY_09.airport, runway: '27', elevationFt: ENVA_RUNWAY_09.elevationFt, headingDeg: 269 },
-  fuel: { centerTank: 2_000, leftTank: 800, rightTank: 800, totalFuel: 3_600 },
-  zeroFuelWeightKg: 44_413,
-  grossWeightKg: 48_013,
-  payloadWeightKg: 3_000,
-  cgPercent: 23,
-  stabilizerTrimUnits: 4.0,
-  flapSetting: 5,
-  wind: { dir: 270, speed: 6 },
-  tutorialSteps: [
-    {
-      id: 'approach-setup',
-      title: 'Approach setup',
-      body: 'Configured on a straight-in for ENVA 27. Flaps set to 5, gear up. Intercept glide path visually.',
-    },
-    {
-      id: 'configure-landing',
-      title: 'Configure for landing',
-      body: 'Lower gear, extend full flaps, and stabilise at VREF. Keep the centerline lined up visually.',
-    },
-    {
-      id: 'touchdown',
-      title: 'Touchdown and rollout',
-      body: 'Flare over the threshold, reduce thrust, and apply gentle braking for a controlled rollout on 27.',
-    },
-  ],
-};
-
 // ── KSEA ────────────────────────────────────────────────────────────────
 export const KSEA_TUTORIAL_SCENARIO: FlightScenario = {
   id: 'ksea-tutorial',
@@ -175,7 +142,7 @@ export const KSEA_LIGHT_PATTERN_SCENARIO: FlightScenario = {
   ],
 };
 
-export const SCENARIOS: FlightScenario[] = [ENVA_TUTORIAL_SCENARIO, ENVA_LANDING_SCENARIO, KSEA_TUTORIAL_SCENARIO, KSEA_LIGHT_PATTERN_SCENARIO];
+export const SCENARIOS: FlightScenario[] = [ENVA_TUTORIAL_SCENARIO, KSEA_TUTORIAL_SCENARIO, KSEA_LIGHT_PATTERN_SCENARIO];
 
 const CENTER_TANK_ARM_PERCENT_MAC = 22;
 const WING_TANK_ARM_PERCENT_MAC = 30;

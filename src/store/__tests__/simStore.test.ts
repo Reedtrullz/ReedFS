@@ -4,7 +4,7 @@ import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
 import type { FlightPlan } from '@shared/types/fmc';
 import type { AutopilotCommands } from '../../sim/types';
 import { KSEA_RUNWAY_ALT_FT } from '../../sim/systems/ground';
-import { ENVA_TUTORIAL_SCENARIO, KSEA_LIGHT_PATTERN_SCENARIO, KSEA_TUTORIAL_SCENARIO } from '../../sim/scenarios';
+import { ENVA_TUTORIAL_SCENARIO, KSEA_LIGHT_PATTERN_SCENARIO, KSEA_TUTORIAL_SCENARIO, SCENARIOS } from '../../sim/scenarios';
 import { createKseaKpdxFlight } from '../../sim/flightPlanLoader';
 import {
   SCENARIO_SAVE_KEY,
@@ -127,6 +127,14 @@ describe('useSimStore', () => {
     expect(state.guidance.activeTutorialStep?.id).toBe('line-up');
     expect(state.guidance.checklist.every((item) => item.complete)).toBe(true);
     expect(state.guidance.coachMessage).toMatch(/start roll/i);
+  });
+
+  it('can select every published scenario without throwing', () => {
+    for (const scenario of SCENARIOS) {
+      expect(() => useSimStore.getState().setScenario(scenario.id)).not.toThrow();
+      expect(useSimStore.getState().selectedScenarioId).toBe(scenario.id);
+    }
+    useSimStore.getState().setScenario(ENVA_TUTORIAL_SCENARIO.id);
   });
 
   it('separates pilot inputs, AP commands, effective controls, and legacy inputs alias', () => {
@@ -586,7 +594,7 @@ describe('useSimStore', () => {
     expect(state.aircraft.engines[0].n1).toBeGreaterThan(0);
   });
 
-  it('manual throttle override disconnects AP and clears stale N1 Boeing flag', () => {
+  it('manual setInput throttle is ignored while AP owns thrust', () => {
     const ap = minimalApState();
     ap.truth.autopilotStatus = 'CMD_A';
     ap.truth.thrustActive = 'N1';
@@ -607,7 +615,32 @@ describe('useSimStore', () => {
     const state = useSimStore.getState();
     expect(state.apState?.truth.autopilotStatus).toBe('CMD_A'); // still engaged
     expect(state.apState?.truth.thrustActive).toBe('N1');
+    expect(state.pilotInputs.throttle1).toBe(0);
     expect(state.effectiveControls.throttle1).not.toBe(0.7); // AP overrides
+  });
+
+  it('manual input action throttle is ignored while AP owns thrust', () => {
+    const ap = minimalApState();
+    ap.truth.autopilotStatus = 'CMD_A';
+    ap.truth.thrustActive = 'N1';
+    ap.boeing.autothrottleArm = true;
+    ap.boeing.n1 = true;
+
+    useSimStore.getState().setApState(ap);
+    useSimStore.setState((s) => ({
+      apCommands: { throttle1: 0.25, throttle2: 0.25 },
+      effectiveControls: { ...s.pilotInputs, throttle1: 0.25, throttle2: 0.25 },
+      inputs: { ...s.pilotInputs, throttle1: 0.25, throttle2: 0.25 },
+    }));
+
+    useSimStore.getState().applyInputActions({ throttleDelta: 0.5 }, 0);
+
+    const state = useSimStore.getState();
+    expect(state.apState?.truth.autopilotStatus).toBe('CMD_A');
+    expect(state.apState?.truth.thrustActive).toBe('N1');
+    expect(state.pilotInputs.throttle1).toBe(0);
+    expect(state.inputManager.throttle).toBe(0);
+    expect(state.effectiveControls.throttle1).toBe(0.25);
   });
 
   it('manual input override disconnects AP and makes pilot controls effective deterministically', () => {
