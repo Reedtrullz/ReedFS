@@ -8,6 +8,7 @@ import {
   computeOleoStrutLoads,
   computeTireSideForces,
   computeWheelBrakeForces,
+  ENVA_RUNWAY_ALT_FT,
   KSEA_RUNWAY_ALT_FT,
 } from '../ground';
 import { bodyToNed, nedToBody } from '../../physics/frames';
@@ -47,7 +48,7 @@ describe('applyGroundContact', () => {
 
     expect(state.ground.weightOnWheels).toBe(true);
     expect(state.ground.aglFt).toBe(0);
-    expect(state.ground.groundAltFt).toBe(KSEA_RUNWAY_ALT_FT);
+    expect(state.ground.groundAltFt).toBe(ENVA_RUNWAY_ALT_FT);
     expect(state.ground.contact).toBe('gear');
     expect(state.ground.onRunway).toBe(true);
     expect(state.ground.normalForceN).toBeGreaterThan(0);

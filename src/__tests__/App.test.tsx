@@ -331,6 +331,14 @@ vi.mock('../viewport/CesiumViewport', async (importOriginal) => {
   };
 });
 
+vi.mock('../config/cesium', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../config/cesium')>();
+  return {
+    ...actual,
+    initCesium: vi.fn(() => actual.getCesiumScenePolicy('')),
+  };
+});
+
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import ThreeToCesium from 'three-to-cesium';
 import { App } from '../App';

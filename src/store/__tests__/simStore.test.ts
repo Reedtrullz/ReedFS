@@ -4,7 +4,7 @@ import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
 import type { FlightPlan } from '@shared/types/fmc';
 import type { AutopilotCommands } from '../../sim/types';
 import { KSEA_RUNWAY_ALT_FT } from '../../sim/systems/ground';
-import { KSEA_LIGHT_PATTERN_SCENARIO, KSEA_TUTORIAL_SCENARIO } from '../../sim/scenarios';
+import { ENVA_TUTORIAL_SCENARIO, KSEA_LIGHT_PATTERN_SCENARIO, KSEA_TUTORIAL_SCENARIO } from '../../sim/scenarios';
 import { createKseaKpdxFlight } from '../../sim/flightPlanLoader';
 import {
   SCENARIO_SAVE_KEY,
@@ -121,7 +121,7 @@ describe('useSimStore', () => {
   it('starts with unified scenario guidance derived from the initial aircraft and controls', () => {
     const state = useSimStore.getState();
 
-    expect(state.guidance.scenarioId).toBe(KSEA_TUTORIAL_SCENARIO.id);
+    expect(state.guidance.scenarioId).toBe(ENVA_TUTORIAL_SCENARIO.id);
     expect(state.guidance.phase).toBe('preflight');
     expect(state.guidance.tutorial.stepIndex).toBe(0);
     expect(state.guidance.activeTutorialStep?.id).toBe('line-up');
@@ -134,7 +134,7 @@ describe('useSimStore', () => {
 
     expect(state.apCommands).toEqual({});
     expect(state.pilotInputs).toEqual(expect.objectContaining({
-      flapLever: KSEA_TUTORIAL_SCENARIO.flapSetting,
+      flapLever: ENVA_TUTORIAL_SCENARIO.flapSetting,
       gearLever: 'DOWN',
     }));
     expect(state.effectiveControls).toEqual(state.pilotInputs);
@@ -147,18 +147,18 @@ describe('useSimStore', () => {
     const state = useSimStore.getState();
     expect(state.status).toBe('running');
     expect(state.inputs).toEqual(expect.objectContaining({
-      throttle1: 1,
-      throttle2: 1,
-      flapLever: 5,
+      throttle1: 0,
+      throttle2: 0,
+      flapLever: 0,
       gearLever: 'DOWN',
       brake: 0,
       elevator: 0,
     }));
-    expect(state.pilotInputs).toEqual(expect.objectContaining({ throttle1: 1, throttle2: 1, elevator: 0 }));
+    expect(state.pilotInputs).toEqual(expect.objectContaining({ throttle1: 0, throttle2: 0, elevator: 0 }));
     expect(state.inputs).toBe(state.effectiveControls);
     expect(state.aircraft.flightPhase).toBe('TAKEOFF');
     expect(state.guidance.phase).toBe('takeoff-roll');
-    expect(state.guidance.coachMessage).toMatch(/centerline|rotate|IAS/i);
+    expect(state.guidance.coachMessage).toMatch(/Flaps set for takeoff/i);
   });
 
   it('startTakeoffRoll clears stale side-specific brake commands', () => {
@@ -435,16 +435,16 @@ describe('useSimStore', () => {
     expect(useSimStore.getState().apCommands).toEqual({});
     expect(useSimStore.getState().inputs.throttle1).toBe(0);
   });
-  it('starts from the KSEA tutorial scenario mass and runway setup', () => {
+  it('starts from the ENVA tutorial scenario mass and runway setup', () => {
     const state = useSimStore.getState();
 
-    expect(state.selectedScenarioId).toBe(KSEA_TUTORIAL_SCENARIO.id);
-    expect(state.aircraft.payloadWeight).toBe(KSEA_TUTORIAL_SCENARIO.payloadWeightKg);
-    expect(state.aircraft.zeroFuelWeight).toBe(KSEA_TUTORIAL_SCENARIO.zeroFuelWeightKg);
-    expect(state.aircraft.cg).toBe(KSEA_TUTORIAL_SCENARIO.cgPercent);
-    expect(state.aircraft.config.stabilizerTrimUnits).toBe(KSEA_TUTORIAL_SCENARIO.stabilizerTrimUnits);
-    expect(state.aircraft.fuel.totalFuel).toBe(KSEA_TUTORIAL_SCENARIO.fuel.totalFuel);
-    expect(state.aircraft.ground.groundAltFt).toBe(KSEA_TUTORIAL_SCENARIO.runway.elevationFt);
+    expect(state.selectedScenarioId).toBe(ENVA_TUTORIAL_SCENARIO.id);
+    expect(state.aircraft.payloadWeight).toBe(ENVA_TUTORIAL_SCENARIO.payloadWeightKg);
+    expect(state.aircraft.zeroFuelWeight).toBe(ENVA_TUTORIAL_SCENARIO.zeroFuelWeightKg);
+    expect(state.aircraft.cg).toBe(ENVA_TUTORIAL_SCENARIO.cgPercent);
+    expect(state.aircraft.config.stabilizerTrimUnits).toBe(ENVA_TUTORIAL_SCENARIO.stabilizerTrimUnits);
+    expect(state.aircraft.fuel.totalFuel).toBe(ENVA_TUTORIAL_SCENARIO.fuel.totalFuel);
+    expect(state.aircraft.ground.groundAltFt).toBe(ENVA_TUTORIAL_SCENARIO.runway.elevationFt);
   });
   it('reset returns to the selected scenario instead of hardcoded defaults', () => {
     useSimStore.getState().setScenario(KSEA_LIGHT_PATTERN_SCENARIO.id);
@@ -603,14 +603,11 @@ describe('useSimStore', () => {
 
     useSimStore.getState().setInput({ throttle1: 0.7, throttle2: 0.7 });
 
+    // When AP owns thrust (N1/SPEED mode), throttle input is silently ignored
     const state = useSimStore.getState();
-    expect(state.apState?.truth.thrustActive).toBe('OFF');
-    expect(state.apState?.truth.lateralActive).toBe('OFF');
-    expect(state.apState?.truth.verticalActive).toBe('OFF');
-    expect(state.apState?.truth.autopilotStatus).toBe('OFF');
-    expect(state.apState?.boeing.n1).toBe(false);
-    expect(state.apState?.boeing.speedMode).toBe(false);
-    expect(state.apCommands).toEqual({});
+    expect(state.apState?.truth.autopilotStatus).toBe('CMD_A'); // still engaged
+    expect(state.apState?.truth.thrustActive).toBe('N1');
+    expect(state.effectiveControls.throttle1).not.toBe(0.7); // AP overrides
   });
 
   it('manual input override disconnects AP and makes pilot controls effective deterministically', () => {

@@ -20,7 +20,7 @@ export function Telemetry() {
 
   return (
     <div style={{
-      position: 'fixed', top: 10, left: 10, zIndex: 100,
+      position: 'fixed', top: 14, left: 360, zIndex: 100,
       background: 'rgba(0,0,0,0.85)', color: '#0f0',
       fontFamily: 'monospace', fontSize: 12, padding: 10,
       borderRadius: 4, lineHeight: 1.7, minWidth: 260,

@@ -26,6 +26,8 @@ import { RfsPFD } from './instruments/RfsPFD';
 import { createDefaultAutopilotState, RfsMCP } from './instruments/RfsMCP';
 import { ContrailLayer } from './viewport/ContrailLayer';
 import { RunwayLayer } from './viewport/RunwayLayer';
+import type { RunwayLayerProps } from './viewport/RunwayLayer';
+import { RunwayEditor } from './viewport/RunwayEditor';
 import { CockpitLayer } from './viewport/CockpitLayer';
 import { nextCameraMode, type CameraMode } from './viewport/cameraMode';
 import { nextOverlayMode, shouldShowDebugOverlays, shouldShowFlightInstruments, type OverlayMode } from './viewport/overlayMode';
@@ -33,6 +35,7 @@ import { CameraManager } from './viewport/CameraManager';
 import { createKseaKpdxFlight } from './sim/flightPlanLoader';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { FPSMonitor } from './components/FPSMonitor';
+import { EngineStrip } from './components/EngineStrip';
 import { ScenarioPanel } from './components/ScenarioPanel';
 import { RouteStatus } from './components/RouteStatus';
 import { SceneStatus } from './components/SceneStatus';
@@ -84,6 +87,7 @@ export function App() {
   const [overlayMode, setOverlayMode] = useState<OverlayMode>('flight');
   const [metarData, setMetarData] = useState<MetarData | null>(null);
   const [viewerGeneration, setViewerGeneration] = useState(0);
+  const [runwayOverrides, setRunwayOverrides] = useState<RunwayLayerProps['runwayOverrides']>(undefined);
 
   // Keyboard controls — tracks pressed keys for simultaneous input
   useEffect(() => {
@@ -187,7 +191,7 @@ export function App() {
     viewerRef.current = viewer;
     setViewerGeneration((generation) => generation + 1);
     viewer.camera.flyTo({
-      destination: Cesium.Cartesian3.fromDegrees(-122.31, 47.45, 5000),
+      destination: Cesium.Cartesian3.fromDegrees(10.91, 63.46, 1500),
       orientation: { heading: Cesium.Math.toRadians(0), pitch: Cesium.Math.toRadians(-30), roll: 0 },
     });
   }, []);
@@ -233,7 +237,8 @@ export function App() {
     <div style={{ width: '100%', height: '100%' }}>
       <CesiumViewport onReady={handleViewerReady} scenePolicy={cesiumScenePolicy} />
       <SceneStatus policy={cesiumScenePolicy} />
-      <RunwayLayer viewerRef={viewerRef} />
+      <RunwayLayer viewerRef={viewerRef} runwayOverrides={runwayOverrides} />
+      {showDebugOverlays && <RunwayEditor onOverridesChange={setRunwayOverrides} />}
       {camMode === 'cockpit' ? <CockpitLayer viewerRef={viewerRef} /> : <ThreeLayer viewerRef={viewerRef} />}
       <CloudLayer viewerRef={viewerRef} metar={metarData} />
       <ContrailLayer viewerRef={viewerRef} />
@@ -245,15 +250,18 @@ export function App() {
       {showFlightInstruments && <RouteStatus />}
       {showFlightInstruments && <RfsPFD />}
       {showFlightInstruments && <RfsMCP />}
+      <EngineStrip />
       {showDebugOverlays && (
         <div
           style={{
             position: 'fixed',
-            top: 10,
-            left: 10,
+            bottom: 80,
+            left: 14,
             color: '#0f0',
             fontFamily: 'monospace',
             zIndex: 10,
+            fontSize: 10,
+            opacity: 0.5,
             pointerEvents: 'none',
           }}
         >

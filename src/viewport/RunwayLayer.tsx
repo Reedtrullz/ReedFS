@@ -1,10 +1,14 @@
 import { useEffect, type RefObject } from 'react';
 import * as Cesium from 'cesium';
 import { isCesiumResourceDestroyed } from './cesiumLifecycle';
-import { KSEA_RUNWAYS, KSEA_RUNWAY_16L, type RunwayGeoPoint, type RunwayReference } from './runwayData';
+import { KSEA_RUNWAY_16L, SUPPORTED_RUNWAYS, type RunwayGeoPoint, type RunwayReference } from './runwayData';
 
 export interface RunwayLayerProps {
   viewerRef: RefObject<Cesium.Viewer | null>;
+  /** Optional per-runway overrides for editing runway positions at runtime.
+   *  Keys are `airport-runwayId` (e.g. `"ENVA-09"`).
+   *  Only the fields provided are overridden; the rest come from the static data. */
+  runwayOverrides?: Record<string, Partial<Pick<RunwayReference, 'start' | 'headingDeg' | 'elevationFt'>>>;
 }
 
 type AddedEntity = ReturnType<Cesium.EntityCollection['add']>;
@@ -174,13 +178,26 @@ function addAirportContext(viewer: Cesium.Viewer): AddedEntity[] {
   return entities;
 }
 
-export function RunwayLayer({ viewerRef }: RunwayLayerProps) {
+export function RunwayLayer({ viewerRef, runwayOverrides }: RunwayLayerProps) {
   useEffect(() => {
     const viewer = viewerRef.current;
     if (!viewer) return;
 
+    // Build runway list, applying any runtime overrides
+    const runways = SUPPORTED_RUNWAYS.map((rw) => {
+      const overrideKey = `${rw.airport}-${rw.id}`;
+      const ov = runwayOverrides?.[overrideKey];
+      if (!ov) return rw;
+      return {
+        ...rw,
+        ...(ov.start ? { start: { ...rw.start, ...ov.start } } : {}),
+        ...(ov.headingDeg !== undefined ? { headingDeg: ov.headingDeg } : {}),
+        ...(ov.elevationFt !== undefined ? { elevationFt: ov.elevationFt } : {}),
+      };
+    });
+
     const created = [
-      ...KSEA_RUNWAYS.flatMap((runway) => addRunwayEntities(viewer, runway)),
+      ...runways.flatMap((runway) => addRunwayEntities(viewer, runway)),
       ...addAirportContext(viewer),
     ];
 
@@ -190,7 +207,7 @@ export function RunwayLayer({ viewerRef }: RunwayLayerProps) {
         viewer.entities.remove(entity);
       });
     };
-  }, [viewerRef]);
+  }, [viewerRef, runwayOverrides]);
 
   return null;
 }

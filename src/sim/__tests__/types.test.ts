@@ -3,10 +3,10 @@ import { createInitialState, B737_800_SPEC } from '../types';
 import { quatToEuler } from '../physics/quaternion';
 
 describe('createInitialState', () => {
-  it('returns parked at KSEA with full fuel', () => {
+  it('returns parked at ENVA with full fuel', () => {
     const s = createInitialState(B737_800_SPEC);
-    expect(s.position.lat).toBeCloseTo(47.45);
-    expect(s.position.lon).toBeCloseTo(-122.301);
+    expect(s.position.lat).toBeCloseTo(63.45767);
+    expect(s.position.lon).toBeCloseTo(10.88648);
     expect(s.flightPhase).toBe('PARKED');
     expect(s.fuel.totalFuel).toBe(B737_800_SPEC.maxFuel);
     expect(s.engines[0].running).toBe(false);

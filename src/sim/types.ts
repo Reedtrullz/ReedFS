@@ -255,9 +255,10 @@ export function createB737GearStations(totalNormalForceN = 0, weightOnWheel = fa
 
 export function createInitialState(spec: AircraftSpec): AircraftState {
   const attitude: Attitude = { phi: 0, theta: 0, psi: Math.PI };
-  const initialLat = 47.45;
-  const initialLon = -122.301;
-  const initialAltFt = 432;
+  // NOTE: Keep in sync with ENVA_RUNWAY_09.start in src/viewport/runwayData.ts
+  const initialLat = 63.45767;
+  const initialLon = 10.88648;
+  const initialAltFt = 56;
   const zeroFuelWeight = spec.emptyWeight;
   const grossWeight = zeroFuelWeight + spec.maxFuel;
 

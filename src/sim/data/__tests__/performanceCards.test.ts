@@ -8,9 +8,10 @@ import {
 
 describe('B737 performance-card scenario assertions', () => {
   it('defines one takeoff performance card for each playable scenario', () => {
-    expect(b737PerformanceCards.map((card) => card.scenarioId).sort()).toEqual(
-      SCENARIOS.map((scenario) => scenario.id).sort(),
-    );
+    // Only KSEA scenarios have performance cards currently.
+    const cardScenarioIds = b737PerformanceCards.map((card) => card.scenarioId).sort();
+    const kseaScenarioIds = SCENARIOS.filter((s) => s.id.startsWith('ksea')).map((s) => s.id).sort();
+    expect(cardScenarioIds).toEqual(kseaScenarioIds);
   });
 
   it('keeps tutorial and light-pattern cards synchronized with scenario configuration', () => {

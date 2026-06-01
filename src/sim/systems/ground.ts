@@ -5,6 +5,7 @@ import { eulerToQuat } from '../physics/quaternion';
 import type { GroundSurfaceSample } from '../runwaySurface';
 import { RUNWAY_FRICTION_SCALE } from '../runwaySurface';
 
+export const ENVA_RUNWAY_ALT_FT = 56;
 export const KSEA_RUNWAY_ALT_FT = 432;
 export const GROUND_CONTACT_EPSILON_FT = 0.5;
 const G = 9.80665;

@@ -4,7 +4,7 @@ import { B737_800_SPEC } from '../sim/types';
 import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
 import type { FlightPlan } from '@shared/types/fmc';
 import type { WindInfo } from '../sim/weather';
-import { KSEA_TUTORIAL_SCENARIO, createAircraftStateForScenario, scenarioById } from '../sim/scenarios';
+import { ENVA_TUTORIAL_SCENARIO, createAircraftStateForScenario, scenarioById } from '../sim/scenarios';
 import type { FlightScenario } from '../sim/scenarios';
 import { buildGuidanceState, type GuidanceState } from '../sim/guidanceState';
 import {
@@ -208,6 +208,7 @@ function sanitizeSetInputPartial(
   pilotInputs: ControlInputs,
   effectiveControls: ControlInputs,
   apActive: boolean,
+  apOwnsThrust: boolean,
 ): { pilotPatch: Partial<ControlInputs>; shouldDisconnect: boolean } {
   if (!apActive) return { pilotPatch: partial, shouldDisconnect: false };
 
@@ -217,6 +218,12 @@ function sanitizeSetInputPartial(
   for (const key of AP_OWNED_INPUT_KEYS) {
     const value = partial[key];
     if (value === undefined) continue;
+
+    // Throttle input is silently ignored when AP owns thrust
+    if (apOwnsThrust && (key === 'throttle1' || key === 'throttle2')) {
+      delete pilotPatch[key];
+      continue;
+    }
 
     if (value === effectiveControls[key] && value !== pilotInputs[key]) {
       delete pilotPatch[key];
@@ -231,8 +238,13 @@ function sanitizeSetInputPartial(
   return { pilotPatch, shouldDisconnect };
 }
 
-function inputActionsIncludeManualApAxis(actions: InputActions): boolean {
-  return actions.pitch !== undefined || actions.roll !== undefined || inputActionsIncludeThrottle(actions);
+function inputActionsIncludeManualApAxis(actions: InputActions, apState: AutopilotState | null): boolean {
+  if (!isAutopilotEngaged(apState)) return false;
+  // Pitch/roll always disconnect
+  if (actions.pitch !== undefined || actions.roll !== undefined) return true;
+  // Throttle only disconnects when the AP is NOT controlling thrust
+  const apOwnsThrust = apState && (apState.truth.thrustActive === 'SPEED' || apState.truth.thrustActive === 'N1');
+  return !apOwnsThrust && inputActionsIncludeThrottle(actions);
 }
 
 function autopilotModesChanged(previous: AutopilotState | null, next: AutopilotState | null): boolean {
@@ -283,11 +295,11 @@ function disconnectAutopilot(apState: AutopilotState | null): AutopilotState | n
   return next;
 }
 
-const initialPilotInputs = inputsForScenario(KSEA_TUTORIAL_SCENARIO);
+const initialPilotInputs = inputsForScenario(ENVA_TUTORIAL_SCENARIO);
 const initialControls = composeControlsSlice(initialPilotInputs);
-const initialAircraft = createAircraftStateForScenario(B737_800_SPEC, KSEA_TUTORIAL_SCENARIO);
+const initialAircraft = createAircraftStateForScenario(B737_800_SPEC, ENVA_TUTORIAL_SCENARIO);
 const initialGuidance = buildGuidanceState({
-  scenario: KSEA_TUTORIAL_SCENARIO,
+  scenario: ENVA_TUTORIAL_SCENARIO,
   status: 'stopped',
   aircraft: initialAircraft,
   controls: initialControls.effectiveControls,
@@ -345,7 +357,7 @@ function restoreSnapshotSlice(snapshot: ScenarioSnapshot): Partial<SimStore> {
 export const useSimStore = create<SimStore>((set, get) => ({
   aircraft: initialAircraft,
   ...initialControls,
-  inputManager: inputManagerForScenario(KSEA_TUTORIAL_SCENARIO),
+  inputManager: inputManagerForScenario(ENVA_TUTORIAL_SCENARIO),
   spec: B737_800_SPEC,
   status: 'stopped',
   lastFrameTime: 0,
@@ -356,19 +368,21 @@ export const useSimStore = create<SimStore>((set, get) => ({
   flightPlan: null,
   activeLegIndex: null,
   routeStatus: initialRouteStatus,
-  wind: cloneWind(KSEA_TUTORIAL_SCENARIO.wind),
-  selectedScenarioId: KSEA_TUTORIAL_SCENARIO.id,
+  wind: cloneWind(ENVA_TUTORIAL_SCENARIO.wind),
+  selectedScenarioId: ENVA_TUTORIAL_SCENARIO.id,
   guidance: initialGuidance,
   scenarioPersistenceMessage: null,
 
   setInput: (partial) =>
     set((s) => {
       const apActive = isAutopilotEngaged(s.apState);
+      const apOwnsThrust = s.apState != null && (s.apState.truth.thrustActive === 'SPEED' || s.apState.truth.thrustActive === 'N1');
       const { pilotPatch, shouldDisconnect } = sanitizeSetInputPartial(
         partial,
         s.pilotInputs,
         s.effectiveControls,
         apActive,
+        apOwnsThrust,
       );
       const pilotInputs = { ...s.pilotInputs, ...pilotPatch };
       const apState = shouldDisconnect ? disconnectAutopilot(s.apState) : s.apState;
@@ -404,7 +418,7 @@ export const useSimStore = create<SimStore>((set, get) => ({
       }
 
       const pilotInputs = Object.keys(inputPatch).length > 0 ? { ...s.pilotInputs, ...inputPatch } : s.pilotInputs;
-      const shouldDisconnect = isAutopilotEngaged(s.apState) && inputActionsIncludeManualApAxis(actions);
+      const shouldDisconnect = isAutopilotEngaged(s.apState) && inputActionsIncludeManualApAxis(actions, s.apState);
       const apState = shouldDisconnect ? disconnectAutopilot(s.apState) : s.apState;
       const apCommands = shouldDisconnect ? {} : s.apCommands;
       const controlsSlice = composeControlsSlice(pilotInputs, apCommands, apState);
@@ -518,11 +532,14 @@ export const useSimStore = create<SimStore>((set, get) => ({
   startTakeoffRoll: () => set((s) => {
     const aircraft = structuredClone(s.aircraft);
     aircraft.flightPhase = 'TAKEOFF';
+    // Reset to zero: pilot sets their own throttle, flaps, and trim for takeoff.
+    aircraft.config.flapSetting = 0;
+    aircraft.config.stabilizerTrimUnits = 0;
     const pilotInputs: ControlInputs = {
       ...s.pilotInputs,
-      throttle1: 1,
-      throttle2: 1,
-      flapLever: aircraft.config.flapSetting,
+      throttle1: 0,
+      throttle2: 0,
+      flapLever: 0,
       gearLever: 'DOWN',
       brake: 0,
       leftBrake: 0,
@@ -537,7 +554,7 @@ export const useSimStore = create<SimStore>((set, get) => ({
       ...controlsSlice,
       inputManager: createInputManagerState({
         ...pilotInputs,
-        stabilizerTrimUnits: aircraft.config.stabilizerTrimUnits,
+        stabilizerTrimUnits: 0,
       }),
       apState: null,
       status: 'running',

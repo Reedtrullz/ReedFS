@@ -2,7 +2,7 @@ import type { AircraftSpec, AircraftState, FuelState, GeoPosition } from './type
 import { createB737GearStations, createInitialState } from './types';
 import { eulerToQuat } from './physics/quaternion';
 import type { WindInfo } from './weather';
-import { KSEA_RUNWAY_16L } from '../viewport/runwayData';
+import { ENVA_RUNWAY_09, KSEA_RUNWAY_16L } from '../viewport/runwayData';
 
 export interface ScenarioFuelLoad {
   centerTank: number;
@@ -41,6 +41,74 @@ export interface FlightScenario {
   tutorialSteps: ScenarioTutorialStep[];
 }
 
+// ── ENVA (default) ─────────────────────────────────────────────────────
+export const ENVA_TUTORIAL_SCENARIO: FlightScenario = {
+  id: 'enva-tutorial',
+  name: 'ENVA Tutorial Takeoff',
+  description: 'Medium-weight 737-800 at Trondheim Værnes for a flaps-5 eastbound runway 09 takeoff.',
+  position: { lat: ENVA_RUNWAY_09.start.lat, lon: ENVA_RUNWAY_09.start.lon, alt: ENVA_RUNWAY_09.elevationFt },
+  runway: { airport: ENVA_RUNWAY_09.airport, runway: ENVA_RUNWAY_09.id, elevationFt: ENVA_RUNWAY_09.elevationFt, headingDeg: ENVA_RUNWAY_09.headingDeg },
+  fuel: { centerTank: 8_000, leftTank: 2_000, rightTank: 2_000, totalFuel: 12_000 },
+  zeroFuelWeightKg: 49_913,
+  grossWeightKg: 61_913,
+  payloadWeightKg: 8_500,
+  cgPercent: 25,
+  stabilizerTrimUnits: 5.0,
+  flapSetting: 5,
+  wind: { dir: 90, speed: 0 },
+  tutorialSteps: [
+    {
+      id: 'line-up',
+      title: 'Line up and configure',
+      body: 'Start on ENVA runway 09 with flaps 5, trim set, gear down, and both throttles idle. Use START ROLL when ready.',
+    },
+    {
+      id: 'advance-thrust',
+      title: 'Advance thrust smoothly',
+      body: 'Bring both thrust levers to takeoff power, keep the centerline with small rudder inputs, and monitor IAS on the PFD.',
+    },
+    {
+      id: 'rotate-positive-rate',
+      title: 'Rotate and clean up',
+      body: 'At VR, ease back to about 10° pitch. After positive rate, retract gear and climb out before cleaning flaps.',
+    },
+  ],
+};
+
+export const ENVA_LANDING_SCENARIO: FlightScenario = {
+  id: 'enva-landing',
+  name: 'ENVA Approach & Landing',
+  description: 'Lightweight 737-800 set up on a ~10-mile final for ENVA runway 27 heading west into the fjord.',
+  position: { lat: 63.44, lon: 11.10, alt: 3_000 },
+  runway: { airport: ENVA_RUNWAY_09.airport, runway: '27', elevationFt: ENVA_RUNWAY_09.elevationFt, headingDeg: 269 },
+  fuel: { centerTank: 2_000, leftTank: 800, rightTank: 800, totalFuel: 3_600 },
+  zeroFuelWeightKg: 44_413,
+  grossWeightKg: 48_013,
+  payloadWeightKg: 3_000,
+  cgPercent: 23,
+  stabilizerTrimUnits: 4.0,
+  flapSetting: 5,
+  wind: { dir: 270, speed: 6 },
+  tutorialSteps: [
+    {
+      id: 'approach-setup',
+      title: 'Approach setup',
+      body: 'Configured on a straight-in for ENVA 27. Flaps set to 5, gear up. Intercept glide path visually.',
+    },
+    {
+      id: 'configure-landing',
+      title: 'Configure for landing',
+      body: 'Lower gear, extend full flaps, and stabilise at VREF. Keep the centerline lined up visually.',
+    },
+    {
+      id: 'touchdown',
+      title: 'Touchdown and rollout',
+      body: 'Flare over the threshold, reduce thrust, and apply gentle braking for a controlled rollout on 27.',
+    },
+  ],
+};
+
+// ── KSEA ────────────────────────────────────────────────────────────────
 export const KSEA_TUTORIAL_SCENARIO: FlightScenario = {
   id: 'ksea-tutorial',
   name: 'KSEA Tutorial Takeoff',
@@ -107,7 +175,7 @@ export const KSEA_LIGHT_PATTERN_SCENARIO: FlightScenario = {
   ],
 };
 
-export const SCENARIOS: FlightScenario[] = [KSEA_TUTORIAL_SCENARIO, KSEA_LIGHT_PATTERN_SCENARIO];
+export const SCENARIOS: FlightScenario[] = [ENVA_TUTORIAL_SCENARIO, ENVA_LANDING_SCENARIO, KSEA_TUTORIAL_SCENARIO, KSEA_LIGHT_PATTERN_SCENARIO];
 
 const CENTER_TANK_ARM_PERCENT_MAC = 22;
 const WING_TANK_ARM_PERCENT_MAC = 30;

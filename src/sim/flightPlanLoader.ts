@@ -1,6 +1,7 @@
 import type { FlightPlan, FlightPlanWaypoint } from '@shared/types/fmc';
 
 const AIRPORT_COORDS: Record<string, Pick<FlightPlanWaypoint, 'lat' | 'lon' | 'coordinateSource'>> = {
+  ENVA: { lat: 63.4583, lon: 10.9101, coordinateSource: 'synthetic' },
   KSEA: { lat: 47.45, lon: -122.31, coordinateSource: 'synthetic' },
   KPDX: { lat: 45.59, lon: -122.60, coordinateSource: 'synthetic' },
 };
