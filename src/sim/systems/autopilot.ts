@@ -47,9 +47,19 @@ function currentVsFpm(state: AircraftState): number {
 function currentTasKt(state: AircraftState): number {
   return Math.sqrt(state.velocity.u ** 2 + state.velocity.v ** 2 + state.velocity.w ** 2) * 1.944;
 }
-function pid(s: { value: number; prevError: number }, err: number, kp: number, ki: number, kd: number, dt: number, maxI = 3): number {
+function pid(
+  s: { value: number; prevError: number },
+  err: number,
+  kp: number,
+  ki: number,
+  kd: number,
+  dt: number,
+  maxI = 3,
+  maxDerivative = Number.POSITIVE_INFINITY,
+): number {
   s.value = clamp(s.value + err * dt, -maxI, maxI);
-  const deriv = (err - s.prevError) / Math.max(dt, 0.001);
+  const rawDerivative = (err - s.prevError) / Math.max(dt, 0.001);
+  const deriv = clamp(rawDerivative, -maxDerivative, maxDerivative);
   s.prevError = err;
   return kp * err + ki * s.value + kd * deriv;
 }
@@ -177,7 +187,7 @@ function pitchHold(targetPitchDeg: number, state: AircraftState, dt: number): nu
   const currentPitchDeg = radToDeg(state.attitude.theta);
   const err = targetPitchDeg - currentPitchDeg;
   // elevator convention: negative = nose-up, positive = nose-down
-  return clampSigned(pid(pitchPid, -err, 0.30, 0.08, 0.10, dt, 4));
+  return clampSigned(pid(pitchPid, -err, 0.30, 0.08, 0.10, dt, 4, 4));
 }
 
 /** Roll inner loop: holds a target bank angle via aileron. */
