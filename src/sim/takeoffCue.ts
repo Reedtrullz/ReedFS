@@ -1,9 +1,14 @@
 import type { AircraftState } from './types';
+import { maybeFindPerformanceCardForScenario } from './data/performance/b737PerformanceCards';
 
 export const ROTATE_SPEED_KT = 140;
 export const POSITIVE_RATE_ALT_FT = 50;
 
-export function takeoffCueText(state: AircraftState, iasKt: number): string | null {
+export function rotateSpeedKtForScenario(scenarioId?: string | null): number {
+  return maybeFindPerformanceCardForScenario(scenarioId)?.vSpeeds.vrKt ?? ROTATE_SPEED_KT;
+}
+
+export function takeoffCueText(state: AircraftState, iasKt: number, scenarioId?: string | null): string | null {
   if (state.flightPhase === 'CLIMB') {
     return state.config.gearDown ? 'GEAR UP' : null;
   }
@@ -22,7 +27,7 @@ export function takeoffCueText(state: AircraftState, iasKt: number): string | nu
     return 'POSITIVE RATE — gear up';
   }
 
-  if (iasKt >= ROTATE_SPEED_KT && state.config.gearDown) {
+  if (iasKt >= rotateSpeedKtForScenario(scenarioId) && state.config.gearDown) {
     return 'ROTATE — hold W';
   }
 

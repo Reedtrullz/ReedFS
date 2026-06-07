@@ -6,9 +6,10 @@ import { takeoffCueText } from '../sim/takeoffCue';
 export function Telemetry() {
   const aircraft = useSimStore((s) => s.aircraft);
   const wind = useSimStore((s) => s.wind);
+  const selectedScenarioId = useSimStore((s) => s.selectedScenarioId);
   const status = useSimStore((s) => s.status);
   const d = computeDerived(aircraft, wind);
-  const takeoffCue = takeoffCueText(aircraft, d.ias);
+  const takeoffCue = takeoffCueText(aircraft, d.ias, selectedScenarioId);
   const euler = quatToEuler(aircraft.quaternion);
   const hdgDeg = (euler.psi * 180) / Math.PI;
   const pitchDeg = (euler.theta * 180) / Math.PI;

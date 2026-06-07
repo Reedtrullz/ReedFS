@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { b737TrimFixtures } from '../../data/performance/b737TrimFixtures';
 import { B737_800_SPEC, createInitialState, type AircraftState, type ControlInputs } from '../../types';
 import { computeAero } from '../aero';
+import { computeDerived } from '../derived';
 import { solvePitchTrimForState } from '../trimSolver';
-
-const KNOT_TO_MPS = 0.514444;
+import { applyIasFlightCondition, tasKtForIasAtAltitude } from './fdmFixtureHelpers';
 const zeroInputs: ControlInputs = {
   elevator: 0,
   aileron: 0,
@@ -27,18 +27,33 @@ function stateForFixture(): AircraftState {
   state.config.gearDown = fixture.gearDown;
   state.config.speedBrake = 0;
   state.config.stabilizerTrimUnits = 0;
-  state.velocity.u = fixture.iasKt * KNOT_TO_MPS;
-  state.velocity.v = 0;
-  state.velocity.w = Math.tan(fixture.angleOfAttackRad) * state.velocity.u;
+  applyIasFlightCondition(state, {
+    iasKt: fixture.iasKt,
+    altitudeFt: fixture.altitudeFt,
+    angleOfAttackRad: fixture.angleOfAttackRad,
+    flapSetting: fixture.flapSetting,
+    gearDown: fixture.gearDown,
+    speedBrake: 0,
+  });
   return state;
 }
 
 describe('B737 trim solver fixtures', () => {
-  it('defines a clean level-flight trim fixture with protective expected bounds', () => {
+  it('defines a clean pitch-trim fixture with protective expected bounds', () => {
     expect(b737TrimFixtures).toHaveLength(1);
     expect(b737TrimFixtures[0].id).toBe('b737-800-clean-220kt-10000ft');
     expect(b737TrimFixtures[0].expectedTrimUnits).toEqual([2, 4]);
-    expect(b737TrimFixtures[0].expectedLiftToWeight).toEqual([0.97, 1.03]);
+    expect(b737TrimFixtures[0].expectedLiftToWeight).toEqual([1.30, 1.40]);
+  });
+
+  it('converts fixture IAS to altitude-correct TAS before seeding body velocity', () => {
+    const fixture = b737TrimFixtures[0];
+    const state = stateForFixture();
+    const derived = computeDerived(state);
+
+    expect(tasKtForIasAtAltitude(fixture.iasKt, fixture.altitudeFt)).toBeGreaterThan(fixture.iasKt);
+    expect(derived.ias).toBeCloseTo(fixture.iasKt, 1);
+    expect(derived.tas).toBeCloseTo(tasKtForIasAtAltitude(fixture.iasKt, fixture.altitudeFt), 1);
   });
 
   it('solves stabilizer trim to near-zero pitch moment for the fixture', () => {

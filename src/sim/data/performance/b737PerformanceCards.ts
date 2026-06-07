@@ -88,11 +88,16 @@ export const b737PerformanceCards: B737TakeoffPerformanceCard[] = [
 ];
 
 export function findPerformanceCardForScenario(scenarioId: string): B737TakeoffPerformanceCard {
-  const card = b737PerformanceCards.find((candidate) => candidate.scenarioId === scenarioId);
+  const card = maybeFindPerformanceCardForScenario(scenarioId);
   if (!card) {
     throw new Error(`No B737 performance card defined for scenario ${scenarioId}`);
   }
   return card;
+}
+
+export function maybeFindPerformanceCardForScenario(scenarioId: string | null | undefined): B737TakeoffPerformanceCard | null {
+  if (!scenarioId) return null;
+  return b737PerformanceCards.find((candidate) => candidate.scenarioId === scenarioId) ?? null;
 }
 
 function assertEqual<T>(actual: T, expected: T, label: string): void {

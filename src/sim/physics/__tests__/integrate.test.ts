@@ -171,6 +171,32 @@ describe('integrate', () => {
     expect(trimmed.attitude.theta).toBeGreaterThan(untrimmed.attitude.theta);
   });
 
+  it('applies pilot configuration controls before the first aero solve of a tick', () => {
+    const laggedConfig = airborneTakeoffConfigState(0);
+    laggedConfig.config.flapSetting = 0;
+    laggedConfig.config.speedBrake = 0;
+    const preconfigured = structuredClone(laggedConfig);
+    preconfigured.config.flapSetting = 30;
+    preconfigured.config.speedBrake = 1;
+    const controls: ControlInputs = {
+      ...idle,
+      flapLever: 30,
+      gearLever: 'UP',
+      spoilers: 1,
+      throttle1: 0.7,
+      throttle2: 0.7,
+    };
+
+    integrate(laggedConfig, controls, B737_800_SPEC, 1 / 60);
+    integrate(preconfigured, controls, B737_800_SPEC, 1 / 60);
+
+    expect(laggedConfig.config.flapSetting).toBe(30);
+    expect(laggedConfig.config.speedBrake).toBe(1);
+    expect(laggedConfig.velocity.u).toBeCloseTo(preconfigured.velocity.u, 6);
+    expect(laggedConfig.velocity.w).toBeCloseTo(preconfigured.velocity.w, 6);
+    expect(laggedConfig.angularVel.q).toBeCloseTo(preconfigured.angularVel.q, 6);
+  });
+
   it('accelerates downward in freefall at level attitude', () => {
     const s = createInitialState(B737_800_SPEC);
     s.position.alt = 10000;

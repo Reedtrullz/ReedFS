@@ -60,6 +60,13 @@ function shouldAllowLiftoff(state: AircraftState, normalForceN: number, weightN:
   );
 }
 
+function applyPilotConfiguration(state: AircraftState, controls: ControlInputs, weightOnWheels = state.ground.weightOnWheels): void {
+  state.config.flapSetting = controls.flapLever;
+  state.config.gearDown = weightOnWheels ? true : controls.gearLever === 'DOWN';
+  state.config.spoilersDeployed = controls.spoilers > 0.5;
+  state.config.speedBrake = controls.spoilers;
+}
+
 export function integrate(
   state: AircraftState,
   controls: ControlInputs,
@@ -75,7 +82,10 @@ export function integrate(
   void flightPlan;
 
   // ── Systems (must run before aero so engine/fuel state is current) ──
-  updateEngines(state, controls, spec, dt);
+  // Pilot-facing configuration controls must be visible to the same tick's aero solve.
+  // Ground contact re-applies the gear safety rule after liftoff/contact resolution.
+  applyPilotConfiguration(state, controls);
+  updateEngines(state, controls, spec, dt, wind ?? null);
   updateFuel(state, spec, dt);
   updateElectrical(state, dt);
   updateHydraulic(state, dt);
@@ -173,10 +183,7 @@ export function integrate(
   });
 
   // ── Config ──
-  state.config.flapSetting = controls.flapLever;
-  state.config.gearDown = groundContact.weightOnWheels ? true : controls.gearLever === 'DOWN';
-  state.config.spoilersDeployed = controls.spoilers > 0.5;
-  state.config.speedBrake = controls.spoilers;
+  applyPilotConfiguration(state, controls, groundContact.weightOnWheels);
   updateTakeoffPhase(state);
   updateLandingPhase(state);
 
