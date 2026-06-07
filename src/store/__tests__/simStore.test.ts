@@ -697,6 +697,24 @@ describe('useSimStore', () => {
     expect(state.effectiveControls.spoilers).toBe(0.3);
   });
 
+  it('gamepad-style input actions latch brake, next-flaps, and gear-toggle commands', () => {
+    useSimStore.getState().setInput({ flapLever: 0, gearLever: 'DOWN', brake: 0 });
+
+    useSimStore.getState().applyInputActions({ brake: 1, flapNext: true, gearToggle: true }, 1 / 60);
+
+    let state = useSimStore.getState();
+    expect(state.pilotInputs.brake).toBe(1);
+    expect(state.pilotInputs.flapLever).toBe(1);
+    expect(state.pilotInputs.gearLever).toBe('UP');
+    expect(state.effectiveControls).toEqual(expect.objectContaining({ brake: 1, flapLever: 1, gearLever: 'UP' }));
+
+    useSimStore.getState().applyInputActions({ flapNext: true, gearToggle: true }, 1 / 60);
+
+    state = useSimStore.getState();
+    expect(state.pilotInputs.flapLever).toBe(2);
+    expect(state.pilotInputs.gearLever).toBe('DOWN');
+  });
+
   it('legacy full-object setInput does not copy AP-owned effective axes into pilot inputs', () => {
     useSimStore.getState().setApState(minimalApState());
     const apCommands: AutopilotCommands = { elevator: -0.5, aileron: 0.25, throttle1: 0.7, throttle2: 0.7 };

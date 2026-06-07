@@ -32,6 +32,10 @@ export interface InputActions {
   trimDelta?: number;
   /** Continuous stabilizer trim rate intent, -1 nose-down to +1 nose-up. */
   trimRate?: number;
+  /** Edge-triggered request to advance to the next published flap detent. */
+  flapNext?: boolean;
+  /** Edge-triggered request to toggle commanded gear UP/DOWN. */
+  gearToggle?: boolean;
 }
 
 export interface InputManagerState {
@@ -145,6 +149,8 @@ export function mergeInputActions(...actions: Array<InputActions | null | undefi
   let throttleTarget: number | undefined;
   let trimDelta: number | undefined;
   let trimRate: number | undefined;
+  let flapNext = false;
+  let gearToggle = false;
 
   for (const action of actions) {
     if (!action) continue;
@@ -159,6 +165,8 @@ export function mergeInputActions(...actions: Array<InputActions | null | undefi
     throttleTarget = lastDefined(throttleTarget, action.throttleTarget);
     trimDelta = sumDefined(trimDelta, action.trimDelta);
     trimRate = sumDefined(trimRate, action.trimRate);
+    flapNext = flapNext || action.flapNext === true;
+    gearToggle = gearToggle || action.gearToggle === true;
   }
 
   const merged: InputActions = {};
@@ -173,6 +181,8 @@ export function mergeInputActions(...actions: Array<InputActions | null | undefi
   if (throttleTarget !== undefined) merged.throttleTarget = clamp01(throttleTarget);
   if (trimDelta !== undefined) merged.trimDelta = trimDelta;
   if (trimRate !== undefined) merged.trimRate = clampSigned(trimRate);
+  if (flapNext) merged.flapNext = true;
+  if (gearToggle) merged.gearToggle = true;
   return merged;
 }
 

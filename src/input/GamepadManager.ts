@@ -53,9 +53,16 @@ function getFirstGamepad(): Gamepad | null {
   return Array.from(gamepads).find((pad): pad is Gamepad => pad != null) ?? null;
 }
 
+let previousFlapButtonPressed = false;
+let previousGearButtonPressed = false;
+
+function buttonPressed(gp: Gamepad, index: number): boolean {
+  return gp.buttons?.[index]?.pressed === true || (gp.buttons?.[index]?.value ?? 0) > 0.5;
+}
+
 export function __resetGamepadStateForTests(): void {
-  // Gamepad input is stateless now: neutral axes/triggers simply produce no
-  // action intent, so they cannot clear a keyboard/UI-controlled lever.
+  previousFlapButtonPressed = false;
+  previousGearButtonPressed = false;
 }
 
 export function readGamepadActions(calibration: GamepadCalibration = DEFAULT_GAMEPAD_CALIBRATION): InputActions | null {
@@ -69,6 +76,9 @@ export function readGamepadActions(calibration: GamepadCalibration = DEFAULT_GAM
   const leftTrigger = activeTrigger(gp.buttons?.[6]?.value, calibration.triggerDeadzone);
   const trimNoseUp = gp.buttons?.[12]?.pressed ? 1 : 0;
   const trimNoseDown = gp.buttons?.[13]?.pressed ? 1 : 0;
+  const brakeButton = buttonPressed(gp, 0) ? 1 : 0;
+  const flapButtonPressed = buttonPressed(gp, 4);
+  const gearButtonPressed = buttonPressed(gp, 5);
 
   const actions: InputActions = {};
 
@@ -83,6 +93,12 @@ export function readGamepadActions(calibration: GamepadCalibration = DEFAULT_GAM
   if (trimNoseUp !== trimNoseDown) {
     actions.trimRate = trimNoseUp - trimNoseDown;
   }
+
+  if (brakeButton > 0) actions.brake = brakeButton;
+  if (flapButtonPressed && !previousFlapButtonPressed) actions.flapNext = true;
+  if (gearButtonPressed && !previousGearButtonPressed) actions.gearToggle = true;
+  previousFlapButtonPressed = flapButtonPressed;
+  previousGearButtonPressed = gearButtonPressed;
 
   return Object.keys(actions).length > 0 ? actions : null;
 }

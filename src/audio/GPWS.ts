@@ -1,39 +1,63 @@
 import type { AircraftState } from '../sim/types';
+import { bodyToNed } from '../sim/physics/frames';
 import { quatToEuler } from '../sim/physics/quaternion';
 import { mapGpwsCalloutToSpeechParams } from './audioMapping';
 
+const MPS_TO_FPM = 196.85;
+
+interface GpwsKinematics {
+  aglFt: number;
+  descentRateFpm: number;
+  groundSpeedMps: number;
+  weightOnWheels: boolean;
+}
+
+function gpwsKinematics(state: AircraftState): GpwsKinematics {
+  const aglFt = Math.max(0, state.ground.aglFt ?? state.position.alt - state.ground.groundAltFt);
+  const nedVelocity = bodyToNed(state.velocity, state.attitude);
+  return {
+    aglFt,
+    descentRateFpm: Math.max(0, nedVelocity.down * MPS_TO_FPM),
+    groundSpeedMps: Math.hypot(nedVelocity.north, nedVelocity.east),
+    weightOnWheels: state.ground.weightOnWheels,
+  };
+}
+
 function checkMode1(state: AircraftState): string | null {
-  const descentRate = -state.velocity.w * 196.85;
-  const alt = state.position.alt;
-  if (alt < 2500 && descentRate > 5000) return 'SINK RATE';
-  if (alt < 1000 && descentRate > 2000) return 'PULL UP';
+  const { aglFt, descentRateFpm, weightOnWheels } = gpwsKinematics(state);
+  if (weightOnWheels) return null;
+  if (aglFt < 2500 && descentRateFpm > 5000) return 'SINK RATE';
+  if (aglFt < 1000 && descentRateFpm > 2000) return 'PULL UP';
   return null;
 }
 
 function checkMode4(state: AircraftState): string | null {
-  const alt = state.position.alt;
-  if (alt < 500 && !state.config.gearDown && state.velocity.u > 10) return 'TOO LOW GEAR';
-  if (alt < 200 && state.config.flapSetting < 15 && state.velocity.u > 10) return 'TOO LOW FLAPS';
+  const { aglFt, groundSpeedMps, weightOnWheels } = gpwsKinematics(state);
+  if (weightOnWheels || groundSpeedMps <= 10) return null;
+  if (state.flightPhase === 'TAKEOFF' || state.flightPhase === 'CLIMB') return null;
+  if (aglFt < 500 && !state.config.gearDown) return 'TOO LOW GEAR';
+  if (aglFt < 200 && state.config.flapSetting < 15) return 'TOO LOW FLAPS';
   return null;
 }
 
 function checkMode5(state: AircraftState): string | null {
-  const alt = state.position.alt;
-  const descentRate = -state.velocity.w * 196.85;
-  if (alt < 1000 && descentRate > 500) return 'GLIDESLOPE';
+  const { aglFt, descentRateFpm, weightOnWheels } = gpwsKinematics(state);
+  if (weightOnWheels) return null;
+  if (aglFt < 1000 && descentRateFpm > 500) return 'GLIDESLOPE';
   return null;
 }
 
 function checkMode2(state: AircraftState): string | null {
-  const alt = state.position.alt;
-  const descentRate = -state.velocity.w * 196.85;
-  if (alt < 1500 && descentRate > 3000) return 'TERRAIN';
-  if (alt < 800 && descentRate > 2000) return 'PULL UP';
+  const { aglFt, descentRateFpm, weightOnWheels } = gpwsKinematics(state);
+  if (weightOnWheels) return null;
+  if (aglFt < 1500 && descentRateFpm > 3000) return 'TERRAIN';
+  if (aglFt < 800 && descentRateFpm > 2000) return 'PULL UP';
   return null;
 }
 
 function checkMode3(state: AircraftState): string | null {
-  if (state.flightPhase === 'TAKEOFF' && state.position.alt < 100) return "DON'T SINK";
+  const { aglFt, descentRateFpm, weightOnWheels } = gpwsKinematics(state);
+  if (state.flightPhase === 'TAKEOFF' && !weightOnWheels && aglFt < 1000 && descentRateFpm > 200) return "DON'T SINK";
   return null;
 }
 

@@ -56,7 +56,7 @@ export const DEFAULT_CONTROL_BINDINGS: ControlBinding[] = [
     id: 'brake',
     label: 'Brake',
     keyboard: ['Space'],
-    gamepad: [],
+    gamepad: ['Gamepad A/Cross'],
     description: 'Wheel braking on the ground.',
   },
   {
@@ -70,14 +70,14 @@ export const DEFAULT_CONTROL_BINDINGS: ControlBinding[] = [
     id: 'gear',
     label: 'Gear',
     keyboard: ['G'],
-    gamepad: [],
+    gamepad: ['Gamepad RB/R1'],
     description: 'Retract gear after positive rate; extend for landing.',
   },
   {
     id: 'flaps',
     label: 'Flaps',
     keyboard: ['F'],
-    gamepad: [],
+    gamepad: ['Gamepad LB/L1'],
     description: 'Cycle flap detents for takeoff/approach setup.',
   },
   {
@@ -90,14 +90,14 @@ export const DEFAULT_CONTROL_BINDINGS: ControlBinding[] = [
   {
     id: 'camera',
     label: 'Camera',
-    keyboard: ['CAM button'],
+    keyboard: ['C'],
     gamepad: [],
     description: 'Cycle chase, cockpit, and tower camera modes.',
   },
   {
     id: 'overlay',
     label: 'Overlay',
-    keyboard: ['OVL button'],
+    keyboard: ['O'],
     gamepad: [],
     description: 'Cycle flight, minimal, and debug overlays.',
   },

@@ -1,49 +1,64 @@
 import { useSimStore } from '../store/simStore';
 
-/** Compact always-visible engine N1 + flaps indicator strip.
+/** Compact always-visible actual/commanded engine, flap, and gear strip.
  *  Sits at bottom-center above the button bar. */
 export function EngineStrip() {
   const engines = useSimStore((s) => s.aircraft.engines);
-  const flaps = useSimStore((s) => s.aircraft.config.flapSetting);
-  const gearDown = useSimStore((s) => s.aircraft.config.gearDown);
+  const flapsActual = useSimStore((s) => s.aircraft.config.flapSetting);
+  const gearDownActual = useSimStore((s) => s.aircraft.config.gearDown);
+  const controls = useSimStore((s) => s.effectiveControls);
 
   const n1L = Math.round(engines[0].n1 * 10) / 10;
   const n1R = Math.round(engines[1].n1 * 10) / 10;
+  const throttleCommandPercent = Math.round(Math.max(controls.throttle1, controls.throttle2) * 100);
+  const gearCommand = controls.gearLever;
 
   return (
     <div style={containerStyle}>
-      {/* Left engine */}
       <div style={engineBlock}>
-        <span style={labelStyle}>N1 L</span>
+        <span style={labelStyle}>N1 ACT L</span>
         <div style={barTrack}>
           <div style={{ ...barFill, width: `${engines[0].n1}%`, background: n1Color(engines[0].n1) }} />
         </div>
         <span style={valueStyle}>{n1L.toFixed(1)}%</span>
       </div>
 
-      {/* Right engine */}
       <div style={engineBlock}>
-        <span style={labelStyle}>N1 R</span>
+        <span style={labelStyle}>N1 ACT R</span>
         <div style={barTrack}>
           <div style={{ ...barFill, width: `${engines[1].n1}%`, background: n1Color(engines[1].n1) }} />
         </div>
         <span style={valueStyle}>{n1R.toFixed(1)}%</span>
       </div>
 
-      {/* Divider */}
-      <div style={divider} />
-
-      {/* Flaps */}
       <div style={indicatorBlock}>
-        <span style={labelStyle}>FLAPS</span>
-        <span style={{ ...valueStyle, color: flaps > 0 ? '#0f0' : '#666' }}>{flaps}°</span>
+        <span style={labelStyle}>THR CMD</span>
+        <span style={{ ...valueStyle, color: throttleCommandPercent > 0 ? '#0f0' : '#666' }}>{throttleCommandPercent}%</span>
       </div>
 
-      {/* Gear */}
+      <div style={divider} />
+
       <div style={indicatorBlock}>
-        <span style={labelStyle}>GEAR</span>
-        <span style={{ ...valueStyle, color: gearDown ? '#0f0' : '#ff0' }}>
-          {gearDown ? 'DN' : 'UP'}
+        <span style={labelStyle}>FLAPS ACT</span>
+        <span style={{ ...valueStyle, color: flapsActual > 0 ? '#0f0' : '#666' }}>{flapsActual}°</span>
+      </div>
+
+      <div style={indicatorBlock}>
+        <span style={labelStyle}>FLAPS CMD</span>
+        <span style={{ ...valueStyle, color: controls.flapLever > 0 ? '#9df' : '#666' }}>{controls.flapLever}°</span>
+      </div>
+
+      <div style={indicatorBlock}>
+        <span style={labelStyle}>GEAR ACT</span>
+        <span style={{ ...valueStyle, color: gearDownActual ? '#0f0' : '#ff0' }}>
+          {gearDownActual ? 'DN' : 'UP'}
+        </span>
+      </div>
+
+      <div style={indicatorBlock}>
+        <span style={labelStyle}>GEAR CMD</span>
+        <span style={{ ...valueStyle, color: gearCommand === 'DOWN' ? '#9df' : '#ff0' }}>
+          {gearCommand === 'DOWN' ? 'DN' : 'UP'}
         </span>
       </div>
     </div>

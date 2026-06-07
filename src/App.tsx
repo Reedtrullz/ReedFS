@@ -104,6 +104,14 @@ export function App() {
         return;
       }
 
+      if (key === 'c' || key === 'o') {
+        if (e.repeat) return;
+        e.preventDefault();
+        if (key === 'c') setCamMode(nextCameraMode);
+        else setOverlayMode(nextOverlayMode);
+        return;
+      }
+
       const action = applyDiscreteKeyAction(key);
       if (action) {
         e.preventDefault();

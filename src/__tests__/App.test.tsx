@@ -345,7 +345,16 @@ vi.mock('three-to-cesium', () => ({
     add: vi.fn(),
     update: vi.fn(),
     destroy: vi.fn(),
-    threeScene: { add: vi.fn() },
+    threeScene: { add: vi.fn(), children: [] },
+    threeCamera: {},
+    threeRenderer: {
+      domElement: {
+        style: { pointerEvents: 'none' },
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        getBoundingClientRect: vi.fn(() => ({ left: 0, top: 0, width: 100, height: 100 })),
+      },
+    },
   })),
 }));
 
@@ -691,6 +700,16 @@ describe('App', () => {
     expect(await screen.findByRole('button', { name: 'AUDIO: ON' })).toBeTruthy();
     expect(mockAudioContexts).toHaveLength(1);
     expect(mockAudioContexts[0].resume).toHaveBeenCalledTimes(1);
+  });
+
+  it('cycles camera and overlay modes from keyboard shortcuts', () => {
+    render(<App />);
+
+    fireEvent.keyDown(window, { key: 'c' });
+    expect(screen.getByRole('button', { name: 'CAM: COCKPIT' })).toBeTruthy();
+
+    fireEvent.keyDown(window, { key: 'o' });
+    expect(screen.getByRole('button', { name: 'OVL: MINIMAL' })).toBeTruthy();
   });
 
   it('cycles overlays from flight to minimal to debug', () => {

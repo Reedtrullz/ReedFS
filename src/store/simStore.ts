@@ -29,6 +29,7 @@ import {
   type InputActions,
   type InputManagerState,
 } from '../input/InputManager';
+import { nextB737FlapDetent } from '../input/flapDetents';
 
 import {
   createScenarioSnapshot,
@@ -171,6 +172,7 @@ function seedInputManagerFromLiveInputs(
 }
 
 function controlPatchFromInputManager(
+  current: ControlInputs,
   previous: InputManagerState,
   next: InputManagerState,
   actions: InputActions,
@@ -187,6 +189,8 @@ function controlPatchFromInputManager(
     patch.throttle1 = next.throttle;
     patch.throttle2 = next.throttle;
   }
+  if (actions.flapNext) patch.flapLever = nextB737FlapDetent(current.flapLever);
+  if (actions.gearToggle) patch.gearLever = current.gearLever === 'UP' ? 'DOWN' : 'UP';
 
   return patch;
 }
@@ -401,7 +405,7 @@ export const useSimStore = create<SimStore>((set, get) => ({
     set((s) => {
       const previousInputManager = seedInputManagerFromLiveInputs(s.inputManager, s.pilotInputs, actions);
       let inputManager = updateInputManager(previousInputManager, actions, dt);
-      let inputPatch = controlPatchFromInputManager(previousInputManager, inputManager, actions);
+      let inputPatch = controlPatchFromInputManager(s.pilotInputs, previousInputManager, inputManager, actions);
       const rejectedTakeoffAbort = isRejectedTakeoffAbortLatched(s.status, s.aircraft, s.pilotInputs);
       if (rejectedTakeoffAbort) {
         inputPatch = {

@@ -11,6 +11,12 @@ const mockTtc = vi.hoisted(() => ({
   update: vi.fn(),
   destroy: vi.fn(),
   threeSceneAdd: vi.fn(),
+  canvas: {
+    style: { pointerEvents: 'none' },
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    getBoundingClientRect: vi.fn(() => ({ left: 0, top: 0, width: 100, height: 100 })),
+  },
 }));
 
 vi.mock('three-to-cesium', () => ({
@@ -20,6 +26,8 @@ vi.mock('three-to-cesium', () => ({
     update: mockTtc.update,
     destroy: mockTtc.destroy,
     threeScene: { add: mockTtc.threeSceneAdd },
+    threeCamera: {},
+    threeRenderer: { domElement: mockTtc.canvas },
   })),
 }));
 
@@ -115,6 +123,9 @@ describe('viewport layer cleanup', () => {
     mockTtc.update.mockClear();
     mockTtc.destroy.mockClear();
     mockTtc.threeSceneAdd.mockClear();
+    mockTtc.canvas.style.pointerEvents = 'none';
+    mockTtc.canvas.addEventListener.mockClear();
+    mockTtc.canvas.removeEventListener.mockClear();
   });
 
   afterEach(() => {
@@ -130,6 +141,19 @@ describe('viewport layer cleanup', () => {
 
     expect(viewer.scene?.postRender.addEventListener).toHaveBeenCalledTimes(1);
     expect(viewer.scene?.preRender.addEventListener).not.toHaveBeenCalled();
+  });
+
+  it('CockpitLayer enables pointer picking on the cockpit overlay canvas', () => {
+    const { viewerRef } = createViewerRef();
+
+    const { unmount } = render(<CockpitLayer viewerRef={viewerRef as never} />);
+
+    expect(mockTtc.canvas.style.pointerEvents).toBe('auto');
+    expect(mockTtc.canvas.addEventListener).toHaveBeenCalledWith('pointerdown', expect.any(Function));
+
+    unmount();
+
+    expect(mockTtc.canvas.removeEventListener).toHaveBeenCalledWith('pointerdown', expect.any(Function));
   });
 
   it.each([

@@ -6,12 +6,16 @@ import { useSimStore } from '../store/simStore';
 import { isCesiumResourceDestroyed } from './cesiumLifecycle';
 import { AircraftRenderer } from './AircraftRenderer';
 import { createCockpitModel } from './CockpitModel';
+import { useCockpitInteractions } from './useCockpitInteractions';
+import { installCockpitPointerInteractions } from './cockpitPointerInteractions';
 
 export interface CockpitLayerProps {
   viewerRef: RefObject<Cesium.Viewer | null>;
 }
 
 export function CockpitLayer({ viewerRef }: CockpitLayerProps) {
+  const { activateCockpitInteraction } = useCockpitInteractions();
+
   useEffect(() => {
     const viewer = viewerRef.current;
     if (!viewer) return;
@@ -28,6 +32,12 @@ export function CockpitLayer({ viewerRef }: CockpitLayerProps) {
     ttc.threeScene.add(ambient);
     ttc.threeScene.add(panelLight);
     const cockpitRenderer = new AircraftRenderer(ttc, createCockpitModel);
+    const pointerCleanup = installCockpitPointerInteractions({
+      scene: ttc.threeScene,
+      camera: ttc.threeCamera,
+      canvas: ttc.threeRenderer.domElement,
+      onActivate: activateCockpitInteraction,
+    });
 
     const sync = () => {
       const { aircraft, effectiveControls } = useSimStore.getState();
@@ -42,6 +52,11 @@ export function CockpitLayer({ viewerRef }: CockpitLayerProps) {
         postRender.removeEventListener(sync);
       }
       try {
+        pointerCleanup();
+      } catch {
+        // Overlay canvas may already be detached during Cesium teardown.
+      }
+      try {
         cockpitRenderer.dispose();
       } catch {
         // three-to-cesium may already be partially torn down.
@@ -52,7 +67,7 @@ export function CockpitLayer({ viewerRef }: CockpitLayerProps) {
         // Cesium may have already torn down the container during React cleanup.
       }
     };
-  }, [viewerRef]);
+  }, [viewerRef, activateCockpitInteraction]);
 
   return null;
 }
