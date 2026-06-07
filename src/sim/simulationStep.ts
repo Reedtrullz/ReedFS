@@ -37,6 +37,11 @@ export interface SimulationStepInput {
   status: SimulationStatus;
   selectedScenarioId: string;
   guidance: GuidanceState;
+  /**
+   * Default true keeps direct callers isolated. Store/runtime loops can clone once before
+   * repeated fixed steps and set this false to avoid cloning the aircraft every substep.
+   */
+  cloneAircraft?: boolean;
 }
 
 export interface SimulationStepResult {
@@ -76,7 +81,7 @@ export function syncGuidanceState(
 }
 
 export function advanceSimulationStep(input: SimulationStepInput): SimulationStepResult {
-  const state = structuredClone(input.aircraft);
+  const state = input.cloneAircraft === false ? input.aircraft : structuredClone(input.aircraft);
   const routeBeforeTick = input.flightPlan
     ? computeRouteStatus(state, input.flightPlan, input.activeLegIndex)
     : createNoRouteStatus();
@@ -92,7 +97,7 @@ export function advanceSimulationStep(input: SimulationStepInput): SimulationSte
     : {};
   const controls = composeControlsSlice(input.pilotInputs, apCommands, input.apState);
 
-  integrate(state, controls.effectiveControls, input.spec, input.dt, null, input.flightPlan, input.wind);
+  integrate(state, controls.effectiveControls, input.spec, input.dt, input.wind);
 
   const routeStatus = input.flightPlan
     ? computeRouteStatus(state, input.flightPlan, routeBeforeTick.activeLegIndex)

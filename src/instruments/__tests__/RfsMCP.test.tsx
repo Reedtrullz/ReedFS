@@ -103,4 +103,43 @@ describe('RfsMCP', () => {
 
     expect(screen.queryByRole('button', { name: 'VNAV' })).toBeNull();
   });
+
+  it('disables LNAV with a visible reason when no compatible route is available', () => {
+    render(<RfsMCP />);
+
+    const lnav = screen.getByRole('button', { name: 'LNAV' });
+    expect(lnav).toHaveProperty('disabled', true);
+    expect(lnav.getAttribute('title')).toMatch(/no flight plan loaded/i);
+
+    fireEvent.click(lnav);
+
+    expect(useSimStore.getState().apState).toBeNull();
+  });
+
+  it('first LNAV click creates AP state when route guidance is available', () => {
+    useSimStore.setState((s) => ({
+      routeStatus: {
+        ...s.routeStatus,
+        routeName: 'KSEA→KPDX',
+        routeValid: true,
+        lnavAvailable: true,
+        lnavUnavailableReason: null,
+        activeLegIndex: 0,
+        activeLegCount: 1,
+        fromIdent: 'KSEA',
+        nextWaypointIdent: 'KPDX',
+        desiredTrackRad: 2.95,
+        desiredTrackDegTrue: 169,
+      },
+    }));
+    render(<RfsMCP />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'LNAV' }));
+
+    const ap = useSimStore.getState().apState;
+    expect(ap).not.toBeNull();
+    expect(ap?.truth.autopilotStatus).toBe('CMD_A');
+    expect(ap?.truth.lateralActive).toBe('LNAV');
+    expect(ap?.boeing.lnav).toBe(true);
+  });
 });

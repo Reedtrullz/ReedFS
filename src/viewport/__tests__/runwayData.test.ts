@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ENVA_RUNWAYS,
   KPDX_RUNWAYS,
   KSEA_RUNWAY_16L,
   KSEA_RUNWAYS,
@@ -21,8 +22,8 @@ describe('runwayData', () => {
     expect(KPDX_RUNWAYS.map((runway) => runway.oppositeId)).toEqual(['28R', '28L', '21']);
   });
 
-  it('exports both KSEA and KPDX references as supported runways', () => {
-    expect(SUPPORTED_RUNWAYS).toEqual([...KSEA_RUNWAYS, ...KPDX_RUNWAYS]);
+  it('exports ENVA, KSEA and KPDX references as supported runways', () => {
+    expect(SUPPORTED_RUNWAYS).toEqual([...ENVA_RUNWAYS, ...KSEA_RUNWAYS, ...KPDX_RUNWAYS]);
   });
 
   it('finds KPDX 10R by primary and opposite runway ids', () => {

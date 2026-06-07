@@ -1,13 +1,16 @@
 import type { AircraftState, AircraftSpec, ControlInputs } from '../types';
 import { isaAtAltitude } from '../physics/atmosphere';
 import { lbfToN } from '../physics/units';
+import { computeAirRelativeVelocity } from './environment';
+import type { WindInfo } from '../weather';
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
-function machFromState(state: AircraftState): number {
-  const speedMs = Math.sqrt(state.velocity.u ** 2 + state.velocity.v ** 2 + state.velocity.w ** 2);
+function machFromState(state: AircraftState, wind: WindInfo | null = null): number {
+  const airRelative = computeAirRelativeVelocity(state, wind);
+  const speedMs = Math.sqrt(airRelative.u ** 2 + airRelative.v ** 2 + airRelative.w ** 2);
   return speedMs / isaAtAltitude(state.position.alt).speedOfSound;
 }
 
@@ -34,8 +37,9 @@ export function updateEngines(
   inputs: ControlInputs,
   spec: AircraftSpec,
   dt: number,
+  wind: WindInfo | null = null,
 ): void {
-  const mach = machFromState(state);
+  const mach = machFromState(state, wind);
   // Internal sub-stepping for numerical stability with large dt
   const subSteps = Math.max(1, Math.ceil(dt / 0.1));
   const subDt = dt / subSteps;

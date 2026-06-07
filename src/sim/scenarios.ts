@@ -2,7 +2,7 @@ import type { AircraftSpec, AircraftState, FuelState, GeoPosition } from './type
 import { createB737GearStations, createInitialState } from './types';
 import { eulerToQuat } from './physics/quaternion';
 import type { WindInfo } from './weather';
-import { KSEA_RUNWAY_16L } from '../viewport/runwayData';
+import { ENVA_RUNWAY_09, KSEA_RUNWAY_16L } from '../viewport/runwayData';
 
 export interface ScenarioFuelLoad {
   centerTank: number;
@@ -41,6 +41,41 @@ export interface FlightScenario {
   tutorialSteps: ScenarioTutorialStep[];
 }
 
+// ── ENVA (default) ─────────────────────────────────────────────────────
+export const ENVA_TUTORIAL_SCENARIO: FlightScenario = {
+  id: 'enva-tutorial',
+  name: 'ENVA Tutorial Takeoff',
+  description: 'Medium-weight 737-800 at Trondheim Værnes for a flaps-5 eastbound runway 09 takeoff.',
+  position: { lat: ENVA_RUNWAY_09.start.lat, lon: ENVA_RUNWAY_09.start.lon, alt: ENVA_RUNWAY_09.elevationFt },
+  runway: { airport: ENVA_RUNWAY_09.airport, runway: ENVA_RUNWAY_09.id, elevationFt: ENVA_RUNWAY_09.elevationFt, headingDeg: ENVA_RUNWAY_09.headingDeg },
+  fuel: { centerTank: 8_000, leftTank: 2_000, rightTank: 2_000, totalFuel: 12_000 },
+  zeroFuelWeightKg: 49_913,
+  grossWeightKg: 61_913,
+  payloadWeightKg: 8_500,
+  cgPercent: 25,
+  stabilizerTrimUnits: 5.0,
+  flapSetting: 5,
+  wind: { dir: 90, speed: 0 },
+  tutorialSteps: [
+    {
+      id: 'line-up',
+      title: 'Line up and configure',
+      body: 'Start on ENVA runway 09 with gear down and both throttles idle. START ROLL resets the takeoff levers, so set flaps 5, trim 5.0, then advance thrust manually.',
+    },
+    {
+      id: 'advance-thrust',
+      title: 'Advance thrust smoothly',
+      body: 'Bring both thrust levers to takeoff power, keep the centerline with small rudder inputs, and monitor IAS on the PFD.',
+    },
+    {
+      id: 'rotate-positive-rate',
+      title: 'Rotate and clean up',
+      body: 'At VR, ease back to about 10° pitch. After positive rate, retract gear and climb out before cleaning flaps.',
+    },
+  ],
+};
+
+// ── KSEA ────────────────────────────────────────────────────────────────
 export const KSEA_TUTORIAL_SCENARIO: FlightScenario = {
   id: 'ksea-tutorial',
   name: 'KSEA Tutorial Takeoff',
@@ -59,7 +94,7 @@ export const KSEA_TUTORIAL_SCENARIO: FlightScenario = {
     {
       id: 'line-up',
       title: 'Line up and configure',
-      body: 'Start on KSEA 16L with flaps 5, trim set, gear down, and both throttles idle. Use START ROLL when ready.',
+      body: 'Start on KSEA 16L with gear down and both throttles idle. START ROLL resets the takeoff levers, so set flaps 5, trim 5.0, then advance thrust manually.',
     },
     {
       id: 'advance-thrust',
@@ -107,7 +142,7 @@ export const KSEA_LIGHT_PATTERN_SCENARIO: FlightScenario = {
   ],
 };
 
-export const SCENARIOS: FlightScenario[] = [KSEA_TUTORIAL_SCENARIO, KSEA_LIGHT_PATTERN_SCENARIO];
+export const SCENARIOS: FlightScenario[] = [ENVA_TUTORIAL_SCENARIO, KSEA_TUTORIAL_SCENARIO, KSEA_LIGHT_PATTERN_SCENARIO];
 
 const CENTER_TANK_ARM_PERCENT_MAC = 22;
 const WING_TANK_ARM_PERCENT_MAC = 30;

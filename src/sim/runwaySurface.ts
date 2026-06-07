@@ -33,7 +33,7 @@ export const OFF_RUNWAY_FRICTION_SCALE: GroundSurfaceFrictionScale = {
 };
 
 const RUNWAY_EDGE_MARGIN_M = 3;
-const KSEA_FALLBACK_ELEVATION_FT = 432;
+const ENVA_FALLBACK_ELEVATION_FT = 56;
 
 function localNorthEastMeters(position: GeoPosition, origin: RunwayReference['start']): { northM: number; eastM: number } {
   const metersPerDegreeLat = 111_320;
@@ -101,7 +101,7 @@ function sampleRunwaySurface(position: GeoPosition, runways: readonly RunwayRefe
   return {
     kind: 'offRunway',
     onRunway: false,
-    groundAltFt: nearestRunway?.elevationFt ?? KSEA_FALLBACK_ELEVATION_FT,
+    groundAltFt: nearestRunway?.elevationFt ?? ENVA_FALLBACK_ELEVATION_FT,
     frictionScale: OFF_RUNWAY_FRICTION_SCALE,
     airport: nearestRunway?.airport,
   };

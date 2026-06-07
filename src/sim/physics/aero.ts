@@ -6,28 +6,16 @@ import { B737_AERO } from '../systems/AeroModel';
 import type { WindInfo } from '../weather';
 
 const G = 9.80665;
-const MAX_ELEVATOR_DEFLECTION_RAD = 0.3;
-const MIN_STABILIZER_TRIM_UNITS = 0;
-const MAX_STABILIZER_TRIM_UNITS = 15;
-// B737 trim units are a cockpit-scale abstraction here. A full 0→15 sweep is
-// intentionally less powerful than full elevator, but enough to change the
-// hands-off elevator force required for takeoff/climb.
-const STABILIZER_TRIM_CM_PER_UNIT = 0.012;
-// Full keyboard/yoke aft input should rotate the aircraft but not keep adding
-// unlimited nose-up moment after the useful takeoff pitch range. This is force
-// shaping, not a hidden attitude clamp: the integrator still evolves q/theta.
-const NOSE_UP_ELEVATOR_FADE_START_RAD = 8 * Math.PI / 180;
-const NOSE_UP_ELEVATOR_FADE_END_RAD = 12.5 * Math.PI / 180;
 const FT_TO_M = 0.3048;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
-function effectiveElevatorInput(input: number, pitchRad: number): number {
+function effectiveElevatorInput(input: number, pitchRad: number, aeroModel: AeroModel): number {
   if (input >= 0) return input;
   const authority = clamp(
-    (NOSE_UP_ELEVATOR_FADE_END_RAD - pitchRad) / (NOSE_UP_ELEVATOR_FADE_END_RAD - NOSE_UP_ELEVATOR_FADE_START_RAD),
+    (aeroModel.elevator.noseUpFadeEndRad - pitchRad) / (aeroModel.elevator.noseUpFadeEndRad - aeroModel.elevator.noseUpFadeStartRad),
     0,
     1,
   );
@@ -38,9 +26,13 @@ function finiteOrDefault(value: number, fallback: number): number {
   return Number.isFinite(value) ? value : fallback;
 }
 
-function stabilizerTrimMomentCoefficient(trimUnits: number): number {
-  const boundedTrimUnits = clamp(finiteOrDefault(trimUnits, 0), MIN_STABILIZER_TRIM_UNITS, MAX_STABILIZER_TRIM_UNITS);
-  return boundedTrimUnits * STABILIZER_TRIM_CM_PER_UNIT;
+function stabilizerTrimMomentCoefficient(trimUnits: number, aeroModel: AeroModel): number {
+  const boundedTrimUnits = clamp(
+    finiteOrDefault(trimUnits, 0),
+    aeroModel.stabilizerTrim.minUnits,
+    aeroModel.stabilizerTrim.maxUnits,
+  );
+  return boundedTrimUnits * aeroModel.stabilizerTrim.cmPerUnit;
 }
 
 function cgPitchMomentCoefficient(state: AircraftState, spec: AircraftSpec, cl: number): number {
@@ -100,7 +92,11 @@ export interface GroundEffectFactors {
   inducedDragMultiplier: number;
 }
 
-export function computeGroundEffectFactors(heightAboveGroundM: number, wingSpanM: number): GroundEffectFactors {
+export function computeGroundEffectFactors(
+  heightAboveGroundM: number,
+  wingSpanM: number,
+  groundEffectModel = B737_AERO.groundEffect,
+): GroundEffectFactors {
   if (!Number.isFinite(heightAboveGroundM) || !Number.isFinite(wingSpanM) || wingSpanM <= 0) {
     return { liftMultiplier: 1, inducedDragMultiplier: 1 };
   }
@@ -116,7 +112,7 @@ export function computeGroundEffectFactors(heightAboveGroundM: number, wingSpanM
   const inducedDragMultiplier = downwashRatio / (1 + downwashRatio);
   const relief = 1 - inducedDragMultiplier;
   return {
-    liftMultiplier: 1 + 0.03 * relief,
+    liftMultiplier: 1 + groundEffectModel.liftReliefFactor * relief,
     inducedDragMultiplier,
   };
 }
@@ -146,7 +142,7 @@ export function computeAero(
   // --- Lift ---
   const polar = flapPolarForSetting(aeroModel, state.config.flapSetting);
   const { cl, stallFraction } = liftCoefficientAtAoA(aoa, mach, polar);
-  const groundEffect = computeGroundEffectFactors(heightAboveGroundM(state), b);
+  const groundEffect = computeGroundEffectFactors(heightAboveGroundM(state), b, aeroModel.groundEffect);
   const effectiveCl = cl * groundEffect.liftMultiplier;
 
   // --- Drag ---
@@ -155,8 +151,7 @@ export function computeAero(
   const cd = cd0 + inducedCd + polar.stallDragRise * stallFraction * stallFraction;
 
   // --- Side force ---
-  const cyBeta = -0.9, cyRudder = 0.15;
-  const cy = cyBeta * beta + cyRudder * inputs.rudder;
+  const cy = aeroModel.sideForce.cyBeta * beta + aeroModel.sideForce.cyRudder * inputs.rudder;
 
   const lift = q * S * effectiveCl;
   const drag = q * S * cd;
@@ -169,8 +164,8 @@ export function computeAero(
 
   // --- Moments ---
   const qHat = state.angularVel.q * c / (2 * Math.max(tasMs, 1));
-  const elevatorDeflectionRad = effectiveElevatorInput(inputs.elevator, state.attitude.theta) * MAX_ELEVATOR_DEFLECTION_RAD;
-  const cmTrim = stabilizerTrimMomentCoefficient(state.config.stabilizerTrimUnits);
+  const elevatorDeflectionRad = effectiveElevatorInput(inputs.elevator, state.attitude.theta, aeroModel) * aeroModel.elevator.maxDeflectionRad;
+  const cmTrim = stabilizerTrimMomentCoefficient(state.config.stabilizerTrimUnits, aeroModel);
   const cmCg = cgPitchMomentCoefficient(state, spec, effectiveCl);
   const cm = aeroModel.cm0 + polar.deltaCm + aeroModel.cmAlpha * aoa + aeroModel.cmElevator * elevatorDeflectionRad + cmTrim + cmCg + aeroModel.cmq * qHat;
   const pitchMoment = q * S * c * cm;

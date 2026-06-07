@@ -51,6 +51,7 @@ describe('RouteStatus', () => {
       routeStatus: routeStatus({
         routeName: 'MOCKA→MOCKB',
         activeLegIndex: 7,
+        activeLegCount: 8,
         fromIdent: 'FAKE1',
         nextWaypointIdent: 'FAKE2',
         fromWaypointIndex: 10,
@@ -65,12 +66,27 @@ describe('RouteStatus', () => {
 
     expect(screen.getByLabelText('Route status')).toBeTruthy();
     expect(screen.getByText('MOCKA→MOCKB')).toBeTruthy();
-    expect(screen.getByText(/LEG 7/i)).toBeTruthy();
+    expect(screen.getByText(/LEG 8\/8/i)).toBeTruthy();
     expect(screen.getByText(/FAKE1 → FAKE2/i)).toBeTruthy();
     expect(screen.getByText(/12\.3 NM/i)).toBeTruthy();
     expect(screen.getByText(/087°T/i)).toBeTruthy();
     expect(screen.getByText(/4\.4 MIN/i)).toBeTruthy();
     expect(screen.queryByText(/LNAV unavailable/i)).toBeNull();
+    expect(useSimStore.getState().routeStatus.activeLegIndex).toBe(7);
+  });
+
+  it('keeps pilot-facing leg display coherent if route feedback has an inconsistent leg count', () => {
+    useSimStore.setState({
+      routeStatus: routeStatus({
+        activeLegIndex: 7,
+        activeLegCount: 3,
+      }),
+    });
+
+    render(<RouteStatus />);
+
+    expect(screen.getByText(/LEG 8\/8/i)).toBeTruthy();
+    expect(screen.queryByText(/LEG 8\/3/i)).toBeNull();
   });
 
   it('displays an explicit unavailable reason from route feedback', () => {

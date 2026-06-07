@@ -1,5 +1,13 @@
 import type { FlightScenario } from '../../scenarios';
 
+export interface B737PerformanceDataOwnership {
+  /** Human-readable ownership label so test-only data is not mistaken for runtime AFM tables. */
+  label: string;
+  runtimeConsumers: string[];
+  testConsumers: string[];
+  sourceNote: string;
+}
+
 export interface B737VSpeeds {
   v1Kt: number;
   vrKt: number;
@@ -31,6 +39,7 @@ export interface B737TakeoffPerformanceCard {
   cleanClimb: B737CleanClimbEnvelope;
   approach: B737ApproachEnvelope;
   initialClimbPitchDeg: number;
+  ownership: B737PerformanceDataOwnership;
   notes: string[];
 }
 
@@ -56,6 +65,15 @@ export const b737PerformanceCards: B737TakeoffPerformanceCard[] = [
       expectedAoADeg: [1, 9],
     },
     initialClimbPitchDeg: 10,
+    ownership: {
+      label: 'runtime-takeoff-cue-and-physics-test-card',
+      runtimeConsumers: ['src/sim/takeoffCue.ts'],
+      testConsumers: [
+        'src/sim/data/__tests__/performanceCards.test.ts',
+        'src/sim/physics/__tests__/performanceCards.test.ts',
+      ],
+      sourceNote: 'RFS gameplay baseline card; broad envelope guard, not a certified Boeing AFM table.',
+    },
     notes: [
       'RFS gameplay card for the medium KSEA tutorial scenario; keeps rotate cue aligned with current takeoff envelope tests.',
     ],
@@ -81,6 +99,15 @@ export const b737PerformanceCards: B737TakeoffPerformanceCard[] = [
       expectedAoADeg: [0, 8],
     },
     initialClimbPitchDeg: 10,
+    ownership: {
+      label: 'runtime-takeoff-cue-and-physics-test-card',
+      runtimeConsumers: ['src/sim/takeoffCue.ts'],
+      testConsumers: [
+        'src/sim/data/__tests__/performanceCards.test.ts',
+        'src/sim/physics/__tests__/performanceCards.test.ts',
+      ],
+      sourceNote: 'RFS gameplay baseline card; broad envelope guard, not a certified Boeing AFM table.',
+    },
     notes: [
       'RFS gameplay card for light hand-flying/pattern practice; lower VR than the tutorial scenario by design.',
     ],
@@ -88,11 +115,16 @@ export const b737PerformanceCards: B737TakeoffPerformanceCard[] = [
 ];
 
 export function findPerformanceCardForScenario(scenarioId: string): B737TakeoffPerformanceCard {
-  const card = b737PerformanceCards.find((candidate) => candidate.scenarioId === scenarioId);
+  const card = maybeFindPerformanceCardForScenario(scenarioId);
   if (!card) {
     throw new Error(`No B737 performance card defined for scenario ${scenarioId}`);
   }
   return card;
+}
+
+export function maybeFindPerformanceCardForScenario(scenarioId: string | null | undefined): B737TakeoffPerformanceCard | null {
+  if (!scenarioId) return null;
+  return b737PerformanceCards.find((candidate) => candidate.scenarioId === scenarioId) ?? null;
 }
 
 function assertEqual<T>(actual: T, expected: T, label: string): void {

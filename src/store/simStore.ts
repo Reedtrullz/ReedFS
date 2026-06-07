@@ -4,14 +4,13 @@ import { B737_800_SPEC } from '../sim/types';
 import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
 import type { FlightPlan } from '@shared/types/fmc';
 import type { WindInfo } from '../sim/weather';
-import { KSEA_TUTORIAL_SCENARIO, createAircraftStateForScenario, scenarioById } from '../sim/scenarios';
-import type { FlightScenario } from '../sim/scenarios';
+import { ENVA_TUTORIAL_SCENARIO, createAircraftStateForScenario, scenarioById } from '../sim/scenarios';
 import { buildGuidanceState, type GuidanceState } from '../sim/guidanceState';
 import {
-  advanceSimulationStep,
   composeControlsSlice,
   syncGuidanceState,
 } from '../sim/simulationStep';
+import { getSimulationRuntime } from '../sim/simulationRuntime';
 import type { SimulationStatus } from '../sim/simulationStatus';
 import {
   computeRouteStatus,
@@ -25,10 +24,19 @@ import {
 } from '../sim/systems/autopilot';
 import {
   createInputManagerState,
-  updateInputManager,
   type InputActions,
   type InputManagerState,
 } from '../input/InputManager';
+import {
+  inputActionsIncludeManualApAxis,
+  inputManagerForScenario,
+  inputsForScenario,
+  isRejectedTakeoffAbortLatched,
+  normalizeControlInputs,
+  reduceInputManagerActions,
+  sanitizeSetInputPartial,
+  syncInputManagerWithInputPartial,
+} from './simStoreInputReducers';
 
 import {
   createScenarioSnapshot,
@@ -86,153 +94,8 @@ export interface SimStore {
 const FIXED_STEP_SECONDS = 1 / 60;
 const MAX_STEPS_PER_FRAME = 16;
 
-const defaultInputs: ControlInputs = {
-  elevator: 0, aileron: 0, rudder: 0,
-  throttle1: 0, throttle2: 0,
-  flapLever: 0, gearLever: 'DOWN',
-  spoilers: 0, brake: 0,
-  leftBrake: 0, rightBrake: 0,
-};
-
-function normalizeControlInputs(inputs: ControlInputs): ControlInputs {
-  return {
-    ...inputs,
-    leftBrake: 0,
-    rightBrake: 0,
-  };
-}
-
 function cloneWind(wind: WindInfo): WindInfo {
   return { ...wind };
-}
-
-function inputsForScenario(scenario: FlightScenario): ControlInputs {
-  return { ...defaultInputs, flapLever: scenario.flapSetting, gearLever: 'DOWN' };
-}
-
-function inputManagerForScenario(scenario: FlightScenario): InputManagerState {
-  return createInputManagerState({
-    ...inputsForScenario(scenario),
-    stabilizerTrimUnits: scenario.stabilizerTrimUnits,
-  });
-}
-
-function syncInputManagerWithInputPartial(
-  inputManager: InputManagerState,
-  partial: Partial<ControlInputs>,
-): InputManagerState {
-  const next: InputManagerState = { ...inputManager };
-  if (partial.elevator !== undefined) next.elevator = 0;
-  if (partial.aileron !== undefined) next.aileron = 0;
-  if (partial.rudder !== undefined) next.rudder = 0;
-  if (partial.brake !== undefined) next.brake = 0;
-  if (partial.leftBrake !== undefined) next.leftBrake = 0;
-  if (partial.rightBrake !== undefined) next.rightBrake = 0;
-
-  if (partial.throttle1 !== undefined && partial.throttle2 !== undefined) {
-    next.throttle = Math.max(partial.throttle1, partial.throttle2);
-  }
-
-  return createInputManagerState(next);
-}
-
-function inputActionsIncludeThrottle(actions: InputActions): boolean {
-  return (
-    actions.throttleDelta !== undefined ||
-    actions.throttleRate !== undefined ||
-    actions.throttleTarget !== undefined
-  );
-}
-
-function inputActionsChangedThrottle(actions: InputActions, previous: InputManagerState, next: InputManagerState): boolean {
-  return inputActionsIncludeThrottle(actions) || previous.throttle !== next.throttle;
-}
-
-function seedInputManagerFromLiveInputs(
-  inputManager: InputManagerState,
-  inputs: ControlInputs,
-  actions: InputActions,
-): InputManagerState {
-  const seed: InputManagerState = { ...inputManager };
-  if (actions.pitch !== undefined) seed.elevator = inputs.elevator;
-  else if (inputManager.elevator !== inputs.elevator) seed.elevator = 0;
-  if (actions.roll !== undefined) seed.aileron = inputs.aileron;
-  else if (inputManager.aileron !== inputs.aileron) seed.aileron = 0;
-  if (actions.yaw !== undefined) seed.rudder = inputs.rudder;
-  else if (inputManager.rudder !== inputs.rudder) seed.rudder = 0;
-  if (actions.brake !== undefined) seed.brake = inputs.brake;
-  else if (inputManager.brake !== inputs.brake) seed.brake = 0;
-  if (actions.leftBrake !== undefined) seed.leftBrake = inputs.leftBrake ?? 0;
-  else if (inputManager.leftBrake !== (inputs.leftBrake ?? 0)) seed.leftBrake = 0;
-  if (actions.rightBrake !== undefined) seed.rightBrake = inputs.rightBrake ?? 0;
-  else if (inputManager.rightBrake !== (inputs.rightBrake ?? 0)) seed.rightBrake = 0;
-  if (inputActionsIncludeThrottle(actions)) seed.throttle = Math.max(inputs.throttle1, inputs.throttle2);
-  return createInputManagerState(seed);
-}
-
-function controlPatchFromInputManager(
-  previous: InputManagerState,
-  next: InputManagerState,
-  actions: InputActions,
-): Partial<ControlInputs> {
-  const patch: Partial<ControlInputs> = {};
-
-  if (actions.pitch !== undefined || previous.elevator !== next.elevator) patch.elevator = next.elevator;
-  if (actions.roll !== undefined || previous.aileron !== next.aileron) patch.aileron = next.aileron;
-  if (actions.yaw !== undefined || previous.rudder !== next.rudder) patch.rudder = next.rudder;
-  if (actions.brake !== undefined || previous.brake !== next.brake) patch.brake = next.brake;
-  if (actions.leftBrake !== undefined || previous.leftBrake !== next.leftBrake) patch.leftBrake = next.leftBrake;
-  if (actions.rightBrake !== undefined || previous.rightBrake !== next.rightBrake) patch.rightBrake = next.rightBrake;
-  if (inputActionsChangedThrottle(actions, previous, next)) {
-    patch.throttle1 = next.throttle;
-    patch.throttle2 = next.throttle;
-  }
-
-  return patch;
-}
-
-function isRejectedTakeoffAbortLatched(status: SimStatus, aircraft: AircraftState, inputs: ControlInputs): boolean {
-  return status === 'running'
-    && aircraft.flightPhase === 'TAKEOFF'
-    && aircraft.ground.weightOnWheels
-    && inputs.throttle1 <= 0.2
-    && inputs.throttle2 <= 0.2
-    && inputs.brake >= 0.8
-    && inputs.spoilers >= 0.95;
-}
-
-const AP_OWNED_INPUT_KEYS = ['elevator', 'aileron', 'throttle1', 'throttle2'] as const;
-
-function sanitizeSetInputPartial(
-  partial: Partial<ControlInputs>,
-  pilotInputs: ControlInputs,
-  effectiveControls: ControlInputs,
-  apActive: boolean,
-): { pilotPatch: Partial<ControlInputs>; shouldDisconnect: boolean } {
-  if (!apActive) return { pilotPatch: partial, shouldDisconnect: false };
-
-  const pilotPatch: Partial<ControlInputs> = { ...partial };
-  let shouldDisconnect = false;
-
-  for (const key of AP_OWNED_INPUT_KEYS) {
-    const value = partial[key];
-    if (value === undefined) continue;
-
-    if (value === effectiveControls[key] && value !== pilotInputs[key]) {
-      delete pilotPatch[key];
-      continue;
-    }
-
-    if (value !== effectiveControls[key]) {
-      shouldDisconnect = true;
-    }
-  }
-
-  return { pilotPatch, shouldDisconnect };
-}
-
-function inputActionsIncludeManualApAxis(actions: InputActions): boolean {
-  return actions.pitch !== undefined || actions.roll !== undefined || inputActionsIncludeThrottle(actions);
 }
 
 function autopilotModesChanged(previous: AutopilotState | null, next: AutopilotState | null): boolean {
@@ -283,11 +146,11 @@ function disconnectAutopilot(apState: AutopilotState | null): AutopilotState | n
   return next;
 }
 
-const initialPilotInputs = inputsForScenario(KSEA_TUTORIAL_SCENARIO);
+const initialPilotInputs = inputsForScenario(ENVA_TUTORIAL_SCENARIO);
 const initialControls = composeControlsSlice(initialPilotInputs);
-const initialAircraft = createAircraftStateForScenario(B737_800_SPEC, KSEA_TUTORIAL_SCENARIO);
+const initialAircraft = createAircraftStateForScenario(B737_800_SPEC, ENVA_TUTORIAL_SCENARIO);
 const initialGuidance = buildGuidanceState({
-  scenario: KSEA_TUTORIAL_SCENARIO,
+  scenario: ENVA_TUTORIAL_SCENARIO,
   status: 'stopped',
   aircraft: initialAircraft,
   controls: initialControls.effectiveControls,
@@ -345,7 +208,7 @@ function restoreSnapshotSlice(snapshot: ScenarioSnapshot): Partial<SimStore> {
 export const useSimStore = create<SimStore>((set, get) => ({
   aircraft: initialAircraft,
   ...initialControls,
-  inputManager: inputManagerForScenario(KSEA_TUTORIAL_SCENARIO),
+  inputManager: inputManagerForScenario(ENVA_TUTORIAL_SCENARIO),
   spec: B737_800_SPEC,
   status: 'stopped',
   lastFrameTime: 0,
@@ -356,19 +219,21 @@ export const useSimStore = create<SimStore>((set, get) => ({
   flightPlan: null,
   activeLegIndex: null,
   routeStatus: initialRouteStatus,
-  wind: cloneWind(KSEA_TUTORIAL_SCENARIO.wind),
-  selectedScenarioId: KSEA_TUTORIAL_SCENARIO.id,
+  wind: cloneWind(ENVA_TUTORIAL_SCENARIO.wind),
+  selectedScenarioId: ENVA_TUTORIAL_SCENARIO.id,
   guidance: initialGuidance,
   scenarioPersistenceMessage: null,
 
   setInput: (partial) =>
     set((s) => {
       const apActive = isAutopilotEngaged(s.apState);
+      const apOwnsThrust = s.apState != null && (s.apState.truth.thrustActive === 'SPEED' || s.apState.truth.thrustActive === 'N1');
       const { pilotPatch, shouldDisconnect } = sanitizeSetInputPartial(
         partial,
         s.pilotInputs,
         s.effectiveControls,
         apActive,
+        apOwnsThrust,
       );
       const pilotInputs = { ...s.pilotInputs, ...pilotPatch };
       const apState = shouldDisconnect ? disconnectAutopilot(s.apState) : s.apState;
@@ -385,10 +250,14 @@ export const useSimStore = create<SimStore>((set, get) => ({
 
   applyInputActions: (actions, dt) =>
     set((s) => {
-      const previousInputManager = seedInputManagerFromLiveInputs(s.inputManager, s.pilotInputs, actions);
-      const inputManager = updateInputManager(previousInputManager, actions, dt);
-      let inputPatch = controlPatchFromInputManager(previousInputManager, inputManager, actions);
-      if (isRejectedTakeoffAbortLatched(s.status, s.aircraft, s.pilotInputs)) {
+      let { inputManager, inputPatch } = reduceInputManagerActions({
+        inputManager: s.inputManager,
+        pilotInputs: s.pilotInputs,
+        actions,
+        dt,
+      });
+      const rejectedTakeoffAbort = isRejectedTakeoffAbortLatched(s.status, s.aircraft, s.pilotInputs);
+      if (rejectedTakeoffAbort) {
         inputPatch = {
           ...inputPatch,
           throttle1: 0,
@@ -397,6 +266,18 @@ export const useSimStore = create<SimStore>((set, get) => ({
           spoilers: 1,
         };
       }
+
+      const apOwnsThrust = s.apState != null && (s.apState.truth.thrustActive === 'SPEED' || s.apState.truth.thrustActive === 'N1');
+      if (!rejectedTakeoffAbort && apOwnsThrust && (inputPatch.throttle1 !== undefined || inputPatch.throttle2 !== undefined)) {
+        inputPatch = { ...inputPatch };
+        delete inputPatch.throttle1;
+        delete inputPatch.throttle2;
+        inputManager = createInputManagerState({
+          ...inputManager,
+          throttle: Math.max(s.pilotInputs.throttle1, s.pilotInputs.throttle2),
+        });
+      }
+
       const trimChanged = inputManager.stabilizerTrimUnits !== s.aircraft.config.stabilizerTrimUnits;
       const aircraft = trimChanged ? structuredClone(s.aircraft) : s.aircraft;
       if (trimChanged) {
@@ -404,7 +285,7 @@ export const useSimStore = create<SimStore>((set, get) => ({
       }
 
       const pilotInputs = Object.keys(inputPatch).length > 0 ? { ...s.pilotInputs, ...inputPatch } : s.pilotInputs;
-      const shouldDisconnect = isAutopilotEngaged(s.apState) && inputActionsIncludeManualApAxis(actions);
+      const shouldDisconnect = isAutopilotEngaged(s.apState) && inputActionsIncludeManualApAxis(actions, s.apState);
       const apState = shouldDisconnect ? disconnectAutopilot(s.apState) : s.apState;
       const apCommands = shouldDisconnect ? {} : s.apCommands;
       const controlsSlice = composeControlsSlice(pilotInputs, apCommands, apState);
@@ -462,14 +343,15 @@ export const useSimStore = create<SimStore>((set, get) => ({
       return;
     }
 
-    let nextAircraft = aircraft;
+    let nextAircraft = structuredClone(aircraft);
     let nextActiveLegIndex = activeLegIndex;
     let nextRouteStatus = routeStatus;
     let nextGuidance = guidance;
     let nextControls = composeControlsSlice(pilotInputs, get().apCommands, apState);
+    const simulationRuntime = getSimulationRuntime();
 
     for (let step = 0; step < stepCount; step++) {
-      const next = advanceSimulationStep({
+      const next = simulationRuntime.step({
         aircraft: nextAircraft,
         spec,
         pilotInputs,
@@ -482,6 +364,7 @@ export const useSimStore = create<SimStore>((set, get) => ({
         status,
         selectedScenarioId,
         guidance: nextGuidance,
+        cloneAircraft: false,
       });
       nextAircraft = next.aircraft;
       nextControls = next.controls;
@@ -518,11 +401,14 @@ export const useSimStore = create<SimStore>((set, get) => ({
   startTakeoffRoll: () => set((s) => {
     const aircraft = structuredClone(s.aircraft);
     aircraft.flightPhase = 'TAKEOFF';
+    // Reset to zero: pilot sets their own throttle, flaps, and trim for takeoff.
+    aircraft.config.flapSetting = 0;
+    aircraft.config.stabilizerTrimUnits = 0;
     const pilotInputs: ControlInputs = {
       ...s.pilotInputs,
-      throttle1: 1,
-      throttle2: 1,
-      flapLever: aircraft.config.flapSetting,
+      throttle1: 0,
+      throttle2: 0,
+      flapLever: 0,
       gearLever: 'DOWN',
       brake: 0,
       leftBrake: 0,
@@ -537,7 +423,7 @@ export const useSimStore = create<SimStore>((set, get) => ({
       ...controlsSlice,
       inputManager: createInputManagerState({
         ...pilotInputs,
-        stabilizerTrimUnits: aircraft.config.stabilizerTrimUnits,
+        stabilizerTrimUnits: 0,
       }),
       apState: null,
       status: 'running',

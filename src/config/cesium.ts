@@ -1,4 +1,4 @@
-import { Ion } from 'cesium';
+import { isVisualTestMode } from './visualTest';
 
 export type CesiumSceneMode = 'ion' | 'degraded';
 export type CesiumTerrainMode = 'world' | 'ellipsoid';
@@ -12,11 +12,12 @@ export interface CesiumScenePolicy {
 }
 
 const PLACEHOLDER_TOKENS = new Set(['YOUR_CESIUM_ION_TOKEN', '[REDACTED]', 'REDACTED']);
+let lastResolvedIonToken: string | null = null;
 
 /**
  * Normalize a Cesium Ion token and reject empty or placeholder values.
  */
-export function normalizeCesiumToken(token?: string): string | null {
+export function normalizeCesiumToken(token?: string | null): string | null {
   const normalizedToken = token?.trim();
 
   if (!normalizedToken || PLACEHOLDER_TOKENS.has(normalizedToken)) {
@@ -27,11 +28,23 @@ export function normalizeCesiumToken(token?: string): string | null {
 }
 
 /**
- * Resolve the Cesium scene policy from the configured Ion token.
+ * Resolve the Cesium scene policy from the configured Ion token without importing
+ * Cesium into the main app chunk. The viewport layer applies the token after the
+ * lazily-loaded Cesium module is available.
  */
 export function getCesiumScenePolicy(
   token: string | undefined = import.meta.env.VITE_CESIUM_ION_TOKEN,
 ): CesiumScenePolicy {
+  if (isVisualTestMode()) {
+    return {
+      mode: 'degraded',
+      terrain: 'ellipsoid',
+      osmBuildings: false,
+      token: null,
+      reason: 'Visual test mode forces deterministic degraded scenery.',
+    };
+  }
+
   const normalizedToken = normalizeCesiumToken(token);
 
   if (normalizedToken) {
@@ -54,22 +67,23 @@ export function getCesiumScenePolicy(
 }
 
 /**
- * Initialize Cesium Ion with an access token.
- *
- * Get a free token at https://ion.cesium.com/signup
- * The free tier includes Cesium World Terrain + Bing Maps imagery.
- *
- * Store the token in VITE_CESIUM_ION_TOKEN env var (never commit).
+ * Backwards-compatible policy initializer. This intentionally does not import
+ * Cesium; callers that already own the Cesium module must apply the token with
+ * `rememberCesiumIonToken(policy.token)` and `Ion.defaultAccessToken = ...`.
  */
 export function initCesium(token?: string): CesiumScenePolicy {
   const policy = getCesiumScenePolicy(token);
-  Ion.defaultAccessToken = policy.token ?? '';
+  rememberCesiumIonToken(policy.token);
   return policy;
 }
 
+export function rememberCesiumIonToken(token: string | null): void {
+  lastResolvedIonToken = normalizeCesiumToken(token);
+}
+
 /**
- * Check if a valid Cesium Ion token is configured.
+ * Check if a valid Cesium Ion token has been resolved for the current scene policy.
  */
 export function hasCesiumToken(): boolean {
-  return normalizeCesiumToken(Ion.defaultAccessToken) !== null;
+  return lastResolvedIonToken !== null;
 }

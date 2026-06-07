@@ -2,6 +2,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import cesium from 'vite-plugin-cesium';
 import path from 'path';
+import { rfsManualChunk } from './manualChunks.config';
 
 export default defineConfig({
   plugins: [react(), cesium()],
@@ -12,12 +13,20 @@ export default defineConfig({
     },
   },
   server: {
-    headers: {
-      'Cross-Origin-Opener-Policy': 'same-origin',
-      'Cross-Origin-Embedder-Policy': 'require-corp',
-    },
+    // NOTE: Do NOT add COOP/COEP headers (Cross-Origin-Opener-Policy /
+    // Cross-Origin-Embedder-Policy). They block Cesium Ion's cross-origin
+    // tile requests to api.cesium.com and assets.ion.cesium.com.
+    // SharedArrayBuffer is not currently required by any RFS subsystem.
   },
   build: {
     target: 'esnext',
+    // Three.js itself is a single large dependency. Keep it isolated as a vendor
+    // chunk and accept a bounded 550 kB ceiling while keeping app/index chunks small.
+    chunkSizeWarningLimit: 550,
+    rolldownOptions: {
+      output: {
+        manualChunks: rfsManualChunk,
+      },
+    },
   },
 });

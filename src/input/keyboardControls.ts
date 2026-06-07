@@ -71,9 +71,9 @@ export function applyDiscreteKeyAction(key: string): InputActions | null {
       return { throttleDelta: THROTTLE_STEP };
     case 'arrowdown':
       return { throttleDelta: -THROTTLE_STEP };
-    case ']':
+    case '9':
       return { trimDelta: TRIM_STEP_UNITS };
-    case '[':
+    case '8':
       return { trimDelta: -TRIM_STEP_UNITS };
     default:
       return null;

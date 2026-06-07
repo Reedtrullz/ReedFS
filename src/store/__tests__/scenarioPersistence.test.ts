@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { createDefaultAutopilotState } from '../../instruments/RfsMCP';
+import { createDefaultAutopilotState } from '../../instruments/defaultAutopilotState';
 import { createKseaKpdxFlight } from '../../sim/flightPlanLoader';
 import { KSEA_LIGHT_PATTERN_SCENARIO, KSEA_TUTORIAL_SCENARIO } from '../../sim/scenarios';
 import {

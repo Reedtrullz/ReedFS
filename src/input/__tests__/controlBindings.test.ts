@@ -28,7 +28,12 @@ describe('controlBindings', () => {
     expect(labels.pitch).toContain('W/S');
     expect(labels.throttle).toContain('ArrowUp/ArrowDown');
     expect(labels.throttle).toContain('Gamepad RT/LT');
+    expect(labels.brake).toContain('Gamepad A/Cross');
+    expect(labels.gear).toContain('Gamepad RB/R1');
+    expect(labels.flaps).toContain('Gamepad LB/L1');
     expect(labels.differentialBrake).toContain('Z/X');
+    expect(labels.camera).toContain('C');
+    expect(labels.overlay).toContain('O');
   });
 
   it('validates defaults without duplicate keys and exposes a differential brake row', () => {

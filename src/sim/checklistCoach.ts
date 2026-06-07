@@ -66,7 +66,13 @@ export function coachMessageForState(
   if (rejectedTakeoff) return 'Rejected takeoff: hold brakes, keep centerline, and use RESET once stopped.';
 
   if (aircraft.ground.weightOnWheels && scenario) {
-    const firstIncomplete = buildTakeoffChecklist(scenario, aircraft, controls).find((item) => !item.complete);
+    const checklist = buildTakeoffChecklist(scenario, aircraft, controls);
+    const needsFlaps = checklist.some((item) => item.id === 'flaps' && !item.complete);
+    const needsTrim = checklist.some((item) => item.id === 'trim' && !item.complete);
+    if (aircraft.flightPhase === 'TAKEOFF' && (needsFlaps || needsTrim) && throttle < 0.2) {
+      return `Set flaps ${scenario.flapSetting}, trim ${scenario.stabilizerTrimUnits.toFixed(1)}, then advance takeoff thrust smoothly.`;
+    }
+    const firstIncomplete = checklist.find((item) => !item.complete);
     if (firstIncomplete) return `${firstIncomplete.label}: ${firstIncomplete.detail}.`;
   }
 

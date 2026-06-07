@@ -5,14 +5,93 @@ import { computeRouteStatus, type NavOutput } from './navigation';
 import { computeVNAV } from './vnav';
 import { bodyToNed } from '../physics/frames';
 
-// PID state (module-level — one set of integrators)
-const rollIntegral = { value: 0, prevError: 0 };
-const pitchIntegral = { value: 0, prevError: 0 };
-const thrustIntegral = { value: 0, prevError: 0 };
-const elevatorCommand = { value: 0 };
-const throttleCommand = { value: 0 };
+// ── Module-level PID state ──────────────────────────────────────────────
 
-export interface AutopilotTargets {
+const pitchPid = { value: 0, prevError: 0 };
+const rollPid = { value: 0, prevError: 0 };
+const thrustPid = { value: 0, prevError: 0 };
+const pitchTargetIntegral = { value: 0, prevError: 0 };
+let throttleLimited = 0; // rate-limited throttle output
+
+// ── Constants ───────────────────────────────────────────────────────────
+
+const PITCH_MIN_DEG = -10;
+const PITCH_MAX_DEG = 20;
+const BANK_MAX_DEG = 30;
+const THROTTLE_RATE_PER_SEC = 1.5;
+
+// ── Helpers ─────────────────────────────────────────────────────────────
+
+function clamp(v: number, min: number, max: number): number { return Math.max(min, Math.min(max, v)); }
+function clampSigned(v: number): number { return clamp(v, -1, 1); }
+function clamp01(v: number): number { return clamp(v, 0, 1); }
+function finiteOrUndefined(v: number | undefined | null): number | undefined {
+  return typeof v === 'number' && Number.isFinite(v) ? v : undefined;
+}
+function degToRad(d: number): number { return d * Math.PI / 180; }
+function radToDeg(r: number): number { return r * 180 / Math.PI; }
+function normalizeAngleRad(r: number): number {
+  const twoPi = Math.PI * 2;
+  return ((r % twoPi) + twoPi) % twoPi;
+}
+function headingErrorRad(target: number, current: number): number {
+  let e = target - current;
+  while (e > Math.PI) e -= 2 * Math.PI;
+  while (e < -Math.PI) e += 2 * Math.PI;
+  return e;
+}
+function currentVsFpm(state: AircraftState): number {
+  const ned = bodyToNed(state.velocity, state.attitude);
+  return -ned.down * 196.850394;
+}
+function currentTasKt(state: AircraftState): number {
+  return Math.sqrt(state.velocity.u ** 2 + state.velocity.v ** 2 + state.velocity.w ** 2) * 1.944;
+}
+function pid(
+  s: { value: number; prevError: number },
+  err: number,
+  kp: number,
+  ki: number,
+  kd: number,
+  dt: number,
+  maxI = 3,
+  maxDerivative = Number.POSITIVE_INFINITY,
+): number {
+  s.value = clamp(s.value + err * dt, -maxI, maxI);
+  const rawDerivative = (err - s.prevError) / Math.max(dt, 0.001);
+  const deriv = clamp(rawDerivative, -maxDerivative, maxDerivative);
+  s.prevError = err;
+  return kp * err + ki * s.value + kd * deriv;
+}
+function throttleForN1(targetN1: number): number {
+  return clamp01((targetN1 - 20) / 80);
+}
+
+// ── Public API ──────────────────────────────────────────────────────────
+
+export function resetAutopilotPID(): void {
+  pitchPid.value = 0; pitchPid.prevError = 0;
+  rollPid.value = 0; rollPid.prevError = 0;
+  thrustPid.value = 0; thrustPid.prevError = 0;
+  pitchTargetIntegral.value = 0; pitchTargetIntegral.prevError = 0;
+  throttleLimited = 0;
+}
+
+export function isAutopilotEngaged(ap: AutopilotState | null | undefined): boolean {
+  return Boolean(ap && ap.truth.autopilotStatus !== 'OFF');
+}
+
+export function computeN1TargetPercent(state: AircraftState): number {
+  if (state.flightPhase === 'TAKEOFF') return 92;
+  if (state.flightPhase === 'CLIMB') return 88;
+  if (state.flightPhase === 'CRUISE' || state.position.alt > 18_000) return 72;
+  if (state.flightPhase === 'DESCENT' || state.flightPhase === 'APPROACH' || state.flightPhase === 'LANDED') return 55;
+  return 20;
+}
+
+// ── Target resolution ───────────────────────────────────────────────────
+
+interface Targets {
   targetHeadingRad: number;
   targetAltFt: number;
   targetSpeedKt: number;
@@ -20,211 +99,134 @@ export interface AutopilotTargets {
   targetN1Percent?: number;
 }
 
-const DEFAULT_TARGET_SPEED_KT = 250;
-const N1_TAKEOFF_LIMIT_PERCENT = 92;
-const N1_CLIMB_LIMIT_PERCENT = 88;
-const N1_CRUISE_LIMIT_PERCENT = 72;
-const N1_APPROACH_LIMIT_PERCENT = 55;
-const N1_IDLE_LIMIT_PERCENT = 20;
-const ELEVATOR_RATE_LIMIT_PER_SEC = 1.5;
-const THROTTLE_RATE_LIMIT_PER_SEC = 1.5;
-const MAX_VS_ELEVATOR = 0.35;
-const LNAV_INTERCEPT_MAX_RAD = 25 * Math.PI / 180;
-const LNAV_INTERCEPT_FULL_SCALE_M = 1852;
-
-function finiteOrUndefined(value: number | undefined | null): number | undefined {
-  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
-}
-
-function validActiveLegIndexOrNull(value: number | undefined | null): number | null {
-  return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : null;
-}
-
-function isVnavVerticalMode(mode: string): boolean {
-  return mode === 'VNAV' || mode === 'VNAV_PTH' || mode === 'ALT*';
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
-}
-
-function clampSigned(value: number): number {
-  return clamp(value, -1, 1);
-}
-
-function clamp01(value: number): number {
-  return clamp(value, 0, 1);
-}
-
-function throttleForTargetN1(targetN1Percent: number): number {
-  return clamp01((targetN1Percent - 20) / 80);
-}
-
-function rateLimit(current: number, target: number, maxDelta: number): number {
-  return current + clamp(target - current, -maxDelta, maxDelta);
-}
-
-function currentVerticalSpeedFpm(state: AircraftState): number {
-  const ned = bodyToNed(state.velocity, state.attitude);
-  return -ned.down * 196.850394;
-}
-
-function rateLimitElevator(target: number, dt: number): number {
-  const limited = rateLimit(
-    elevatorCommand.value,
-    clamp(target, -MAX_VS_ELEVATOR, MAX_VS_ELEVATOR),
-    ELEVATOR_RATE_LIMIT_PER_SEC * Math.max(0, dt),
-  );
-  elevatorCommand.value = limited;
-  return limited;
-}
-
-function normalizeHeadingRad(rad: number): number {
-  const twoPi = Math.PI * 2;
-  return ((rad % twoPi) + twoPi) % twoPi;
-}
-
-function lnavInterceptHeading(desiredTrackRad: number, crossTrackErrorM: number): number {
-  const interceptRad = clamp(
-    crossTrackErrorM / LNAV_INTERCEPT_FULL_SCALE_M,
-    -1,
-    1,
-  ) * LNAV_INTERCEPT_MAX_RAD;
-  return normalizeHeadingRad(desiredTrackRad - interceptRad);
-}
-
-function normalizeHeadingError(rad: number): number {
-  let err = rad;
-  while (err > Math.PI) err -= 2 * Math.PI;
-  while (err < -Math.PI) err += 2 * Math.PI;
-  return err;
-}
-
-function pid(pidState: { value: number; prevError: number }, error: number, kp: number, ki: number, kd: number, dt: number): number {
-  pidState.value += error * dt;
-  const deriv = (error - pidState.prevError) / Math.max(dt, 0.001);
-  pidState.prevError = error;
-  return kp * error + ki * pidState.value + kd * deriv;
-}
-
-export function resetAutopilotPID(): void {
-  rollIntegral.value = 0;
-  rollIntegral.prevError = 0;
-  pitchIntegral.value = 0;
-  pitchIntegral.prevError = 0;
-  thrustIntegral.value = 0;
-  thrustIntegral.prevError = 0;
-  elevatorCommand.value = 0;
-  throttleCommand.value = 0;
-}
-
-export function isAutopilotEngaged(apState: AutopilotState | null | undefined): boolean {
-  return Boolean(apState && apState.truth.autopilotStatus !== 'OFF');
-}
-
-export function computeN1TargetPercent(state: AircraftState): number {
-  if (state.flightPhase === 'TAKEOFF') return N1_TAKEOFF_LIMIT_PERCENT;
-  if (state.flightPhase === 'CLIMB') return N1_CLIMB_LIMIT_PERCENT;
-  if (state.flightPhase === 'CRUISE' || state.position.alt > 18_000) return N1_CRUISE_LIMIT_PERCENT;
-  if (state.flightPhase === 'DESCENT' || state.flightPhase === 'APPROACH' || state.flightPhase === 'LANDED') {
-    return N1_APPROACH_LIMIT_PERCENT;
-  }
-  return N1_IDLE_LIMIT_PERCENT;
-}
-
 export function resolveAutopilotTargets(
   state: AircraftState,
-  apState: AutopilotState,
+  ap: AutopilotState,
   flightPlan?: FlightPlan | null,
   activeLegIndex?: number | null,
-): AutopilotTargets {
-  let targetHeading = state.attitude.psi;
-  let targetAlt = state.position.alt;
-  const selectedSpeed = finiteOrUndefined(apState.boeing.speed);
-  let targetSpeed = selectedSpeed ?? DEFAULT_TARGET_SPEED_KT;
-  let targetVerticalSpeed: number | undefined;
-  let targetN1Percent: number | undefined;
-  let activeLegNav: NavOutput | null | undefined;
-  const validActiveLegIndex = validActiveLegIndexOrNull(activeLegIndex);
+): Targets {
+  let hdg = state.attitude.psi;
+  let alt = state.position.alt;
+  const selSpd = finiteOrUndefined(ap.boeing.speed);
+  let spd = selSpd ?? 250;
+  let vs: number | undefined;
+  let n1: number | undefined;
+  let navCache: NavOutput | null | undefined;
 
-  const navForActiveLeg = (): NavOutput | null => {
-    if (activeLegNav !== undefined) return activeLegNav;
-    const legIndex = validActiveLegIndex;
-    if (!flightPlan || legIndex === null) {
-      activeLegNav = null;
-      return activeLegNav;
-    }
-
-    const routeStatus = computeRouteStatus(state, flightPlan, legIndex);
-    if (routeStatus?.lnavAvailable && routeStatus.desiredTrackRad !== null) {
-      const crossTrackError = routeStatus.crossTrackErrorM ?? 0;
-      const nav: NavOutput = {
-        crossTrackError,
-        alongTrackDist: routeStatus.alongTrackM ?? routeStatus.distanceToNextM ?? 0,
-        desiredTrack: lnavInterceptHeading(routeStatus.desiredTrackRad, crossTrackError),
-        activeWaypointIndex: routeStatus.toWaypointIndex ?? legIndex,
-        waypointReached: routeStatus.waypointReached,
+  const nav = (): NavOutput | null => {
+    if (navCache !== undefined) return navCache;
+    const idx = typeof activeLegIndex === 'number' && Number.isFinite(activeLegIndex) && activeLegIndex >= 0 ? activeLegIndex : null;
+    if (!flightPlan || idx === null) { navCache = null; return null; }
+    const rs = computeRouteStatus(state, flightPlan, idx);
+    if (rs?.lnavAvailable && rs.desiredTrackRad !== null) {
+      const xte = rs.crossTrackErrorM ?? 0;
+      navCache = {
+        crossTrackError: xte,
+        alongTrackDist: rs.alongTrackM ?? rs.distanceToNextM ?? 0,
+        desiredTrack: normalizeAngleRad(rs.desiredTrackRad - clamp(xte / 1852, -1, 1) * degToRad(25)),
+        activeWaypointIndex: rs.toWaypointIndex ?? idx,
+        waypointReached: rs.waypointReached,
       };
-      activeLegNav = nav;
-      return nav;
+      return navCache;
     }
-
-    activeLegNav = null;
-    return activeLegNav;
+    navCache = null; return null;
   };
 
-  if (apState.truth.lateralActive === 'HDG_SEL') {
-    targetHeading = (finiteOrUndefined(apState.boeing.heading) ?? 0) * Math.PI / 180;
+  if (ap.truth.lateralActive === 'HDG_SEL') {
+    hdg = (finiteOrUndefined(ap.boeing.heading) ?? 0) * Math.PI / 180;
+  }
+  if (ap.truth.verticalActive === 'ALT_HOLD') {
+    const sa = finiteOrUndefined(ap.boeing.altitude);
+    if (sa !== undefined && sa > 0) alt = sa;
+  }
+  if (ap.truth.verticalActive === 'VS') {
+    vs = finiteOrUndefined(ap.boeing.verticalSpeed) ?? 0;
+    // Altitude capture: blend into ALT_HOLD near the MCP altitude window
+    const sa = finiteOrUndefined(ap.boeing.altitude);
+    if (sa !== undefined && sa > 0 && vs !== undefined) {
+      const d = sa - state.position.alt;
+      const windowFt = 500;
+      if (Math.abs(d) < windowFt * 2 && ((vs > 0 && d <= windowFt) || (vs < 0 && d >= -windowFt))) {
+        vs = vs * Math.max(0, Math.abs(d) / windowFt);
+      }
+    }
+  }
+  if (ap.truth.lateralActive === 'LNAV' && flightPlan) {
+    const n = nav();
+    if (n) hdg = n.desiredTrack;
   }
 
-  if (apState.truth.verticalActive === 'ALT_HOLD') {
-    const selectedAltitude = finiteOrUndefined(apState.boeing.altitude);
-    if (selectedAltitude !== undefined && selectedAltitude > 0) targetAlt = selectedAltitude;
-  }
-
-  if (apState.truth.verticalActive === 'VS') {
-    targetVerticalSpeed = finiteOrUndefined(apState.boeing.verticalSpeed) ?? 0;
-  }
-
-  // LNAV: compute desired track from the active route leg only.
-  if (apState.truth.lateralActive === 'LNAV' && flightPlan) {
-    const nav = navForActiveLeg();
-    if (nav) targetHeading = nav.desiredTrack;
-  }
-
-  // VNAV: only expose altitude/VS/speed targets when the active route leg has an actionable constraint.
-  if (isVnavVerticalMode(apState.truth.verticalActive) && flightPlan) {
-    const nav = navForActiveLeg();
-    if (nav) {
-      const vnav = computeVNAV(state, flightPlan, nav);
-      if (vnav.available) {
-        if (vnav.altitudeConstraint) {
-          targetAlt = vnav.targetAlt;
-          targetVerticalSpeed = vnav.targetVs;
+  // ── VNAV: expose targets from the active route leg ──
+  const isVnav = ap.truth.verticalActive === 'VNAV' || ap.truth.verticalActive === 'VNAV_PTH' || ap.truth.verticalActive === 'ALT*';
+  if (isVnav && flightPlan) {
+    const n = nav();
+    if (n) {
+      const v = computeVNAV(state, flightPlan, n);
+      if (v.available) {
+        if (v.altitudeConstraint) {
+          alt = v.targetAlt;
+          vs = v.targetVs;
         }
-        if (vnav.speedConstraint && selectedSpeed === undefined && apState.truth.thrustActive === 'SPEED') {
-          targetSpeed = vnav.targetSpeedKt ?? targetSpeed;
+        if (v.speedConstraint && selSpd === undefined && ap.truth.thrustActive === 'SPEED') {
+          spd = v.targetSpeedKt ?? spd;
         }
       }
     }
   }
-
-  if (apState.truth.thrustActive === 'N1' && apState.boeing.autothrottleArm) {
-    targetN1Percent = computeN1TargetPercent(state);
+  if (ap.truth.thrustActive === 'N1' && ap.boeing.autothrottleArm) {
+    n1 = computeN1TargetPercent(state);
   }
 
-  return {
-    targetHeadingRad: targetHeading,
-    targetAltFt: targetAlt,
-    targetSpeedKt: targetSpeed,
-    targetVerticalSpeedFpm: targetVerticalSpeed,
-    targetN1Percent,
-  };
+  return { targetHeadingRad: hdg, targetAltFt: alt, targetSpeedKt: spd, targetVerticalSpeedFpm: vs, targetN1Percent: n1 };
 }
+
+// ── Inner loops: attitude control ───────────────────────────────────────
+
+/** Pitch inner loop: holds a target pitch angle via elevator. */
+function pitchHold(targetPitchDeg: number, state: AircraftState, dt: number): number {
+  const currentPitchDeg = radToDeg(state.attitude.theta);
+  const err = targetPitchDeg - currentPitchDeg;
+  // elevator convention: negative = nose-up, positive = nose-down
+  return clampSigned(pid(pitchPid, -err, 0.30, 0.08, 0.10, dt, 4, 4));
+}
+
+/** Roll inner loop: holds a target bank angle via aileron. */
+function bankHold(targetBankDeg: number, state: AircraftState, dt: number): number {
+  const currentBankDeg = radToDeg(state.attitude.phi);
+  const err = targetBankDeg - currentBankDeg;
+  return clampSigned(pid(rollPid, err, 0.06, 0.01, 0.03, dt, 2));
+}
+
+// ── Outer loops: navigation targets → attitude targets ──────────────────
+
+/** Heading outer loop: converts heading error to bank angle target. */
+function headingToBank(targetHeadingRad: number, state: AircraftState): number {
+  const errRad = headingErrorRad(targetHeadingRad, state.attitude.psi);
+  // 25° bank for 90° heading error
+  const targetBankDeg = clamp(errRad * radToDeg(1) * 0.28, -BANK_MAX_DEG, BANK_MAX_DEG);
+  return targetBankDeg;
+}
+
+/** Altitude outer loop: converts altitude error to pitch target. */
+function altitudeToPitch(targetAltFt: number, state: AircraftState, dt: number): number {
+  const err = targetAltFt - state.position.alt;
+  // P=0.004: 250ft error → 1° pitch adjustment
+  const pitchAdjustDeg = pid(pitchTargetIntegral, err, 0.004, 0.0008, 0, dt, 4);
+  return clamp(pitchAdjustDeg, -10, 15);
+}
+
+/** VS outer loop: adjusts pitch to track vertical speed. */
+function vsToPitch(targetVerticalSpeedFpm: number, state: AircraftState, dt: number): number {
+  const err = targetVerticalSpeedFpm - currentVsFpm(state);
+  const pitchAdjustDeg = pid(pitchTargetIntegral, err, 0.00015, 0.00003, 0, dt, 2);
+  return clamp(pitchAdjustDeg, -8, 15);
+}
+
+// ── Main command computation ────────────────────────────────────────────
 
 export function computeAutopilotCommands(
   state: AircraftState,
-  apState: AutopilotState,
+  ap: AutopilotState,
   targetHeadingRad: number,
   targetAltFt: number,
   targetSpeedKt: number,
@@ -232,77 +234,96 @@ export function computeAutopilotCommands(
   targetVerticalSpeedFpm?: number,
   targetN1Percent?: number,
 ): AutopilotCommands {
-  if (!isAutopilotEngaged(apState)) return {};
+  if (!isAutopilotEngaged(ap)) return {};
 
-  const t = apState.truth;
-  const commands: AutopilotCommands = {};
+  const t = ap.truth;
+  const cmd: AutopilotCommands = {};
 
-  // ── Lateral ──
-  if (t.lateralActive === 'HDG_SEL' || t.lateralActive === 'LNAV') {
-    const hdgErr = normalizeHeadingError(targetHeadingRad - state.attitude.psi);
-    commands.aileron = clampSigned(pid(rollIntegral, hdgErr, 0.03, 0.002, 0.01, dt));
-  }
+  // ── Pitch target ──
+  let pitchTargetDeg = radToDeg(state.attitude.theta); // default: hold current pitch
 
-  // ── Vertical ──
   if (t.verticalActive === 'ALT_HOLD') {
-    const altErr = state.position.alt - targetAltFt;
-    const rawElevator = pid(pitchIntegral, altErr, 0.00004, 0.000001, 0.00001, dt);
-    commands.elevator = rateLimitElevator(rawElevator, dt);
-  } else if (t.verticalActive === 'VS' || isVnavVerticalMode(t.verticalActive)) {
-    const selectedVs = t.verticalActive === 'VS'
-      ? finiteOrUndefined(apState.boeing.verticalSpeed) ?? 0
-      : finiteOrUndefined(targetVerticalSpeedFpm);
-    if (selectedVs !== undefined) {
-      const vsErr = currentVerticalSpeedFpm(state) - selectedVs;
-      const rawElevator = pid(pitchIntegral, vsErr, 0.00008, 0.0000005, 0.000002, dt);
-      commands.elevator = rateLimitElevator(rawElevator, dt);
-    }
+    pitchTargetDeg = altitudeToPitch(targetAltFt, state, dt);
+  } else if (t.verticalActive === 'VS' || t.verticalActive === 'VNAV' || t.verticalActive === 'VNAV_PTH' || t.verticalActive === 'ALT*') {
+    const vs = finiteOrUndefined(targetVerticalSpeedFpm) ?? finiteOrUndefined(ap.boeing.verticalSpeed) ?? 0;
+    pitchTargetDeg = vsToPitch(vs, state, dt);
   }
+
+  pitchTargetDeg = clamp(pitchTargetDeg, PITCH_MIN_DEG, PITCH_MAX_DEG);
+  cmd.elevator = pitchHold(pitchTargetDeg, state, dt);
+
+  // ── Bank target ──
+  let bankTargetDeg = 0; // default: wings level
+  if (t.lateralActive === 'HDG_SEL' || t.lateralActive === 'LNAV') {
+    bankTargetDeg = headingToBank(targetHeadingRad, state);
+  }
+  cmd.aileron = bankHold(bankTargetDeg, state, dt);
 
   // ── Thrust ──
   if (t.thrustActive === 'SPEED') {
-    const tas = Math.sqrt(state.velocity.u ** 2 + state.velocity.v ** 2 + state.velocity.w ** 2) * 1.944; // m/s → kts
-    const spdErr = targetSpeedKt - tas;
-    const thr = pid(thrustIntegral, spdErr, 0.002, 0.00005, 0.0005, dt);
-    const desired = clamp01(thr);
-    const clamped = rateLimit(throttleCommand.value, desired, THROTTLE_RATE_LIMIT_PER_SEC * Math.max(0, dt));
-    throttleCommand.value = clamped;
-    commands.throttle1 = clamped;
-    commands.throttle2 = clamped;
-  } else if (t.thrustActive === 'N1' && apState.boeing.autothrottleArm && targetN1Percent !== undefined) {
+    const tasKt = currentTasKt(state);
+    const spdErr = targetSpeedKt - tasKt;
+    const altFt = state.position.alt;
+    const deficit = targetSpeedKt - tasKt;
+    const vsFpm = currentVsFpm(state);
+    const aboveTarget = t.verticalActive === 'ALT_HOLD' && state.position.alt > targetAltFt + 200;
+
+    const thr = pid(thrustPid, spdErr, aboveTarget ? 0.003 : 0.008, aboveTarget ? 0.0005 : 0.002, 0.003, dt, 5);
+
+    let minT: number;
+
+    if (state.ground.weightOnWheels) {
+      minT = 0;
+    } else if (aboveTarget && vsFpm < 0) {
+      minT = 0.15; // descending toward target: let the dive do the work
+    } else if (aboveTarget && deficit > 10) {
+      minT = 0.25; // above target, slow — don't add energy
+    } else if (deficit > 30) {
+      minT = 0.75;
+    } else if (deficit > 10) {
+      minT = 0.60;
+    } else if (vsFpm < -500) {
+      minT = 0.70;
+    } else if (state.flightPhase === 'CLIMB') {
+      minT = 0.55;
+    } else if (altFt > 15000) {
+      minT = 0.50;
+    } else {
+      minT = 0.40;
+    }
+
+    const raw = clamp(thr, minT, 1);
+    // Rate-limit throttle changes for smooth engine response
+    const maxDelta = THROTTLE_RATE_PER_SEC * Math.max(0, dt);
+    throttleLimited = clamp(raw, throttleLimited - maxDelta, throttleLimited + maxDelta);
+    cmd.throttle1 = throttleLimited;
+    cmd.throttle2 = throttleLimited;
+  } else if (t.thrustActive === 'N1' && ap.boeing.autothrottleArm && targetN1Percent !== undefined) {
     const avgN1 = (state.engines[0].n1 + state.engines[1].n1) / 2;
-    const baseThrottle = throttleForTargetN1(targetN1Percent);
-    const n1Correction = clamp((targetN1Percent - avgN1) * 0.01, -0.15, 0.15);
-    const desired = clamp01(baseThrottle + n1Correction);
-    const clamped = rateLimit(throttleCommand.value, desired, THROTTLE_RATE_LIMIT_PER_SEC * Math.max(0, dt));
-    throttleCommand.value = clamped;
-    commands.throttle1 = clamped;
-    commands.throttle2 = clamped;
+    const base = throttleForN1(targetN1Percent);
+    const correction = clamp((targetN1Percent - avgN1) * 0.01, -0.15, 0.15);
+    cmd.throttle1 = clamp01(base + correction);
+    cmd.throttle2 = cmd.throttle1;
   }
 
-  return commands;
+  return cmd;
 }
+
+// ── Convenience wrapper ─────────────────────────────────────────────────
 
 export function computeAutopilotCommandsForState(
   state: AircraftState,
-  apState: AutopilotState | null | undefined,
+  ap: AutopilotState | null | undefined,
   flightPlan: FlightPlan | null | undefined,
   dt: number,
   activeLegIndex?: number | null,
 ): AutopilotCommands {
-  if (!apState || !isAutopilotEngaged(apState)) return {};
-  const targets = resolveAutopilotTargets(state, apState, flightPlan, activeLegIndex);
-  return computeAutopilotCommands(
-    state,
-    apState,
-    targets.targetHeadingRad,
-    targets.targetAltFt,
-    targets.targetSpeedKt,
-    dt,
-    targets.targetVerticalSpeedFpm,
-    targets.targetN1Percent,
-  );
+  if (!ap || !isAutopilotEngaged(ap)) return {};
+  const tgts = resolveAutopilotTargets(state, ap, flightPlan, activeLegIndex);
+  return computeAutopilotCommands(state, ap, tgts.targetHeadingRad, tgts.targetAltFt, tgts.targetSpeedKt, dt, tgts.targetVerticalSpeedFpm, tgts.targetN1Percent);
 }
+
+// ── Controls composition ────────────────────────────────────────────────
 
 export function composeEffectiveControls(
   pilotInputs: ControlInputs,
@@ -313,17 +334,10 @@ export function composeEffectiveControls(
   const effective: ControlInputs = { ...pilotInputs };
   if (!apActive || manualOverride) return effective;
 
-  const elevator = finiteOrUndefined(apCommands.elevator);
-  if (elevator !== undefined) effective.elevator = clampSigned(elevator);
-
-  const aileron = finiteOrUndefined(apCommands.aileron);
-  if (aileron !== undefined) effective.aileron = clampSigned(aileron);
-
-  const throttle1 = finiteOrUndefined(apCommands.throttle1);
-  if (throttle1 !== undefined) effective.throttle1 = clamp01(throttle1);
-
-  const throttle2 = finiteOrUndefined(apCommands.throttle2);
-  if (throttle2 !== undefined) effective.throttle2 = clamp01(throttle2);
+  if (apCommands.elevator !== undefined) effective.elevator = clampSigned(apCommands.elevator);
+  if (apCommands.aileron !== undefined) effective.aileron = clampSigned(apCommands.aileron);
+  if (apCommands.throttle1 !== undefined) effective.throttle1 = clamp01(apCommands.throttle1);
+  if (apCommands.throttle2 !== undefined) effective.throttle2 = clamp01(apCommands.throttle2);
 
   return effective;
 }

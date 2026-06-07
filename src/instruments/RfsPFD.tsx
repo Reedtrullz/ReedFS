@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react';
 import { useSimStore } from '../store/simStore';
 import { computeDerived } from '../sim/physics/derived';
 import { quatToEuler } from '../sim/physics/quaternion';
+import { deriveDisplayFmaTruth } from '../sim/systems/fmaTruth';
 
 const glass: CSSProperties = {
   background: 'linear-gradient(180deg, rgba(9,14,18,0.95), rgba(2,5,7,0.92))',
@@ -128,18 +129,34 @@ function Tape({
   );
 }
 
+function useFmaText(kind: 'thrustActive' | 'lateralActive' | 'verticalActive' | 'autopilotStatus') {
+  return useSimStore((s) => modeText(deriveDisplayFmaTruth(s.apState, {
+    aircraft: s.aircraft,
+    flightPlan: s.flightPlan,
+    routeStatus: s.routeStatus,
+  })[kind]));
+}
+
 export function RfsPFD() {
-  const a = useSimStore((s) => s.aircraft);
-  const wind = useSimStore((s) => s.wind);
-  const apState = useSimStore((s) => s.apState);
-  const d = computeDerived(a, wind);
-  const euler = quatToEuler(a.quaternion);
-  const pitch = (euler.theta * 180) / Math.PI;
-  const roll = (euler.phi * 180) / Math.PI;
-  const hdg = ((euler.psi * 180) / Math.PI + 360) % 360;
-  const ias = Math.max(0, d.ias);
-  const altitude = Math.max(0, a.position.alt);
-  const fma = apState?.truth;
+  const ias = useSimStore((s) => Math.max(0, computeDerived(s.aircraft, s.wind).ias));
+  const altitude = useSimStore((s) => Math.max(0, s.aircraft.position.alt));
+  const vs = useSimStore((s) => computeDerived(s.aircraft, s.wind).vs);
+  const pitch = useSimStore((s) => {
+    const euler = quatToEuler(s.aircraft.quaternion);
+    return (euler.theta * 180) / Math.PI;
+  });
+  const roll = useSimStore((s) => {
+    const euler = quatToEuler(s.aircraft.quaternion);
+    return (euler.phi * 180) / Math.PI;
+  });
+  const hdg = useSimStore((s) => {
+    const euler = quatToEuler(s.aircraft.quaternion);
+    return ((euler.psi * 180) / Math.PI + 360) % 360;
+  });
+  const thrustMode = useFmaText('thrustActive');
+  const lateralMode = useFmaText('lateralActive');
+  const verticalMode = useFmaText('verticalActive');
+  const autopilotMode = useFmaText('autopilotStatus');
 
   return (
     <div
@@ -167,10 +184,10 @@ export function RfsPFD() {
         <div style={{ width: 48, padding: '5px 8px', color: '#9ddcff', fontSize: 12, fontWeight: 900, letterSpacing: 1.5 }}>
           FMA
         </div>
-        <FmaCell label="THR" value={modeText(fma?.thrustActive)} />
-        <FmaCell label="ROLL" value={modeText(fma?.lateralActive)} />
-        <FmaCell label="PITCH" value={modeText(fma?.verticalActive)} />
-        <FmaCell label="AP" value={modeText(fma?.autopilotStatus)} />
+        <FmaCell label="THR" value={thrustMode} />
+        <FmaCell label="ROLL" value={lateralMode} />
+        <FmaCell label="PITCH" value={verticalMode} />
+        <FmaCell label="AP" value={autopilotMode} />
       </div>
 
       <div style={{ display: 'flex', gap: 8, padding: 10, alignItems: 'stretch' }}>
@@ -239,7 +256,7 @@ export function RfsPFD() {
           >
             <span style={{ color: '#9ddcff', fontSize: 13, fontWeight: 800 }}>HDG</span>
             <span style={{ color: '#ffffff', fontSize: 26, fontWeight: 900 }}>{hdg.toFixed(0).padStart(3, '0')}°</span>
-            <span style={{ color: '#9ddcff', fontSize: 13, fontWeight: 800 }}>VS {d.vs.toFixed(0)}</span>
+            <span style={{ color: '#9ddcff', fontSize: 13, fontWeight: 800 }}>VS {vs.toFixed(0)}</span>
           </div>
         </div>
 

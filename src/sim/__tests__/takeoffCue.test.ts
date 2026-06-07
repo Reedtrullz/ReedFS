@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createInitialState, B737_800_SPEC } from '../types';
 import { takeoffCueText } from '../takeoffCue';
+import { KSEA_LIGHT_PATTERN_SCENARIO, KSEA_TUTORIAL_SCENARIO } from '../scenarios';
 
 function stateAtIas(iasKt: number) {
   const state = createInitialState(B737_800_SPEC);
@@ -15,9 +16,17 @@ describe('takeoffCueText', () => {
     expect(takeoffCueText(state, iasKt)).toBe('TAKEOFF ROLL');
   });
 
-  it('shows rotate at or above rotate speed while gear is down', () => {
+  it('shows rotate at or above the fallback rotate speed while gear is down', () => {
     const { state, iasKt } = stateAtIas(145);
     expect(takeoffCueText(state, iasKt)).toBe('ROTATE — hold W');
+  });
+
+  it('uses scenario performance-card VR when a card exists', () => {
+    const { state } = stateAtIas(138);
+
+    expect(takeoffCueText(state, 138, KSEA_LIGHT_PATTERN_SCENARIO.id)).toBe('ROTATE — hold W');
+    expect(takeoffCueText(state, 145, KSEA_TUTORIAL_SCENARIO.id)).toBe('TAKEOFF ROLL');
+    expect(takeoffCueText(state, 149, KSEA_TUTORIAL_SCENARIO.id)).toBe('ROTATE — hold W');
   });
 
   it('shows positive rate after airborne climb starts', () => {

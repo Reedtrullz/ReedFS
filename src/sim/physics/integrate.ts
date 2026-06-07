@@ -9,8 +9,6 @@ import { geodeticToEcef, ecefToGeodetic, ecefToEnu, enuToEcef } from './geodesy'
 import { bodyToNed } from './frames';
 import { ftToM, ktToMs, mToFt } from './units';
 import { quatDerivative, quatNormalize, quatToEuler } from './quaternion';
-import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
-import type { FlightPlan } from '@shared/types/fmc';
 import type { WindInfo } from '../weather';
 import { sampleSupportedAirportSurface } from '../runwaySurface';
 
@@ -60,22 +58,25 @@ function shouldAllowLiftoff(state: AircraftState, normalForceN: number, weightN:
   );
 }
 
+function applyPilotConfiguration(state: AircraftState, controls: ControlInputs, weightOnWheels = state.ground.weightOnWheels): void {
+  state.config.flapSetting = controls.flapLever;
+  state.config.gearDown = weightOnWheels ? true : controls.gearLever === 'DOWN';
+  state.config.spoilersDeployed = controls.spoilers > 0.5;
+  state.config.speedBrake = controls.spoilers;
+}
+
 export function integrate(
   state: AircraftState,
   controls: ControlInputs,
   spec: AircraftSpec,
   dt: number,
-  apState?: AutopilotState | null,
-  flightPlan?: FlightPlan | null,
   wind?: WindInfo | null,
 ): void {
-  // Autopilot is composed upstream. These legacy parameters are intentionally
-  // accepted for older call sites, but the integrator consumes only effective controls.
-  void apState;
-  void flightPlan;
-
   // ── Systems (must run before aero so engine/fuel state is current) ──
-  updateEngines(state, controls, spec, dt);
+  // Pilot-facing configuration controls must be visible to the same tick's aero solve.
+  // Ground contact re-applies the gear safety rule after liftoff/contact resolution.
+  applyPilotConfiguration(state, controls);
+  updateEngines(state, controls, spec, dt, wind ?? null);
   updateFuel(state, spec, dt);
   updateElectrical(state, dt);
   updateHydraulic(state, dt);
@@ -173,10 +174,7 @@ export function integrate(
   });
 
   // ── Config ──
-  state.config.flapSetting = controls.flapLever;
-  state.config.gearDown = groundContact.weightOnWheels ? true : controls.gearLever === 'DOWN';
-  state.config.spoilersDeployed = controls.spoilers > 0.5;
-  state.config.speedBrake = controls.spoilers;
+  applyPilotConfiguration(state, controls, groundContact.weightOnWheels);
   updateTakeoffPhase(state);
   updateLandingPhase(state);
 

@@ -135,8 +135,8 @@ describe('computeAutopilotCommands N1', () => {
       targets.targetN1Percent,
     );
 
-    expect(commands.throttle1).toBeGreaterThan(0);
-    expect(commands.throttle1).toBeLessThan(0.15);
+    // TAKEOFF N1 target = 92%, current N1 = 35% → full throttle commanded
+    expect(commands.throttle1).toBeGreaterThan(0.85);
     expect(commands.throttle2).toBe(commands.throttle1);
   });
 
@@ -150,17 +150,11 @@ describe('computeAutopilotCommands N1', () => {
     const targets = resolveAutopilotTargets(s, ap);
 
     const commands = computeAutopilotCommands(
-      s,
-      ap,
-      targets.targetHeadingRad,
-      targets.targetAltFt,
-      targets.targetSpeedKt,
-      1,
-      targets.targetVerticalSpeedFpm,
-      targets.targetN1Percent,
+      s, ap, targets.targetHeadingRad, targets.targetAltFt, 100, 1 / 60,
+      targets.targetVerticalSpeedFpm, targets.targetN1Percent,
     );
 
-    expect(commands.throttle1).toBeLessThan(0.6);
+    expect(commands.throttle1).toBeLessThan(0.6); // below cruise base due to high N1
     expect(commands.throttle2).toBe(commands.throttle1);
   });
 
@@ -191,13 +185,15 @@ describe('computeAutopilotCommands N1', () => {
 });
 
 describe('computeAutopilotCommands VS', () => {
-  it('commands nose-up elevator when selected VS is above current VS', () => {
+  it('commands bounded nose-up elevator on first VS engagement frame', () => {
     const s = createInitialState(B737_800_SPEC);
+    s.position.alt = 20000;
     s.velocity.u = 128.6;
     s.velocity.w = 0;
     s.attitude.theta = 0;
     const ap = makeAp('HDG_SEL', 'VS', 'OFF');
     ap.boeing.verticalSpeed = 1000;
+    ap.boeing.altitude = 30000; // prevent altitude capture from blending VS
 
     const targets = resolveAutopilotTargets(s, ap);
     const commands = computeAutopilotCommands(
@@ -211,6 +207,7 @@ describe('computeAutopilotCommands VS', () => {
     );
 
     expect(targets.targetVerticalSpeedFpm).toBe(1000);
+    // First VS engagement should not full-deflect the elevator; derivative kick must be bounded.
     expect(commands.elevator).toBeLessThan(0);
     expect(commands.elevator).toBeGreaterThan(-0.5);
   });
@@ -289,7 +286,8 @@ describe('resolveAutopilotTargets VNAV', () => {
 
     expect(targets.targetAltFt).toBe(s.position.alt);
     expect(targets.targetVerticalSpeedFpm).toBeUndefined();
-    expect(commands.elevator).toBeUndefined();
+    // Inner loop always provides elevator (wings level + pitch hold)
+    expect(commands.elevator).toBeDefined();
   });
 
   it.each([Number.NaN, Number.POSITIVE_INFINITY, -1])(

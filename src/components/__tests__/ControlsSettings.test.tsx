@@ -21,7 +21,11 @@ describe('ControlsSettings', () => {
     expect(screen.getByText(/W\/S/)).toBeTruthy();
     expect(screen.getByText(/Gamepad left stick Y/)).toBeTruthy();
     expect(screen.getByText('Overlay')).toBeTruthy();
-    expect(screen.getByText(/OVL button/)).toBeTruthy();
+    expect(screen.getByText('O')).toBeTruthy();
+    expect(screen.getByText('Camera')).toBeTruthy();
+    expect(screen.getByText('C')).toBeTruthy();
+    expect(screen.getByText('Gear')).toBeTruthy();
+    expect(screen.getByText(/Gamepad RB\/R1/)).toBeTruthy();
     expect(screen.getByText('Differential brake')).toBeTruthy();
     expect(screen.getByText(/Z\/X/)).toBeTruthy();
   });

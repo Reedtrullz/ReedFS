@@ -23,21 +23,23 @@ describe('flight scenarios', () => {
     expect(KSEA_TUTORIAL_SCENARIO.wind).toEqual(expect.objectContaining({ speed: expect.any(Number) }));
   });
 
-  it('initializes the KSEA tutorial scenario with explicit weight, CG, fuel, and runway state', () => {
-    const state = createAircraftStateForScenario(B737_800_SPEC, KSEA_TUTORIAL_SCENARIO);
+  it('initializes every selectable scenario with explicit weight, CG, fuel, and runway state', () => {
+    for (const scenario of SCENARIOS) {
+      const state = createAircraftStateForScenario(B737_800_SPEC, scenario);
 
-    expect(state.position).toEqual(expect.objectContaining(KSEA_TUTORIAL_SCENARIO.position));
-    expect(state.attitude.psi).toBeCloseTo(KSEA_TUTORIAL_SCENARIO.runway.headingDeg * Math.PI / 180, 9);
-    expect(state.config.flapSetting).toBe(KSEA_TUTORIAL_SCENARIO.flapSetting);
-    expect(state.config.gearDown).toBe(true);
-    expect(state.payloadWeight).toBe(KSEA_TUTORIAL_SCENARIO.payloadWeightKg);
-    expect(state.zeroFuelWeight).toBe(KSEA_TUTORIAL_SCENARIO.zeroFuelWeightKg);
-    expect(state.fuel.totalFuel).toBe(KSEA_TUTORIAL_SCENARIO.fuel.totalFuel);
-    expect(state.grossWeight).toBe(scenarioGrossWeight(KSEA_TUTORIAL_SCENARIO));
-    expect(state.cg).toBe(KSEA_TUTORIAL_SCENARIO.cgPercent);
-    expect(state.config.stabilizerTrimUnits).toBe(KSEA_TUTORIAL_SCENARIO.stabilizerTrimUnits);
-    expect(state.ground.groundAltFt).toBe(KSEA_TUTORIAL_SCENARIO.runway.elevationFt);
-    expect(state.ground.normalForceN).toBeCloseTo(state.grossWeight * 9.80665, 6);
+      expect(state.position).toEqual(expect.objectContaining(scenario.position));
+      expect(state.attitude.psi).toBeCloseTo(scenario.runway.headingDeg * Math.PI / 180, 9);
+      expect(state.config.flapSetting).toBe(scenario.flapSetting);
+      expect(state.config.gearDown).toBe(true);
+      expect(state.payloadWeight).toBe(scenario.payloadWeightKg);
+      expect(state.zeroFuelWeight).toBe(scenario.zeroFuelWeightKg);
+      expect(state.fuel.totalFuel).toBe(scenario.fuel.totalFuel);
+      expect(state.grossWeight).toBe(scenarioGrossWeight(scenario));
+      expect(state.cg).toBe(scenario.cgPercent);
+      expect(state.config.stabilizerTrimUnits).toBe(scenario.stabilizerTrimUnits);
+      expect(state.ground.groundAltFt).toBe(scenario.runway.elevationFt);
+      expect(state.ground.normalForceN).toBeCloseTo(state.grossWeight * 9.80665, 6);
+    }
   });
 
   it('preserves scenario-authored CG across a no-burn fuel update', () => {

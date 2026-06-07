@@ -1,12 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import * as Cesium from 'cesium';
-import { initCesium } from './config/cesium';
-import { CesiumViewport } from './viewport/CesiumViewport';
-import { ThreeLayer } from './viewport/ThreeLayer';
-import { Telemetry } from './components/Telemetry';
-import { AttitudeIndicator } from './components/AttitudeIndicator';
-import { ControlsHelp } from './components/ControlsHelp';
-import { ControlsSettings } from './components/ControlsSettings';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import type { Viewer as CesiumViewer } from 'cesium';
+import { getCesiumScenePolicy } from './config/cesium';
+import type { RunwayLayerProps } from './viewport/RunwayLayer';
+import { LoadingScreen } from './components/LoadingScreen';
 import { useSimLoop } from './hooks/useSimLoop';
 import { useAudioLoop } from './hooks/useAudioLoop';
 import { getAudioEngine } from './audio/AudioEngine';
@@ -21,18 +17,15 @@ import {
 import { mergeInputActions } from './input/InputManager';
 import { fetchMetar, parseMetarWind } from './sim/weather';
 import type { MetarData } from './sim/weather';
-import { CloudLayer } from './viewport/CloudLayer';
-import { RfsPFD } from './instruments/RfsPFD';
-import { createDefaultAutopilotState, RfsMCP } from './instruments/RfsMCP';
-import { ContrailLayer } from './viewport/ContrailLayer';
-import { RunwayLayer } from './viewport/RunwayLayer';
-import { CockpitLayer } from './viewport/CockpitLayer';
+import { createDefaultAutopilotState } from './instruments/defaultAutopilotState';
 import { nextCameraMode, type CameraMode } from './viewport/cameraMode';
 import { nextOverlayMode, shouldShowDebugOverlays, shouldShowFlightInstruments, type OverlayMode } from './viewport/overlayMode';
-import { CameraManager } from './viewport/CameraManager';
-import { createKseaKpdxFlight } from './sim/flightPlanLoader';
+import { createDefaultFlightForScenario } from './sim/flightPlanLoader';
+import { scenarioById } from './sim/scenarios';
+import { computeRouteStatus, getInitialActiveLegIndex } from './sim/systems/navigation';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { FPSMonitor } from './components/FPSMonitor';
+import { EngineStrip } from './components/EngineStrip';
 import { ScenarioPanel } from './components/ScenarioPanel';
 import { RouteStatus } from './components/RouteStatus';
 import { SceneStatus } from './components/SceneStatus';
@@ -40,7 +33,21 @@ import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
 import type { AircraftState } from './sim/types';
 import type { SimulationStatus } from './sim/simulationStatus';
 
-const cesiumScenePolicy = initCesium();
+const CesiumViewport = lazy(() => import('./viewport/CesiumViewport').then((m) => ({ default: m.CesiumViewport })));
+const ThreeLayer = lazy(() => import('./viewport/ThreeLayer').then((m) => ({ default: m.ThreeLayer })));
+const CockpitLayer = lazy(() => import('./viewport/CockpitLayer').then((m) => ({ default: m.CockpitLayer })));
+const CloudLayer = lazy(() => import('./viewport/CloudLayer').then((m) => ({ default: m.CloudLayer })));
+const ContrailLayer = lazy(() => import('./viewport/ContrailLayer').then((m) => ({ default: m.ContrailLayer })));
+const RunwayLayer = lazy(() => import('./viewport/RunwayLayer').then((m) => ({ default: m.RunwayLayer })));
+const RunwayEditor = lazy(() => import('./viewport/RunwayEditor').then((m) => ({ default: m.RunwayEditor })));
+const RfsPFD = lazy(() => import('./instruments/RfsPFD').then((m) => ({ default: m.RfsPFD })));
+const RfsMCP = lazy(() => import('./instruments/RfsMCP').then((m) => ({ default: m.RfsMCP })));
+const Telemetry = lazy(() => import('./components/Telemetry').then((m) => ({ default: m.Telemetry })));
+const AttitudeIndicator = lazy(() => import('./components/AttitudeIndicator').then((m) => ({ default: m.AttitudeIndicator })));
+const ControlsHelp = lazy(() => import('./components/ControlsHelp').then((m) => ({ default: m.ControlsHelp })));
+const ControlsSettings = lazy(() => import('./components/ControlsSettings').then((m) => ({ default: m.ControlsSettings })));
+
+const cesiumScenePolicy = getCesiumScenePolicy();
 type AudioUiStatus = 'off' | 'starting' | 'on' | 'blocked';
 
 function applyLoadedRouteAutopilotDefaults(apState: AutopilotState): AutopilotState {
@@ -60,12 +67,12 @@ function applyLoadedRouteAutopilotDefaults(apState: AutopilotState): AutopilotSt
   return next;
 }
 
-function shouldApplyLoadedRouteAutopilotDefaults(status: SimulationStatus, aircraft: AircraftState): boolean {
-  return status === 'stopped' && aircraft.flightPhase === 'PARKED';
+function shouldApplyLoadedRouteAutopilotDefaults(status: SimulationStatus, aircraft: AircraftState, routeCompatible: boolean): boolean {
+  return routeCompatible && status === 'stopped' && aircraft.flightPhase === 'PARKED';
 }
 
 export function App() {
-  const viewerRef = useRef<Cesium.Viewer | null>(null);
+  const viewerRef = useRef<CesiumViewer | null>(null);
   const [audioEnabled, setAudioEnabled] = useState(false);
   const [audioStatus, setAudioStatus] = useState<AudioUiStatus>('off');
   useSimLoop();
@@ -84,6 +91,7 @@ export function App() {
   const [overlayMode, setOverlayMode] = useState<OverlayMode>('flight');
   const [metarData, setMetarData] = useState<MetarData | null>(null);
   const [viewerGeneration, setViewerGeneration] = useState(0);
+  const [runwayOverrides, setRunwayOverrides] = useState<RunwayLayerProps['runwayOverrides']>(undefined);
 
   // Keyboard controls — tracks pressed keys for simultaneous input
   useEffect(() => {
@@ -95,6 +103,14 @@ export function App() {
       if (['w', 's', 'a', 'd', 'q', 'e', ' ', 'z', 'x'].includes(key)) {
         if (key === ' ') e.preventDefault();
         keys.add(key);
+        return;
+      }
+
+      if (key === 'c' || key === 'o') {
+        if (e.repeat) return;
+        e.preventDefault();
+        if (key === 'c') setCamMode(nextCameraMode);
+        else setOverlayMode(nextOverlayMode);
         return;
       }
 
@@ -169,26 +185,38 @@ export function App() {
   useEffect(() => {
     const viewer = viewerRef.current;
     if (!viewer) return;
-    const cameraManager = new CameraManager(viewer);
+    let cleanup: (() => void) | null = null;
+    let cancelled = false;
 
-    const updateCamera = () => {
-      const { status: currentStatus, aircraft: a } = useSimStore.getState();
-      cameraManager.update({ status: currentStatus, mode: camMode, aircraft: a });
-    };
+    void import('./viewport/CameraManager').then(({ CameraManager }) => {
+      if (cancelled || viewerRef.current !== viewer || viewer.isDestroyed()) return;
+      const cameraManager = new CameraManager(viewer);
 
-    updateCamera();
-    viewer.scene.preRender.addEventListener(updateCamera);
+      const updateCamera = () => {
+        const { status: currentStatus, aircraft: a } = useSimStore.getState();
+        cameraManager.update({ status: currentStatus, mode: camMode, aircraft: a });
+      };
+
+      updateCamera();
+      viewer.scene.preRender.addEventListener(updateCamera);
+      cleanup = () => viewer.scene.preRender.removeEventListener(updateCamera);
+    });
+
     return () => {
-      viewer.scene.preRender.removeEventListener(updateCamera);
+      cancelled = true;
+      cleanup?.();
     };
   }, [camMode, status, viewerGeneration]);
 
-  const handleViewerReady = useCallback((viewer: Cesium.Viewer) => {
+  const handleViewerReady = useCallback((viewer: CesiumViewer) => {
     viewerRef.current = viewer;
     setViewerGeneration((generation) => generation + 1);
-    viewer.camera.flyTo({
-      destination: Cesium.Cartesian3.fromDegrees(-122.31, 47.45, 5000),
-      orientation: { heading: Cesium.Math.toRadians(0), pitch: Cesium.Math.toRadians(-30), roll: 0 },
+    void import('cesium').then(({ Cartesian3, Math: CesiumMath }) => {
+      if (viewerRef.current !== viewer || viewer.isDestroyed()) return;
+      viewer.camera.flyTo({
+        destination: Cartesian3.fromDegrees(10.91, 63.46, 1500),
+        orientation: { heading: CesiumMath.toRadians(0), pitch: CesiumMath.toRadians(-30), roll: 0 },
+      });
     });
   }, []);
 
@@ -227,33 +255,62 @@ export function App() {
 
   const showDebugOverlays = shouldShowDebugOverlays(overlayMode);
   const showFlightInstruments = shouldShowFlightInstruments(overlayMode);
+  const viewerReady = viewerGeneration > 0;
 
   return (
     <ErrorBoundary>
     <div style={{ width: '100%', height: '100%' }}>
-      <CesiumViewport onReady={handleViewerReady} scenePolicy={cesiumScenePolicy} />
+      <Suspense fallback={<LoadingScreen />}>
+        <CesiumViewport onReady={handleViewerReady} scenePolicy={cesiumScenePolicy} />
+      </Suspense>
+      {viewerReady && (
+        <>
+          <Suspense key={`runway-${viewerGeneration}`} fallback={null}>
+            <RunwayLayer viewerRef={viewerRef} runwayOverrides={runwayOverrides} />
+          </Suspense>
+          {showDebugOverlays && (
+            <Suspense fallback={null}>
+              <RunwayEditor onOverridesChange={setRunwayOverrides} />
+            </Suspense>
+          )}
+          <Suspense key={`aircraft-${viewerGeneration}-${camMode}`} fallback={null}>
+            {camMode === 'cockpit' ? <CockpitLayer viewerRef={viewerRef} /> : <ThreeLayer viewerRef={viewerRef} />}
+          </Suspense>
+          <Suspense key={`weather-${viewerGeneration}`} fallback={null}>
+            <CloudLayer viewerRef={viewerRef} metar={metarData} />
+            <ContrailLayer viewerRef={viewerRef} />
+          </Suspense>
+        </>
+      )}
+      {showDebugOverlays && (
+        <Suspense fallback={null}>
+          <Telemetry />
+          <ControlsHelp />
+          <ControlsSettings />
+          <AttitudeIndicator />
+        </Suspense>
+      )}
+      {showFlightInstruments && (
+        <Suspense fallback={null}>
+          <RfsPFD />
+          <RfsMCP />
+        </Suspense>
+      )}
       <SceneStatus policy={cesiumScenePolicy} />
-      <RunwayLayer viewerRef={viewerRef} />
-      {camMode === 'cockpit' ? <CockpitLayer viewerRef={viewerRef} /> : <ThreeLayer viewerRef={viewerRef} />}
-      <CloudLayer viewerRef={viewerRef} metar={metarData} />
-      <ContrailLayer viewerRef={viewerRef} />
-      {showDebugOverlays && <Telemetry />}
-      {showDebugOverlays && <ControlsHelp />}
-      {showDebugOverlays && <ControlsSettings />}
-      {showDebugOverlays && <AttitudeIndicator />}
       {showFlightInstruments && <ScenarioPanel />}
       {showFlightInstruments && <RouteStatus />}
-      {showFlightInstruments && <RfsPFD />}
-      {showFlightInstruments && <RfsMCP />}
+      <EngineStrip />
       {showDebugOverlays && (
         <div
           style={{
             position: 'fixed',
-            top: 10,
-            left: 10,
+            bottom: 80,
+            left: 14,
             color: '#0f0',
             fontFamily: 'monospace',
             zIndex: 10,
+            fontSize: 10,
+            opacity: 0.5,
             pointerEvents: 'none',
           }}
         >
@@ -293,10 +350,13 @@ export function App() {
         </button>
         <button
           onClick={() => {
-            const fp = createKseaKpdxFlight();
             const store = useSimStore.getState();
+            const scenario = scenarioById(store.selectedScenarioId);
+            const fp = createDefaultFlightForScenario(scenario);
             store.setFlightPlan(fp);
-            if (!shouldApplyLoadedRouteAutopilotDefaults(store.status, store.aircraft)) return;
+            if (!fp) return;
+            const routeStatus = computeRouteStatus(store.aircraft, fp, getInitialActiveLegIndex(fp));
+            if (!shouldApplyLoadedRouteAutopilotDefaults(store.status, store.aircraft, routeStatus.lnavAvailable)) return;
             const ap = store.apState ?? createDefaultAutopilotState();
             store.setApState(applyLoadedRouteAutopilotDefaults(ap));
           }}

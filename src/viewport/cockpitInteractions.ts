@@ -1,5 +1,6 @@
 import type * as THREE from 'three';
 import type { ControlInputs } from '../sim/types';
+import { nextB737FlapDetent } from '../input/flapDetents';
 
 export type CockpitInteractionId =
   | 'yoke'
@@ -19,8 +20,6 @@ export interface CockpitInteractionDefinition {
 export interface CockpitInteractionMetadata extends CockpitInteractionDefinition {
   interactive: true;
 }
-
-const FLAP_DETENTS = [0, 1, 2, 5, 10, 15, 25, 30, 40] as const;
 
 export const COCKPIT_INTERACTIONS: readonly CockpitInteractionDefinition[] = [
   {
@@ -71,13 +70,6 @@ export function interactionForObjectName(objectName: string): CockpitInteraction
   return COCKPIT_INTERACTIONS.find((entry) => entry.objectName === objectName);
 }
 
-function nextFlapDetent(current: number): number {
-  const currentIndex = FLAP_DETENTS.findIndex((detent) => current <= detent);
-  if (currentIndex < 0 || currentIndex === FLAP_DETENTS.length - 1) return FLAP_DETENTS[0];
-  if (FLAP_DETENTS[currentIndex] === current) return FLAP_DETENTS[currentIndex + 1];
-  return FLAP_DETENTS[currentIndex];
-}
-
 function roundedClamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, Math.round(value * 100) / 100));
 }
@@ -92,7 +84,7 @@ export function cockpitInputForInteraction(
       return { throttle1: nextThrottle, throttle2: nextThrottle };
     }
     case 'flap-lever':
-      return { flapLever: nextFlapDetent(current.flapLever) };
+      return { flapLever: nextB737FlapDetent(current.flapLever) };
     case 'gear-lever':
       return { gearLever: current.gearLever === 'DOWN' ? 'UP' : 'DOWN' };
     case 'speedbrake-lever':

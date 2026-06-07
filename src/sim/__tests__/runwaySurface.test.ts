@@ -87,6 +87,8 @@ describe('sampleKseaSurface', () => {
 
   it('classifies the default initial state consistently with its ground state', () => {
     const defaultState = createInitialState(B737_800_SPEC);
+    defaultState.position = { lat: KSEA_RUNWAY_16L.start.lat, lon: KSEA_RUNWAY_16L.start.lon, alt: KSEA_RUNWAY_16L.elevationFt };
+    defaultState.ground.groundAltFt = KSEA_RUNWAY_16L.elevationFt;
     const surface = sampleKseaSurface(defaultState.position);
 
     expect(surface.kind).toBe('runway');

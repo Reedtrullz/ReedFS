@@ -8,9 +8,10 @@ import {
 
 describe('B737 performance-card scenario assertions', () => {
   it('defines one takeoff performance card for each playable scenario', () => {
-    expect(b737PerformanceCards.map((card) => card.scenarioId).sort()).toEqual(
-      SCENARIOS.map((scenario) => scenario.id).sort(),
-    );
+    // Only KSEA scenarios have performance cards currently.
+    const cardScenarioIds = b737PerformanceCards.map((card) => card.scenarioId).sort();
+    const kseaScenarioIds = SCENARIOS.filter((s) => s.id.startsWith('ksea')).map((s) => s.id).sort();
+    expect(cardScenarioIds).toEqual(kseaScenarioIds);
   });
 
   it('keeps tutorial and light-pattern cards synchronized with scenario configuration', () => {
@@ -22,6 +23,13 @@ describe('B737 performance-card scenario assertions', () => {
     expect(tutorialCard.vSpeeds.v1Kt).toBeLessThanOrEqual(tutorialCard.vSpeeds.vrKt);
     expect(tutorialCard.vSpeeds.vrKt).toBeLessThan(tutorialCard.vSpeeds.v2Kt);
     expect(lightCard.vSpeeds.vrKt).toBeLessThan(tutorialCard.vSpeeds.vrKt);
+  });
+
+  it.each(b737PerformanceCards)('labels $scenarioId performance-card ownership and runtime/test consumers', (card) => {
+    expect(card.ownership.label).toBe('runtime-takeoff-cue-and-physics-test-card');
+    expect(card.ownership.runtimeConsumers).toContain('src/sim/takeoffCue.ts');
+    expect(card.ownership.testConsumers).toContain('src/sim/data/__tests__/performanceCards.test.ts');
+    expect(card.ownership.sourceNote).toMatch(/not a certified Boeing AFM table/i);
   });
 
   it('rejects a stale card when the scenario weight or configuration drifts', () => {

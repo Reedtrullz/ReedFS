@@ -5,16 +5,17 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && node scripts/write-version-metadata.mjs dist/rfs-version.json",
     "typecheck": "tsc -b",
     "test": "vitest run",
     "lint": "eslint .",
     "lint:ci": "eslint . --max-warnings=0",
     "check:deps": "node scripts/check-single-three.mjs",
-    "check": "npm run check:deps && npm run lint:ci && npm run typecheck && npm run test && npm run build",
+    "check:release": "node scripts/release-hardening-check.mjs",
+    "check": "npm run check:deps && npm run check:release && npm run lint:ci && npm run typecheck && npm run test && npm run build",
     "preview": "vite preview",
-    "test:visual": "playwright test --pass-with-no-tests",
-    "test:visual:update": "playwright test --update-snapshots --pass-with-no-tests"
+    "test:visual": "playwright test",
+    "test:visual:update": "playwright test --update-snapshots"
   },
   "dependencies": {
     "@virtual-cdu/shared": "file:../RFMS/shared",

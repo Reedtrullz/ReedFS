@@ -164,6 +164,39 @@ describe('readGamepad', () => {
     });
   });
 
+  it('maps standard buttons to brake plus edge-triggered flaps and gear actions', () => {
+    setGamepads([
+      {
+        axes: [0, 0, 0],
+        buttons: Array.from({ length: 16 }, (_, i) => button(i === 0 || i === 4 || i === 5 ? 1 : 0)),
+      },
+    ]);
+
+    expect(readGamepadActions()).toEqual({
+      brake: 1,
+      flapNext: true,
+      gearToggle: true,
+    });
+
+    expect(readGamepadActions()).toEqual({ brake: 1 });
+
+    setGamepads([
+      {
+        axes: [0, 0, 0],
+        buttons: Array.from({ length: 16 }, () => button(0)),
+      },
+    ]);
+    expect(readGamepadActions()).toBeNull();
+
+    setGamepads([
+      {
+        axes: [0, 0, 0],
+        buttons: Array.from({ length: 16 }, (_, i) => button(i === 4 || i === 5 ? 1 : 0)),
+      },
+    ]);
+    expect(readGamepadActions()).toEqual({ flapNext: true, gearToggle: true });
+  });
+
   it('applies calibration inversion to action intent', () => {
     setGamepads([
       {

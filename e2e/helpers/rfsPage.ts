@@ -2,13 +2,17 @@ import type { Page } from '@playwright/test';
 
 export async function openRfs(page: Page) {
   await page.goto('/');
-  await page.getByTestId('cesium-viewport').waitFor({ state: 'visible' });
-  await page.waitForTimeout(500);
+  const viewport = page.getByTestId('cesium-viewport');
+  await viewport.waitFor({ state: 'visible' });
+  await page.waitForFunction(() => document.querySelector('[data-testid="cesium-viewport"]')?.getAttribute('data-rfs-ready') === 'true');
+  await page.waitForFunction(() => document.querySelectorAll('canvas').length >= 2);
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+  await page.getByRole('button', { name: /START ROLL|ABORT/i }).waitFor({ state: 'visible' });
 }
 
 export async function clickButton(page: Page, name: string | RegExp) {
   await page.getByRole('button', { name }).click();
-  await page.waitForTimeout(250);
+  await page.waitForFunction(() => document.fonts?.status === 'loaded');
 }
 
 export async function startRoll(page: Page) {

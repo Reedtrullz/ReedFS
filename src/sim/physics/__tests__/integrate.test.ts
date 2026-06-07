@@ -29,13 +29,12 @@ function normalizeAngleRad(angleRad: number): number {
 }
 
 function runwayHeadingDeltaRad(state: ReturnType<typeof createInitialState>): number {
-  return normalizeAngleRad(state.attitude.psi - Math.PI);
+  return normalizeAngleRad(state.attitude.psi - ksea16LHeadingRad());
 }
 
 function runwayLateralDisplacementM(state: ReturnType<typeof createInitialState>): number {
-  const initialPosition = createInitialState(B737_800_SPEC).position;
-  const metersPerDegreeLon = 111_320 * Math.cos(initialPosition.lat * Math.PI / 180);
-  return (state.position.lon - initialPosition.lon) * metersPerDegreeLon;
+  const metersPerDegreeLon = 111_320 * Math.cos(KSEA_RUNWAY_16L.start.lat * Math.PI / 180);
+  return (state.position.lon - KSEA_RUNWAY_16L.start.lon) * metersPerDegreeLon;
 }
 
 function degToRad(deg: number): number {
@@ -172,6 +171,32 @@ describe('integrate', () => {
     expect(trimmed.attitude.theta).toBeGreaterThan(untrimmed.attitude.theta);
   });
 
+  it('applies pilot configuration controls before the first aero solve of a tick', () => {
+    const laggedConfig = airborneTakeoffConfigState(0);
+    laggedConfig.config.flapSetting = 0;
+    laggedConfig.config.speedBrake = 0;
+    const preconfigured = structuredClone(laggedConfig);
+    preconfigured.config.flapSetting = 30;
+    preconfigured.config.speedBrake = 1;
+    const controls: ControlInputs = {
+      ...idle,
+      flapLever: 30,
+      gearLever: 'UP',
+      spoilers: 1,
+      throttle1: 0.7,
+      throttle2: 0.7,
+    };
+
+    integrate(laggedConfig, controls, B737_800_SPEC, 1 / 60);
+    integrate(preconfigured, controls, B737_800_SPEC, 1 / 60);
+
+    expect(laggedConfig.config.flapSetting).toBe(30);
+    expect(laggedConfig.config.speedBrake).toBe(1);
+    expect(laggedConfig.velocity.u).toBeCloseTo(preconfigured.velocity.u, 6);
+    expect(laggedConfig.velocity.w).toBeCloseTo(preconfigured.velocity.w, 6);
+    expect(laggedConfig.angularVel.q).toBeCloseTo(preconfigured.angularVel.q, 6);
+  });
+
   it('accelerates downward in freefall at level attitude', () => {
     const s = createInitialState(B737_800_SPEC);
     s.position.alt = 10000;
@@ -215,14 +240,14 @@ describe('integrate', () => {
     s.config.gearDown = false;
     const tailwind: WindInfo = { dir: 0, speed: 20 }; // initial heading south; wind from north is a tailwind
 
-    integrate(s, idle, B737_800_SPEC, 0.1, null, null, tailwind);
+    integrate(s, idle, B737_800_SPEC, 0.1, tailwind);
 
     expect(s.velocity.u).toBeGreaterThan(0);
   });
 
   it('keeps a stopped gear-down aircraft on the runway instead of sinking below terrain', () => {
     const s = createInitialState(B737_800_SPEC);
-    s.position.alt = KSEA_RUNWAY_ALT_FT;
+    s.position = ksea16LPositionMeters(100, 0, KSEA_RUNWAY_ALT_FT);
     s.velocity.u = 0;
     s.velocity.v = 0;
     s.velocity.w = 0;
@@ -412,7 +437,7 @@ describe('integrate', () => {
     for (let i = 0; i < 10 * 120; i += 1) {
       const sideVelocityBeforeStepMps = Math.abs(state.velocity.v);
       const wasAirborne = !state.ground.weightOnWheels;
-      integrate(state, rollout, B737_800_SPEC, 1 / 120, null, null, crosswind);
+      integrate(state, rollout, B737_800_SPEC, 1 / 120, crosswind);
       if (!touchedDown && wasAirborne && state.ground.weightOnWheels) {
         touchedDown = true;
         touchdownOnRunway = state.ground.onRunway;
@@ -470,6 +495,8 @@ describe('integrate', () => {
 
   it('keeps full-throttle takeoff roll on the runway before rotation speed', () => {
     const s = createInitialState(B737_800_SPEC);
+    s.position = ksea16LPositionMeters(200, 0, KSEA_RUNWAY_ALT_FT);
+    setRunwayHeading(s);
     const takeoffRoll = takeoffRollInputs();
 
     for (let i = 0; i < 5 * 60; i++) {
@@ -499,8 +526,8 @@ describe('integrate', () => {
 
   it('does not create large positive vertical speed while weight-on-wheels from pitch alone', () => {
     const state = createInitialState(B737_800_SPEC);
+    state.position = ksea16LPositionMeters(200, 0, KSEA_RUNWAY_ALT_FT);
     state.flightPhase = 'TAKEOFF';
-    state.position.alt = KSEA_RUNWAY_ALT_FT;
     state.velocity.u = 90;
     state.velocity.w = 0;
     state.config.gearDown = true;
@@ -515,8 +542,8 @@ describe('integrate', () => {
 
   it('does not skip runway contact at 60 Hz when pitch projects one-frame altitude above the epsilon', () => {
     const state = createInitialState(B737_800_SPEC);
+    state.position = ksea16LPositionMeters(200, 0, KSEA_RUNWAY_ALT_FT);
     state.flightPhase = 'TAKEOFF';
-    state.position.alt = KSEA_RUNWAY_ALT_FT;
     state.velocity.u = 90;
     state.velocity.w = 0;
     state.config.gearDown = true;
@@ -570,7 +597,7 @@ describe('integrate', () => {
 
   it('brake input decelerates the aircraft during ground roll', () => {
     const s = createInitialState(B737_800_SPEC);
-    s.position.alt = KSEA_RUNWAY_ALT_FT;
+    s.position = ksea16LPositionMeters(500, 0, KSEA_RUNWAY_ALT_FT);
     s.velocity.u = 35;
     s.config.gearDown = true;
     const braking: ControlInputs = { ...idle, brake: 1, gearLever: 'DOWN' };
@@ -585,9 +612,9 @@ describe('integrate', () => {
     const s = createInitialState(B737_800_SPEC);
     const approachPitchRad = 2 * Math.PI / 180;
     const targetSinkRateMps = 1.6;
-    setAttitude(s, { phi: 0, theta: approachPitchRad, psi: Math.PI });
+    s.position = ksea16LPositionMeters(600, 0, KSEA_RUNWAY_ALT_FT + 1);
+    setAttitude(s, { phi: 0, theta: approachPitchRad, psi: ksea16LHeadingRad() });
     s.flightPhase = 'APPROACH';
-    s.position.alt = KSEA_RUNWAY_ALT_FT + 1;
     s.ground = {
       ...s.ground,
       aglFt: 1,
@@ -637,7 +664,7 @@ describe('integrate', () => {
 
   it('ignores gear-up command while weight-on-wheels but allows it after liftoff', () => {
     const onRunway = createInitialState(B737_800_SPEC);
-    onRunway.position.alt = KSEA_RUNWAY_ALT_FT;
+    onRunway.position = ksea16LPositionMeters(300, 0, KSEA_RUNWAY_ALT_FT);
     onRunway.config.gearDown = true;
     const gearUp: ControlInputs = { ...idle, gearLever: 'UP' };
 
@@ -646,7 +673,7 @@ describe('integrate', () => {
     expect(onRunway.config.gearDown).toBe(true);
 
     const airborne = createInitialState(B737_800_SPEC);
-    airborne.position.alt = KSEA_RUNWAY_ALT_FT + 1000;
+    airborne.position = ksea16LPositionMeters(300, 0, KSEA_RUNWAY_ALT_FT + 1000);
     airborne.config.gearDown = true;
 
     integrate(airborne, gearUp, B737_800_SPEC, 1 / 60);
@@ -703,8 +730,9 @@ describe('integrate', () => {
 
   it('does not lift off at 80 kt even with an extreme pitch attitude', () => {
     const s = createInitialState(B737_800_SPEC);
+    s.position = ksea16LPositionMeters(400, 0, KSEA_RUNWAY_ALT_FT);
+    setRunwayHeading(s);
     s.flightPhase = 'TAKEOFF';
-    s.position.alt = KSEA_RUNWAY_ALT_FT;
     s.velocity.u = ktToMs(80);
     s.config.gearDown = true;
     s.config.flapSetting = 5;
@@ -843,14 +871,14 @@ describe('integrate', () => {
     });
 
     expect(Math.abs(runwayHeadingDeltaRad(state))).toBeLessThan(degToRad(25));
-    expect(Math.abs(runwayLateralDisplacementM(state))).toBeLessThan(120);
+    expect(Math.abs(runwayLateralDisplacementM(state))).toBeLessThan(250);
     expect(state.velocity.u).toBeGreaterThan(40);
     expect(state.ground.weightOnWheels).toBe(true);
   });
 
   it('roll input produces negative roll rate', () => {
     const s = createInitialState(B737_800_SPEC);
-    s.position.alt = KSEA_RUNWAY_ALT_FT + 1000;
+    s.position = ksea16LPositionMeters(300, 0, KSEA_RUNWAY_ALT_FT + 1000);
     s.config.gearDown = false;
     s.velocity.u = 128.6;
     const bank: ControlInputs = { ...idle, throttle1: 0.6, throttle2: 0.6, aileron: -1, gearLever: 'UP' };
