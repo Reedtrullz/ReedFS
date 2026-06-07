@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useSimStore } from '../simStore';
 import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
 import type { FlightPlan } from '@shared/types/fmc';
@@ -380,6 +380,19 @@ describe('useSimStore', () => {
     expect(after.simulationTimeSeconds).toBeCloseTo(17 / 60, 8);
     expect(after.fixedStepAccumulatorSeconds).toBe(0);
     expect(after.droppedSimulationTimeSeconds).toBeGreaterThan(9.7);
+  });
+
+  it('clones the aircraft once per rendered frame instead of once per fixed substep', () => {
+    useSimStore.getState().startTakeoffRoll();
+    const cloneSpy = vi.spyOn(globalThis, 'structuredClone');
+
+    useSimStore.getState().tick(1000);
+    useSimStore.getState().tick(11000);
+
+    // The 10s frame is capped at 16 fixed substeps. The store should clone the
+    // aircraft once before the loop, then run substeps with cloneAircraft=false.
+    expect(cloneSpy.mock.calls.length).toBeLessThanOrEqual(2);
+    cloneSpy.mockRestore();
   });
 
   it('setFlightPlan initializes the first valid active leg and route feedback', () => {

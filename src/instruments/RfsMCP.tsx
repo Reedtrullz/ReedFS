@@ -1,5 +1,6 @@
 import { useSimStore } from '../store/simStore';
 import type { AutopilotState, LateralMode, ThrustMode, VerticalMode } from '@shared/autopilot/autopilotTypes';
+import { createDefaultAutopilotState } from './defaultAutopilotState';
 
 const btnStyle: React.CSSProperties = {
   background: '#333',
@@ -38,65 +39,6 @@ const targetDisplayStyle: React.CSSProperties = {
 type McpTarget = 'speed' | 'heading' | 'altitude' | 'verticalSpeed';
 
 type EnabledMcpMode = 'HDG_SEL' | 'LNAV' | 'ALT_HOLD' | 'VS' | 'SPEED' | 'N1' | 'OFF';
-
-export function createDefaultAutopilotState(): AutopilotState {
-  return {
-    boeing: {
-      courseL: 0,
-      courseR: 0,
-      speed: null as number | null,
-      mach: null as number | null,
-      heading: 0,
-      altitude: 10000,
-      verticalSpeed: null as number | null,
-      fdLeft: false,
-      fdRight: false,
-      autothrottleArm: true,
-      n1: false,
-      speedMode: false,
-      lnav: false,
-      vnav: false,
-      lvlChg: false,
-      hdgSel: false,
-      vorLoc: false,
-      app: false,
-      altHold: false,
-      vs: false,
-      cmdA: true,
-      cmdB: false,
-      cwsA: false,
-      cwsB: false,
-    },
-    airbus: {
-      speed: null,
-      speedManaged: false,
-      heading: null,
-      headingManaged: false,
-      altitude: 10000,
-      altitudeManaged: false,
-      verticalSpeed: null,
-      fpa: null,
-      fd1: false,
-      fd2: false,
-      athr: false,
-      ap1: false,
-      ap2: false,
-      loc: false,
-      appr: false,
-      exped: false,
-      hdgTrkMode: 'HDG_VS' as const,
-      metricAltitude: false,
-      speedMachMode: 'SPD' as const,
-    },
-    truth: {
-      lateralActive: 'OFF',
-      verticalActive: 'OFF',
-      thrustActive: 'OFF',
-      autopilotStatus: 'OFF',
-      lastModeChangeTimestamps: { thrust: 0, lateral: 0, vertical: 0 },
-    },
-  };
-}
 
 function clearBoeingModeFlags(apState: AutopilotState): void {
   apState.boeing.hdgSel = false;

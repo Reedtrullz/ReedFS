@@ -209,6 +209,7 @@ vi.mock('cesium', () => ({
   Ion: { defaultAccessToken: '' },
   Viewer: class {
     destroy = mockDestroy;
+    isDestroyed = vi.fn(() => false);
     camera = {
       flyTo: mockFlyTo,
       cancelFlight: mockCancelFlight,
@@ -370,17 +371,26 @@ vi.mock('../config/cesium', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../config/cesium')>();
   return {
     ...actual,
+    getCesiumScenePolicy: vi.fn(() => actual.getCesiumScenePolicy('')),
     initCesium: vi.fn(() => actual.getCesiumScenePolicy('')),
   };
 });
 
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import ThreeToCesium from 'three-to-cesium';
 import { App } from '../App';
 import { useSimStore } from '../store/simStore';
 import { CesiumViewport } from '../viewport/CesiumViewport';
 
 const defaultAppTestApState = structuredClone(useSimStore.getState().apState);
+
+async function settleLazyImports(): Promise<void> {
+  await act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+}
 
 describe('App', () => {
   beforeEach(() => {
@@ -398,11 +408,12 @@ describe('App', () => {
     cleanup();
   });
 
-  it('hides debug overlays by default while keeping the flight instrument overlay available', () => {
+  it('hides debug overlays by default while keeping the flight instrument overlay available', async () => {
     render(<App />);
+    await settleLazyImports();
 
     expect(screen.getByRole('button', { name: 'OVL: FLIGHT' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'HDG' })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: 'HDG' })).toBeTruthy();
     expect(screen.queryByText('RFS — Flight Test Build')).toBeNull();
     expect(screen.queryByText('Controls')).toBeNull();
     expect(screen.queryByText(/SIM:/)).toBeNull();
@@ -417,8 +428,9 @@ describe('App', () => {
     expect(screen.getByText(/KSEA → OLM/)).toBeTruthy();
   });
 
-  it('shows degraded scenery status and passes the degraded policy to the viewport when Ion is unavailable', () => {
+  it('shows degraded scenery status and passes the degraded policy to the viewport when Ion is unavailable', async () => {
     render(<App />);
+    await settleLazyImports();
 
     const status = screen.getByRole('status');
     expect(status.textContent).toMatch(/SCENERY DEGRADED/i);
@@ -645,27 +657,44 @@ describe('App', () => {
     expect(mockSetApState).not.toHaveBeenCalled();
   });
 
-  it('uses a single Three/Cesium overlay canvas for the aircraft only', () => {
-    render(<App />);
+  it('defers viewer-dependent layers until the Cesium viewer is ready', async () => {
+    vi.mocked(CesiumViewport).mockImplementationOnce(() => <div data-testid="pending-viewport" />);
 
-    expect(ThreeToCesium).toHaveBeenCalledTimes(1);
+    render(<App />);
+    await settleLazyImports();
+
+    expect(screen.getByTestId('pending-viewport')).toBeTruthy();
+    expect(ThreeToCesium).not.toHaveBeenCalled();
+    expect(mockEntityAdd).not.toHaveBeenCalled();
   });
 
-  it('mounts the Cesium-native runway layer', () => {
+  it('uses a single Three/Cesium overlay canvas for the aircraft only', async () => {
     render(<App />);
+    await settleLazyImports();
 
-    expect(mockEntityAdd).toHaveBeenCalledWith(expect.objectContaining({ id: 'runway-pavement-KSEA-16L' }));
-    expect(mockEntityAdd).toHaveBeenCalledWith(expect.objectContaining({ id: 'runway-centerline-KSEA-16L' }));
+    await waitFor(() => expect(ThreeToCesium).toHaveBeenCalledTimes(1));
   });
 
-  it('switches from exterior aircraft layer to cockpit layer in cockpit mode', () => {
+  it('mounts the Cesium-native runway layer', async () => {
     render(<App />);
+    await settleLazyImports();
+
+    await waitFor(() => {
+      expect(mockEntityAdd).toHaveBeenCalledWith(expect.objectContaining({ id: 'runway-pavement-KSEA-16L' }));
+      expect(mockEntityAdd).toHaveBeenCalledWith(expect.objectContaining({ id: 'runway-centerline-KSEA-16L' }));
+    });
+  });
+
+  it('switches from exterior aircraft layer to cockpit layer in cockpit mode', async () => {
+    render(<App />);
+    await settleLazyImports();
     const cameraButton = screen.getByRole('button', { name: 'CAM: CHASE' });
 
     fireEvent.click(cameraButton);
+    await settleLazyImports();
 
     expect(screen.getByRole('button', { name: 'CAM: COCKPIT' })).toBeTruthy();
-    expect(ThreeToCesium).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(ThreeToCesium).toHaveBeenCalledTimes(2));
   });
 
   it('calls startTakeoffRoll from the START ROLL button', () => {
@@ -712,8 +741,9 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: 'OVL: MINIMAL' })).toBeTruthy();
   });
 
-  it('cycles overlays from flight to minimal to debug', () => {
+  it('cycles overlays from flight to minimal to debug', async () => {
     render(<App />);
+    await settleLazyImports();
     const overlayButton = screen.getByRole('button', { name: 'OVL: FLIGHT' });
 
     fireEvent.click(overlayButton);
@@ -722,9 +752,10 @@ describe('App', () => {
     expect(screen.queryByText('Controls')).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'OVL: MINIMAL' }));
+    await settleLazyImports();
     expect(screen.getByRole('button', { name: 'OVL: DEBUG' })).toBeTruthy();
     expect(screen.getByText('RFS — Flight Test Build')).toBeTruthy();
-    expect(screen.getByText('Controls')).toBeTruthy();
-    expect(screen.getByText(/SIM:/)).toBeTruthy();
+    expect(await screen.findByText('Controls')).toBeTruthy();
+    expect(await screen.findByText(/SIM:/)).toBeTruthy();
   });
 });

@@ -240,7 +240,7 @@ describe('integrate', () => {
     s.config.gearDown = false;
     const tailwind: WindInfo = { dir: 0, speed: 20 }; // initial heading south; wind from north is a tailwind
 
-    integrate(s, idle, B737_800_SPEC, 0.1, null, null, tailwind);
+    integrate(s, idle, B737_800_SPEC, 0.1, tailwind);
 
     expect(s.velocity.u).toBeGreaterThan(0);
   });
@@ -437,7 +437,7 @@ describe('integrate', () => {
     for (let i = 0; i < 10 * 120; i += 1) {
       const sideVelocityBeforeStepMps = Math.abs(state.velocity.v);
       const wasAirborne = !state.ground.weightOnWheels;
-      integrate(state, rollout, B737_800_SPEC, 1 / 120, null, null, crosswind);
+      integrate(state, rollout, B737_800_SPEC, 1 / 120, crosswind);
       if (!touchedDown && wasAirborne && state.ground.weightOnWheels) {
         touchedDown = true;
         touchdownOnRunway = state.ground.onRunway;

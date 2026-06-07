@@ -13,13 +13,14 @@ interface GpwsKinematics {
 }
 
 function gpwsKinematics(state: AircraftState): GpwsKinematics {
-  const aglFt = Math.max(0, state.ground.aglFt ?? state.position.alt - state.ground.groundAltFt);
+  const groundAltFt = state.ground?.groundAltFt ?? 0;
+  const aglFt = Math.max(0, state.ground?.aglFt ?? state.position.alt - groundAltFt);
   const nedVelocity = bodyToNed(state.velocity, state.attitude);
   return {
     aglFt,
     descentRateFpm: Math.max(0, nedVelocity.down * MPS_TO_FPM),
     groundSpeedMps: Math.hypot(nedVelocity.north, nedVelocity.east),
-    weightOnWheels: state.ground.weightOnWheels,
+    weightOnWheels: state.ground?.weightOnWheels ?? false,
   };
 }
 

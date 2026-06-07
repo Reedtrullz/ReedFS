@@ -143,19 +143,21 @@ Regression coverage:
 
 `integrate()` must keep this order unless a new plan proves why it should change:
 
-1. `updateEngines()`
-2. `updateFuel()`
-3. `updateElectrical()`
-4. `updateHydraulic()`
-5. `computeAero()`
-6. Physics integration
-7. Surface sampling, ground/contact constraint, and flight-phase updates
+1. `applyPilotConfiguration()` copies same-tick flap/gear/spoiler controls into aircraft config
+2. `updateEngines()`
+3. `updateFuel()`
+4. `updateElectrical()`
+5. `updateHydraulic()`
+6. `computeAero()`
+7. Physics integration
+8. Surface sampling, ground/contact constraint, and flight-phase updates
 
 Reasoning:
 
+- Pilot-facing configuration controls are applied before `computeAero()` so flap/gear/spoiler changes affect the same tick's aero solve.
 - Engine state must be current before thrust is computed.
 - Fuel burn and gross weight must be current before accelerations are computed.
-- Autopilot commands are composed upstream before `integrate()`; the legacy AP parameters accepted by `integrate()` are intentionally ignored. This includes AP-owned SPEED/N1 throttle commands, so N1 autothrottle output must be present in `effectiveControls` before `updateEngines()` runs.
+- Autopilot commands are composed upstream before `integrate()`; AP-owned SPEED/N1 throttle commands must be present in `effectiveControls` before `updateEngines()` runs. `integrate()` intentionally accepts only aircraft, effective controls, spec, timestep, and optional wind so route/AP state cannot leak into the physics integrator.
 - Surface sampling happens after position integration for the contact solve, while the pre-integration sample is used only for near-ground normal-force/liftoff checks.
 
 Autopilot/control regression coverage:

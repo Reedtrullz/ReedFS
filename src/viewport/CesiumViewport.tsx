@@ -1,7 +1,7 @@
 import 'cesium/Build/Cesium/Widgets/widgets.css';
 import { useEffect, useRef } from 'react';
 import * as Cesium from 'cesium';
-import { getCesiumScenePolicy, type CesiumScenePolicy } from '../config/cesium';
+import { getCesiumScenePolicy, rememberCesiumIonToken, type CesiumScenePolicy } from '../config/cesium';
 import { isVisualTestMode } from '../config/visualTest';
 
 export interface CesiumViewportProps {
@@ -25,6 +25,8 @@ export function CesiumViewport({ onReady, scenePolicy }: CesiumViewportProps) {
     if (viewerRef.current) return; // React StrictMode double-mount guard
 
     const policy = scenePolicy ?? getCesiumScenePolicy();
+    rememberCesiumIonToken(policy.token);
+    Cesium.Ion.defaultAccessToken = policy.token ?? '';
     let disposed = false;
     const viewerOptions = {
       useDefaultRenderLoop: true,

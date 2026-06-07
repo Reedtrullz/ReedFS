@@ -44,6 +44,11 @@ describe('B737 trim solver fixtures', () => {
     expect(b737TrimFixtures[0].id).toBe('b737-800-clean-220kt-10000ft');
     expect(b737TrimFixtures[0].expectedTrimUnits).toEqual([2, 4]);
     expect(b737TrimFixtures[0].expectedLiftToWeight).toEqual([1.30, 1.40]);
+    expect(b737TrimFixtures[0].ownership).toMatchObject({
+      label: 'physics-test-only-trim-fixture',
+      runtimeConsumers: [],
+      testConsumers: ['src/sim/physics/__tests__/trimSolver.test.ts'],
+    });
   });
 
   it('converts fixture IAS to altitude-correct TAS before seeding body velocity', () => {

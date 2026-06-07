@@ -1,3 +1,10 @@
+export interface B737TrimFixtureOwnership {
+  label: 'physics-test-only-trim-fixture';
+  runtimeConsumers: string[];
+  testConsumers: string[];
+  sourceNote: string;
+}
+
 export interface B737TrimFixture {
   id: string;
   description: string;
@@ -10,6 +17,7 @@ export interface B737TrimFixture {
   angleOfAttackRad: number;
   expectedTrimUnits: [number, number];
   expectedLiftToWeight: [number, number];
+  ownership: B737TrimFixtureOwnership;
 }
 
 export const b737TrimFixtures: B737TrimFixture[] = [
@@ -25,5 +33,11 @@ export const b737TrimFixtures: B737TrimFixture[] = [
     angleOfAttackRad: 0.09554,
     expectedTrimUnits: [2, 4],
     expectedLiftToWeight: [1.30, 1.40],
+    ownership: {
+      label: 'physics-test-only-trim-fixture',
+      runtimeConsumers: [],
+      testConsumers: ['src/sim/physics/__tests__/trimSolver.test.ts'],
+      sourceNote: 'RFS gameplay baseline trim guard for coefficient regression detection; not a runtime dispatch table.',
+    },
   },
 ];

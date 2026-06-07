@@ -25,6 +25,13 @@ describe('B737 performance-card scenario assertions', () => {
     expect(lightCard.vSpeeds.vrKt).toBeLessThan(tutorialCard.vSpeeds.vrKt);
   });
 
+  it.each(b737PerformanceCards)('labels $scenarioId performance-card ownership and runtime/test consumers', (card) => {
+    expect(card.ownership.label).toBe('runtime-takeoff-cue-and-physics-test-card');
+    expect(card.ownership.runtimeConsumers).toContain('src/sim/takeoffCue.ts');
+    expect(card.ownership.testConsumers).toContain('src/sim/data/__tests__/performanceCards.test.ts');
+    expect(card.ownership.sourceNote).toMatch(/not a certified Boeing AFM table/i);
+  });
+
   it('rejects a stale card when the scenario weight or configuration drifts', () => {
     const tutorialCard = findPerformanceCardForScenario(KSEA_TUTORIAL_SCENARIO.id);
 

@@ -41,7 +41,7 @@ export function runFixedStepScenario(options: {
   const dt = 1 / options.hz;
   for (let i = 0; i < options.seconds * options.hz; i += 1) {
     options.mutateInputs?.(state, inputs, i * dt);
-    integrate(state, inputs, B737_800_SPEC, dt, null, null, options.wind ?? null);
+    integrate(state, inputs, B737_800_SPEC, dt, options.wind ?? null);
   }
   return state;
 }

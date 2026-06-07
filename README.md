@@ -100,7 +100,7 @@ npm install --legacy-peer-deps
 npm run dev -- --host 127.0.0.1
 ```
 
-The app starts at the default Vite URL. The dev server sets COOP/COEP headers in `vite.config.ts` so future SharedArrayBuffer/worker work can run locally.
+The app starts at the default Vite URL. RFS intentionally does **not** set COOP/COEP headers in dev or production because `require-corp` breaks Cesium Ion imagery/terrain/building tiles. SharedArrayBuffer-backed physics remains out of scope until the scenery policy changes; worker experiments use plain structured-clone messages first.
 
 ### Cesium scenery token
 
@@ -179,8 +179,10 @@ React App
       -> computeRouteStatus before physics for active-leg AP targets
       -> computeAutopilotCommandsForState (HDG/LNAV/VNAV/VS plus SPEED/N1 thrust)
       -> compose pilotInputs + apCommands into effectiveControls
-      -> structuredClone(aircraft)
-      -> integrate(state, effectiveControls, spec, dt, null, flightPlan, wind)
+      -> getSimulationRuntime().step(...)
+        -> MainThreadSimulationRuntime (default) or WorkerHandlerSimulationRuntime parity adapter
+        -> advanceSimulationStep(..., cloneAircraft=false inside the store loop)
+          -> integrate(state, effectiveControls, spec, dt, wind)
         -> updateEngines
         -> updateFuel
         -> updateElectrical
@@ -193,15 +195,15 @@ React App
       -> Zustand state update
 ```
 
-Moving physics to a fixed-timestep Web Worker remains a recommended follow-up after the state/control/route contracts stabilize.
+Moving physics to a default-on browser `Worker` remains a recommended follow-up after the state/control/route contracts stabilize. The current bridge slice provides runtime adapters and main-thread/worker-handler parity tests, but production still uses the main-thread adapter.
 
 Autopilot thrust guidance currently includes SPEED airspeed hold and a conservative phase-based N1 target mode. Both produce AP-owned, rate-limited throttle commands before engine integration; N1 is gated by Boeing A/T arm state, uses target N1 versus average current engine N1 rather than the SPEED airspeed-error law, and clears stale `boeing.n1` on AP disconnect/override.
 
 ### Experimental worker physics flag
 
-`VITE_RFS_WORKER_PHYSICS` is parsed by `src/config/workerPhysics.ts` as an experimental, default-off feature flag for future worker-physics wiring. Truthy tokens are `1`, `true`, `yes`, `on`, and `enabled`; false/off tokens are `0`, `false`, `no`, `off`, `disabled`, and an empty value. Invalid values fall back safely to main-thread physics with an explanatory config reason.
+`VITE_RFS_WORKER_PHYSICS` is parsed by `src/config/workerPhysics.ts` as an experimental, default-off feature flag for future browser-Worker physics wiring. Truthy tokens are `1`, `true`, `yes`, `on`, and `enabled`; false/off tokens are `0`, `false`, `no`, `off`, `disabled`, and an empty value. Invalid values fall back safely to main-thread physics with an explanatory config reason.
 
-The current runtime still keeps `simStore.tick()` and physics execution on the main thread. Enabling the flag today does not migrate ticks to a Worker or instantiate a runtime Worker; that bridge remains future work.
+The current runtime still keeps `simStore.tick()` and physics execution on the main thread. The bridge adapter in `src/sim/simulationRuntime.ts` can route a step through the same worker message codec/handler for parity tests, but enabling the flag today does not instantiate a browser Worker or require SharedArrayBuffer/COOP/COEP.
 
 ### Audio startup
 

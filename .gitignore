@@ -5,6 +5,7 @@ dist/
 .DS_Store
 *.tsbuildinfo
 *.config.d.ts
+src/config/manualChunks.d.ts
 test-results/
 playwright-report/
 blob-report/

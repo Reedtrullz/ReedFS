@@ -2,6 +2,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import cesium from 'vite-plugin-cesium';
 import path from 'path';
+import { rfsManualChunk } from './manualChunks.config';
 
 export default defineConfig({
   plugins: [react(), cesium()],
@@ -19,5 +20,13 @@ export default defineConfig({
   },
   build: {
     target: 'esnext',
+    // Three.js itself is a single large dependency. Keep it isolated as a vendor
+    // chunk and accept a bounded 550 kB ceiling while keeping app/index chunks small.
+    chunkSizeWarningLimit: 550,
+    rolldownOptions: {
+      output: {
+        manualChunks: rfsManualChunk,
+      },
+    },
   },
 });

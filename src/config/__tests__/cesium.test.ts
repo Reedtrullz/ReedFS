@@ -1,10 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Ion } from 'cesium';
 import { getCesiumScenePolicy, hasCesiumToken, initCesium, normalizeCesiumToken } from '../cesium';
 
 describe('cesium scene policy', () => {
   beforeEach(() => {
-    Ion.defaultAccessToken = '';
+    initCesium('');
     vi.stubEnv('VITE_RFS_VISUAL_TEST', undefined);
   });
 
@@ -28,12 +27,11 @@ describe('cesium scene policy', () => {
     expect(policy.reason).toContain('VITE_CESIUM_ION_TOKEN');
   });
 
-  it('reports ion mode and initializes Ion when a token is configured', () => {
+  it('reports ion mode and records a configured token without importing Cesium', () => {
     const policy = initCesium('test-token-123');
     expect(policy.mode).toBe('ion');
     expect(policy.terrain).toBe('world');
     expect(policy.osmBuildings).toBe(true);
-    expect(Ion.defaultAccessToken).toBe('test-token-123');
     expect(hasCesiumToken()).toBe(true);
   });
 
@@ -49,6 +47,6 @@ describe('cesium scene policy', () => {
       token: null,
     });
     expect(policy.reason).toMatch(/visual test/i);
-    expect(Ion.defaultAccessToken).toBe('');
+    expect(hasCesiumToken()).toBe(false);
   });
 });

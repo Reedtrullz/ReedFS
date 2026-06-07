@@ -60,7 +60,7 @@ The system order is intentional:
 - Derived values: IAS/TAS/GS/Mach/VS/AoA/Beta, recomputed from state and wind.
 - Engine, fuel, electrical, hydraulic, config, and flight phase data.
 
-`B737_800_SPEC` is loaded from the versioned data module `src/sim/data/aircraft/b737-800.v1.ts`; the exported data version pins the mass, geometry, propulsion, inertia, fuel, CG, and baseline performance numbers used by the runtime. `src/sim/data/performance/b737TrimFixtures.ts` and `src/sim/physics/trimSolver.ts` provide the first level-flight pitch-trim fixture and solver guard for future coefficient tuning. `src/sim/data/performance/b737PerformanceCards.ts` pins scenario-specific V-speeds plus clean-climb and approach envelopes that are asserted against current physics.
+`B737_800_SPEC` is loaded from the versioned data module `src/sim/data/aircraft/b737-800.v1.ts`; the exported data version pins the mass, geometry, propulsion, inertia, fuel, CG, and baseline performance numbers used by the runtime. `src/sim/data/performance/b737TrimFixtures.ts` and `src/sim/physics/trimSolver.ts` provide a clearly labeled test-only pitch-trim fixture and solver guard for future coefficient tuning. `src/sim/data/performance/b737PerformanceCards.ts` pins scenario-specific V-speeds plus clean-climb and approach envelopes with explicit runtime/test ownership metadata; today only the V-speed rotate cue is runtime-consumed.
 
 `ControlInputs` keeps `brake` as the backward-compatible symmetric brake channel and adds optional `leftBrake`/`rightBrake` side channels. Ground physics treats missing side-specific brake fields as zero, so stored snapshots from older versions restore without stale differential braking.
 
@@ -88,14 +88,15 @@ See `docs/physics-invariants.md` for the detailed checklist and test locations.
 
 RFS renders with Cesium plus a focused Three.js overlay:
 
-- `CesiumViewport.tsx` owns the Cesium viewer lifecycle and base globe/terrain setup.
+- `CesiumViewport.tsx` owns the Cesium viewer lifecycle and base globe/terrain setup; it is lazy-loaded behind `LoadingScreen` so Cesium does not inflate the initial app surface.
 - `config/cesium.ts` defines the scene policy: with `VITE_CESIUM_ION_TOKEN`, RFS enables Cesium World Terrain and OSM buildings; without it, RFS disables Ion terrain/imagery/buildings, uses degraded ellipsoid scenery, and `SceneStatus.tsx` shows a visible banner.
 - `RunwayLayer.tsx` renders the KSEA runway/centerline as Cesium-native entities instead of a ground-attached Three overlay.
 - `ThreeLayer.tsx` owns a single `three-to-cesium` bridge for the exterior aircraft and lights.
 - `AircraftRenderer.ts` keeps the aircraft object persistent and updates transform/animation state each frame.
 - `CockpitLayer.tsx` and `CockpitModel.ts` provide the first-pass pilot-eye cockpit shell for cockpit camera mode.
 - `CameraManager.ts` owns chase/cockpit camera updates from Cesium `preRender` so follow cameras stay live while the sim runs.
-- `CloudLayer.tsx` and `ContrailLayer.tsx` add scene content and effects.
+- `CloudLayer.tsx` and `ContrailLayer.tsx` add scene content and effects; they are part of the lazy viewport surface set.
+- `App.tsx` lazy-loads Cesium/Three viewport surfaces, cockpit/debug overlays, and MCP/PFD instrument surfaces; `vite.config.ts` pins manual chunks for Cesium, Three, React/Zustand, and generic vendor code, with a documented 550 kB ceiling for the isolated Three.js vendor chunk while keeping the app/index chunk small.
 
 Known rendering follow-up:
 
@@ -108,7 +109,7 @@ Known rendering follow-up:
 RFS bridges RFMS-compatible avionics state into native physics and player-facing feedback:
 
 - `RfsMCP.tsx` edits RFMS-compatible selected speed/heading/altitude/vertical-speed targets, creates a default AP state on first valid mode/target click, exposes clickable SPD and N1 thrust buttons because both command laws exist, keeps the Boeing `speedMode` and `n1` flags mutually exclusive, and keeps unsupported modes hidden.
-- `RfsPFD.tsx` renders readable speed/altitude tapes, attitude/heading, and an FMA row from the same truth modes the servo laws use; `N1` is shown from `apState.truth.thrustActive`, not from a cosmetic flag.
+- `RfsPFD.tsx` renders readable speed/altitude tapes, attitude/heading, and an FMA row from the same truth modes the servo laws use; `N1` is shown from `apState.truth.thrustActive`, not from a cosmetic flag. PFD/debug telemetry selectors subscribe to primitive/derived values instead of the full `aircraft` object snapshot.
 - `App.tsx` can load the KSEA -> OLM -> BTG -> KPDX sample route. LOAD PLAN applies the safe LNAV + SPEED + ALT_HOLD defaults only in the stopped/PARKED preflight state; during a running takeoff it stores the route without auto-commanding AP modes.
 - `navigation.ts` validates route geometry, computes cross-track/along-track/desired-track/turn metrics, and sequences legs on capture radius, passed-waypoint geometry, or a bounded turn-anticipation gate.
 - `RouteStatus.tsx` exposes active leg, next waypoint, DTG, track, ETA, and LNAV unavailable reasons.
@@ -183,7 +184,7 @@ push master
 These are intentional gaps, not regressions:
 
 1. Advanced gear/tire model details: dynamic oleo spring/damper compression loads, normal-force-scaled tire side-load/cornering stiffness, anti-skid brake limiting, asymmetric brake-force helpers, rollout/taxi/crosswind landing regressions, player-facing differential brake controls, gear-up runway-tangent belly/crash slide damping, and supported KSEA/KPDX prepared-runway/off-runway rectangle sampling with friction scaling are now in the ground model; remaining gaps are deeper ground-handling tuning, broader terrain mesh collision, additional airports beyond KSEA/KPDX, and richer airport surface coverage outside prepared runway rectangles.
-2. Worker physics: codec and worker entry scaffolding exist, and `VITE_RFS_WORKER_PHYSICS` is parsed as an experimental/default-off runtime flag for future wiring. The active runtime still uses main-thread physics; no `simStore` tick migration or runtime Worker bridge is enabled yet.
+2. Worker physics: codec and worker entry scaffolding exist, `src/sim/simulationRuntime.ts` provides a main-thread runtime plus worker-handler parity adapter, and `VITE_RFS_WORKER_PHYSICS` is parsed as an experimental/default-off flag for future browser-Worker wiring. The active runtime still uses main-thread physics; no default-on browser Worker migration is enabled yet, and no SharedArrayBuffer/COOP/COEP dependency is introduced.
 3. Advanced flight guidance: RFMS-backed route edits, route modification UI, and VNAV/LVL CHG/FMA lifecycle controls beyond the current conservative target laws remain future work.
 4. Data-driven flight model: the B737-800 baseline spec is versioned, but validated aircraft coefficient tables and trim/response tests remain future work.
 5. Audio immersion: explicit Web Audio startup and deterministic mapping are in place; richer engine/cockpit/airframe sound layers remain future work.
