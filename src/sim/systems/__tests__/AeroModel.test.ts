@@ -1,7 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { B737_AERO } from '../AeroModel';
+import { B737_800_FDM } from '../../data/aircraft/b737-800-fdm.v1';
 
 describe('B737_AERO', () => {
+  it('is re-exported from the source-cited B737 FDM dataset for compatibility', () => {
+    expect(B737_AERO).toBe(B737_800_FDM.aero);
+  });
+
   it('defines explicit flap-detent polar tables for the usable 737 configurations', () => {
     expect(B737_AERO.flapPolars.map((polar) => polar.detent)).toEqual([0, 1, 5, 15, 30, 40]);
 

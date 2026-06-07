@@ -11,6 +11,7 @@ import {
   ENVA_RUNWAY_ALT_FT,
   KSEA_RUNWAY_ALT_FT,
 } from '../ground';
+import { B737_800_FDM } from '../../data/aircraft/b737-800-fdm.v1';
 import { bodyToNed, nedToBody } from '../../physics/frames';
 import { eulerToQuat } from '../../physics/quaternion';
 import { KSEA_RUNWAY_16L } from '../../../viewport/runwayData';
@@ -496,6 +497,23 @@ describe('applyGroundContact', () => {
     expect(computeNosewheelSteeringAngleRad({ ...idle, rudder: 1 }, 5)).toBeCloseTo(fullPedalSteeringRad, 8);
     expect(computeNosewheelSteeringAngleRad({ ...idle, rudder: -1 }, 5)).toBeCloseTo(-fullPedalSteeringRad, 8);
     expect(computeNosewheelSteeringAngleRad({ ...idle, rudder: 1 }, 80)).toBe(0);
+  });
+
+  it('exposes source-cited ground constants and allows helpers to use an overridden ground model', () => {
+    expect(B737_800_FDM.ground.sourceReferenceIds.length).toBeGreaterThan(0);
+
+    const customGroundModel = {
+      ...B737_800_FDM.ground,
+      steering: {
+        ...B737_800_FDM.ground.steering,
+        maxRudderPedalNosewheelSteeringRad: B737_800_FDM.ground.steering.maxRudderPedalNosewheelSteeringRad * 2,
+      },
+    };
+
+    expect(computeNosewheelSteeringAngleRad({ ...idle, rudder: 1 }, 5, customGroundModel)).toBeCloseTo(
+      B737_800_FDM.ground.steering.maxRudderPedalNosewheelSteeringRad * 2,
+      8,
+    );
   });
 
   it('applies nosewheel steering yaw rate and stores the steering angle on the nose station', () => {

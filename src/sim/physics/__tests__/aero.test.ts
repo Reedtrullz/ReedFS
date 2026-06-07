@@ -3,6 +3,7 @@ import { computeAero, computeGroundEffectFactors } from '../aero';
 import { createInitialState, B737_800_SPEC } from '../../types';
 import type { ControlInputs } from '../../types';
 import type { WindInfo } from '../../weather';
+import { B737_AERO } from '../../systems/AeroModel';
 
 const cruise: ControlInputs = {
   elevator: -0.1, aileron: 0, rudder: 0,
@@ -83,6 +84,23 @@ describe('computeAero', () => {
     const a = computeAero(s, { ...cruise, throttle1: 1, throttle2: 1 }, B737_800_SPEC);
 
     expect(a.thrust).toBeCloseTo(35_801, 6);
+  });
+
+  it('uses side-force coefficients supplied by the active aero model', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.velocity.u = 80;
+
+    const baseline = computeAero(s, { ...cruise, rudder: 0.5, throttle1: 0, throttle2: 0 }, B737_800_SPEC, B737_AERO);
+    const customAero = {
+      ...B737_AERO,
+      sideForce: {
+        ...B737_AERO.sideForce,
+        cyRudder: B737_AERO.sideForce.cyRudder * 2,
+      },
+    };
+    const custom = computeAero(s, { ...cruise, rudder: 0.5, throttle1: 0, throttle2: 0 }, B737_800_SPEC, customAero);
+
+    expect(custom.side).toBeCloseTo(baseline.side * 2, 6);
   });
 
   it('applies ground-effect factors only close to the runway', () => {

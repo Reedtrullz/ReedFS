@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { createInitialState, B737_800_SPEC } from '../types';
+import { createB737GearStations, createInitialState, B737_800_SPEC } from '../types';
 import { quatToEuler } from '../physics/quaternion';
+import { B737_800_FDM } from '../data/aircraft/b737-800-fdm.v1';
 
 describe('createInitialState', () => {
   it('returns parked at ENVA with full fuel', () => {
@@ -33,5 +34,18 @@ describe('createInitialState', () => {
     expect(euler.phi).toBeCloseTo(s.attitude.phi, 8);
     expect(euler.theta).toBeCloseTo(s.attitude.theta, 8);
     expect(euler.psi).toBeCloseTo(s.attitude.psi, 8);
+  });
+});
+
+describe('createB737GearStations', () => {
+  it('initializes runtime gear station state from the B737 FDM gear-station data', () => {
+    const stations = createB737GearStations(100_000, true);
+
+    expect(stations.map((station) => station.id)).toEqual(B737_800_FDM.gearStations.map((station) => station.id));
+    expect(stations[0].positionBodyM).toEqual(B737_800_FDM.gearStations[0].positionBodyM);
+    expect(stations.map((station) => station.normalForceN)).toEqual([10_000, 45_000, 45_000]);
+    expect(stations.every((station) => station.weightOnWheel)).toBe(true);
+    expect(stations.every((station) => station.compressionM > 0)).toBe(true);
+    expect(stations.every((station) => station.steeringAngleRad === 0)).toBe(true);
   });
 });

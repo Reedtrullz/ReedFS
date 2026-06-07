@@ -4,6 +4,8 @@ import { bodyToNed, nedToBody } from '../physics/frames';
 import { eulerToQuat } from '../physics/quaternion';
 import type { GroundSurfaceSample } from '../runwaySurface';
 import { RUNWAY_FRICTION_SCALE } from '../runwaySurface';
+import { B737_800_FDM } from '../data/aircraft/b737-800-fdm.v1';
+import type { GroundModelData } from '../data/aircraft/fdmTypes';
 
 export const ENVA_RUNWAY_ALT_FT = 56;
 export const KSEA_RUNWAY_ALT_FT = 432;
@@ -11,29 +13,7 @@ export const GROUND_CONTACT_EPSILON_FT = 0.5;
 const G = 9.80665;
 const FT_TO_M = 0.3048;
 
-const ROLLING_FRICTION_COEFFICIENT = 0.35 / G;
-const MAX_BRAKE_COEFFICIENT = 6.0 / G;
-const MAX_BRAKE_FRICTION_COEFFICIENT = 0.55;
-const STOP_EPSILON_MPS = 0.05;
-const BREAKAWAY_THROTTLE = 0.05;
-const MIN_GROUND_PITCH_RAD = 0;
-const MAX_GROUND_PITCH_RAD = 0.35;
-const MAX_GROUND_ROLL_RAD = 0.2;
-const MAX_RUDDER_PEDAL_NOSEWHEEL_STEERING_RAD = 7 * Math.PI / 180;
-const STEERING_FADE_START_MPS = 30;
-const STEERING_FADE_END_MPS = 70;
-const TOUCHDOWN_MIN_SINK_RATE_MPS = 0.25;
-const TOUCHDOWN_ANGULAR_DAMPING = 0.35;
-const BELLY_SLIDE_DECEL_MPS2 = 4.0;
-const CRASH_SLIDE_DECEL_MPS2 = 9.0;
-const BELLY_CONTACT_ANGULAR_RETENTION_PER_SECOND = 0.7;
-const CRASH_CONTACT_ANGULAR_RETENTION_PER_SECOND = 0.25;
-const OLEO_DAMPING_RATIO = 0.35;
-const TIRE_CORNERING_STIFFNESS_PER_NORMAL = 3.2;
-const MAX_TIRE_SIDE_FRICTION_COEFFICIENT = 0.45;
-const MIN_SLIP_FORWARD_SPEED_MPS = 2;
-// Mirrors the current B737-800 yaw inertia so ground.ts can stay spec-agnostic for this pure tire helper.
-const APPROX_B737_YAW_INERTIA_KGM2 = 4_610_000;
+export const B737_GROUND_MODEL: GroundModelData = B737_800_FDM.ground;
 
 export type GroundContactResult = GroundState;
 
@@ -41,6 +21,7 @@ export interface GroundContactOptions {
   normalForceN?: number;
   allowLiftoff?: boolean;
   surface?: GroundSurfaceSample;
+  groundModel?: GroundModelData;
 }
 
 export interface GroundRollForceBreakdown {
@@ -118,17 +99,17 @@ function clampSymmetric(value: number, limit: number): number {
   return clamp(value, -limit, limit);
 }
 
-function hasBreakawayThrustCommand(inputs: ControlInputs): boolean {
-  return Math.max(inputs.throttle1, inputs.throttle2) > BREAKAWAY_THROTTLE;
+function hasBreakawayThrustCommand(inputs: ControlInputs, groundModel: GroundModelData): boolean {
+  return Math.max(inputs.throttle1, inputs.throttle2) > groundModel.friction.breakawayThrottle;
 }
 
-function isRollingForSteering(state: AircraftState): boolean {
-  return Math.abs(state.velocity.u) > STOP_EPSILON_MPS;
+function isRollingForSteering(state: AircraftState, groundModel: GroundModelData): boolean {
+  return Math.abs(state.velocity.u) > groundModel.friction.stopEpsilonMps;
 }
 
-function brakeDirectionForVelocity(state: AircraftState): number {
-  if (state.velocity.u > STOP_EPSILON_MPS) return -1;
-  if (state.velocity.u < -STOP_EPSILON_MPS) return 1;
+function brakeDirectionForVelocity(state: AircraftState, groundModel: GroundModelData): number {
+  if (state.velocity.u > groundModel.friction.stopEpsilonMps) return -1;
+  if (state.velocity.u < -groundModel.friction.stopEpsilonMps) return 1;
   return 0;
 }
 
@@ -197,6 +178,7 @@ export function constrainRunwayNormalVelocity(state: AircraftState): void {
 export function computeOleoStrutLoads(
   gearStations: GearStationState[],
   options: OleoStrutLoadOptions,
+  groundModel: GroundModelData = B737_GROUND_MODEL,
 ): OleoStrutLoadBreakdown {
   const totalStaticNormalForceN = Math.max(0, options.totalStaticNormalForceN);
   const referenceWeightN = Math.max(totalStaticNormalForceN, Math.max(0, options.referenceWeightN ?? 0));
@@ -217,7 +199,7 @@ export function computeOleoStrutLoads(
     const stationSpringForceN = station.springStiffnessNPerM * compressionM;
     const effectiveStationMassKg = Math.max(referenceStationForceN, stationSpringForceN) / G;
     const criticalDampingNPerMps = 2 * Math.sqrt(station.springStiffnessNPerM * effectiveStationMassKg);
-    const stationDampingForceN = OLEO_DAMPING_RATIO * criticalDampingNPerMps * compressionRateMps;
+    const stationDampingForceN = groundModel.oleo.dampingRatio * criticalDampingNPerMps * compressionRateMps;
     const normalForceN = stationSpringForceN + stationDampingForceN;
 
     springForceN += stationSpringForceN;
@@ -244,6 +226,7 @@ export function computeWheelBrakeForces(
   command: BrakeCommand,
   gearStations: GearStationState[] = state.ground.gearStations,
   surface?: GroundSurfaceSample,
+  groundModel: GroundModelData = B737_GROUND_MODEL,
 ): WheelBrakeForceBreakdown {
   let brakeNormalForceN = 0;
   let requestedBrakeForceN = 0;
@@ -253,7 +236,7 @@ export function computeWheelBrakeForces(
   let yawMomentNm = 0;
   let antiSkidLimited = false;
   const useAntiSkid = command.antiSkid !== false;
-  const longitudinalForceDirection = brakeDirectionForVelocity(state);
+  const longitudinalForceDirection = brakeDirectionForVelocity(state, groundModel);
   const rollingForBraking = longitudinalForceDirection !== 0;
   const frictionScale = frictionScaleForSurface(surface);
   const stationForces: WheelBrakeStationForce[] = [];
@@ -261,8 +244,8 @@ export function computeWheelBrakeForces(
   for (const station of gearStations) {
     const normalForceN = station.weightOnWheel && station.brakeCapable ? Math.max(0, station.normalForceN) : 0;
     const brakeCommand = brakeCommandForStation(command, station);
-    const requestedStationBrakeForceN = brakeCommand * MAX_BRAKE_COEFFICIENT * normalForceN;
-    const availableStationBrakeForceN = MAX_BRAKE_FRICTION_COEFFICIENT * frictionScale.brake * normalForceN;
+    const requestedStationBrakeForceN = brakeCommand * groundModel.friction.maxBrakeCoefficient * normalForceN;
+    const availableStationBrakeForceN = groundModel.friction.maxBrakeFrictionCoefficient * frictionScale.brake * normalForceN;
     const stationAntiSkidLimited = rollingForBraking && useAntiSkid && requestedStationBrakeForceN > availableStationBrakeForceN + 1e-9;
     const stationBrakeForceN = rollingForBraking
       ? useAntiSkid
@@ -298,7 +281,7 @@ export function computeWheelBrakeForces(
     rightBrakeForceN,
     brakeForceN,
     yawMomentNm,
-    yawAccelerationRadps2: yawMomentNm / APPROX_B737_YAW_INERTIA_KGM2,
+    yawAccelerationRadps2: yawMomentNm / groundModel.inertia.yawInertiaKgM2,
     antiSkidLimited,
     stationForces,
   };
@@ -309,6 +292,7 @@ export function computeGroundRollForces(
   inputs: ControlInputs,
   gearStations: GearStationState[] = state.ground.gearStations,
   surface?: GroundSurfaceSample,
+  groundModel: GroundModelData = B737_GROUND_MODEL,
 ): GroundRollForceBreakdown {
   const loadedStations = gearStations.filter((station) => station.weightOnWheel);
   const rollingNormalForceN = loadedStations.reduce((sum, station) => sum + Math.max(0, station.normalForceN), 0);
@@ -318,8 +302,9 @@ export function computeGroundRollForces(
     brakeCommandFromInputs(inputs),
     gearStations,
     surface,
+    groundModel,
   );
-  const rollingFrictionForceN = ROLLING_FRICTION_COEFFICIENT * frictionScale.rolling * rollingNormalForceN;
+  const rollingFrictionForceN = groundModel.friction.rollingFrictionCoefficient * frictionScale.rolling * rollingNormalForceN;
   const retardingForceN = rollingFrictionForceN + brakeForces.brakeForceN;
   return {
     rollingNormalForceN,
@@ -334,28 +319,33 @@ export function computeGroundRollForces(
   };
 }
 
-export function computeNosewheelSteeringAngleRad(inputs: ControlInputs, forwardSpeedMps: number): number {
+export function computeNosewheelSteeringAngleRad(
+  inputs: ControlInputs,
+  forwardSpeedMps: number,
+  groundModel: GroundModelData = B737_GROUND_MODEL,
+): number {
   const speed = Math.abs(forwardSpeedMps);
-  const fade = speed <= STEERING_FADE_START_MPS
+  const fade = speed <= groundModel.steering.fadeStartMps
     ? 1
-    : speed >= STEERING_FADE_END_MPS
+    : speed >= groundModel.steering.fadeEndMps
       ? 0
-      : (STEERING_FADE_END_MPS - speed) / (STEERING_FADE_END_MPS - STEERING_FADE_START_MPS);
-  return clamp01(Math.abs(inputs.rudder)) * Math.sign(inputs.rudder) * MAX_RUDDER_PEDAL_NOSEWHEEL_STEERING_RAD * fade;
+      : (groundModel.steering.fadeEndMps - speed) / (groundModel.steering.fadeEndMps - groundModel.steering.fadeStartMps);
+  return clamp01(Math.abs(inputs.rudder)) * Math.sign(inputs.rudder) * groundModel.steering.maxRudderPedalNosewheelSteeringRad * fade;
 }
 
 export function computeTireSideForces(
   state: AircraftState,
   gearStations: GearStationState[] = state.ground.gearStations,
   surface?: GroundSurfaceSample,
+  groundModel: GroundModelData = B737_GROUND_MODEL,
 ): TireSideForceBreakdown {
   let loadedNormalForceN = 0;
   let peakSideForceN = 0;
   let sideForceN = 0;
   let yawMomentNm = 0;
   let frictionLimited = false;
-  const forwardReferenceMps = Math.max(Math.abs(state.velocity.u), MIN_SLIP_FORWARD_SPEED_MPS);
-  const rollingForSteering = isRollingForSteering(state);
+  const forwardReferenceMps = Math.max(Math.abs(state.velocity.u), groundModel.tire.minSlipForwardSpeedMps);
+  const rollingForSteering = isRollingForSteering(state, groundModel);
   const frictionScale = frictionScaleForSurface(surface);
 
   for (const station of gearStations) {
@@ -366,8 +356,8 @@ export function computeTireSideForces(
     const lateralVelocityAtStationMps = state.velocity.v + state.angularVel.r * station.positionBodyM.x;
     const steeringAngleRad = station.steerable && rollingForSteering ? station.steeringAngleRad : 0;
     const slipAngleRad = Math.atan2(lateralVelocityAtStationMps, forwardReferenceMps) - steeringAngleRad;
-    const stationPeakSideForceN = MAX_TIRE_SIDE_FRICTION_COEFFICIENT * frictionScale.side * normalForceN;
-    const desiredSideForceN = -TIRE_CORNERING_STIFFNESS_PER_NORMAL * normalForceN * slipAngleRad;
+    const stationPeakSideForceN = groundModel.tire.maxSideFrictionCoefficient * frictionScale.side * normalForceN;
+    const desiredSideForceN = -groundModel.tire.corneringStiffnessPerNormal * normalForceN * slipAngleRad;
     const stationSideForceN = clampSymmetric(desiredSideForceN, stationPeakSideForceN);
 
     if (Math.abs(desiredSideForceN) > stationPeakSideForceN + 1e-9) {
@@ -385,7 +375,7 @@ export function computeTireSideForces(
     sideForceN,
     yawMomentNm,
     lateralAccelerationMps2: sideForceN / Math.max(1, state.grossWeight),
-    yawAccelerationRadps2: yawMomentNm / APPROX_B737_YAW_INERTIA_KGM2,
+    yawAccelerationRadps2: yawMomentNm / groundModel.inertia.yawInertiaKgM2,
     frictionLimited,
   };
 }
@@ -398,11 +388,11 @@ function wheelBaseM(gearStations: GearStationState[]): number {
   return Math.max(1, nose.positionBodyM.x - mainX);
 }
 
-function applyTouchdownDamping(state: AircraftState, sinkRateMps: number): void {
-  if (sinkRateMps < TOUCHDOWN_MIN_SINK_RATE_MPS) return;
-  state.angularVel.p *= TOUCHDOWN_ANGULAR_DAMPING;
-  state.angularVel.q *= TOUCHDOWN_ANGULAR_DAMPING;
-  state.angularVel.r *= TOUCHDOWN_ANGULAR_DAMPING;
+function applyTouchdownDamping(state: AircraftState, sinkRateMps: number, groundModel: GroundModelData): void {
+  if (sinkRateMps < groundModel.contact.touchdownMinSinkRateMps) return;
+  state.angularVel.p *= groundModel.contact.touchdownAngularDamping;
+  state.angularVel.q *= groundModel.contact.touchdownAngularDamping;
+  state.angularVel.r *= groundModel.contact.touchdownAngularDamping;
 }
 
 function applyRunwayTangentSlideDecel(state: AircraftState, decelMps2: number, dt: number): void {
@@ -419,13 +409,22 @@ function applyRunwayTangentSlideDecel(state: AircraftState, decelMps2: number, d
   }, state.attitude);
 }
 
-function applyGearUpContactDamping(state: AircraftState, contact: GroundContactType, dt: number): void {
+function applyGearUpContactDamping(
+  state: AircraftState,
+  contact: GroundContactType,
+  dt: number,
+  groundModel: GroundModelData,
+): void {
   const crashed = contact === 'crashed';
-  applyRunwayTangentSlideDecel(state, crashed ? CRASH_SLIDE_DECEL_MPS2 : BELLY_SLIDE_DECEL_MPS2, dt);
+  applyRunwayTangentSlideDecel(
+    state,
+    crashed ? groundModel.contact.crashSlideDecelMps2 : groundModel.contact.bellySlideDecelMps2,
+    dt,
+  );
 
   const angularRetentionPerSecond = crashed
-    ? CRASH_CONTACT_ANGULAR_RETENTION_PER_SECOND
-    : BELLY_CONTACT_ANGULAR_RETENTION_PER_SECOND;
+    ? groundModel.contact.crashContactAngularRetentionPerSecond
+    : groundModel.contact.bellyContactAngularRetentionPerSecond;
   const angularDamping = Math.pow(angularRetentionPerSecond, Math.max(0, dt));
   state.angularVel.p *= angularDamping;
   state.angularVel.q *= angularDamping;
@@ -437,12 +436,13 @@ function applyTireSideForces(
   dt: number,
   gearStations: GearStationState[],
   surface?: GroundSurfaceSample,
+  groundModel: GroundModelData = B737_GROUND_MODEL,
 ): void {
-  const tireSideForces = computeTireSideForces(state, gearStations, surface);
+  const tireSideForces = computeTireSideForces(state, gearStations, surface, groundModel);
   const previousLateralVelocity = state.velocity.v;
   const lateralDelta = tireSideForces.lateralAccelerationMps2 * Math.max(0, dt);
   const nextLateralVelocity = previousLateralVelocity + lateralDelta;
-  const effectiveNeutralSteering = !isRollingForSteering(state)
+  const effectiveNeutralSteering = !isRollingForSteering(state, groundModel)
     || gearStations.every((station) => Math.abs(station.steeringAngleRad) < 1e-6);
   const forceOpposesSlip = previousLateralVelocity !== 0
     && Math.sign(tireSideForces.sideForceN) === -Math.sign(previousLateralVelocity);
@@ -465,13 +465,14 @@ function applyNosewheelSteering(
   state: AircraftState,
   inputs: ControlInputs,
   gearStations: GearStationState[],
+  groundModel: GroundModelData = B737_GROUND_MODEL,
 ): GearStationState[] {
-  const steeringAngleRad = computeNosewheelSteeringAngleRad(inputs, state.velocity.u);
+  const steeringAngleRad = computeNosewheelSteeringAngleRad(inputs, state.velocity.u, groundModel);
   const nextStations = gearStations.map((station) => (
     station.id === 'nose' ? { ...station, steeringAngleRad } : station
   ));
   const speed = state.velocity.u;
-  if (Math.abs(speed) > STOP_EPSILON_MPS && Math.abs(steeringAngleRad) > 1e-6) {
+  if (Math.abs(speed) > groundModel.friction.stopEpsilonMps && Math.abs(steeringAngleRad) > 1e-6) {
     state.angularVel.r = (speed / wheelBaseM(nextStations)) * Math.tan(steeringAngleRad);
   }
 
@@ -484,16 +485,17 @@ function applyLongitudinalGroundDecel(
   dt: number,
   gearStations: GearStationState[],
   surface?: GroundSurfaceSample,
+  groundModel: GroundModelData = B737_GROUND_MODEL,
 ): void {
   const speed = state.velocity.u;
-  const breakawayThrust = hasBreakawayThrustCommand(inputs);
+  const breakawayThrust = hasBreakawayThrustCommand(inputs, groundModel);
 
-  if (Math.abs(speed) <= STOP_EPSILON_MPS && !breakawayThrust) {
+  if (Math.abs(speed) <= groundModel.friction.stopEpsilonMps && !breakawayThrust) {
     state.velocity.u = 0;
     return;
   }
 
-  const forces = computeGroundRollForces(state, inputs, gearStations, surface);
+  const forces = computeGroundRollForces(state, inputs, gearStations, surface, groundModel);
   const decel = forces.accelerationMps2 * Math.max(0, dt);
   state.angularVel.r += forces.yawAccelerationRadps2 * Math.max(0, dt);
 
@@ -504,9 +506,9 @@ function applyLongitudinalGroundDecel(
   }
 }
 
-function stabilizeGroundAttitude(state: AircraftState): void {
-  const clampedPhi = Math.max(-MAX_GROUND_ROLL_RAD, Math.min(MAX_GROUND_ROLL_RAD, state.attitude.phi));
-  const clampedTheta = Math.max(MIN_GROUND_PITCH_RAD, Math.min(MAX_GROUND_PITCH_RAD, state.attitude.theta));
+function stabilizeGroundAttitude(state: AircraftState, groundModel: GroundModelData = B737_GROUND_MODEL): void {
+  const clampedPhi = Math.max(-groundModel.attitude.maxGroundRollRad, Math.min(groundModel.attitude.maxGroundRollRad, state.attitude.phi));
+  const clampedTheta = Math.max(groundModel.attitude.minGroundPitchRad, Math.min(groundModel.attitude.maxGroundPitchRad, state.attitude.theta));
 
   if (clampedPhi === state.attitude.phi && clampedTheta === state.attitude.theta) {
     return;
@@ -526,6 +528,7 @@ export function applyGroundContact(
   groundAltFt = KSEA_RUNWAY_ALT_FT,
   options: GroundContactOptions = {},
 ): GroundContactResult {
+  const groundModel = options.groundModel ?? B737_GROUND_MODEL;
   const gearAvailableForContact = state.config.gearDown || inputs.gearLever === 'DOWN';
   const atOrBelowGround = state.position.alt <= groundAltFt + GROUND_CONTACT_EPSILON_FT;
   const runwayDownMps = bodyToNed(state.velocity, state.attitude).down;
@@ -548,7 +551,7 @@ export function applyGroundContact(
   if (!gearAvailableForContact) {
     const contact: GroundContactType = state.ground.contact === 'crashed' || runwayDownMps > 5 ? 'crashed' : 'belly';
     state.position.alt = groundAltFt;
-    applyGearUpContactDamping(state, contact, dt);
+    applyGearUpContactDamping(state, contact, dt, groundModel);
     constrainRunwayNormalVelocity(state);
     return setGroundState(
       state,
@@ -569,17 +572,17 @@ export function applyGroundContact(
     referenceWeightN: grossWeightForceN(state),
     groundPenetrationM,
     runwayDownMps,
-  });
+  }, groundModel);
   const gearNormalForceN = oleoLoads.totalNormalForceN;
   let loadedGearStations = oleoLoads.gearStations;
   state.position.alt = groundAltFt;
   state.config.gearDown = true;
 
-  stabilizeGroundAttitude(state);
-  applyTouchdownDamping(state, touchdownSinkRateMps ?? 0);
-  loadedGearStations = applyNosewheelSteering(state, inputs, loadedGearStations);
-  applyTireSideForces(state, dt, loadedGearStations, options.surface);
-  applyLongitudinalGroundDecel(state, inputs, dt, loadedGearStations, options.surface);
+  stabilizeGroundAttitude(state, groundModel);
+  applyTouchdownDamping(state, touchdownSinkRateMps ?? 0, groundModel);
+  loadedGearStations = applyNosewheelSteering(state, inputs, loadedGearStations, groundModel);
+  applyTireSideForces(state, dt, loadedGearStations, options.surface, groundModel);
+  applyLongitudinalGroundDecel(state, inputs, dt, loadedGearStations, options.surface, groundModel);
   constrainRunwayNormalVelocity(state);
 
   return setGroundState(
