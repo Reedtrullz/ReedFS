@@ -191,8 +191,10 @@ function applyMcpMode(apState: AutopilotState, mode: EnabledMcpMode): void {
 
 export function RfsMCP() {
   const apState = useSimStore((s) => s.apState);
+  const routeStatus = useSimStore((s) => s.routeStatus);
 
   const toggleMode = (mode: EnabledMcpMode) => {
+    if (mode === 'LNAV' && !useSimStore.getState().routeStatus.lnavAvailable) return;
     const current = useSimStore.getState().apState;
     const next = structuredClone(current ?? createDefaultAutopilotState());
     applyMcpMode(next, mode);
@@ -209,6 +211,15 @@ export function RfsMCP() {
   const latActive = apState?.truth.lateralActive ?? 'OFF';
   const vertActive = apState?.truth.verticalActive ?? 'OFF';
   const thrActive = apState?.truth.thrustActive ?? 'OFF';
+  const lnavAvailable = routeStatus.lnavAvailable;
+  const lnavUnavailableReason = routeStatus.lnavUnavailableReason ?? 'route guidance unavailable';
+  const displayedLatActive = latActive === 'LNAV' && !lnavAvailable ? 'OFF' : latActive;
+  const lnavTitle = lnavAvailable ? 'Engage LNAV' : `LNAV unavailable: ${lnavUnavailableReason}`;
+  const lnavStyle = displayedLatActive === 'LNAV'
+    ? activeStyle
+    : lnavAvailable
+      ? btnStyle
+      : { ...btnStyle, color: '#777', border: '1px solid #444', cursor: 'not-allowed' };
   const speedTarget = selectedSpeedKt(apState);
   const headingTarget = selectedHeadingDeg(apState);
   const altitudeTarget = selectedAltitudeFt(apState);
@@ -255,13 +266,15 @@ export function RfsMCP() {
       <div>
         <button
           onClick={() => toggleMode('HDG_SEL')}
-          style={latActive === 'HDG_SEL' ? activeStyle : btnStyle}
+          style={displayedLatActive === 'HDG_SEL' ? activeStyle : btnStyle}
         >
           HDG
         </button>
         <button
+          disabled={!lnavAvailable}
+          title={lnavTitle}
           onClick={() => toggleMode('LNAV')}
-          style={latActive === 'LNAV' ? activeStyle : btnStyle}
+          style={lnavStyle}
         >
           LNAV
         </button>

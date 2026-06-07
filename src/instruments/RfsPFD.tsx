@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react';
 import { useSimStore } from '../store/simStore';
 import { computeDerived } from '../sim/physics/derived';
 import { quatToEuler } from '../sim/physics/quaternion';
+import { deriveDisplayFmaTruth } from '../sim/systems/fmaTruth';
 
 const glass: CSSProperties = {
   background: 'linear-gradient(180deg, rgba(9,14,18,0.95), rgba(2,5,7,0.92))',
@@ -132,6 +133,8 @@ export function RfsPFD() {
   const a = useSimStore((s) => s.aircraft);
   const wind = useSimStore((s) => s.wind);
   const apState = useSimStore((s) => s.apState);
+  const routeStatus = useSimStore((s) => s.routeStatus);
+  const flightPlan = useSimStore((s) => s.flightPlan);
   const d = computeDerived(a, wind);
   const euler = quatToEuler(a.quaternion);
   const pitch = (euler.theta * 180) / Math.PI;
@@ -139,7 +142,7 @@ export function RfsPFD() {
   const hdg = ((euler.psi * 180) / Math.PI + 360) % 360;
   const ias = Math.max(0, d.ias);
   const altitude = Math.max(0, a.position.alt);
-  const fma = apState?.truth;
+  const fma = deriveDisplayFmaTruth(apState, { aircraft: a, flightPlan, routeStatus });
 
   return (
     <div

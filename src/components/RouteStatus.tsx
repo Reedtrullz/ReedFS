@@ -69,7 +69,9 @@ export function RouteStatus() {
   const distanceText = formatDistanceNm(routeStatus.distanceToNextNm);
   const trackText = formatTrackDeg(routeStatus.desiredTrackDegTrue);
   const etaText = formatEtaMinutes(routeStatus.etaMinutes);
-  const legText = routeStatus.activeLegIndex !== null ? `LEG ${routeStatus.activeLegIndex}` : null;
+  const displayLegIndex = routeStatus.activeLegIndex !== null ? routeStatus.activeLegIndex + 1 : null;
+  const displayLegCount = displayLegIndex !== null ? Math.max(routeStatus.activeLegCount, displayLegIndex) : 0;
+  const legText = displayLegIndex !== null ? `LEG ${displayLegIndex}/${displayLegCount}` : null;
   const activeLegText = routeStatus.fromIdent && routeStatus.nextWaypointIdent
     ? `${routeStatus.fromIdent} → ${routeStatus.nextWaypointIdent}`
     : routeStatus.nextWaypointIdent;

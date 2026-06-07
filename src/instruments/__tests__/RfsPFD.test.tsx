@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
+import type { FlightPlan } from '@shared/types/fmc';
 import { RfsPFD } from '../RfsPFD';
 import { useSimStore } from '../../store/simStore';
+import { computeRouteStatus } from '../../sim/systems/navigation';
 
 function apStateWithModes(): AutopilotState {
   return {
@@ -63,6 +65,30 @@ function apStateWithModes(): AutopilotState {
   };
 }
 
+function routeWithAltitudeConstraint(): FlightPlan {
+  return {
+    origin: 'KSEA',
+    destination: 'KPDX',
+    flightNumber: 'TST800',
+    route: 'KSEA OLM',
+    waypoints: [
+      { ident: 'KSEA', lat: 47.45, lon: -122.31, discontinuity: false },
+      { ident: 'OLM', lat: 46.97, lon: -122.9, discontinuity: false, altitudeConstraint: { type: 'AT', altitude: 10000 } },
+    ],
+  };
+}
+
+function setAircraftOnKseaRoute() {
+  const aircraft = structuredClone(useSimStore.getState().aircraft);
+  aircraft.position.lat = 47.45;
+  aircraft.position.lon = -122.31;
+  aircraft.position.alt = 5000;
+  aircraft.velocity.u = 128.6;
+  const flightPlan = routeWithAltitudeConstraint();
+  const routeStatus = computeRouteStatus(aircraft, flightPlan, 0);
+  useSimStore.setState({ aircraft, flightPlan, activeLegIndex: 0, routeStatus });
+}
+
 describe('RfsPFD', () => {
   beforeEach(() => {
     useSimStore.getState().reset();
@@ -81,6 +107,7 @@ describe('RfsPFD', () => {
   });
 
   it('shows FMA truth modes instead of burying autopilot status in debug telemetry', () => {
+    setAircraftOnKseaRoute();
     useSimStore.getState().setApState(apStateWithModes());
 
     render(<RfsPFD />);
@@ -88,7 +115,7 @@ describe('RfsPFD', () => {
     expect(screen.getByText('FMA')).toBeTruthy();
     expect(screen.getByText('SPEED')).toBeTruthy();
     expect(screen.getByText('LNAV')).toBeTruthy();
-    expect(screen.getByText('VNAV')).toBeTruthy();
+    expect(screen.getByText('VNAV_PTH')).toBeTruthy();
     expect(screen.getByText('CMD_A')).toBeTruthy();
   });
 
@@ -102,5 +129,15 @@ describe('RfsPFD', () => {
     render(<RfsPFD />);
 
     expect(screen.getByText('N1')).toBeTruthy();
+  });
+
+  it('does not display raw LNAV or VNAV FMA modes when route guidance is unavailable', () => {
+    useSimStore.getState().setApState(apStateWithModes());
+
+    render(<RfsPFD />);
+
+    expect(screen.getByText('FMA')).toBeTruthy();
+    expect(screen.queryByText('LNAV')).toBeNull();
+    expect(screen.queryByText('VNAV')).toBeNull();
   });
 });
