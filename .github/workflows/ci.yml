@@ -5,21 +5,53 @@ on:
   pull_request:
     branches: [master]
 
+permissions:
+  contents: read
+
 jobs:
+  secret-scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+      security-events: write
+    steps:
+      # actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          fetch-depth: 0
+      # gitleaks/gitleaks-action@v3
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   test:
+    needs: secret-scan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      # actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
       - name: Clone RFMS (shared types dependency)
-        run: git clone --depth 1 https://github.com/Reedtrullz/RFMC.git ../RFMS
-      - uses: actions/setup-node@v4
+        run: |
+          git init ../RFMS
+          git -C ../RFMS remote add origin https://github.com/Reedtrullz/RFMC.git
+          git -C ../RFMS fetch --depth 1 origin 810fc9652da431eaf8978b85bf4af131605559b5
+          git -C ../RFMS checkout --detach FETCH_HEAD
+      # actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 22
-      - run: npm install --legacy-peer-deps
+          cache: npm
+      - run: npm ci --legacy-peer-deps
+      - run: npm run check:release
       - run: npm run lint:ci
       - run: npm run typecheck
       - run: npm run test
       - run: npm run build
+        env:
+          RFS_COMMIT_SHA: ${{ github.sha }}
+          RFS_IMAGE_REF: ghcr.io/reedtrullz/rfs:sha-${{ github.sha }}
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
       - run: npm run test:visual
@@ -31,63 +63,144 @@ jobs:
     permissions:
       contents: read
       packages: write
+    outputs:
+      image_ref: ${{ steps.image-meta.outputs.image_ref }}
+      image_digest: ${{ steps.build.outputs.digest }}
     steps:
-      - uses: actions/checkout@v4
+      # actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
       - name: Clone RFMS (shared types dependency)
-        run: git clone --depth 1 https://github.com/Reedtrullz/RFMC.git ../RFMS
-      - uses: actions/setup-node@v4
+        run: |
+          git init ../RFMS
+          git -C ../RFMS remote add origin https://github.com/Reedtrullz/RFMC.git
+          git -C ../RFMS fetch --depth 1 origin 810fc9652da431eaf8978b85bf4af131605559b5
+          git -C ../RFMS checkout --detach FETCH_HEAD
+      # actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 22
-      - run: npm install --legacy-peer-deps
+          cache: npm
+      - run: npm ci --legacy-peer-deps
+      - name: Define immutable image ref
+        id: image-meta
+        run: echo "image_ref=ghcr.io/reedtrullz/rfs:sha-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
       - name: Log in to GHCR
-        uses: docker/login-action@v3
+        # docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build and push Docker image
-        uses: docker/build-push-action@v6
+        id: build
+        # docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8
         with:
           context: .
           push: true
-          tags: ghcr.io/reedtrullz/rfs:latest
+          tags: |
+            ghcr.io/reedtrullz/rfs:latest
+            ghcr.io/reedtrullz/rfs:sha-${{ github.sha }}
+          build-args: |
+            RFS_COMMIT_SHA=${{ github.sha }}
+            RFS_IMAGE_REF=ghcr.io/reedtrullz/rfs:sha-${{ github.sha }}
+            RFS_VERSION=${{ github.sha }}
+          labels: |
+            org.opencontainers.image.title=RFS
+            org.opencontainers.image.description=Reidar Flight Simulator web app
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ github.sha }}
 
   deploy:
     needs: publish
     if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Deploy to VPS
-        uses: appleboy/ssh-action@v1
+        # appleboy/ssh-action@v1
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2
         with:
           host: 198.23.137.16
           username: deploy
           key: ${{ secrets.VPS_DEPLOY_KEY }}
           script: |
-            docker pull ghcr.io/reedtrullz/rfs:latest
+            set -eu
+            IMAGE_REF=ghcr.io/reedtrullz/rfs:sha-${{ github.sha }}
+            EXPECTED_COMMIT=${{ github.sha }}
+            PREVIOUS_IMAGE_ID="$(docker inspect -f '{{.Image}}' rfs 2>/dev/null || true)"
+            PREVIOUS_IMAGE_REF="$(docker inspect -f '{{.Config.Image}}' rfs 2>/dev/null || true)"
+            PREVIOUS_IMAGE="$PREVIOUS_IMAGE_ID"
+            if [ -z "$PREVIOUS_IMAGE" ] || [ "$PREVIOUS_IMAGE" = "<no value>" ]; then
+              PREVIOUS_IMAGE="$PREVIOUS_IMAGE_REF"
+            fi
+            if [ "$PREVIOUS_IMAGE" = "<no value>" ]; then
+              PREVIOUS_IMAGE=""
+            fi
+
+            rollback() {
+              if [ -n "$PREVIOUS_IMAGE" ]; then
+                echo "Rolling back to previous image: $PREVIOUS_IMAGE (previous ref: $PREVIOUS_IMAGE_REF)"
+                docker rm -f rfs 2>/dev/null || true
+                docker run -d --name rfs --restart unless-stopped \
+                  -p 127.0.0.1:3005:80 \
+                  --memory 256m --cpus 1.0 \
+                  --log-driver json-file --log-opt max-size=10m --log-opt max-file=3 \
+                  "$PREVIOUS_IMAGE" || true
+              fi
+            }
+
+            docker pull "$IMAGE_REF"
             docker rm -f rfs_canary 2>/dev/null || true
 
-            # Start canary on port 3004
+            # Start canary on port 3004. Existing production stays up until canary passes.
             docker run -d --name rfs_canary \
               -p 127.0.0.1:3004:80 \
-              ghcr.io/reedtrullz/rfs:latest
+              "$IMAGE_REF"
 
-            sleep 5
-
-            # Health check
-            if curl -f -s http://localhost:3004/ > /dev/null; then
-              echo "Canary healthy, promoting..."
-              docker rm -f rfs 2>/dev/null || true
-              docker run -d --name rfs --restart unless-stopped \
-                -p 127.0.0.1:3005:80 \
-                --memory 256m --cpus 1.0 \
-                --log-driver json-file --log-opt max-size=10m --log-opt max-file=3 \
-                ghcr.io/reedtrullz/rfs:latest
-              docker rm -f rfs_canary
-              echo "Deployed successfully to https://fly.reidar.tech"
-            else
-              echo "Canary health check failed!"
+            # Canary health and version checks.
+            for attempt in $(seq 1 10); do
+              if curl -fsS http://localhost:3004/ > /dev/null; then
+                break
+              fi
+              if [ "$attempt" = "10" ]; then
+                echo "Canary health check failed!"
+                docker logs --tail=50 rfs_canary
+                docker rm -f rfs_canary
+                exit 1
+              fi
+              sleep 3
+            done
+            if ! curl -fsS http://localhost:3004/rfs-version.json | grep -F "$EXPECTED_COMMIT" > /dev/null; then
+              echo "Canary version check failed!"
               docker logs --tail=50 rfs_canary
               docker rm -f rfs_canary
               exit 1
             fi
+
+            echo "Canary healthy, promoting immutable image $IMAGE_REF..."
+            docker rm -f rfs 2>/dev/null || true
+            if ! docker run -d --name rfs --restart unless-stopped \
+              -p 127.0.0.1:3005:80 \
+              --memory 256m --cpus 1.0 \
+              --log-driver json-file --log-opt max-size=10m --log-opt max-file=3 \
+              "$IMAGE_REF"; then
+              rollback
+              docker rm -f rfs_canary
+              exit 1
+            fi
+            docker rm -f rfs_canary
+
+            if ! curl -fsS https://fly.reidar.tech/ > /dev/null; then
+              echo "Public post-promotion health check failed; rolling back."
+              rollback
+              exit 1
+            fi
+            if ! curl -fsS https://fly.reidar.tech/rfs-version.json | grep -F "$EXPECTED_COMMIT" > /dev/null; then
+              echo "Public post-promotion version check failed; rolling back."
+              rollback
+              exit 1
+            fi
+            echo "Deployed $IMAGE_REF (${{ needs.publish.outputs.image_digest }}) successfully to https://fly.reidar.tech"

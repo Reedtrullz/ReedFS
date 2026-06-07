@@ -3,37 +3,76 @@
   gather_facts: false
   vars:
     repo_url: 'https://github.com/Reedtrullz/ReedFS.git'
+    rfms_commit: '810fc9652da431eaf8978b85bf4af131605559b5'
+    git_commit: "{{ lookup('env', 'RFS_COMMIT_SHA') | default(lookup('pipe', 'git rev-parse HEAD'), true) }}"
     app_dir: '/home/deploy/rfs'
     container_name: 'rfs'
     host_port: '3005'
+    canary_host_port: '3004'
     container_port: '80'
     public_domain: 'fly.reidar.tech'
+    image_ref: "{{ lookup('env', 'RFS_IMAGE_REF') | default('ghcr.io/reedtrullz/rfs:sha-' ~ git_commit, true) }}"
+    expected_commit: "{{ lookup('env', 'RFS_EXPECTED_COMMIT') | default(git_commit, true) }}"
+    build_local_image: "{{ lookup('env', 'RFS_BUILD_LOCAL') | default('false', true) }}"
+    local_image_ref: '{{ container_name }}:local'
+    deploy_image_ref: "{{ local_image_ref if (build_local_image | bool) else image_ref }}"
 
   tasks:
-    - name: Ensure app directory exists
+    - name: Require immutable image ref unless explicitly building locally
+      assert:
+        that:
+          - (build_local_image | bool) or image_ref is match('^ghcr\.io/reedtrullz/rfs:sha-[0-9a-f]{40}$')
+        fail_msg: 'Set RFS_IMAGE_REF to an immutable ghcr.io/reedtrullz/rfs:sha-<40 hex sha> image, or set RFS_BUILD_LOCAL=true for a local build.'
+
+    - name: Ensure app directory exists for optional local build
       file:
         path: '{{ app_dir }}'
         state: directory
         owner: deploy
         group: deploy
         mode: '0755'
+      when: build_local_image | bool
 
-    - name: Clone or pull repository
+    - name: Clone or update repository for optional local build
       git:
         repo: '{{ repo_url }}'
         dest: '{{ app_dir }}'
-        version: master
+        version: '{{ expected_commit }}'
         force: true
+      when: build_local_image | bool
       register: git_result
 
-    - name: Build Docker image
+    - name: Build local Docker image with release metadata
       community.docker.docker_image:
-        name: '{{ container_name }}'
+        name: '{{ local_image_ref }}'
         source: build
         build:
           path: '{{ app_dir }}'
+          args:
+            RFS_COMMIT_SHA: '{{ expected_commit }}'
+            RFS_IMAGE_REF: '{{ local_image_ref }}'
+            RFS_VERSION: '{{ expected_commit }}'
         force_source: true
+      when: build_local_image | bool
       register: build_result
+
+    - name: Pull immutable deploy image
+      community.docker.docker_image:
+        name: '{{ deploy_image_ref }}'
+        source: pull
+        force_source: true
+      when: not (build_local_image | bool)
+      register: pull_result
+
+    - name: Capture current production container image for rollback
+      community.docker.docker_container_info:
+        name: '{{ container_name }}'
+      register: existing_prod
+      ignore_errors: true
+
+    - name: Remember previous production image
+      set_fact:
+        previous_image: "{{ existing_prod.container.Image | default(existing_prod.container.Config.Image | default(''), true) if (existing_prod.exists | default(false)) else '' }}"
 
     - name: Stop any stale canary container
       community.docker.docker_container:
@@ -43,32 +82,45 @@
     - name: Start canary container for health check
       community.docker.docker_container:
         name: '{{ container_name }}_canary'
-        image: '{{ container_name }}'
+        image: '{{ deploy_image_ref }}'
         state: started
         ports:
-          - '127.0.0.1:3004:{{ container_port }}'
+          - '127.0.0.1:{{ canary_host_port }}:{{ container_port }}'
       register: canary_start
 
     - name: Wait for canary health check
       block:
-        - name: Wait for nginx to start
-          wait_for:
-            timeout: 10
-
         - name: Check canary HTTP response
           uri:
-            url: 'http://localhost:3004/'
+            url: 'http://localhost:{{ canary_host_port }}/'
             return_content: true
             timeout: 5
           register: canary_health
           until: canary_health is succeeded
           retries: 10
           delay: 3
+
+        - name: Verify canary release metadata
+          uri:
+            url: 'http://localhost:{{ canary_host_port }}/rfs-version.json'
+            return_content: true
+            timeout: 5
+          register: canary_version
+          until: canary_version is succeeded
+          retries: 5
+          delay: 2
+
+        - name: Assert canary commit matches expected release
+          assert:
+            that:
+              - expected_commit in canary_version.content
+            fail_msg: 'Canary metadata did not contain expected commit {{ expected_commit }}: {{ canary_version.content }}'
       rescue:
         - name: Show canary logs on failure
           shell: docker logs --tail=50 {{ container_name }}_canary
           register: canary_logs
           ignore_errors: true
+          changed_when: false
 
         - name: Cleanup canary
           community.docker.docker_container:
@@ -77,19 +129,19 @@
 
         - name: Fail deployment
           fail:
-            msg: 'Deployment aborted: New image failed health check. Logs: {{ canary_logs.stdout }}'
+            msg: 'Deployment aborted: New image failed canary health/version checks. Logs: {{ canary_logs.stdout | default("") }}'
 
-    - name: Promote canary to production
+    - name: Promote canary to production with rollback
       block:
-        - name: Stop existing production container
+        - name: Stop existing production container after canary passed
           community.docker.docker_container:
             name: '{{ container_name }}'
             state: absent
 
-        - name: Start production container
+        - name: Start production container on immutable image
           community.docker.docker_container:
             name: '{{ container_name }}'
-            image: '{{ container_name }}'
+            image: '{{ deploy_image_ref }}'
             state: started
             restart_policy: unless-stopped
             ports:
@@ -101,33 +153,94 @@
               max-size: '10m'
               max-file: '3'
 
+        - name: Ensure Caddy serves fly.reidar.tech
+          become: true
+          blockinfile:
+            path: /etc/caddy/Caddyfile
+            block: |
+              fly.reidar.tech {
+                reverse_proxy localhost:{{ host_port }}
+              }
+            marker: '# {mark} ANSIBLE MANAGED - RFS'
+            create: false
+
+        - name: Reload Caddy
+          become: true
+          systemd:
+            name: caddy
+            state: reloaded
+
+        - name: Verify container is running
+          community.docker.docker_container_info:
+            name: '{{ container_name }}'
+          register: container_info
+
+        - name: Verify public domain after promotion
+          uri:
+            url: 'https://{{ public_domain }}/'
+            status_code: 200
+            timeout: 10
+          register: public_health
+          until: public_health is succeeded
+          retries: 6
+          delay: 5
+
+        - name: Verify public release metadata after promotion
+          uri:
+            url: 'https://{{ public_domain }}/rfs-version.json'
+            return_content: true
+            status_code: 200
+            timeout: 10
+          register: public_version
+          until: public_version is succeeded
+          retries: 6
+          delay: 5
+
+        - name: Assert public metadata matches expected release
+          assert:
+            that:
+              - expected_commit in public_version.content
+            fail_msg: 'Public metadata did not contain expected commit {{ expected_commit }}: {{ public_version.content }}'
+
+      rescue:
+        - name: Capture failed production logs
+          shell: docker logs --tail=50 {{ container_name }}
+          register: prod_logs
+          ignore_errors: true
+          changed_when: false
+
+        - name: Remove failed production container before rollback
+          community.docker.docker_container:
+            name: '{{ container_name }}'
+            state: absent
+          ignore_errors: true
+
+        - name: Rollback previous production image
+          community.docker.docker_container:
+            name: '{{ container_name }}'
+            image: '{{ previous_image }}'
+            state: started
+            restart_policy: unless-stopped
+            ports:
+              - '127.0.0.1:{{ host_port }}:{{ container_port }}'
+            memory: '256m'
+            cpus: 1.0
+            log_driver: 'json-file'
+            log_options:
+              max-size: '10m'
+              max-file: '3'
+          when: previous_image | length > 0
+
+        - name: Fail deployment after rollback attempt
+          fail:
+            msg: 'Deployment failed after canary promotion; rollback image={{ previous_image | default("none") }}. Logs: {{ prod_logs.stdout | default("") }}'
+
+      always:
         - name: Remove canary container
           community.docker.docker_container:
             name: '{{ container_name }}_canary'
             state: absent
 
-    - name: Ensure Caddy serves fly.reidar.tech
-      become: true
-      blockinfile:
-        path: /etc/caddy/Caddyfile
-        block: |
-          fly.reidar.tech {
-            reverse_proxy localhost:{{ host_port }}
-          }
-        marker: '# {mark} ANSIBLE MANAGED - RFS'
-        create: false
-
-    - name: Reload Caddy
-      become: true
-      systemd:
-        name: caddy
-        state: reloaded
-
-    - name: Verify container is running
-      community.docker.docker_container_info:
-        name: '{{ container_name }}'
-      register: container_info
-
     - name: Report deployment status
       debug:
-        msg: 'RFS deployed: {{ container_info.container.State.Status }} -> https://{{ public_domain }}'
+        msg: 'RFS deployed: {{ container_info.container.State.Status }} -> https://{{ public_domain }} using {{ deploy_image_ref }}'
