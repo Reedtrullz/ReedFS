@@ -266,8 +266,31 @@ vi.mock('cesium', () => ({
 }));
 
 vi.mock('three', () => {
-  const vec = function () {
-    return { x: 0, y: 0, z: 0, set: vi.fn() };
+  const vec = function (x = 0, y = 0, z = 0) {
+    const vector = {
+      x,
+      y,
+      z,
+      set: vi.fn(),
+      clone: vi.fn(),
+      normalize: vi.fn(),
+      applyQuaternion: vi.fn(),
+    };
+    vector.clone.mockReturnValue(vector);
+    vector.normalize.mockReturnValue(vector);
+    vector.applyQuaternion.mockReturnValue(vector);
+    return vector;
+  };
+  const quat = function () {
+    const quaternion = { setFromRotationMatrix: vi.fn(), normalize: vi.fn() };
+    quaternion.setFromRotationMatrix.mockReturnValue(quaternion);
+    quaternion.normalize.mockReturnValue(quaternion);
+    return quaternion;
+  };
+  const mat4 = function () {
+    const matrix = { makeBasis: vi.fn() };
+    matrix.makeBasis.mockReturnValue(matrix);
+    return matrix;
   };
   const rot = function () {
     return { x: 0, y: 0, z: 0, set: vi.fn() };
@@ -311,6 +334,9 @@ vi.mock('three', () => {
       return { position: vec() };
     }),
     DoubleSide: 2,
+    Vector3: vi.fn(vec),
+    Quaternion: vi.fn(quat),
+    Matrix4: vi.fn(mat4),
   };
 });
 
@@ -353,6 +379,8 @@ describe('App', () => {
     mockAudioContexts.length = 0;
     useSimStore.getState().apState = structuredClone(defaultAppTestApState);
     useSimStore.getState().status = 'stopped';
+    useSimStore.getState().selectedScenarioId = 'ksea-tutorial';
+    useSimStore.getState().aircraft.position = { lat: 47.45, lon: -122.31, alt: 432 };
     useSimStore.getState().aircraft.flightPhase = 'PARKED';
     delete (useSimStore.getState().aircraft as { ground?: unknown }).ground;
   });
@@ -397,13 +425,27 @@ describe('App', () => {
     expect(viewportProps.scenePolicy?.reason).toMatch(/VITE_CESIUM_ION_TOKEN/);
   });
 
-  it('LOAD PLAN creates and stores the default route', () => {
+  it('LOAD PLAN creates and stores the default route for compatible KSEA scenarios', () => {
     render(<App />);
 
     fireEvent.click(screen.getByRole('button', { name: 'LOAD PLAN' }));
 
     expect(mockSetFlightPlan).toHaveBeenCalledTimes(1);
     expect(mockSetFlightPlan).toHaveBeenCalledWith(expect.objectContaining({ origin: 'KSEA', destination: 'KPDX' }));
+  });
+
+  it('LOAD PLAN keeps NO ROUTE and does not arm route AP modes for the default ENVA scenario', () => {
+    const store = useSimStore.getState();
+    store.selectedScenarioId = 'enva-tutorial';
+    store.aircraft.position = { lat: 63.4583, lon: 10.9101, alt: 40 };
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'LOAD PLAN' }));
+
+    expect(mockSetFlightPlan).toHaveBeenCalledTimes(1);
+    expect(mockSetFlightPlan).toHaveBeenCalledWith(null);
+    expect(mockSetApState).not.toHaveBeenCalled();
   });
 
   it('tracks Z/X differential brake keys in the live input path and clears them on blur and cleanup', () => {

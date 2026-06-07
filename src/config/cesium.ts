@@ -1,4 +1,5 @@
 import { Ion } from 'cesium';
+import { isVisualTestMode } from './visualTest';
 
 export type CesiumSceneMode = 'ion' | 'degraded';
 export type CesiumTerrainMode = 'world' | 'ellipsoid';
@@ -32,6 +33,16 @@ export function normalizeCesiumToken(token?: string): string | null {
 export function getCesiumScenePolicy(
   token: string | undefined = import.meta.env.VITE_CESIUM_ION_TOKEN,
 ): CesiumScenePolicy {
+  if (isVisualTestMode()) {
+    return {
+      mode: 'degraded',
+      terrain: 'ellipsoid',
+      osmBuildings: false,
+      token: null,
+      reason: 'Visual test mode forces deterministic degraded scenery.',
+    };
+  }
+
   const normalizedToken = normalizeCesiumToken(token);
 
   if (normalizedToken) {

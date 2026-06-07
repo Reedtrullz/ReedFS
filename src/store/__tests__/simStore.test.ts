@@ -166,7 +166,9 @@ describe('useSimStore', () => {
     expect(state.inputs).toBe(state.effectiveControls);
     expect(state.aircraft.flightPhase).toBe('TAKEOFF');
     expect(state.guidance.phase).toBe('takeoff-roll');
-    expect(state.guidance.coachMessage).toMatch(/Flaps set for takeoff/i);
+    expect(state.guidance.coachMessage).toMatch(/set flaps 5/i);
+    expect(state.guidance.coachMessage).toMatch(/trim 5\.0/i);
+    expect(state.guidance.coachMessage).toMatch(/takeoff thrust/i);
   });
 
   it('startTakeoffRoll clears stale side-specific brake commands', () => {
@@ -381,6 +383,7 @@ describe('useSimStore', () => {
   });
 
   it('setFlightPlan initializes the first valid active leg and route feedback', () => {
+    useSimStore.getState().setScenario(KSEA_TUTORIAL_SCENARIO.id);
     const fp = createKseaKpdxFlight();
 
     useSimStore.getState().setFlightPlan(fp);
@@ -393,6 +396,20 @@ describe('useSimStore', () => {
     expect(state.routeStatus.fromIdent).toBe('KSEA');
     expect(state.routeStatus.nextWaypointIdent).not.toBe('KPDX');
     expect(state.routeStatus.distanceToNextNm).toBeGreaterThan(0);
+  });
+
+  it('keeps LNAV unavailable when a loaded route is incompatible with the selected scenario position', () => {
+    useSimStore.getState().setScenario(ENVA_TUTORIAL_SCENARIO.id);
+    const fp = createKseaKpdxFlight();
+
+    useSimStore.getState().setFlightPlan(fp);
+
+    const state = useSimStore.getState();
+    expect(state.selectedScenarioId).toBe(ENVA_TUTORIAL_SCENARIO.id);
+    expect(state.flightPlan).toBe(fp);
+    expect(state.routeStatus.routeName).toBe('KSEA→KPDX');
+    expect(state.routeStatus.lnavAvailable).toBe(false);
+    expect(state.routeStatus.lnavUnavailableReason).toMatch(/route.*not compatible.*current aircraft position/i);
   });
 
   it('tick advances the active leg and refreshes route feedback as the aircraft progresses', () => {

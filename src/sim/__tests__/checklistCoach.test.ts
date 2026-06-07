@@ -36,6 +36,24 @@ describe('checklistCoach', () => {
     expect(coachMessageForState('running', aircraft, { ...configuredInputs, throttle1: 0.35, throttle2: 0.35 }, KSEA_TUTORIAL_SCENARIO)).toMatch(/takeoff thrust/i);
   });
 
+  it('treats START ROLL zeroed flaps and trim as pilot setup instructions before thrust', () => {
+    const aircraft = createAircraftStateForScenario(B737_800_SPEC, KSEA_TUTORIAL_SCENARIO);
+    aircraft.flightPhase = 'TAKEOFF';
+    aircraft.config.flapSetting = 0;
+    aircraft.config.stabilizerTrimUnits = 0;
+
+    const message = coachMessageForState('running', aircraft, {
+      ...configuredInputs,
+      flapLever: 0,
+      throttle1: 0,
+      throttle2: 0,
+    }, KSEA_TUTORIAL_SCENARIO);
+
+    expect(message).toMatch(/set flaps 5/i);
+    expect(message).toMatch(/trim 5\.0/i);
+    expect(message).toMatch(/takeoff thrust/i);
+  });
+
   it('coaches climb instead of re-running the before-takeoff gear check after cleanup', () => {
     const aircraft = createAircraftStateForScenario(B737_800_SPEC, KSEA_TUTORIAL_SCENARIO);
     aircraft.ground.weightOnWheels = false;

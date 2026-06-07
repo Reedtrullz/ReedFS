@@ -32,7 +32,9 @@ import { CockpitLayer } from './viewport/CockpitLayer';
 import { nextCameraMode, type CameraMode } from './viewport/cameraMode';
 import { nextOverlayMode, shouldShowDebugOverlays, shouldShowFlightInstruments, type OverlayMode } from './viewport/overlayMode';
 import { CameraManager } from './viewport/CameraManager';
-import { createKseaKpdxFlight } from './sim/flightPlanLoader';
+import { createDefaultFlightForScenario } from './sim/flightPlanLoader';
+import { scenarioById } from './sim/scenarios';
+import { computeRouteStatus, getInitialActiveLegIndex } from './sim/systems/navigation';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { FPSMonitor } from './components/FPSMonitor';
 import { EngineStrip } from './components/EngineStrip';
@@ -63,8 +65,8 @@ function applyLoadedRouteAutopilotDefaults(apState: AutopilotState): AutopilotSt
   return next;
 }
 
-function shouldApplyLoadedRouteAutopilotDefaults(status: SimulationStatus, aircraft: AircraftState): boolean {
-  return status === 'stopped' && aircraft.flightPhase === 'PARKED';
+function shouldApplyLoadedRouteAutopilotDefaults(status: SimulationStatus, aircraft: AircraftState, routeCompatible: boolean): boolean {
+  return routeCompatible && status === 'stopped' && aircraft.flightPhase === 'PARKED';
 }
 
 export function App() {
@@ -301,10 +303,13 @@ export function App() {
         </button>
         <button
           onClick={() => {
-            const fp = createKseaKpdxFlight();
             const store = useSimStore.getState();
+            const scenario = scenarioById(store.selectedScenarioId);
+            const fp = createDefaultFlightForScenario(scenario);
             store.setFlightPlan(fp);
-            if (!shouldApplyLoadedRouteAutopilotDefaults(store.status, store.aircraft)) return;
+            if (!fp) return;
+            const routeStatus = computeRouteStatus(store.aircraft, fp, getInitialActiveLegIndex(fp));
+            if (!shouldApplyLoadedRouteAutopilotDefaults(store.status, store.aircraft, routeStatus.lnavAvailable)) return;
             const ap = store.apState ?? createDefaultAutopilotState();
             store.setApState(applyLoadedRouteAutopilotDefaults(ap));
           }}

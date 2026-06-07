@@ -2,12 +2,12 @@ import type { SimStatus } from '../sim/simulationStatus';
 
 export type CameraMode = 'chase' | 'cockpit' | 'tower' | 'free';
 
-export function shouldAutoFollowCamera(status: SimStatus, mode: CameraMode): boolean {
+export function shouldAutoFollowCamera(_status: SimStatus, mode: CameraMode): boolean {
   switch (mode) {
     case 'chase':
     case 'cockpit':
     case 'tower':
-      return status === 'running';
+      return true;
     case 'free':
       return false;
   }

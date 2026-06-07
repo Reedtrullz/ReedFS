@@ -61,13 +61,17 @@ export function CesiumViewport({ onReady, scenePolicy }: CesiumViewportProps) {
     if (!visualTest) {
       globe.enableLighting = true;
       globe.showWaterEffect = true;
+      viewer.scene.requestRenderMode = false;
       if (viewer.scene.skyAtmosphere) viewer.scene.skyAtmosphere.show = true;
     } else {
       globe.enableLighting = false;
       globe.showWaterEffect = false;
+      viewer.scene.requestRenderMode = true;
+      viewer.scene.maximumRenderTimeChange = 0;
       if (viewer.scene.skyAtmosphere) viewer.scene.skyAtmosphere.show = false;
     }
 
+    containerRef.current.dataset.rfsReady = 'true';
     onReady?.(viewer);
 
     return () => {

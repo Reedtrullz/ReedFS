@@ -16,13 +16,14 @@ test.describe('RFS deterministic visual states', () => {
   test('route overlay and safe AP modes are visible after LOAD PLAN', async ({ page }) => {
     await openRfs(page);
     await clickButton(page, /LOAD PLAN/i);
+    await expect(page.getByLabel('Route status')).toContainText(/NO ROUTE|KSEA→KPDX/);
     await expect(page).toHaveScreenshot('route-loaded.png', { fullPage: true });
   });
 
   test('start roll state is visually stable', async ({ page }) => {
     await openRfs(page);
     await startRoll(page);
-    await page.waitForTimeout(1000);
+    await expect(page.getByText(/Set flaps 5, trim 5\.0, then advance takeoff thrust smoothly\./i)).toBeVisible();
     await expect(page).toHaveScreenshot('start-roll.png', { fullPage: true });
   });
 });

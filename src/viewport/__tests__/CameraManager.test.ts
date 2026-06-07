@@ -105,7 +105,21 @@ describe('CameraManager', () => {
     expect(viewer.camera.lookAt).not.toHaveBeenCalled();
   });
 
-  it('disables manual camera only in running follow modes, not free mode', () => {
+  it('snaps follow camera modes while paused or stopped so mode changes are visible immediately', () => {
+    const viewer = createViewer();
+    const manager = new CameraManager(viewer as never);
+
+    update(manager, viewer, 'stopped', 'chase');
+    update(manager, viewer, 'paused', 'tower');
+    update(manager, viewer, 'stopped', 'cockpit');
+
+    expect(viewer.camera.lookAt).toHaveBeenCalledTimes(2);
+    expect(viewer.camera.setView).toHaveBeenCalledTimes(1);
+    expect(viewer.camera.cancelFlight).toHaveBeenCalledTimes(3);
+    expect(viewer.scene.screenSpaceCameraController.enableInputs).toBe(false);
+  });
+
+  it('disables manual camera in selected follow modes, not free mode', () => {
     const viewer = createViewer();
     const manager = new CameraManager(viewer as never);
 
@@ -116,6 +130,6 @@ describe('CameraManager', () => {
     expect(viewer.scene.screenSpaceCameraController.enableInputs).toBe(true);
 
     update(manager, viewer, 'paused', 'tower');
-    expect(viewer.scene.screenSpaceCameraController.enableInputs).toBe(true);
+    expect(viewer.scene.screenSpaceCameraController.enableInputs).toBe(false);
   });
 });

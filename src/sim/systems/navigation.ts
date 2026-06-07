@@ -4,6 +4,7 @@ import type { FlightPlan, FlightPlanWaypoint } from '@shared/types/fmc';
 const EARTH_RADIUS_M = 6371000;
 const M_PER_NM = 1852;
 const DEFAULT_CAPTURE_RADIUS_M = 0.5 * M_PER_NM;
+const DEFAULT_ROUTE_COMPATIBILITY_RADIUS_M = 50 * M_PER_NM;
 const LEG_COMPLETE_RADIUS_M = 0.1 * M_PER_NM;
 const STANDARD_LNAV_BANK_RAD = 25 * Math.PI / 180;
 const MAX_TURN_ANTICIPATION_LEG_FRACTION = 0.5;
@@ -47,6 +48,9 @@ export interface RouteStatusSnapshot {
 
 export interface RouteStatusOptions {
   captureRadiusM?: number;
+  routeCompatibilityRadiusM?: number;
+  /** @deprecated Use routeCompatibilityRadiusM. Kept for existing callers. */
+  originCompatibilityRadiusM?: number;
   turnAnticipationEnabled?: boolean;
 }
 
@@ -207,6 +211,29 @@ function positionRelativeToLegM(leg: RouteLeg, lat: number, lon: number): { alon
   return { alongTrackM, crossTrackM, legLengthM };
 }
 
+function distanceToRouteLegM(leg: RouteLeg, lat: number, lon: number): number {
+  if (leg.fromLat === null || leg.fromLon === null) {
+    return distanceM(lat, lon, leg.toLat, leg.toLon);
+  }
+
+  const relative = positionRelativeToLegM(leg, lat, lon);
+  if (relative && relative.alongTrackM >= 0 && relative.alongTrackM <= relative.legLengthM) {
+    return Math.abs(relative.crossTrackM);
+  }
+
+  return Math.min(
+    distanceM(lat, lon, leg.fromLat, leg.fromLon),
+    distanceM(lat, lon, leg.toLat, leg.toLon),
+  );
+}
+
+function nearestRouteDistanceM(legs: RouteLeg[], lat: number, lon: number): number {
+  return legs.reduce(
+    (nearest, leg) => Math.min(nearest, distanceToRouteLegM(leg, lat, lon)),
+    Number.POSITIVE_INFINITY,
+  );
+}
+
 function computeLegTurnAngleRad(leg: RouteLeg, nextLeg: RouteLeg | undefined): number | null {
   if (!nextLeg || leg.fromLat === null || leg.fromLon === null) return null;
   const desiredTrackRad = bearingRad(leg.fromLat, leg.fromLon, leg.toLat, leg.toLon);
@@ -306,6 +333,16 @@ export function computeRouteStatus(
   if (route.unavailableReason) return createNoRouteStatus(flightPlan, route.unavailableReason);
 
   const legs = route.legs;
+  const routeCompatibilityRadiusM = options.routeCompatibilityRadiusM
+    ?? options.originCompatibilityRadiusM
+    ?? DEFAULT_ROUTE_COMPATIBILITY_RADIUS_M;
+  if (nearestRouteDistanceM(legs, state.position.lat, state.position.lon) > routeCompatibilityRadiusM) {
+    return createNoRouteStatus(
+      flightPlan,
+      'route is not compatible with current aircraft position',
+    );
+  }
+
   const captureRadiusM = options.captureRadiusM ?? DEFAULT_CAPTURE_RADIUS_M;
   const turnAnticipationEnabled = options.turnAnticipationEnabled ?? true;
   let legIndex = Math.max(0, Math.min(activeLegIndex ?? 0, legs.length - 1));

@@ -325,6 +325,40 @@ describe('computeRouteStatus', () => {
     expect(leftStatus.crossTrackErrorM).toBeLessThan(-1000);
   });
 
+  it('keeps LNAV available when the aircraft is near a downstream active route leg beyond the origin compatibility radius', () => {
+    const fp = makePlan([
+      { ident: 'ORIG', lat: 47.0, lon: -122.0, discontinuity: false },
+      { ident: 'MID', lat: 48.0, lon: -122.0, discontinuity: false },
+      { ident: 'DEST', lat: 48.2, lon: -122.0, discontinuity: false },
+    ]);
+    const state = makeState(48.1, -122.0, 100);
+
+    const status = computeRouteStatus(state, fp, 1);
+
+    expect(status.routeValid).toBe(true);
+    expect(status.lnavAvailable).toBe(true);
+    expect(status.lnavUnavailableReason).toBeNull();
+    expect(status.activeLegIndex).toBe(1);
+    expect(status.fromIdent).toBe('MID');
+    expect(status.nextWaypointIdent).toBe('DEST');
+  });
+
+  it('marks LNAV unavailable when the aircraft is not near the loaded route', () => {
+    const fp = makePlan([
+      { ident: 'KSEA', lat: 47.45, lon: -122.31, discontinuity: false },
+      { ident: 'KPDX', lat: 45.59, lon: -122.60, discontinuity: false },
+    ]);
+    const state = makeState(63.4583, 10.9101);
+
+    const status = computeRouteStatus(state, fp, 0);
+
+    expect(status.routeName).toBe('KSEA→KPDX');
+    expect(status.routeValid).toBe(false);
+    expect(status.lnavAvailable).toBe(false);
+    expect(status.lnavUnavailableReason).toMatch(/route.*not compatible.*current aircraft position/i);
+    expect(status.distanceToNextNm).toBeNull();
+  });
+
   it('reports turn anticipation metrics for the next active leg transition', () => {
     const fp = makePlan([
       { ident: 'ORIG', lat: 47.0, lon: -122.0, discontinuity: false },

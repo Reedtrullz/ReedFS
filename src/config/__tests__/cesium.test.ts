@@ -1,10 +1,15 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Ion } from 'cesium';
 import { getCesiumScenePolicy, hasCesiumToken, initCesium, normalizeCesiumToken } from '../cesium';
 
 describe('cesium scene policy', () => {
   beforeEach(() => {
     Ion.defaultAccessToken = '';
+    vi.stubEnv('VITE_RFS_VISUAL_TEST', undefined);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it('normalizes empty and placeholder tokens as missing', () => {
@@ -30,5 +35,20 @@ describe('cesium scene policy', () => {
     expect(policy.osmBuildings).toBe(true);
     expect(Ion.defaultAccessToken).toBe('test-token-123');
     expect(hasCesiumToken()).toBe(true);
+  });
+
+  it('forces degraded deterministic scenery in visual test mode even with an Ion token', () => {
+    vi.stubEnv('VITE_RFS_VISUAL_TEST', '1');
+
+    const policy = initCesium('test-token-123');
+
+    expect(policy).toMatchObject({
+      mode: 'degraded',
+      terrain: 'ellipsoid',
+      osmBuildings: false,
+      token: null,
+    });
+    expect(policy.reason).toMatch(/visual test/i);
+    expect(Ion.defaultAccessToken).toBe('');
   });
 });

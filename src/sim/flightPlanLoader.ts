@@ -1,4 +1,5 @@
 import type { FlightPlan, FlightPlanWaypoint } from '@shared/types/fmc';
+import type { FlightScenario } from './scenarios';
 
 const AIRPORT_COORDS: Record<string, Pick<FlightPlanWaypoint, 'lat' | 'lon' | 'coordinateSource'>> = {
   ENVA: { lat: 63.4583, lon: 10.9101, coordinateSource: 'synthetic' },
@@ -40,4 +41,13 @@ export function createKseaKpdxFlight(): FlightPlan {
       { ident: 'KPDX', lat: 45.59, lon: -122.60, coordinateSource: 'synthetic', discontinuity: false },
     ],
   };
+}
+
+export function createDefaultFlightForScenario(scenario: FlightScenario): FlightPlan | null {
+  switch (scenario.runway.airport.toUpperCase()) {
+    case 'KSEA':
+      return createKseaKpdxFlight();
+    default:
+      return null;
+  }
 }

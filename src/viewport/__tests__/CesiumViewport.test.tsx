@@ -15,6 +15,8 @@ const {
       screenSpaceCameraController: { enableInputs: boolean };
       globe: { enableLighting: boolean; terrainExaggeration?: number; showWaterEffect?: boolean };
       skyAtmosphere: { show: boolean };
+      requestRenderMode?: boolean;
+      maximumRenderTimeChange?: number;
       primitives: { add: ReturnType<typeof vi.fn>; remove: ReturnType<typeof vi.fn> };
     };
   }>,
@@ -139,6 +141,18 @@ describe('CesiumViewport scene policy', () => {
     expect(globe.enableLighting).toBe(false);
     expect(globe.showWaterEffect).toBe(false);
     expect(skyAtmosphere.show).toBe(false);
+  });
+
+  it('marks the viewport ready for visual tests only after deterministic render settings are applied', () => {
+    const onReady = vi.fn();
+    vi.stubEnv('VITE_RFS_VISUAL_TEST', '1');
+
+    render(<CesiumViewport scenePolicy={degradedPolicy} onReady={onReady} />);
+
+    const viewer = mockViewerInstances[0];
+    expect(viewer.scene.requestRenderMode).toBe(true);
+    expect(viewer.scene.maximumRenderTimeChange).toBe(0);
+    expect(onReady).toHaveBeenCalledWith(viewer);
   });
 
   it('adds OSM buildings to the same Ion viewer exactly once after async resolution', async () => {
