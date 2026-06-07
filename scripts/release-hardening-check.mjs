@@ -31,10 +31,10 @@ for (const [name, command] of Object.entries(packageJson.scripts ?? {})) {
 }
 
 const requiredActions = [
-  ["actions/checkout", "34e114876b0b11c390a56381ad16ebd13914f8d5"],
-  ["actions/setup-node", "49933ea5288caeca8642d1e84afbd3f7d6820020"],
-  ["docker/login-action", "c94ce9fb468520275223c153574b00df6fe4bcc9"],
-  ["docker/build-push-action", "10e90e3645eae34f1e60eeb005ba3a3d33f178e8"],
+  ["actions/checkout", "df4cb1c069e1874edd31b4311f1884172cec0e10"],
+  ["actions/setup-node", "48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e"],
+  ["docker/login-action", "650006c6eb7dba73a995cc03b0b2d7f5ca915bee"],
+  ["docker/build-push-action", "f9f3042f7e2789586610d6e8b85c8f03e5195baf"],
   ["appleboy/ssh-action", "0ff4204d59e8e51228ff73bce53f80d53301dee2"],
   ["gitleaks/gitleaks-action", "e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e"],
 ];
