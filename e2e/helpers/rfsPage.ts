@@ -5,6 +5,8 @@ export async function openRfs(page: Page) {
   const viewport = page.getByTestId('cesium-viewport');
   await viewport.waitFor({ state: 'visible' });
   await page.waitForFunction(() => document.querySelector('[data-testid="cesium-viewport"]')?.getAttribute('data-rfs-ready') === 'true');
+  await page.waitForFunction(() => document.querySelectorAll('canvas').length >= 2);
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
   await page.getByRole('button', { name: /START ROLL|ABORT/i }).waitFor({ state: 'visible' });
 }
 
