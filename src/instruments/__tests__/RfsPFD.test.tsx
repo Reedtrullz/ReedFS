@@ -181,6 +181,32 @@ describe('RfsPFD', () => {
     expect(screen.getByText('SEL VS -800')).toBeTruthy();
   });
 
+  it('draws selected speed and altitude bugs on the IAS and ALT tapes when targets are in range', () => {
+    const aircraft = structuredClone(useSimStore.getState().aircraft);
+    aircraft.velocity.u = 240 * KNOT_TO_MPS;
+    aircraft.position.alt = 11_800;
+    aircraft.ground = { ...aircraft.ground, aglFt: 3_000, groundAltFt: 432, weightOnWheels: false };
+    const ap = apStateWithModes();
+    ap.boeing.speed = 245;
+    ap.boeing.altitude = 12_000;
+    useSimStore.setState({ aircraft });
+    useSimStore.getState().setApState(ap);
+
+    render(<RfsPFD />);
+
+    expect(screen.getByLabelText('Airspeed selected bug')).toBeTruthy();
+    expect(screen.getByText('SPD BUG 245')).toBeTruthy();
+    expect(screen.getByLabelText('Altitude selected bug')).toBeTruthy();
+    expect(screen.getByText('ALT BUG 12000')).toBeTruthy();
+  });
+
+  it('does not invent speed or altitude tape bugs before MCP/autopilot targets exist', () => {
+    render(<RfsPFD />);
+
+    expect(screen.queryByLabelText('Airspeed selected bug')).toBeNull();
+    expect(screen.queryByLabelText('Altitude selected bug')).toBeNull();
+  });
+
   it('does not invent PFD MCP selected target bugs before an MCP/autopilot state exists', () => {
     render(<RfsPFD />);
 

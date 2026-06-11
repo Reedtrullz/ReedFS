@@ -142,19 +142,33 @@ function McpTargetStrip({
   );
 }
 
+function targetBugPositionPercent(selectedValue: number, ticks: number[]): number | null {
+  if (!Number.isFinite(selectedValue) || ticks.length < 2) return null;
+  const min = Math.min(...ticks);
+  const max = Math.max(...ticks);
+  if (selectedValue < min || selectedValue > max || max <= min) return null;
+  const normalized = (selectedValue - min) / (max - min);
+  return 100 - normalized * 100;
+}
+
 function Tape({
   label,
   value,
   unit,
   ticks,
   align,
+  selectedBug,
 }: {
   label: string;
   value: number;
   unit: string;
   ticks: number[];
   align: 'left' | 'right';
+  selectedBug?: { ariaLabel: string; label: string; value: number | null | undefined };
 }) {
+  const selectedBugValue = Number.isFinite(selectedBug?.value) ? Math.round(selectedBug?.value as number) : null;
+  const selectedBugTop = selectedBugValue === null ? null : targetBugPositionPercent(selectedBugValue, ticks);
+
   return (
     <div
       aria-label={label === 'IAS' ? 'Airspeed tape' : 'Altitude tape'}
@@ -221,6 +235,29 @@ function Tape({
             </div>
           ))}
         </div>
+        {selectedBug && selectedBugValue !== null && selectedBugTop !== null && (
+          <div
+            aria-label={selectedBug.ariaLabel}
+            style={{
+              position: 'absolute',
+              top: `${selectedBugTop}%`,
+              transform: 'translateY(-50%)',
+              [align === 'right' ? 'right' : 'left']: 4,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 3,
+              color: '#ff4df3',
+              fontSize: 10,
+              fontWeight: 900,
+              textShadow: '0 0 5px rgba(255,77,243,0.85)',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {align === 'right' && <span style={{ fontSize: 14, lineHeight: 1 }}>◀</span>}
+            <span>{selectedBug.label} {selectedBugValue}</span>
+            {align === 'left' && <span style={{ fontSize: 14, lineHeight: 1 }}>▶</span>}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -319,7 +356,14 @@ export function RfsPFD() {
       {showTakeoffReference && <TakeoffReferenceStrip cue={takeoffCue} vSpeeds={vSpeeds} />}
 
       <div style={{ display: 'flex', gap: 8, padding: 10, alignItems: 'stretch' }}>
-        <Tape label="IAS" value={ias} unit="KT" ticks={tapeTicks(ias, 10, 7)} align="right" />
+        <Tape
+          label="IAS"
+          value={ias}
+          unit="KT"
+          ticks={tapeTicks(ias, 10, 7)}
+          align="right"
+          selectedBug={hasMcpTargets ? { ariaLabel: 'Airspeed selected bug', label: 'SPD BUG', value: selectedSpeed } : undefined}
+        />
 
         <div
           aria-label="Attitude and heading display"
@@ -408,7 +452,14 @@ export function RfsPFD() {
           </div>
         </div>
 
-        <Tape label="ALT" value={altitude} unit="FT" ticks={tapeTicks(altitude, 500, 5)} align="left" />
+        <Tape
+          label="ALT"
+          value={altitude}
+          unit="FT"
+          ticks={tapeTicks(altitude, 500, 5)}
+          align="left"
+          selectedBug={hasMcpTargets ? { ariaLabel: 'Altitude selected bug', label: 'ALT BUG', value: selectedAltitude } : undefined}
+        />
       </div>
     </div>
   );
