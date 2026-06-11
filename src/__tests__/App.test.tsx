@@ -626,6 +626,10 @@ describe('App', () => {
     expect(nextApState.boeing.lnav).toBe(true);
     expect(nextApState.boeing.speedMode).toBe(true);
     expect(nextApState.boeing.altHold).toBe(true);
+    expect(nextApState.boeing.cmdA).toBe(true);
+    expect(nextApState.boeing.cmdB).toBe(false);
+    expect(nextApState.boeing.cwsA).toBe(false);
+    expect(nextApState.boeing.cwsB).toBe(false);
     expect(nextApState.boeing.vnav).toBe(false);
     expect(nextApState.boeing.vs).toBe(false);
     expect(nextApState.boeing.hdgSel).toBe(false);
