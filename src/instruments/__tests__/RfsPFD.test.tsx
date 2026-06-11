@@ -126,6 +126,44 @@ describe('RfsPFD', () => {
     expect(screen.getByText('V2 155')).toBeTruthy();
   });
 
+  it('shows radio altitude below 2500 ft AGL for takeoff and landing height awareness', () => {
+    const aircraft = structuredClone(useSimStore.getState().aircraft);
+    aircraft.flightPhase = 'CLIMB';
+    aircraft.ground = { ...aircraft.ground, aglFt: 350, groundAltFt: 432, weightOnWheels: false };
+    aircraft.position.alt = 782;
+    useSimStore.setState({ aircraft });
+
+    render(<RfsPFD />);
+
+    expect(screen.getByLabelText('Radio altitude')).toBeTruthy();
+    expect(screen.getByText('RA 350')).toBeTruthy();
+  });
+
+  it('hides radio altitude at cruise heights so the PFD does not show stale low-altitude cues', () => {
+    const aircraft = structuredClone(useSimStore.getState().aircraft);
+    aircraft.flightPhase = 'CRUISE';
+    aircraft.ground = { ...aircraft.ground, aglFt: 3_000, groundAltFt: 432, weightOnWheels: false };
+    aircraft.position.alt = 3_432;
+    useSimStore.setState({ aircraft });
+
+    render(<RfsPFD />);
+
+    expect(screen.queryByLabelText('Radio altitude')).toBeNull();
+    expect(screen.queryByText('RA 3000')).toBeNull();
+  });
+
+  it('does not round just-below-threshold radio altitude into a misleading RA 2500 annunciation', () => {
+    const aircraft = structuredClone(useSimStore.getState().aircraft);
+    aircraft.flightPhase = 'APPROACH';
+    aircraft.ground = { ...aircraft.ground, aglFt: 2499.6, groundAltFt: 432, weightOnWheels: false };
+    aircraft.position.alt = 2931.6;
+    useSimStore.setState({ aircraft });
+
+    render(<RfsPFD />);
+
+    expect(screen.queryByText('RA 2500')).toBeNull();
+  });
+
   it('shows FMA truth modes instead of burying autopilot status in debug telemetry', () => {
     setAircraftOnKseaRoute();
     useSimStore.getState().setApState(apStateWithModes());

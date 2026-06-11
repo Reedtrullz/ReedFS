@@ -187,6 +187,15 @@ export function RfsPFD() {
     const euler = quatToEuler(s.aircraft.quaternion);
     return ((euler.psi * 180) / Math.PI + 360) % 360;
   });
+  const radioAltitude = useSimStore((s) => {
+    const ground = s.aircraft.ground;
+    if (!ground) return null;
+    const aglFt = Number.isFinite(ground.aglFt)
+      ? ground.aglFt
+      : s.aircraft.position.alt - ground.groundAltFt;
+    if (!Number.isFinite(aglFt) || aglFt < 0 || aglFt >= 2500) return null;
+    return Math.floor(aglFt);
+  });
   const thrustMode = useFmaText('thrustActive');
   const lateralMode = useFmaText('lateralActive');
   const verticalMode = useFmaText('verticalActive');
@@ -287,6 +296,26 @@ export function RfsPFD() {
             <div style={{ position: 'absolute', right: 12, bottom: 10, color: '#ffffff', fontSize: 13, fontWeight: 800 }}>
               R {roll.toFixed(1)}°
             </div>
+            {radioAltitude !== null && (
+              <div
+                aria-label="Radio altitude"
+                style={{
+                  position: 'absolute',
+                  left: '50%',
+                  bottom: 9,
+                  transform: 'translateX(-50%)',
+                  padding: '2px 8px',
+                  borderRadius: 4,
+                  background: 'rgba(0,0,0,0.55)',
+                  color: '#ffffff',
+                  fontSize: 13,
+                  fontWeight: 900,
+                  letterSpacing: 0.6,
+                }}
+              >
+                RA {radioAltitude}
+              </div>
+            )}
           </div>
           <div
             style={{
