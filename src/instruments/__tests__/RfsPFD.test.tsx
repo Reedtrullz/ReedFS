@@ -5,6 +5,7 @@ import type { FlightPlan } from '@shared/types/fmc';
 import { RfsPFD } from '../RfsPFD';
 import { useSimStore } from '../../store/simStore';
 import { computeRouteStatus } from '../../sim/systems/navigation';
+import { eulerToQuat } from '../../sim/physics/quaternion';
 import { KSEA_TUTORIAL_SCENARIO } from '../../sim/scenarios';
 
 const KNOT_TO_MPS = 0.514444;
@@ -212,6 +213,72 @@ describe('RfsPFD', () => {
     expect(screen.getByText('HDG BUG 185')).toBeTruthy();
     expect(screen.getByLabelText('Vertical speed selected bug')).toBeTruthy();
     expect(screen.getByText('VS BUG +700')).toBeTruthy();
+  });
+
+  it('shows Flight Director pitch and roll command bars when FD switches and supported AFDS modes exist', () => {
+    const aircraft = structuredClone(useSimStore.getState().aircraft);
+    aircraft.position.alt = 9_000;
+    aircraft.attitude = { phi: 0, theta: 0, psi: 180 * Math.PI / 180 };
+    aircraft.quaternion = eulerToQuat(aircraft.attitude.phi, aircraft.attitude.theta, aircraft.attitude.psi);
+    const ap = apStateWithModes();
+    ap.truth.lateralActive = 'HDG_SEL';
+    ap.truth.verticalActive = 'ALT_HOLD';
+    ap.boeing.hdgSel = true;
+    ap.boeing.lnav = false;
+    ap.boeing.altHold = true;
+    ap.boeing.vnav = false;
+    ap.boeing.heading = 210;
+    ap.boeing.altitude = 10_000;
+    useSimStore.setState({ aircraft });
+    useSimStore.getState().setApState(ap);
+
+    render(<RfsPFD />);
+
+    expect(screen.getByLabelText('Flight director roll bar')).toBeTruthy();
+    expect(screen.getByText('FD ROLL +8.4°')).toBeTruthy();
+    expect(screen.getByLabelText('Flight director pitch bar')).toBeTruthy();
+    expect(screen.getByText('FD PITCH +4.0°')).toBeTruthy();
+  });
+
+  it('keeps Flight Director bars hidden for LNAV and VS modes until cues mirror the AP resolver', () => {
+    setAircraftOnKseaRoute();
+    const ap = apStateWithModes();
+    ap.truth.lateralActive = 'LNAV';
+    ap.truth.verticalActive = 'VS';
+    ap.boeing.lnav = true;
+    ap.boeing.hdgSel = false;
+    ap.boeing.vs = true;
+    ap.boeing.altHold = false;
+    ap.boeing.verticalSpeed = 700;
+    useSimStore.getState().setApState(ap);
+
+    render(<RfsPFD />);
+
+    expect(screen.queryByLabelText('Flight director roll bar')).toBeNull();
+    expect(screen.queryByLabelText('Flight director pitch bar')).toBeNull();
+  });
+
+  it('does not invent Flight Director bars before MCP/autopilot state exists', () => {
+    render(<RfsPFD />);
+
+    expect(screen.queryByLabelText('Flight director roll bar')).toBeNull();
+    expect(screen.queryByLabelText('Flight director pitch bar')).toBeNull();
+  });
+
+  it('does not show Flight Director bars when both FD switches are off', () => {
+    const ap = apStateWithModes();
+    ap.truth.lateralActive = 'HDG_SEL';
+    ap.truth.verticalActive = 'ALT_HOLD';
+    ap.boeing.hdgSel = true;
+    ap.boeing.altHold = true;
+    ap.boeing.fdLeft = false;
+    ap.boeing.fdRight = false;
+    useSimStore.getState().setApState(ap);
+
+    render(<RfsPFD />);
+
+    expect(screen.queryByLabelText('Flight director roll bar')).toBeNull();
+    expect(screen.queryByLabelText('Flight director pitch bar')).toBeNull();
   });
 
   it('does not invent heading or vertical-speed bugs before MCP/autopilot targets exist', () => {
