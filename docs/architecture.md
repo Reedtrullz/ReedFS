@@ -108,7 +108,7 @@ Known rendering follow-up:
 
 RFS bridges RFMS-compatible avionics state into native physics and player-facing feedback:
 
-- `RfsMCP.tsx` edits RFMS-compatible selected speed/heading/altitude/vertical-speed targets, creates a default AP state on first valid mode/target click, exposes clickable SPD and N1 thrust buttons because both command laws exist, keeps the Boeing `speedMode` and `n1` flags mutually exclusive, and keeps unsupported modes hidden.
+- `RfsMCP.tsx` edits RFMS-compatible selected speed/heading/altitude/vertical-speed targets, creates a default AP state on first valid target/mode/FD switch click, exposes clickable FD L/R, SPD, and N1 buttons because those backed controls now exist, keeps the Boeing `speedMode` and `n1` flags mutually exclusive, and keeps unsupported modes hidden.
 - `RfsPFD.tsx` renders readable speed/altitude tapes, attitude/heading, low-altitude radio-altitude awareness, selected MCP target strip/tape/footer bugs, honest FD command bars for supported direct HDG SEL/ALT HOLD modes, and an FMA row from the same truth modes the servo laws use; `N1` is shown from `apState.truth.thrustActive`, not from a cosmetic flag. PFD/debug telemetry selectors subscribe to primitive/derived values instead of the full `aircraft` object snapshot.
 - `App.tsx` can load the KSEA -> OLM -> BTG -> KPDX sample route. LOAD PLAN applies the safe LNAV + SPEED + ALT_HOLD defaults only in the stopped/PARKED preflight state; during a running takeoff it stores the route without auto-commanding AP modes.
 - `navigation.ts` validates route geometry, computes cross-track/along-track/desired-track/turn metrics, and sequences legs on capture radius, passed-waypoint geometry, or a bounded turn-anticipation gate.
