@@ -200,6 +200,27 @@ describe('RfsPFD', () => {
     expect(screen.getByText('ALT BUG 12000')).toBeTruthy();
   });
 
+  it('shows selected heading and vertical-speed bugs in the PFD footer when MCP targets exist', () => {
+    const ap = apStateWithModes();
+    ap.boeing.heading = 185;
+    ap.boeing.verticalSpeed = 700;
+    useSimStore.getState().setApState(ap);
+
+    render(<RfsPFD />);
+
+    expect(screen.getByLabelText('Heading selected bug')).toBeTruthy();
+    expect(screen.getByText('HDG BUG 185')).toBeTruthy();
+    expect(screen.getByLabelText('Vertical speed selected bug')).toBeTruthy();
+    expect(screen.getByText('VS BUG +700')).toBeTruthy();
+  });
+
+  it('does not invent heading or vertical-speed bugs before MCP/autopilot targets exist', () => {
+    render(<RfsPFD />);
+
+    expect(screen.queryByLabelText('Heading selected bug')).toBeNull();
+    expect(screen.queryByLabelText('Vertical speed selected bug')).toBeNull();
+  });
+
   it('does not invent speed or altitude tape bugs before MCP/autopilot targets exist', () => {
     render(<RfsPFD />);
 

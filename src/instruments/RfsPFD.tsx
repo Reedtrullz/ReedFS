@@ -447,8 +447,22 @@ export function RfsPFD() {
             }}
           >
             <span style={{ color: '#9ddcff', fontSize: 13, fontWeight: 800 }}>HDG</span>
-            <span style={{ color: '#ffffff', fontSize: 26, fontWeight: 900 }}>{hdg.toFixed(0).padStart(3, '0')}°</span>
-            <span style={{ color: '#9ddcff', fontSize: 13, fontWeight: 800 }}>VS {vs.toFixed(0)}</span>
+            <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1.05 }}>
+              <span style={{ color: '#ffffff', fontSize: 26, fontWeight: 900 }}>{hdg.toFixed(0).padStart(3, '0')}°</span>
+              {hasMcpTargets && Number.isFinite(selectedHeading) && (
+                <span aria-label="Heading selected bug" style={{ color: '#ff4df3', fontSize: 10, fontWeight: 900 }}>
+                  HDG BUG {headingTargetText(selectedHeading)}
+                </span>
+              )}
+            </span>
+            <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', lineHeight: 1.15 }}>
+              <span style={{ color: '#9ddcff', fontSize: 13, fontWeight: 800 }}>VS {vs.toFixed(0)}</span>
+              {hasMcpTargets && Number.isFinite(selectedVerticalSpeed) && (
+                <span aria-label="Vertical speed selected bug" style={{ color: '#ff4df3', fontSize: 10, fontWeight: 900 }}>
+                  VS BUG {verticalSpeedTargetText(selectedVerticalSpeed)}
+                </span>
+              )}
+            </span>
           </div>
         </div>
 
