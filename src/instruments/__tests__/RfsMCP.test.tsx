@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { RfsMCP } from '../RfsMCP';
+import { RfsPFD } from '../RfsPFD';
 import { useSimStore } from '../../store/simStore';
+import { eulerToQuat } from '../../sim/physics/quaternion';
 
 describe('RfsMCP', () => {
   beforeEach(() => {
@@ -10,6 +12,64 @@ describe('RfsMCP', () => {
 
   afterEach(() => {
     cleanup();
+  });
+
+  it('first FD L click creates AP state without engaging any autopilot mode', () => {
+    render(<RfsMCP />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'FD L' }));
+
+    const ap = useSimStore.getState().apState;
+    expect(ap).not.toBeNull();
+    expect(ap?.boeing.fdLeft).toBe(true);
+    expect(ap?.boeing.fdRight).toBe(false);
+    expect(ap?.truth.autopilotStatus).toBe('OFF');
+    expect(ap?.truth.lateralActive).toBe('OFF');
+    expect(ap?.truth.verticalActive).toBe('OFF');
+    expect(ap?.truth.thrustActive).toBe('OFF');
+    expect(screen.getByRole('button', { name: 'FD L' }).getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('toggles FD switches independently without clearing active MCP modes', () => {
+    render(<RfsMCP />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'HDG' }));
+    fireEvent.click(screen.getByRole('button', { name: 'FD L' }));
+    fireEvent.click(screen.getByRole('button', { name: 'FD R' }));
+    fireEvent.click(screen.getByRole('button', { name: 'FD L' }));
+
+    const ap = useSimStore.getState().apState;
+    expect(ap?.truth.autopilotStatus).toBe('CMD_A');
+    expect(ap?.truth.lateralActive).toBe('HDG_SEL');
+    expect(ap?.boeing.hdgSel).toBe(true);
+    expect(ap?.boeing.fdLeft).toBe(false);
+    expect(ap?.boeing.fdRight).toBe(true);
+    expect(screen.getByRole('button', { name: 'FD L' }).getAttribute('aria-pressed')).toBe('false');
+    expect(screen.getByRole('button', { name: 'FD R' }).getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('lets the player enable PFD Flight Director bars from the MCP controls', () => {
+    const aircraft = structuredClone(useSimStore.getState().aircraft);
+    aircraft.position.alt = 9_000;
+    aircraft.attitude = { phi: 0, theta: 0, psi: 180 * Math.PI / 180 };
+    aircraft.quaternion = eulerToQuat(aircraft.attitude.phi, aircraft.attitude.theta, aircraft.attitude.psi);
+    useSimStore.setState({ aircraft });
+
+    render(
+      <>
+        <RfsMCP />
+        <RfsPFD />
+      </>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'FD L' }));
+    fireEvent.click(screen.getByRole('button', { name: 'HDG' }));
+    fireEvent.click(screen.getByRole('button', { name: 'ALT' }));
+
+    expect(screen.getByLabelText('Flight director roll bar')).toBeTruthy();
+    expect(screen.getByText('FD ROLL -30.0°')).toBeTruthy();
+    expect(screen.getByLabelText('Flight director pitch bar')).toBeTruthy();
+    expect(screen.getByText('FD PITCH +4.0°')).toBeTruthy();
   });
 
   it('first SPD click creates AP state and honestly engages SPEED', () => {

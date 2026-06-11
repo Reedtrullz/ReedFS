@@ -37,6 +37,7 @@ const targetDisplayStyle: React.CSSProperties = {
 };
 
 type McpTarget = 'speed' | 'heading' | 'altitude' | 'verticalSpeed';
+type FlightDirectorSide = 'left' | 'right';
 
 type EnabledMcpMode = 'HDG_SEL' | 'LNAV' | 'ALT_HOLD' | 'VS' | 'SPEED' | 'N1' | 'OFF';
 
@@ -94,6 +95,14 @@ function applyMcpTargetDelta(apState: AutopilotState, target: McpTarget, delta: 
   }
 }
 
+function toggleFlightDirectorSwitch(apState: AutopilotState, side: FlightDirectorSide): void {
+  if (side === 'left') {
+    apState.boeing.fdLeft = !apState.boeing.fdLeft;
+  } else {
+    apState.boeing.fdRight = !apState.boeing.fdRight;
+  }
+}
+
 function applyMcpMode(apState: AutopilotState, mode: EnabledMcpMode): void {
   if (mode === 'OFF') {
     apState.truth.lateralActive = 'OFF';
@@ -143,6 +152,13 @@ export function RfsMCP() {
     useSimStore.getState().setApState(next);
   };
 
+  const toggleFlightDirector = (side: FlightDirectorSide) => {
+    const current = useSimStore.getState().apState;
+    const next = structuredClone(current ?? createDefaultAutopilotState());
+    toggleFlightDirectorSwitch(next, side);
+    useSimStore.getState().setApState(next);
+  };
+
   const editTarget = (target: McpTarget, delta: number) => {
     const current = useSimStore.getState().apState;
     const next = structuredClone(current ?? createDefaultAutopilotState());
@@ -153,6 +169,8 @@ export function RfsMCP() {
   const latActive = apState?.truth.lateralActive ?? 'OFF';
   const vertActive = apState?.truth.verticalActive ?? 'OFF';
   const thrActive = apState?.truth.thrustActive ?? 'OFF';
+  const fdLeft = apState?.boeing.fdLeft ?? false;
+  const fdRight = apState?.boeing.fdRight ?? false;
   const lnavAvailable = routeStatus.lnavAvailable;
   const lnavUnavailableReason = routeStatus.lnavUnavailableReason ?? 'route guidance unavailable';
   const displayedLatActive = latActive === 'LNAV' && !lnavAvailable ? 'OFF' : latActive;
@@ -182,6 +200,24 @@ export function RfsMCP() {
     >
       <div style={{ color: '#0f0', fontFamily: 'monospace', fontSize: 10, marginBottom: 4 }}>
         MCP
+      </div>
+      <div aria-label="Flight Director switches" style={{ marginBottom: 4 }}>
+        <button
+          aria-pressed={fdLeft}
+          onClick={() => toggleFlightDirector('left')}
+          style={fdLeft ? activeStyle : btnStyle}
+          title="Toggle left Flight Director switch"
+        >
+          FD L
+        </button>
+        <button
+          aria-pressed={fdRight}
+          onClick={() => toggleFlightDirector('right')}
+          style={fdRight ? activeStyle : btnStyle}
+          title="Toggle right Flight Director switch"
+        >
+          FD R
+        </button>
       </div>
       <div aria-label="MCP selected targets" style={{ marginBottom: 4 }}>
         <div>
