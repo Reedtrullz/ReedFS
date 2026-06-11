@@ -23,6 +23,8 @@ describe('RfsMCP', () => {
     expect(ap).not.toBeNull();
     expect(ap?.boeing.fdLeft).toBe(true);
     expect(ap?.boeing.fdRight).toBe(false);
+    expect(ap?.boeing.cmdA).toBe(false);
+    expect(ap?.boeing.cmdB).toBe(false);
     expect(ap?.truth.autopilotStatus).toBe('OFF');
     expect(ap?.truth.lateralActive).toBe('OFF');
     expect(ap?.truth.verticalActive).toBe('OFF');

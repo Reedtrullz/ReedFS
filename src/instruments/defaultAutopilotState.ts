@@ -23,7 +23,7 @@ export function createDefaultAutopilotState(): AutopilotState {
       app: false,
       altHold: false,
       vs: false,
-      cmdA: true,
+      cmdA: false,
       cmdB: false,
       cwsA: false,
       cwsB: false,

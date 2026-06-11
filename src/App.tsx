@@ -56,6 +56,10 @@ function applyLoadedRouteAutopilotDefaults(apState: AutopilotState): AutopilotSt
   next.truth.verticalActive = 'ALT_HOLD';
   next.truth.thrustActive = 'SPEED';
   next.truth.autopilotStatus = 'CMD_A';
+  next.boeing.cmdA = true;
+  next.boeing.cmdB = false;
+  next.boeing.cwsA = false;
+  next.boeing.cwsB = false;
   next.boeing.lnav = true;
   next.boeing.hdgSel = false;
   next.boeing.vnav = false;
