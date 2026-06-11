@@ -79,6 +79,69 @@ function TakeoffReferenceStrip({ cue, vSpeeds }: { cue: string | null; vSpeeds: 
   );
 }
 
+function finiteTargetText(value: number | null | undefined, empty: string): string {
+  return Number.isFinite(value) ? `${Math.round(value as number)}` : empty;
+}
+
+function headingTargetText(value: number | null | undefined): string {
+  if (!Number.isFinite(value)) return '---';
+  const wrapped = ((Math.round(value as number) % 360) + 360) % 360;
+  return String(wrapped).padStart(3, '0');
+}
+
+function verticalSpeedTargetText(value: number | null | undefined): string {
+  if (!Number.isFinite(value)) return '----';
+  const rounded = Math.round(value as number);
+  return rounded > 0 ? `+${rounded}` : `${rounded}`;
+}
+
+function McpTargetStrip({
+  visible,
+  speed,
+  heading,
+  altitude,
+  verticalSpeed,
+}: {
+  visible: boolean;
+  speed: number | null | undefined;
+  heading: number | null | undefined;
+  altitude: number | null | undefined;
+  verticalSpeed: number | null | undefined;
+}) {
+  if (!visible) return null;
+
+  const items = [
+    `SEL SPD ${finiteTargetText(speed, '---')}`,
+    `SEL HDG ${headingTargetText(heading)}`,
+    `SEL ALT ${finiteTargetText(altitude, '-----')}`,
+    `SEL VS ${verticalSpeedTargetText(verticalSpeed)}`,
+  ];
+
+  return (
+    <div
+      aria-label="PFD MCP selected targets"
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(4, 1fr)',
+        gap: 4,
+        padding: '5px 10px',
+        borderBottom: '1px solid rgba(120,180,210,0.22)',
+        background: 'rgba(0,0,0,0.26)',
+        color: '#7fffa0',
+        fontSize: 11,
+        fontWeight: 900,
+        letterSpacing: 0.6,
+      }}
+    >
+      {items.map((item) => (
+        <span key={item} style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+          {item}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function Tape({
   label,
   value,
@@ -200,6 +263,11 @@ export function RfsPFD() {
   const lateralMode = useFmaText('lateralActive');
   const verticalMode = useFmaText('verticalActive');
   const autopilotMode = useFmaText('autopilotStatus');
+  const hasMcpTargets = useSimStore((s) => s.apState != null);
+  const selectedSpeed = useSimStore((s) => s.apState?.boeing.speed ?? null);
+  const selectedHeading = useSimStore((s) => s.apState?.boeing.heading ?? null);
+  const selectedAltitude = useSimStore((s) => s.apState?.boeing.altitude ?? null);
+  const selectedVerticalSpeed = useSimStore((s) => s.apState?.boeing.verticalSpeed ?? null);
   const selectedScenarioId = useSimStore((s) => s.selectedScenarioId);
   const flightPhase = useSimStore((s) => s.aircraft.flightPhase);
   const takeoffCue = useSimStore((s) => {
@@ -241,6 +309,13 @@ export function RfsPFD() {
         <FmaCell label="PITCH" value={verticalMode} />
         <FmaCell label="AP" value={autopilotMode} />
       </div>
+      <McpTargetStrip
+        visible={hasMcpTargets}
+        speed={selectedSpeed}
+        heading={selectedHeading}
+        altitude={selectedAltitude}
+        verticalSpeed={selectedVerticalSpeed}
+      />
       {showTakeoffReference && <TakeoffReferenceStrip cue={takeoffCue} vSpeeds={vSpeeds} />}
 
       <div style={{ display: 'flex', gap: 8, padding: 10, alignItems: 'stretch' }}>

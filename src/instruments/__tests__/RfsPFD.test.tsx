@@ -164,6 +164,30 @@ describe('RfsPFD', () => {
     expect(screen.queryByText('RA 2500')).toBeNull();
   });
 
+  it('shows MCP selected speed heading altitude and vertical-speed targets on the PFD', () => {
+    const ap = apStateWithModes();
+    ap.boeing.speed = 245;
+    ap.boeing.heading = 272;
+    ap.boeing.altitude = 12000;
+    ap.boeing.verticalSpeed = -800;
+    useSimStore.getState().setApState(ap);
+
+    render(<RfsPFD />);
+
+    expect(screen.getByLabelText('PFD MCP selected targets')).toBeTruthy();
+    expect(screen.getByText('SEL SPD 245')).toBeTruthy();
+    expect(screen.getByText('SEL HDG 272')).toBeTruthy();
+    expect(screen.getByText('SEL ALT 12000')).toBeTruthy();
+    expect(screen.getByText('SEL VS -800')).toBeTruthy();
+  });
+
+  it('does not invent PFD MCP selected target bugs before an MCP/autopilot state exists', () => {
+    render(<RfsPFD />);
+
+    expect(screen.queryByLabelText('PFD MCP selected targets')).toBeNull();
+    expect(screen.queryByText(/SEL SPD/)).toBeNull();
+  });
+
   it('shows FMA truth modes instead of burying autopilot status in debug telemetry', () => {
     setAircraftOnKseaRoute();
     useSimStore.getState().setApState(apStateWithModes());
