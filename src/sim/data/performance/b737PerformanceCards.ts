@@ -45,6 +45,40 @@ export interface B737TakeoffPerformanceCard {
 
 export const b737PerformanceCards: B737TakeoffPerformanceCard[] = [
   {
+    scenarioId: 'enva-tutorial',
+    runway: '09',
+    grossWeightKg: 61_913,
+    flapSetting: 5,
+    stabilizerTrimUnits: 5.0,
+    assumedTemperatureC: null,
+    vSpeeds: { v1Kt: 141, vrKt: 149, v2Kt: 155 },
+    cleanClimb: {
+      altitudeFt: 10_000,
+      iasKt: 250,
+      n1Percent: 72,
+      expectedClimbFpm: [1_500, 3_500],
+    },
+    approach: {
+      heightAglFt: 1_500,
+      iasKt: 140,
+      flapSetting: 30,
+      expectedAoADeg: [1, 9],
+    },
+    initialClimbPitchDeg: 10,
+    ownership: {
+      label: 'runtime-takeoff-cue-and-physics-test-card',
+      runtimeConsumers: ['src/sim/takeoffCue.ts', 'src/instruments/RfsPFD.tsx'],
+      testConsumers: [
+        'src/sim/data/__tests__/performanceCards.test.ts',
+        'src/sim/physics/__tests__/performanceCards.test.ts',
+      ],
+      sourceNote: 'RFS gameplay baseline card; broad envelope guard, not a certified Boeing AFM table.',
+    },
+    notes: [
+      'RFS gameplay card for the default medium ENVA tutorial scenario; keeps player-facing PFD V-speed references aligned with rotate cue logic.',
+    ],
+  },
+  {
     scenarioId: 'ksea-tutorial',
     runway: '16L',
     grossWeightKg: 61_913,
@@ -67,7 +101,7 @@ export const b737PerformanceCards: B737TakeoffPerformanceCard[] = [
     initialClimbPitchDeg: 10,
     ownership: {
       label: 'runtime-takeoff-cue-and-physics-test-card',
-      runtimeConsumers: ['src/sim/takeoffCue.ts'],
+      runtimeConsumers: ['src/sim/takeoffCue.ts', 'src/instruments/RfsPFD.tsx'],
       testConsumers: [
         'src/sim/data/__tests__/performanceCards.test.ts',
         'src/sim/physics/__tests__/performanceCards.test.ts',
@@ -101,7 +135,7 @@ export const b737PerformanceCards: B737TakeoffPerformanceCard[] = [
     initialClimbPitchDeg: 10,
     ownership: {
       label: 'runtime-takeoff-cue-and-physics-test-card',
-      runtimeConsumers: ['src/sim/takeoffCue.ts'],
+      runtimeConsumers: ['src/sim/takeoffCue.ts', 'src/instruments/RfsPFD.tsx'],
       testConsumers: [
         'src/sim/data/__tests__/performanceCards.test.ts',
         'src/sim/physics/__tests__/performanceCards.test.ts',

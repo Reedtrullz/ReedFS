@@ -5,6 +5,9 @@ import type { FlightPlan } from '@shared/types/fmc';
 import { RfsPFD } from '../RfsPFD';
 import { useSimStore } from '../../store/simStore';
 import { computeRouteStatus } from '../../sim/systems/navigation';
+import { KSEA_TUTORIAL_SCENARIO } from '../../sim/scenarios';
+
+const KNOT_TO_MPS = 0.514444;
 
 function apStateWithModes(): AutopilotState {
   return {
@@ -104,6 +107,23 @@ describe('RfsPFD', () => {
     expect(screen.getByText('ALT')).toBeTruthy();
     expect(screen.getByText('ATT')).toBeTruthy();
     expect(screen.getByText('HDG')).toBeTruthy();
+  });
+
+  it('shows player-facing takeoff cue and V-speed references on the PFD during the takeoff roll', () => {
+    const aircraft = structuredClone(useSimStore.getState().aircraft);
+    aircraft.flightPhase = 'TAKEOFF';
+    aircraft.config.gearDown = true;
+    aircraft.velocity.u = 155 * KNOT_TO_MPS;
+    aircraft.position.alt = aircraft.ground.groundAltFt;
+    useSimStore.setState({ aircraft, selectedScenarioId: KSEA_TUTORIAL_SCENARIO.id });
+
+    render(<RfsPFD />);
+
+    expect(screen.getByText('TAKEOFF REF')).toBeTruthy();
+    expect(screen.getByText('ROTATE — hold W')).toBeTruthy();
+    expect(screen.getByText('V1 141')).toBeTruthy();
+    expect(screen.getByText('VR 149')).toBeTruthy();
+    expect(screen.getByText('V2 155')).toBeTruthy();
   });
 
   it('shows FMA truth modes instead of burying autopilot status in debug telemetry', () => {
