@@ -3,6 +3,8 @@ import { useSimStore } from '../store/simStore';
 import { computeDerived } from '../sim/physics/derived';
 import { quatToEuler } from '../sim/physics/quaternion';
 import { deriveDisplayFmaTruth } from '../sim/systems/fmaTruth';
+import { maybeFindPerformanceCardForScenario, type B737VSpeeds } from '../sim/data/performance/b737PerformanceCards';
+import { takeoffCueText } from '../sim/takeoffCue';
 
 const glass: CSSProperties = {
   background: 'linear-gradient(180deg, rgba(9,14,18,0.95), rgba(2,5,7,0.92))',
@@ -41,6 +43,38 @@ function FmaCell({ label, value }: { label: string; value: string }) {
       <div style={{ color: active ? '#6dff8d' : '#95a6ad', fontSize: 16, fontWeight: 800, whiteSpace: 'nowrap' }}>
         {value}
       </div>
+    </div>
+  );
+}
+
+function TakeoffReferenceStrip({ cue, vSpeeds }: { cue: string | null; vSpeeds: B737VSpeeds | undefined }) {
+  if (!cue && !vSpeeds) return null;
+
+  return (
+    <div
+      aria-label="PFD takeoff reference"
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        padding: '6px 10px',
+        borderBottom: '1px solid rgba(120,180,210,0.22)',
+        background: 'rgba(0,0,0,0.34)',
+        color: '#e8f8ff',
+        fontSize: 12,
+        fontWeight: 800,
+        letterSpacing: 0.6,
+      }}
+    >
+      <span style={{ color: '#9ddcff' }}>TAKEOFF REF</span>
+      {cue && <span style={{ color: '#ffd84a', flex: 1 }}>{cue}</span>}
+      {vSpeeds && (
+        <span style={{ display: 'flex', gap: 8, marginLeft: 'auto', color: '#ffffff', whiteSpace: 'nowrap' }}>
+          <span>V1 {vSpeeds.v1Kt}</span>
+          <span>VR {vSpeeds.vrKt}</span>
+          <span>V2 {vSpeeds.v2Kt}</span>
+        </span>
+      )}
     </div>
   );
 }
@@ -157,6 +191,15 @@ export function RfsPFD() {
   const lateralMode = useFmaText('lateralActive');
   const verticalMode = useFmaText('verticalActive');
   const autopilotMode = useFmaText('autopilotStatus');
+  const selectedScenarioId = useSimStore((s) => s.selectedScenarioId);
+  const flightPhase = useSimStore((s) => s.aircraft.flightPhase);
+  const takeoffCue = useSimStore((s) => {
+    if (!s.aircraft.ground) return null;
+    const derived = computeDerived(s.aircraft, s.wind);
+    return takeoffCueText(s.aircraft, derived.ias, s.selectedScenarioId);
+  });
+  const vSpeeds = maybeFindPerformanceCardForScenario(selectedScenarioId)?.vSpeeds;
+  const showTakeoffReference = takeoffCue != null || flightPhase === 'PARKED' || flightPhase === 'TAKEOFF';
 
   return (
     <div
@@ -189,6 +232,7 @@ export function RfsPFD() {
         <FmaCell label="PITCH" value={verticalMode} />
         <FmaCell label="AP" value={autopilotMode} />
       </div>
+      {showTakeoffReference && <TakeoffReferenceStrip cue={takeoffCue} vSpeeds={vSpeeds} />}
 
       <div style={{ display: 'flex', gap: 8, padding: 10, alignItems: 'stretch' }}>
         <Tape label="IAS" value={ias} unit="KT" ticks={tapeTicks(ias, 10, 7)} align="right" />
