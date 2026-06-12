@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { KSEA_TUTORIAL_SCENARIO, createAircraftStateForScenario } from '../scenarios';
 import { B737_800_SPEC, type ControlInputs } from '../types';
-import { buildTakeoffChecklist, coachMessageForState } from '../checklistCoach';
+import { buildGuidanceChecklist, buildTakeoffChecklist, coachMessageForState } from '../checklistCoach';
 
 const configuredInputs: ControlInputs = {
   elevator: 0,
@@ -57,9 +57,46 @@ describe('checklistCoach', () => {
   it('coaches climb instead of re-running the before-takeoff gear check after cleanup', () => {
     const aircraft = createAircraftStateForScenario(B737_800_SPEC, KSEA_TUTORIAL_SCENARIO);
     aircraft.ground.weightOnWheels = false;
+    aircraft.ground.aglFt = 80;
+    aircraft.velocity.w = -1.5;
     aircraft.config.gearDown = false;
 
     expect(coachMessageForState('running', aircraft, { ...configuredInputs, throttle1: 1, throttle2: 1, gearLever: 'UP' }, KSEA_TUTORIAL_SCENARIO)).toMatch(/climb stable/i);
+  });
+
+  it('does not mark positive rate established in cleanup checklists while descending', () => {
+    const aircraft = createAircraftStateForScenario(B737_800_SPEC, KSEA_TUTORIAL_SCENARIO);
+    aircraft.ground.weightOnWheels = false;
+    aircraft.ground.aglFt = 80;
+    aircraft.velocity.w = 2;
+
+    for (const phase of ['positive-rate', 'climb'] as const) {
+      const checklist = buildGuidanceChecklist(KSEA_TUTORIAL_SCENARIO, aircraft, configuredInputs, phase);
+      expect(checklist).toContainEqual(expect.objectContaining({
+        id: 'positive-rate',
+        label: 'Positive rate established',
+        complete: false,
+      }));
+    }
+  });
+
+  it('does not coach gear retraction while airborne but descending', () => {
+    const aircraft = createAircraftStateForScenario(B737_800_SPEC, KSEA_TUTORIAL_SCENARIO);
+    aircraft.flightPhase = 'TAKEOFF';
+    aircraft.ground.weightOnWheels = false;
+    aircraft.ground.aglFt = 80;
+    aircraft.velocity.w = 2;
+    aircraft.config.gearDown = true;
+
+    const message = coachMessageForState('running', aircraft, {
+      ...configuredInputs,
+      throttle1: 1,
+      throttle2: 1,
+      gearLever: 'DOWN',
+    }, KSEA_TUTORIAL_SCENARIO);
+
+    expect(message).not.toMatch(/positive rate: raise the gear/i);
+    expect(message).toMatch(/rotate|climb/i);
   });
 
   it('coaches landed rollout toward braking and reset without takeoff thrust instructions', () => {

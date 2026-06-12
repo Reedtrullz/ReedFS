@@ -2,6 +2,7 @@ import type { SimStatus } from './simulationStatus';
 import { buildGuidanceChecklist, coachMessageForState, type ChecklistItem } from './checklistCoach';
 import type { FlightScenario, ScenarioTutorialStep } from './scenarios';
 import type { AircraftState, ControlInputs } from './types';
+import { isPositiveRateEstablished } from './flightPhasePredicates';
 import {
   clampTutorialStepIndex,
   createTutorialState,
@@ -66,6 +67,7 @@ export function deriveGuidancePhase(
 
   const airborne = !aircraft.ground.weightOnWheels || aircraft.ground.aglFt > 5;
   if (airborne) {
+    if (!isPositiveRateEstablished(aircraft)) return 'rotation';
     return aircraft.config.gearDown || controls.gearLever === 'DOWN' ? 'positive-rate' : 'climb';
   }
 

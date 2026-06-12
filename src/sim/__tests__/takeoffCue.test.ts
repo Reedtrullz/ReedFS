@@ -31,9 +31,24 @@ describe('takeoffCueText', () => {
 
   it('shows positive rate after airborne climb starts', () => {
     const { state, iasKt } = stateAtIas(155);
+    state.ground.weightOnWheels = false;
+    state.ground.aglFt = 80;
+    state.velocity.w = -1.5;
     state.position.alt += 80;
     state.config.gearDown = true;
     expect(takeoffCueText(state, iasKt)).toBe('POSITIVE RATE — gear up');
+  });
+
+  it('keeps rotate cue while airborne above the runway but descending', () => {
+    const { state, iasKt } = stateAtIas(155);
+    state.ground.weightOnWheels = false;
+    state.ground.aglFt = 80;
+    state.velocity.w = 2;
+    state.position.alt += 80;
+    state.config.gearDown = true;
+
+    expect(takeoffCueText(state, iasKt)).not.toContain('POSITIVE RATE');
+    expect(takeoffCueText(state, iasKt)).toBe('ROTATE — hold W');
   });
 
   it('clears takeoff cue after gear up while airborne', () => {
@@ -46,10 +61,25 @@ describe('takeoffCueText', () => {
   it('continues showing a gear-up cue in climb if gear remains down', () => {
     const { state } = stateAtIas(170);
     state.flightPhase = 'CLIMB';
+    state.ground.weightOnWheels = false;
+    state.ground.aglFt = 300;
+    state.velocity.w = -1.5;
     state.position.alt += 300;
     state.config.gearDown = true;
 
     expect(takeoffCueText(state, 170)).toBe('GEAR UP');
+  });
+
+  it('does not cue gear up in climb phase until positive rate is established', () => {
+    const { state } = stateAtIas(170);
+    state.flightPhase = 'CLIMB';
+    state.ground.weightOnWheels = false;
+    state.ground.aglFt = 80;
+    state.velocity.w = 2;
+    state.position.alt += 80;
+    state.config.gearDown = true;
+
+    expect(takeoffCueText(state, 170)).toBeNull();
   });
 
   it('returns null outside takeoff phase', () => {

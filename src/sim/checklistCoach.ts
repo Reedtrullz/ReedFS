@@ -1,6 +1,7 @@
 import type { AircraftState, ControlInputs } from './types';
 import type { FlightScenario } from './scenarios';
 import type { SimStatus } from './simulationStatus';
+import { isPositiveRateEstablished } from './flightPhasePredicates';
 
 type GuidanceChecklistPhase =
   | 'preflight'
@@ -134,7 +135,7 @@ export function buildGuidanceChecklist(
       {
         id: 'positive-rate',
         label: 'Positive rate established',
-        complete: !aircraft.ground.weightOnWheels && aircraft.ground.aglFt > 10,
+        complete: isPositiveRateEstablished(aircraft),
         detail: 'Confirm climb before retracting gear',
       },
       {
@@ -151,7 +152,7 @@ export function buildGuidanceChecklist(
       {
         id: 'positive-rate',
         label: 'Positive rate established',
-        complete: !aircraft.ground.weightOnWheels && aircraft.ground.aglFt > 10,
+        complete: isPositiveRateEstablished(aircraft),
         detail: 'Maintain stable climb',
       },
       {
@@ -216,6 +217,7 @@ export function coachMessageForState(
 
   if (throttle < 0.9) return 'Set takeoff thrust smoothly, then keep the runway centerline.';
   if (aircraft.ground.weightOnWheels) return 'Track centerline, monitor IAS, and rotate gently at VR.';
+  if (!isPositiveRateEstablished(aircraft)) return 'Rotate: hold a stable climb attitude until positive rate is established.';
   if (aircraft.config.gearDown) return 'Positive rate: raise the gear and hold a stable climb attitude.';
   return 'Climb stable. Keep pitch changes small and follow the next tutorial step.';
 }

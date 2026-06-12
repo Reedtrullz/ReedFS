@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { KSEA_TUTORIAL_SCENARIO, createAircraftStateForScenario } from '../scenarios';
 import { B737_800_SPEC, type ControlInputs } from '../types';
-import { buildGuidanceState, rebuildGuidanceState } from '../guidanceState';
+import { buildGuidanceState, deriveGuidancePhase, rebuildGuidanceState } from '../guidanceState';
 
 const configuredInputs: ControlInputs = {
   elevator: 0,
@@ -98,6 +98,7 @@ describe('guidanceState', () => {
     climbAircraft.flightPhase = 'CLIMB';
     climbAircraft.ground.weightOnWheels = false;
     climbAircraft.ground.aglFt = 400;
+    climbAircraft.velocity.w = -1.5;
     climbAircraft.position.alt += 400;
     climbAircraft.config.gearDown = false;
 
@@ -127,6 +128,7 @@ describe('guidanceState', () => {
     climbAircraft.flightPhase = 'CLIMB';
     climbAircraft.ground.weightOnWheels = false;
     climbAircraft.ground.aglFt = 400;
+    climbAircraft.velocity.w = -1.5;
     climbAircraft.position.alt += 400;
     climbAircraft.config.gearDown = false;
 
@@ -160,6 +162,7 @@ describe('guidanceState', () => {
     climbAircraft.flightPhase = 'CLIMB';
     climbAircraft.ground.weightOnWheels = false;
     climbAircraft.ground.aglFt = 400;
+    climbAircraft.velocity.w = -1.5;
     climbAircraft.position.alt += 400;
     climbAircraft.config.gearDown = false;
 
@@ -219,6 +222,7 @@ describe('guidanceState', () => {
     const airborneGearDown = structuredClone(rotatingAircraft);
     airborneGearDown.ground.weightOnWheels = false;
     airborneGearDown.ground.aglFt = 25;
+    airborneGearDown.velocity.w = -1.5;
     airborneGearDown.position.alt += 25;
     expect(buildGuidanceState({
       scenario: KSEA_TUTORIAL_SCENARIO,
@@ -235,6 +239,13 @@ describe('guidanceState', () => {
       aircraft: cleanClimb,
       controls: { ...takeoffControls, gearLever: 'UP' },
     }).phase).toBe('climb');
+
+    const descendingAirborneGearDown = structuredClone(rotatingAircraft);
+    descendingAirborneGearDown.ground.weightOnWheels = false;
+    descendingAirborneGearDown.ground.aglFt = 80;
+    descendingAirborneGearDown.velocity.w = 2;
+    descendingAirborneGearDown.position.alt += 80;
+    expect(deriveGuidancePhase('running', descendingAirborneGearDown, takeoffControls)).toBe('rotation');
   });
 
   it('shows positive-rate cleanup instead of pre-takeoff gear-down checklist once airborne', () => {
@@ -242,6 +253,7 @@ describe('guidanceState', () => {
     aircraft.flightPhase = 'CLIMB';
     aircraft.ground.weightOnWheels = false;
     aircraft.ground.aglFt = 75;
+    aircraft.velocity.w = -1.5;
     aircraft.position.alt += 75;
     aircraft.config.gearDown = true;
 
@@ -262,6 +274,7 @@ describe('guidanceState', () => {
     aircraft.flightPhase = 'CLIMB';
     aircraft.ground.weightOnWheels = false;
     aircraft.ground.aglFt = 400;
+    aircraft.velocity.w = -1.5;
     aircraft.position.alt += 400;
     aircraft.config.gearDown = false;
 
