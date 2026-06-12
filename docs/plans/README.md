@@ -9,6 +9,7 @@ Current source-of-truth documents:
 - `../roadmap.md` — prioritized necessary enhancements.
 - `../reviews/2026-06-12-comprehensive-project-review-remaining-work.md` — latest comprehensive project review, browser dogfood evidence, and remaining-work roadmap.
 - `../reviews/2026-06-12-comprehensive-remaining-work-review.md` — earlier 2026-06-12 comprehensive remaining-work audit and evidence ledger.
+- `2026-06-12-rfs-ksea-extended-route-coupled-descent-bridge.md` — current autonomous slice plan for extending the KSEA final-route coupled descent before manual handoff into the KPDX manual landing/rollout/reset bridge, without claiming full-route/full-flight, VNAV, or route-coupled landing proof.
 - `2026-06-12-rfs-route-bridge-structural-evidence.md` — current autonomous cleanup plan for replacing the KSEA-to-KPDX landing bridge's tautological same-store boolean with structural sample-order and reset-separation assertions.
 - `2026-06-12-rfs-ksea-route-to-kpdx-landing-bridge-proof.md` — current autonomous slice plan for bridging a scoped KSEA final-route configured approach/manual handoff into a KPDX short-final landing/rollout/reset proof in one browser store session without claiming full-route/full-flight or continuous route-coupled landing proof.
 - `2026-06-12-rfs-kpdx-short-final-landing-proof.md` — current autonomous slice plan for proving a scoped KPDX destination short-final touchdown, braking rollout, and reset cleanup browser loop without claiming route-coupled landing or full-flight/full-route proof.
