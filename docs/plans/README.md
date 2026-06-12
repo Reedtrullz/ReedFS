@@ -9,6 +9,7 @@ Current source-of-truth documents:
 - `../roadmap.md` — prioritized necessary enhancements.
 - `../reviews/2026-06-12-comprehensive-project-review-remaining-work.md` — latest comprehensive project review, browser dogfood evidence, and remaining-work roadmap.
 - `../reviews/2026-06-12-comprehensive-remaining-work-review.md` — earlier 2026-06-12 comprehensive remaining-work audit and evidence ledger.
+- `2026-06-12-rfs-ksea-multi-gate-route-progression-proof.md` — current autonomous slice plan for proving multiple KSEA route leg transitions in one browser store run without claiming full-route/full-flight proof.
 - `2026-06-12-rfs-ksea-second-leg-sequencing-proof.md` — current autonomous slice plan for refactoring the route-proof helper and proving second-leg KSEA route sequencing in browser without claiming full-route/full-flight proof.
 - `2026-06-12-rfs-route-sequencing-browser-proof.md` — current autonomous slice plan for proving first-leg KSEA route sequencing in the browser without claiming full-route/full-flight proof.
 - `2026-06-12-rfs-autoflight-truth-and-route-proof.md` — current next-slice implementation plan for effective AP/FMA/VNAV truth and KSEA LNAV route-leg browser proof.
