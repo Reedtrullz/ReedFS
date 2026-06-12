@@ -22,6 +22,7 @@ import {
   isAutopilotEngaged,
   resetAutopilotPID,
 } from '../sim/systems/autopilot';
+import { deriveEffectiveAutoflightTruth } from '../sim/systems/effectiveAutoflightTruth';
 import {
   createInputManagerState,
   type InputActions,
@@ -106,6 +107,15 @@ function autopilotModesChanged(previous: AutopilotState | null, next: AutopilotS
     previous.truth.verticalActive !== next.truth.verticalActive ||
     previous.truth.thrustActive !== next.truth.thrustActive
   );
+}
+
+function apEffectivelyOwnsThrust(s: Pick<SimStore, 'apState' | 'aircraft' | 'flightPlan' | 'routeStatus'>): boolean {
+  const truth = deriveEffectiveAutoflightTruth(s.apState, {
+    aircraft: s.aircraft,
+    flightPlan: s.flightPlan,
+    routeStatus: s.routeStatus,
+  });
+  return truth.thrustActive === 'SPEED' || truth.thrustActive === 'N1';
 }
 
 function disconnectAutopilot(apState: AutopilotState | null): AutopilotState | null {
@@ -227,7 +237,7 @@ export const useSimStore = create<SimStore>((set, get) => ({
   setInput: (partial) =>
     set((s) => {
       const apActive = isAutopilotEngaged(s.apState);
-      const apOwnsThrust = s.apState != null && (s.apState.truth.thrustActive === 'SPEED' || s.apState.truth.thrustActive === 'N1');
+      const apOwnsThrust = apEffectivelyOwnsThrust(s);
       const { pilotPatch, shouldDisconnect } = sanitizeSetInputPartial(
         partial,
         s.pilotInputs,
@@ -267,7 +277,7 @@ export const useSimStore = create<SimStore>((set, get) => ({
         };
       }
 
-      const apOwnsThrust = s.apState != null && (s.apState.truth.thrustActive === 'SPEED' || s.apState.truth.thrustActive === 'N1');
+      const apOwnsThrust = apEffectivelyOwnsThrust(s);
       if (!rejectedTakeoffAbort && apOwnsThrust && (inputPatch.throttle1 !== undefined || inputPatch.throttle2 !== undefined)) {
         inputPatch = { ...inputPatch };
         delete inputPatch.throttle1;

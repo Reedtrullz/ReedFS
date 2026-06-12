@@ -163,9 +163,10 @@ export function sanitizeSetInputPartial(
     const value = partial[key];
     if (value === undefined) continue;
 
-    // Throttle input is silently ignored when AP owns thrust.
-    if (apOwnsThrust && (key === 'throttle1' || key === 'throttle2')) {
-      delete pilotPatch[key];
+    if (key === 'throttle1' || key === 'throttle2') {
+      if (apOwnsThrust) {
+        delete pilotPatch[key];
+      }
       continue;
     }
 
@@ -184,7 +185,5 @@ export function sanitizeSetInputPartial(
 
 export function inputActionsIncludeManualApAxis(actions: InputActions, apState: AutopilotState | null): boolean {
   if (!isAutopilotEngaged(apState)) return false;
-  if (actions.pitch !== undefined || actions.roll !== undefined) return true;
-  const apOwnsThrust = apState && (apState.truth.thrustActive === 'SPEED' || apState.truth.thrustActive === 'N1');
-  return !apOwnsThrust && inputActionsIncludeThrottle(actions);
+  return actions.pitch !== undefined || actions.roll !== undefined;
 }

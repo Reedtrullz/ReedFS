@@ -578,7 +578,10 @@ describe('useSimStore', () => {
     const pilotBeforeRef = useSimStore.getState().pilotInputs;
     const pilotBefore = structuredClone(pilotBeforeRef);
 
-    useSimStore.getState().setApState(minimalApState());
+    const ap = minimalApState();
+    ap.boeing.autothrottleArm = true;
+    ap.boeing.speedMode = true;
+    useSimStore.getState().setApState(ap);
     useSimStore.getState().start();
     useSimStore.getState().tick(1000);
 
@@ -673,6 +676,30 @@ describe('useSimStore', () => {
     expect(state.effectiveControls.throttle1).toBe(0.25);
   });
 
+  it('does not treat unbacked SPEED truth as AP-owned thrust for manual setInput', () => {
+    const ap = minimalApState();
+    ap.truth.thrustActive = 'SPEED';
+    ap.boeing.autothrottleArm = true;
+    ap.boeing.speedMode = false;
+    useSimStore.getState().setApState(ap);
+    useSimStore.getState().setInput({ throttle1: 0.7, throttle2: 0.7 });
+    expect(useSimStore.getState().pilotInputs.throttle1).toBe(0.7);
+    expect(useSimStore.getState().pilotInputs.throttle2).toBe(0.7);
+    expect(useSimStore.getState().effectiveControls.throttle1).toBe(0.7);
+    expect(useSimStore.getState().apState?.truth.autopilotStatus).toBe('CMD_A');
+  });
+
+  it('does not strip throttle input actions when SPEED truth is unbacked', () => {
+    const ap = minimalApState();
+    ap.truth.thrustActive = 'SPEED';
+    ap.boeing.autothrottleArm = true;
+    ap.boeing.speedMode = false;
+    useSimStore.getState().setApState(ap);
+    useSimStore.getState().applyInputActions({ throttleDelta: 0.1 }, 1 / 60);
+    expect(useSimStore.getState().pilotInputs.throttle1).toBeGreaterThan(0);
+    expect(useSimStore.getState().pilotInputs.throttle2).toBeGreaterThan(0);
+  });
+
   it('manual input override disconnects AP and makes pilot controls effective deterministically', () => {
     useSimStore.getState().setApState(minimalApState());
     useSimStore.setState((s) => {
@@ -729,7 +756,10 @@ describe('useSimStore', () => {
   });
 
   it('legacy full-object setInput does not copy AP-owned effective axes into pilot inputs', () => {
-    useSimStore.getState().setApState(minimalApState());
+    const ap = minimalApState();
+    ap.boeing.autothrottleArm = true;
+    ap.boeing.speedMode = true;
+    useSimStore.getState().setApState(ap);
     const apCommands: AutopilotCommands = { elevator: -0.5, aileron: 0.25, throttle1: 0.7, throttle2: 0.7 };
     useSimStore.setState((s) => {
       const effectiveControls = { ...s.pilotInputs, ...apCommands };
