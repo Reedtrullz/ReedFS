@@ -169,8 +169,8 @@ npm run build
 
 Browser proof:
 
-- `e2e/rfs-flight.spec.ts` proves ENVA takeoff roll to clean climb with phase-aware guidance and gear-up state, and separately proves a scoped ENVA short-final approach state touches down through the real physics/ground-contact path, rolls out slower under braking, and returns to a clean reset state.
-- `e2e/rfs-route.spec.ts` proves the KSEA sample route loads in-browser, exposes backed LNAV, decreases DTG while the route leg is flown, sequences the first and second KSEA route legs while backed LNAV/FMA truth remains active, and runs a single-store multi-gate route progression proof through the OLM and BTG gates. These are clean-climb, scoped approach-to-touchdown/rollout/reset, and scoped route-progression proofs, not full-flight/full-route completion claims.
+- `e2e/rfs-flight.spec.ts` proves ENVA takeoff roll to clean climb with phase-aware guidance and gear-up state, separately proves a scoped ENVA short-final approach state touches down through the real physics/ground-contact path, rolls out slower under braking, and returns to a clean reset state, and proves a seeded ENVA DESCENT-to-configured-approach/landing bridge in one browser store session without resetting between descent and landing.
+- `e2e/rfs-route.spec.ts` proves the KSEA sample route loads in-browser, exposes backed LNAV, decreases DTG while the route leg is flown, sequences the first and second KSEA route legs while backed LNAV/FMA truth remains active, and runs a single-store multi-gate route progression proof through the OLM and BTG gates. These are clean-climb, scoped short-final approach-to-touchdown/rollout/reset, seeded descent-to-approach/landing bridge, and scoped route-progression proofs, not full-flight, full-route, or route-coupled descent completion claims.
 
 Deployment pipeline:
 
