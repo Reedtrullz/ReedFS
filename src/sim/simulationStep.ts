@@ -93,6 +93,7 @@ export function advanceSimulationStep(input: SimulationStepInput): SimulationSte
       input.flightPlan,
       input.dt,
       routeBeforeTick.activeLegIndex,
+      routeBeforeTick,
     )
     : {};
   const controls = composeControlsSlice(input.pilotInputs, apCommands, input.apState);

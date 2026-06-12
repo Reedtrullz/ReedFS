@@ -1,7 +1,12 @@
 import type { AircraftState, AutopilotCommands, ControlInputs } from '../types';
 import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
 import type { FlightPlan } from '@shared/types/fmc';
-import { computeRouteStatus, type NavOutput } from './navigation';
+import {
+  computeRouteStatus,
+  routeStatusToNavOutput,
+  type NavOutput,
+  type RouteStatusSnapshot,
+} from './navigation';
 import { computeVNAV } from './vnav';
 import { bodyToNed } from '../physics/frames';
 
@@ -28,12 +33,7 @@ function clamp01(v: number): number { return clamp(v, 0, 1); }
 function finiteOrUndefined(v: number | undefined | null): number | undefined {
   return typeof v === 'number' && Number.isFinite(v) ? v : undefined;
 }
-function degToRad(d: number): number { return d * Math.PI / 180; }
 function radToDeg(r: number): number { return r * 180 / Math.PI; }
-function normalizeAngleRad(r: number): number {
-  const twoPi = Math.PI * 2;
-  return ((r % twoPi) + twoPi) % twoPi;
-}
 function headingErrorRad(target: number, current: number): number {
   let e = target - current;
   while (e > Math.PI) e -= 2 * Math.PI;
@@ -104,6 +104,7 @@ export function resolveAutopilotTargets(
   ap: AutopilotState,
   flightPlan?: FlightPlan | null,
   activeLegIndex?: number | null,
+  routeStatusOverride?: RouteStatusSnapshot | null,
 ): Targets {
   let hdg = state.attitude.psi;
   let alt = state.position.alt;
@@ -115,21 +116,15 @@ export function resolveAutopilotTargets(
 
   const nav = (): NavOutput | null => {
     if (navCache !== undefined) return navCache;
-    const idx = typeof activeLegIndex === 'number' && Number.isFinite(activeLegIndex) && activeLegIndex >= 0 ? activeLegIndex : null;
-    if (!flightPlan || idx === null) { navCache = null; return null; }
-    const rs = computeRouteStatus(state, flightPlan, idx);
-    if (rs?.lnavAvailable && rs.desiredTrackRad !== null) {
-      const xte = rs.crossTrackErrorM ?? 0;
-      navCache = {
-        crossTrackError: xte,
-        alongTrackDist: rs.alongTrackM ?? rs.distanceToNextM ?? 0,
-        desiredTrack: normalizeAngleRad(rs.desiredTrackRad - clamp(xte / 1852, -1, 1) * degToRad(25)),
-        activeWaypointIndex: rs.toWaypointIndex ?? idx,
-        waypointReached: rs.waypointReached,
-      };
+    if (routeStatusOverride) {
+      navCache = routeStatusToNavOutput(routeStatusOverride, { maxInterceptDeg: 25 });
       return navCache;
     }
-    navCache = null; return null;
+
+    const idx = typeof activeLegIndex === 'number' && Number.isFinite(activeLegIndex) && activeLegIndex >= 0 ? activeLegIndex : null;
+    if (!flightPlan || idx === null) { navCache = null; return null; }
+    navCache = routeStatusToNavOutput(computeRouteStatus(state, flightPlan, idx), { maxInterceptDeg: 25 });
+    return navCache;
   };
 
   if (ap.truth.lateralActive === 'HDG_SEL') {
@@ -151,7 +146,7 @@ export function resolveAutopilotTargets(
       }
     }
   }
-  if (ap.truth.lateralActive === 'LNAV' && flightPlan) {
+  if (ap.truth.lateralActive === 'LNAV') {
     const n = nav();
     if (n) hdg = n.desiredTrack;
   }
@@ -317,9 +312,10 @@ export function computeAutopilotCommandsForState(
   flightPlan: FlightPlan | null | undefined,
   dt: number,
   activeLegIndex?: number | null,
+  routeStatus?: RouteStatusSnapshot | null,
 ): AutopilotCommands {
   if (!ap || !isAutopilotEngaged(ap)) return {};
-  const tgts = resolveAutopilotTargets(state, ap, flightPlan, activeLegIndex);
+  const tgts = resolveAutopilotTargets(state, ap, flightPlan, activeLegIndex, routeStatus);
   return computeAutopilotCommands(state, ap, tgts.targetHeadingRad, tgts.targetAltFt, tgts.targetSpeedKt, dt, tgts.targetVerticalSpeedFpm, tgts.targetN1Percent);
 }
 

@@ -10,6 +10,7 @@ import { createInitialState, B737_800_SPEC } from '../../types';
 import type { AutopilotCommands, ControlInputs } from '../../types';
 import type { AutopilotState, LateralMode, ThrustMode, VerticalMode } from '@shared/autopilot/autopilotTypes';
 import type { FlightPlan } from '@shared/types/fmc';
+import { createNoRouteStatus, type RouteStatusSnapshot } from '../navigation';
 
 beforeEach(() => resetAutopilotPID());
 
@@ -349,6 +350,41 @@ describe('resolveAutopilotTargets VNAV', () => {
 });
 
 describe('resolveAutopilotTargets LNAV', () => {
+  it('resolves LNAV heading from provided route status with AP intercept correction', () => {
+    const aircraft = createInitialState(B737_800_SPEC);
+    aircraft.attitude.psi = 0;
+    const ap = makeAp('LNAV', 'ALT_HOLD', 'SPEED');
+    ap.boeing.lnav = true;
+    ap.boeing.hdgSel = false;
+
+    const routeStatus: RouteStatusSnapshot = {
+      ...createNoRouteStatus(),
+      routeName: 'KSEA→KPDX',
+      routeValid: true,
+      lnavAvailable: true,
+      lnavUnavailableReason: null,
+      activeLegIndex: 0,
+      activeLegCount: 1,
+      fromWaypointIndex: 0,
+      toWaypointIndex: 1,
+      fromIdent: 'KSEA',
+      nextWaypointIdent: 'OLM',
+      distanceToNextM: 18_520,
+      distanceToNextNm: 10,
+      desiredTrackRad: Math.PI / 2,
+      desiredTrackDegTrue: 90,
+      crossTrackErrorM: 1_852,
+      alongTrackM: 5_000,
+      legLengthM: 18_520,
+      waypointReached: false,
+      sequenced: false,
+    };
+
+    const targets = resolveAutopilotTargets(aircraft, ap, null, null, routeStatus);
+
+    expect(targets.targetHeadingRad * 180 / Math.PI).toBeCloseTo(65, 5);
+  });
+
   it('commands an intercept angle back toward the active route leg when right of course', () => {
     const s = createInitialState(B737_800_SPEC);
     s.position.lat = 47.05;
