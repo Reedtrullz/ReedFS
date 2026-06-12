@@ -174,6 +174,11 @@ describe('computeLNAV', () => {
 });
 
 describe('routeStatusToNavOutput', () => {
+  it('returns null for null or undefined route status', () => {
+    expect(routeStatusToNavOutput(null)).toBeNull();
+    expect(routeStatusToNavOutput(undefined)).toBeNull();
+  });
+
   it('converts an available route status into VNAV/LNAV NavOutput using remaining distance', () => {
     const nav = routeStatusToNavOutput(routeStatusForNavOutput());
 
@@ -195,8 +200,52 @@ describe('routeStatusToNavOutput', () => {
 
   it('returns null for unavailable or under-specified route status', () => {
     expect(routeStatusToNavOutput(createNoRouteStatus())).toBeNull();
+    expect(routeStatusToNavOutput(routeStatusForNavOutput({ routeValid: false }))).toBeNull();
     expect(routeStatusToNavOutput(routeStatusForNavOutput({ desiredTrackRad: null }))).toBeNull();
+    expect(routeStatusToNavOutput(routeStatusForNavOutput({ desiredTrackRad: Number.NaN }))).toBeNull();
+    expect(routeStatusToNavOutput(routeStatusForNavOutput({ desiredTrackRad: Number.POSITIVE_INFINITY }))).toBeNull();
     expect(routeStatusToNavOutput(routeStatusForNavOutput({ toWaypointIndex: null, activeLegIndex: null }))).toBeNull();
+    expect(routeStatusToNavOutput(routeStatusForNavOutput({ toWaypointIndex: Number.NaN, activeLegIndex: null }))).toBeNull();
+    expect(routeStatusToNavOutput(routeStatusForNavOutput({ toWaypointIndex: Number.POSITIVE_INFINITY, activeLegIndex: Number.NaN }))).toBeNull();
+  });
+
+  it('falls back to finite distance fields without treating along-track progress as remaining distance', () => {
+    expect(routeStatusToNavOutput(routeStatusForNavOutput({
+      distanceToNextM: 12_000,
+      alongTrackM: 4_000,
+    }))?.alongTrackDist).toBe(12_000);
+
+    expect(routeStatusToNavOutput(routeStatusForNavOutput({
+      distanceToNextM: null,
+      alongTrackM: 3_000,
+    }))?.alongTrackDist).toBe(3_000);
+
+    expect(routeStatusToNavOutput(routeStatusForNavOutput({
+      distanceToNextM: Number.NaN,
+      alongTrackM: 4_000,
+    }))?.alongTrackDist).toBe(4_000);
+
+    expect(routeStatusToNavOutput(routeStatusForNavOutput({
+      distanceToNextM: Number.POSITIVE_INFINITY,
+      alongTrackM: Number.NaN,
+    }))?.alongTrackDist).toBe(0);
+  });
+
+  it('sanitizes non-finite optional nav output inputs for valid route statuses', () => {
+    for (const crossTrackErrorM of [null, Number.NaN, Number.NEGATIVE_INFINITY]) {
+      const nav = routeStatusToNavOutput(routeStatusForNavOutput({ crossTrackErrorM }));
+      expect(nav?.crossTrackError).toBe(0);
+    }
+
+    const nav = routeStatusToNavOutput(routeStatusForNavOutput({ desiredTrackRad: 5 * Math.PI }), {
+      maxInterceptDeg: Number.POSITIVE_INFINITY,
+    });
+    const negativeInterceptNav = routeStatusToNavOutput(routeStatusForNavOutput(), { maxInterceptDeg: -25 });
+
+    expect(nav).not.toBeNull();
+    expect(nav!.desiredTrack).toBeCloseTo(Math.PI, 5);
+    expect(Number.isFinite(nav!.desiredTrack)).toBe(true);
+    expect(negativeInterceptNav?.desiredTrack).toBe(Math.PI / 2);
   });
 });
 

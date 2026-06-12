@@ -74,7 +74,7 @@ interface RouteValidationResult {
 
 type SequencingReason = 'capture' | 'passed' | 'turnAnticipation' | null;
 
-function isFiniteNumber(value: number | undefined): value is number {
+function isFiniteNumber(value: number | null | undefined): value is number {
   return typeof value === 'number' && Number.isFinite(value);
 }
 
@@ -330,22 +330,34 @@ export function routeStatusToNavOutput(
   routeStatus: RouteStatusSnapshot | null | undefined,
   options: RouteStatusToNavOutputOptions = {},
 ): NavOutput | null {
-  if (!routeStatus?.lnavAvailable || routeStatus.desiredTrackRad === null) return null;
+  if (!routeStatus?.routeValid || !routeStatus.lnavAvailable || !isFiniteNumber(routeStatus.desiredTrackRad)) return null;
 
-  const activeWaypointIndex = routeStatus.toWaypointIndex ?? routeStatus.activeLegIndex;
-  if (activeWaypointIndex === null || !Number.isFinite(activeWaypointIndex)) return null;
+  const activeWaypointIndex = isFiniteNumber(routeStatus.toWaypointIndex)
+    ? routeStatus.toWaypointIndex
+    : routeStatus.activeLegIndex;
+  if (!isFiniteNumber(activeWaypointIndex)) return null;
 
-  const crossTrackError = routeStatus.crossTrackErrorM ?? 0;
-  const maxInterceptRad = Math.max(0, options.maxInterceptDeg ?? 0) * Math.PI / 180;
+  const crossTrackError = isFiniteNumber(routeStatus.crossTrackErrorM)
+    ? routeStatus.crossTrackErrorM
+    : 0;
+  const maxInterceptDeg = isFiniteNumber(options.maxInterceptDeg) && options.maxInterceptDeg > 0
+    ? options.maxInterceptDeg
+    : 0;
+  const maxInterceptRad = maxInterceptDeg * Math.PI / 180;
   const interceptCorrectionRad = maxInterceptRad > 0
     ? clamp(crossTrackError / M_PER_NM, -1, 1) * maxInterceptRad
     : 0;
+  const alongTrackDist = isFiniteNumber(routeStatus.distanceToNextM)
+    ? routeStatus.distanceToNextM
+    : isFiniteNumber(routeStatus.alongTrackM)
+      ? routeStatus.alongTrackM
+      : 0;
 
   return {
     crossTrackError,
     // NavOutput.alongTrackDist is consumed by VNAV as distance remaining to the active constraint.
     // Do not prefer RouteStatusSnapshot.alongTrackM here; that field is progress from leg start.
-    alongTrackDist: routeStatus.distanceToNextM ?? routeStatus.alongTrackM ?? 0,
+    alongTrackDist,
     desiredTrack: normalizeRad(routeStatus.desiredTrackRad - interceptCorrectionRad),
     activeWaypointIndex,
     waypointReached: routeStatus.waypointReached,
