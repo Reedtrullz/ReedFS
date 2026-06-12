@@ -180,7 +180,7 @@ async function runFlightHelper(page: Page, mode: FlightHelperMode): Promise<Flig
         if (
           gearRaised &&
           finalSnapshot.phase === 'climb' &&
-          finalSnapshot.aglFt > 50 &&
+          finalSnapshot.aglFt > 200 &&
           finalSnapshot.verticalSpeedFpm > 0 &&
           !finalSnapshot.weightOnWheels &&
           !finalSnapshot.gearDown &&
