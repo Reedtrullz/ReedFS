@@ -9,6 +9,7 @@ Current source-of-truth documents:
 - `../roadmap.md` — prioritized necessary enhancements.
 - `../reviews/2026-06-12-comprehensive-project-review-remaining-work.md` — latest comprehensive project review, browser dogfood evidence, and remaining-work roadmap.
 - `../reviews/2026-06-12-comprehensive-remaining-work-review.md` — earlier 2026-06-12 comprehensive remaining-work audit and evidence ledger.
+- `2026-06-12-rfs-route-sequencing-browser-proof.md` — current autonomous slice plan for proving first-leg KSEA route sequencing in the browser without claiming full-route/full-flight proof.
 - `2026-06-12-rfs-autoflight-truth-and-route-proof.md` — current next-slice implementation plan for effective AP/FMA/VNAV truth and KSEA LNAV route-leg browser proof.
 - `2026-06-12-rfs-guidance-truth-full-flight-proof.md` — current next-slice plan for AP/FMA route truth, phase-aware guidance, and ENVA takeoff-to-clean-climb browser proof.
 - `../reviews/2026-05-26-comprehensive-gameplay-review.md` — completed May comprehensive gameplay/realism/visual/cockpit audit and historical status record.

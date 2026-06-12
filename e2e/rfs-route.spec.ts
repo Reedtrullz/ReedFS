@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { openRfs } from './helpers/rfsPage';
-import { flyKseaRouteWithLnav } from './helpers/rfsRoute';
+import { flyKseaRouteThroughFirstSequence, flyKseaRouteWithLnav } from './helpers/rfsRoute';
 
 test.describe('RFS route and LNAV browser proof', () => {
   test('KSEA sample route loads, enables LNAV, and decreases DTG while flying', async ({ page }) => {
@@ -25,5 +25,27 @@ test.describe('RFS route and LNAV browser proof', () => {
       expect(result.samples[i].activeLegIndex, routeDebug).toBeGreaterThanOrEqual(result.samples[i - 1].activeLegIndex);
     }
     expect(result.samples.length).toBeGreaterThan(3);
+  });
+
+  test('KSEA sample route sequences from OLM to BTG while LNAV remains backed', async ({ page }) => {
+    await openRfs(page);
+
+    const result = await flyKseaRouteThroughFirstSequence(page);
+    const routeDebug = JSON.stringify(result.samples, null, 2);
+    const legTransitioned = result.samples.some((sample, index) => {
+      return index > 0 && result.samples[index - 1].activeLegIndex === 0 && sample.activeLegIndex === 1;
+    });
+    const sequenced = result.samples.some((sample) => sample.sequenced);
+
+    expect(result.initial.routeName).toBe('KSEA→KPDX');
+    expect(result.initial.activeLegIndex).toBe(0);
+    expect(result.final.activeLegIndex, routeDebug).toBe(1);
+    expect(result.final.fromIdent, routeDebug).toBe('OLM');
+    expect(result.final.nextWaypointIdent, routeDebug).toBe('BTG');
+    for (const sample of result.samples) {
+      expect(sample.lnavAvailable, routeDebug).toBe(true);
+      expect(sample.fmaLateralActive, routeDebug).toBe('LNAV');
+    }
+    expect(legTransitioned || sequenced, routeDebug).toBe(true);
   });
 });
