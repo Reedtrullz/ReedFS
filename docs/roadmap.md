@@ -4,7 +4,7 @@ This roadmap lists the enhancements that remain after the foundation stabilizati
 
 Latest comprehensive remaining-work audit and next implementation plan:
 
-- `docs/reviews/2026-06-12-comprehensive-remaining-work-review.md`
+- `docs/reviews/2026-06-12-comprehensive-project-review-remaining-work.md`
 - `docs/plans/2026-06-12-rfs-autoflight-truth-and-route-proof.md`
 
 As of the current repository state, the release-hardening/playability sequence through Task 10.4 and the June Tasks 2-11 guidance-truth slice are implemented. AP and FMA now share route-status-derived navigation truth, guidance/checklists/tutorials are phase-aware, the ENVA tutorial has a deterministic Playwright takeoff-to-clean-climb proof, and the KSEA sample has a route-leg browser proof. The remaining roadmap is now advanced realism, full-route/full-flight proof beyond clean climb and the route-leg proof, visual/layout polish, data quality, and deploy verification.
