@@ -14,8 +14,11 @@ import {
 import {
   composeEffectiveControls,
   computeAutopilotCommandsForState,
-  isAutopilotEngaged,
 } from './systems/autopilot';
+import {
+  effectiveAutopilotIsEngaged,
+  type EffectiveAutoflightTruthContext,
+} from './systems/effectiveAutoflightTruth';
 
 export interface ControlsSlice {
   pilotInputs: ControlInputs;
@@ -57,8 +60,9 @@ export function composeControlsSlice(
   pilotInputs: ControlInputs,
   apCommands: AutopilotCommands = {},
   apState: AutopilotState | null = null,
+  truthContext: EffectiveAutoflightTruthContext = {},
 ): ControlsSlice {
-  const active = isAutopilotEngaged(apState);
+  const active = effectiveAutopilotIsEngaged(apState, truthContext);
   const activeApCommands = active ? apCommands : {};
   const effectiveControls = composeEffectiveControls(pilotInputs, activeApCommands, active);
   return {
@@ -85,7 +89,12 @@ export function advanceSimulationStep(input: SimulationStepInput): SimulationSte
   const routeBeforeTick = input.flightPlan
     ? computeRouteStatus(state, input.flightPlan, input.activeLegIndex)
     : createNoRouteStatus();
-  const apActive = isAutopilotEngaged(input.apState);
+  const truthContext: EffectiveAutoflightTruthContext = {
+    aircraft: state,
+    flightPlan: input.flightPlan,
+    routeStatus: routeBeforeTick,
+  };
+  const apActive = effectiveAutopilotIsEngaged(input.apState, truthContext);
   const apCommands = apActive
     ? computeAutopilotCommandsForState(
       state,
@@ -96,7 +105,7 @@ export function advanceSimulationStep(input: SimulationStepInput): SimulationSte
       routeBeforeTick,
     )
     : {};
-  const controls = composeControlsSlice(input.pilotInputs, apCommands, input.apState);
+  const controls = composeControlsSlice(input.pilotInputs, apCommands, input.apState, truthContext);
 
   integrate(state, controls.effectiveControls, input.spec, input.dt, input.wind);
 

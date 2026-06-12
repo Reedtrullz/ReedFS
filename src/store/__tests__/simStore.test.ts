@@ -358,6 +358,52 @@ describe('useSimStore', () => {
     expect(restored.inputManager.rightBrake).toBe(0);
   });
 
+  it('loadScenarioState does not restore stale AP axis commands when CMD_A truth is unbacked', () => {
+    const storage = memoryScenarioStorage();
+    useSimStore.getState().setInput({
+      elevator: 0.12,
+      aileron: -0.08,
+      throttle1: 0.21,
+      throttle2: 0.23,
+    });
+    const snapshot = createScenarioSnapshot(useSimStore.getState());
+    const ap = minimalApState();
+    ap.truth.autopilotStatus = 'CMD_A';
+    ap.truth.lateralActive = 'HDG_SEL';
+    ap.truth.verticalActive = 'ALT_HOLD';
+    ap.truth.thrustActive = 'SPEED';
+    ap.boeing.cmdA = false;
+    ap.boeing.hdgSel = true;
+    ap.boeing.altHold = true;
+    ap.boeing.autothrottleArm = true;
+    ap.boeing.speedMode = true;
+    snapshot.apState = ap;
+    snapshot.apCommands = {
+      elevator: -0.7,
+      aileron: 0.6,
+      throttle1: 0.9,
+      throttle2: 0.85,
+    };
+    storage.setItem(SCENARIO_SAVE_KEY, JSON.stringify(snapshot));
+
+    useSimStore.getState().reset();
+    useSimStore.getState().loadScenarioState(storage);
+
+    const restored = useSimStore.getState();
+    expect(restored.apCommands).toEqual({});
+    expect(restored.effectiveControls).toEqual(expect.objectContaining({
+      elevator: 0.12,
+      aileron: -0.08,
+      throttle1: 0.21,
+      throttle2: 0.23,
+    }));
+    expect(restored.effectiveControls.elevator).toBe(restored.pilotInputs.elevator);
+    expect(restored.effectiveControls.aileron).toBe(restored.pilotInputs.aileron);
+    expect(restored.effectiveControls.throttle1).toBe(restored.pilotInputs.throttle1);
+    expect(restored.effectiveControls.throttle2).toBe(restored.pilotInputs.throttle2);
+    expect(restored.inputs).toBe(restored.effectiveControls);
+  });
+
   it('tick advances simTime when running', () => { useSimStore.getState().start(); const b = useSimStore.getState().aircraft.simTime; useSimStore.getState().tick(performance.now()); expect(useSimStore.getState().aircraft.simTime).toBeGreaterThanOrEqual(b); });
 
   it('splits a long frame into fixed simulation steps', () => {

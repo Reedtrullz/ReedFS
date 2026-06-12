@@ -1,8 +1,6 @@
-import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
 import type { AircraftState, ControlInputs } from '../sim/types';
 import type { SimulationStatus } from '../sim/simulationStatus';
 import type { FlightScenario } from '../sim/scenarios';
-import { isAutopilotEngaged } from '../sim/systems/autopilot';
 import {
   createInputManagerState,
   updateInputManager,
@@ -183,7 +181,7 @@ export function sanitizeSetInputPartial(
   return { pilotPatch, shouldDisconnect };
 }
 
-export function inputActionsIncludeManualApAxis(actions: InputActions, apState: AutopilotState | null): boolean {
-  if (!isAutopilotEngaged(apState)) return false;
+export function inputActionsIncludeManualApAxis(actions: InputActions, apActive: boolean): boolean {
+  if (!apActive) return false;
   return actions.pitch !== undefined || actions.roll !== undefined;
 }
