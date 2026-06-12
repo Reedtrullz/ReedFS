@@ -1,5 +1,5 @@
 import type { AircraftState, AutopilotCommands, ControlInputs } from '../types';
-import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
+import type { AutoflightTruthState, AutopilotState } from '@shared/autopilot/autopilotTypes';
 import type { FlightPlan } from '@shared/types/fmc';
 import {
   computeRouteStatus,
@@ -9,6 +9,7 @@ import {
 } from './navigation';
 import { computeVNAV } from './vnav';
 import { bodyToNed } from '../physics/frames';
+import { deriveEffectiveAutoflightTruth } from './effectiveAutoflightTruth';
 
 // ── Module-level PID state ──────────────────────────────────────────────
 
@@ -79,6 +80,18 @@ export function resetAutopilotPID(): void {
 
 export function isAutopilotEngaged(ap: AutopilotState | null | undefined): boolean {
   return Boolean(ap && ap.truth.autopilotStatus !== 'OFF');
+}
+
+function apWithEffectiveTruth(ap: AutopilotState, truth: AutoflightTruthState): AutopilotState {
+  return { ...ap, truth };
+}
+
+function hasVerticalGuidance(truth: AutoflightTruthState): boolean {
+  return truth.verticalActive !== 'OFF';
+}
+
+function hasLateralGuidance(truth: AutoflightTruthState): boolean {
+  return truth.lateralActive !== 'OFF';
 }
 
 export function computeN1TargetPercent(state: AircraftState): number {
@@ -237,22 +250,26 @@ export function computeAutopilotCommands(
   // ── Pitch target ──
   let pitchTargetDeg = radToDeg(state.attitude.theta); // default: hold current pitch
 
-  if (t.verticalActive === 'ALT_HOLD') {
-    pitchTargetDeg = altitudeToPitch(targetAltFt, state, dt);
-  } else if (t.verticalActive === 'VS' || t.verticalActive === 'VNAV' || t.verticalActive === 'VNAV_PTH' || t.verticalActive === 'ALT*') {
-    const vs = finiteOrUndefined(targetVerticalSpeedFpm) ?? finiteOrUndefined(ap.boeing.verticalSpeed) ?? 0;
-    pitchTargetDeg = vsToPitch(vs, state, dt);
-  }
+  if (hasVerticalGuidance(t)) {
+    if (t.verticalActive === 'ALT_HOLD') {
+      pitchTargetDeg = altitudeToPitch(targetAltFt, state, dt);
+    } else if (t.verticalActive === 'VS' || t.verticalActive === 'VNAV' || t.verticalActive === 'VNAV_PTH' || t.verticalActive === 'ALT*') {
+      const vs = finiteOrUndefined(targetVerticalSpeedFpm) ?? finiteOrUndefined(ap.boeing.verticalSpeed) ?? 0;
+      pitchTargetDeg = vsToPitch(vs, state, dt);
+    }
 
-  pitchTargetDeg = clamp(pitchTargetDeg, PITCH_MIN_DEG, PITCH_MAX_DEG);
-  cmd.elevator = pitchHold(pitchTargetDeg, state, dt);
+    pitchTargetDeg = clamp(pitchTargetDeg, PITCH_MIN_DEG, PITCH_MAX_DEG);
+    cmd.elevator = pitchHold(pitchTargetDeg, state, dt);
+  }
 
   // ── Bank target ──
-  let bankTargetDeg = 0; // default: wings level
-  if (t.lateralActive === 'HDG_SEL' || t.lateralActive === 'LNAV') {
-    bankTargetDeg = headingToBank(targetHeadingRad, state);
+  if (hasLateralGuidance(t)) {
+    let bankTargetDeg = 0; // default: wings level
+    if (t.lateralActive === 'HDG_SEL' || t.lateralActive === 'LNAV') {
+      bankTargetDeg = headingToBank(targetHeadingRad, state);
+    }
+    cmd.aileron = bankHold(bankTargetDeg, state, dt);
   }
-  cmd.aileron = bankHold(bankTargetDeg, state, dt);
 
   // ── Thrust ──
   if (t.thrustActive === 'SPEED') {
@@ -314,9 +331,20 @@ export function computeAutopilotCommandsForState(
   activeLegIndex?: number | null,
   routeStatus?: RouteStatusSnapshot | null,
 ): AutopilotCommands {
-  if (!ap || !isAutopilotEngaged(ap)) return {};
-  const tgts = resolveAutopilotTargets(state, ap, flightPlan, activeLegIndex, routeStatus);
-  return computeAutopilotCommands(state, ap, tgts.targetHeadingRad, tgts.targetAltFt, tgts.targetSpeedKt, dt, tgts.targetVerticalSpeedFpm, tgts.targetN1Percent);
+  if (!ap) return {};
+
+  const routeStatusForTruth = routeStatus
+    ?? (flightPlan ? computeRouteStatus(state, flightPlan, activeLegIndex ?? null) : null);
+  const truth = deriveEffectiveAutoflightTruth(ap, {
+    aircraft: state,
+    flightPlan: flightPlan ?? null,
+    routeStatus: routeStatusForTruth,
+  });
+  if (truth.autopilotStatus === 'OFF') return {};
+
+  const effectiveAp = apWithEffectiveTruth(ap, truth);
+  const tgts = resolveAutopilotTargets(state, effectiveAp, flightPlan, activeLegIndex, routeStatusForTruth);
+  return computeAutopilotCommands(state, effectiveAp, tgts.targetHeadingRad, tgts.targetAltFt, tgts.targetSpeedKt, dt, tgts.targetVerticalSpeedFpm, tgts.targetN1Percent);
 }
 
 // ── Controls composition ────────────────────────────────────────────────

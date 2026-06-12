@@ -46,6 +46,61 @@ function makeInputs(partial: Partial<ControlInputs> = {}): ControlInputs {
   };
 }
 
+describe('computeAutopilotCommandsForState effective truth gating', () => {
+  it('does not command controls when CMD_A truth is not backed by cmdA', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.velocity.u = 128.6;
+    const ap = makeAp('HDG_SEL', 'ALT_HOLD', 'SPEED');
+    ap.boeing.cmdA = false;
+    ap.boeing.hdgSel = true;
+    ap.boeing.altHold = true;
+    ap.boeing.speedMode = true;
+    ap.boeing.autothrottleArm = true;
+    const commands = computeAutopilotCommandsForState(s, ap, null, 1 / 60, null, createNoRouteStatus());
+    expect(commands).toEqual({});
+  });
+
+  it('does not command throttle when SPEED truth is not backed by speedMode', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.velocity.u = 50;
+    const ap = makeAp('HDG_SEL', 'ALT_HOLD', 'SPEED');
+    ap.boeing.hdgSel = true;
+    ap.boeing.altHold = true;
+    ap.boeing.speedMode = false;
+    ap.boeing.autothrottleArm = true;
+    const commands = computeAutopilotCommandsForState(s, ap, null, 1 / 60, null, createNoRouteStatus());
+    expect(commands.elevator).toBeDefined();
+    expect(commands.aileron).toBeDefined();
+    expect(commands.throttle1).toBeUndefined();
+    expect(commands.throttle2).toBeUndefined();
+  });
+
+  it('does not command LNAV or VNAV axes when the route is unavailable', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.velocity.u = 128.6;
+    const ap = makeAp('LNAV', 'VNAV', 'OFF');
+    ap.boeing.lnav = true;
+    ap.boeing.vnav = true;
+    const commands = computeAutopilotCommandsForState(s, ap, null, 1 / 60, null, createNoRouteStatus());
+    expect(commands.aileron).toBeUndefined();
+    expect(commands.elevator).toBeUndefined();
+    expect(commands.throttle1).toBeUndefined();
+    expect(commands.throttle2).toBeUndefined();
+  });
+
+  it('does not command VNAV pitch when the active leg has no actionable VNAV constraint', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.position.lat = 47.45; s.position.lon = -122.31; s.position.alt = 7000; s.velocity.u = 128.6;
+    const ap = makeAp('LNAV', 'VNAV', 'OFF');
+    ap.boeing.lnav = true;
+    ap.boeing.vnav = true;
+    const fp: FlightPlan = { origin:'KSEA', destination:'KPDX', flightNumber:'TST791', route:'KSEA OLM', waypoints:[{ ident:'KSEA', lat:47.45, lon:-122.31, discontinuity:false }, { ident:'OLM', lat:46.97, lon:-122.9, discontinuity:false }] };
+    const commands = computeAutopilotCommandsForState(s, ap, fp, 1 / 60, 0);
+    expect(commands.aileron).toBeDefined();
+    expect(commands.elevator).toBeUndefined();
+  });
+});
+
 describe('computeAutopilotCommands HDG_SEL', () => {
   it('commands right aileron to turn toward target heading', () => {
     const s = createInitialState(B737_800_SPEC);
@@ -222,6 +277,8 @@ describe('resolveAutopilotTargets VNAV', () => {
     s.position.alt = 5000;
     s.velocity.u = 128.6;
     const ap = makeAp('LNAV', 'VNAV', 'SPEED');
+    ap.boeing.lnav = true;
+    ap.boeing.vnav = true;
     const fp: FlightPlan = {
       origin: 'KSEA',
       destination: 'KPDX',
@@ -287,8 +344,8 @@ describe('resolveAutopilotTargets VNAV', () => {
 
     expect(targets.targetAltFt).toBe(s.position.alt);
     expect(targets.targetVerticalSpeedFpm).toBeUndefined();
-    // Inner loop always provides elevator (wings level + pitch hold)
-    expect(commands.elevator).toBeDefined();
+    // VNAV with no actionable constraint is not effective vertical guidance.
+    expect(commands.elevator).toBeUndefined();
   });
 
   it.each([Number.NaN, Number.POSITIVE_INFINITY, -1])(
@@ -330,6 +387,8 @@ describe('resolveAutopilotTargets VNAV', () => {
     s.position.alt = 5000;
     s.velocity.u = 128.6;
     const ap = makeAp('LNAV', 'VNAV_PTH', 'SPEED');
+    ap.boeing.lnav = true;
+    ap.boeing.vnav = true;
     const fp: FlightPlan = {
       origin: 'KSEA',
       destination: 'KPDX',
