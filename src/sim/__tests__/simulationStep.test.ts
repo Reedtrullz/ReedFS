@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { FlightPlan } from '@shared/types/fmc';
 import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
-import type { ControlInputs } from '../types';
+import type { AutopilotCommands, ControlInputs } from '../types';
 import { B737_800_SPEC, createInitialState } from '../types';
 import { buildGuidanceState } from '../guidanceState';
 import { KSEA_TUTORIAL_SCENARIO } from '../scenarios';
 import { createNoRouteStatus } from '../systems/navigation';
 import { resetAutopilotPID } from '../systems/autopilot';
-import { advanceSimulationStep } from '../simulationStep';
+import { advanceSimulationStep, composeControlsSlice } from '../simulationStep';
 
 function tutorialControls(): ControlInputs {
   return {
@@ -126,6 +126,47 @@ function n1AutopilotState(): AutopilotState {
 beforeEach(() => resetAutopilotPID());
 
 describe('advanceSimulationStep', () => {
+  it('filters stale AP commands when backed AP modes are effectively unavailable', () => {
+    const pilotInputs = tutorialControls();
+    pilotInputs.elevator = 0.12;
+    pilotInputs.aileron = -0.08;
+    pilotInputs.throttle1 = 0.21;
+    pilotInputs.throttle2 = 0.23;
+    const apState = lnavAutopilotState();
+    apState.truth.lateralActive = 'HDG_SEL';
+    apState.truth.verticalActive = 'ALT_HOLD';
+    apState.truth.thrustActive = 'SPEED';
+    apState.truth.autopilotStatus = 'CMD_A';
+    apState.boeing.cmdA = true;
+    apState.boeing.hdgSel = false;
+    apState.boeing.altHold = false;
+    apState.boeing.autothrottleArm = true;
+    apState.boeing.speedMode = false;
+    const apCommands: AutopilotCommands = {
+      elevator: -0.7,
+      aileron: 0.6,
+      throttle1: 0.9,
+      throttle2: 0.85,
+    };
+
+    const controls = composeControlsSlice(pilotInputs, apCommands, apState, {
+      routeStatus: createNoRouteStatus(),
+    });
+
+    expect(controls.apCommands).toEqual({});
+    expect(controls.effectiveControls).toEqual(expect.objectContaining({
+      elevator: 0.12,
+      aileron: -0.08,
+      throttle1: 0.21,
+      throttle2: 0.23,
+    }));
+    expect(controls.effectiveControls.elevator).toBe(controls.pilotInputs.elevator);
+    expect(controls.effectiveControls.aileron).toBe(controls.pilotInputs.aileron);
+    expect(controls.effectiveControls.throttle1).toBe(controls.pilotInputs.throttle1);
+    expect(controls.effectiveControls.throttle2).toBe(controls.pilotInputs.throttle2);
+    expect(controls.inputs).toBe(controls.effectiveControls);
+  });
+
   it('does not mutate the input aircraft snapshot', () => {
     const aircraft = createInitialState(B737_800_SPEC);
     const pilotInputs = tutorialControls();

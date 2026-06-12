@@ -1,4 +1,4 @@
-import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
+import type { AutoflightTruthState, AutopilotState } from '@shared/autopilot/autopilotTypes';
 import type { FlightPlan } from '@shared/types/fmc';
 import type { SimulationStatus } from './simulationStatus';
 import type { WindInfo } from './weather';
@@ -16,9 +16,20 @@ import {
   computeAutopilotCommandsForState,
 } from './systems/autopilot';
 import {
+  deriveEffectiveAutoflightTruth,
   effectiveAutopilotIsEngaged,
   type EffectiveAutoflightTruthContext,
 } from './systems/effectiveAutoflightTruth';
+
+const AP_LATERAL_SERVO_MODES = new Set<AutoflightTruthState['lateralActive']>(['HDG_SEL', 'LNAV']);
+const AP_VERTICAL_SERVO_MODES = new Set<AutoflightTruthState['verticalActive']>([
+  'ALT_HOLD',
+  'VS',
+  'VNAV',
+  'VNAV_PTH',
+  'ALT*',
+]);
+const AP_THRUST_SERVO_MODES = new Set<AutoflightTruthState['thrustActive']>(['SPEED', 'N1']);
 
 export interface ControlsSlice {
   pilotInputs: ControlInputs;
@@ -56,14 +67,35 @@ export interface SimulationStepResult {
   guidance: GuidanceState;
 }
 
+function filterApCommandsByEffectiveModes(
+  apCommands: AutopilotCommands,
+  truth: AutoflightTruthState,
+): AutopilotCommands {
+  if (truth.autopilotStatus === 'OFF') return {};
+
+  const filtered: AutopilotCommands = {};
+  if (AP_LATERAL_SERVO_MODES.has(truth.lateralActive) && apCommands.aileron !== undefined) {
+    filtered.aileron = apCommands.aileron;
+  }
+  if (AP_VERTICAL_SERVO_MODES.has(truth.verticalActive) && apCommands.elevator !== undefined) {
+    filtered.elevator = apCommands.elevator;
+  }
+  if (AP_THRUST_SERVO_MODES.has(truth.thrustActive)) {
+    if (apCommands.throttle1 !== undefined) filtered.throttle1 = apCommands.throttle1;
+    if (apCommands.throttle2 !== undefined) filtered.throttle2 = apCommands.throttle2;
+  }
+  return filtered;
+}
+
 export function composeControlsSlice(
   pilotInputs: ControlInputs,
   apCommands: AutopilotCommands = {},
   apState: AutopilotState | null = null,
   truthContext: EffectiveAutoflightTruthContext = {},
 ): ControlsSlice {
-  const active = effectiveAutopilotIsEngaged(apState, truthContext);
-  const activeApCommands = active ? apCommands : {};
+  const effectiveTruth = deriveEffectiveAutoflightTruth(apState, truthContext);
+  const active = effectiveTruth.autopilotStatus !== 'OFF';
+  const activeApCommands = filterApCommandsByEffectiveModes(apCommands, effectiveTruth);
   const effectiveControls = composeEffectiveControls(pilotInputs, activeApCommands, active);
   return {
     pilotInputs,
