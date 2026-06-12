@@ -343,6 +343,36 @@ describe('resolveAutopilotTargets VNAV', () => {
     expect(targets.targetSpeedKt).toBe(210);
   });
 
+  it('does not command VNAV pitch for a speed-only VNAV constraint', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.position.lat = 47.45;
+    s.position.lon = -122.31;
+    s.velocity.u = 128.6;
+    const ap = makeAp('LNAV', 'VNAV', 'SPEED');
+    ap.boeing.lnav = true;
+    ap.boeing.vnav = true;
+    ap.boeing.speed = null;
+    ap.boeing.speedMode = true;
+    ap.boeing.autothrottleArm = true;
+    const fp: FlightPlan = {
+      origin: 'KSEA',
+      destination: 'OLM',
+      flightNumber: 'TST794',
+      route: 'KSEA OLM',
+      waypoints: [
+        { ident: 'KSEA', lat: 47.45, lon: -122.31, discontinuity: false },
+        { ident: 'OLM', lat: 46.97, lon: -122.9, discontinuity: false, speedConstraint: { type: 'AT_OR_BELOW', speed: 210 } },
+      ],
+    };
+
+    const targets = resolveAutopilotTargets(s, ap, fp, 0);
+    const commands = computeAutopilotCommandsForState(s, ap, fp, 1 / 60, 0);
+
+    expect(targets.targetSpeedKt).toBe(210);
+    expect(targets.targetVerticalSpeedFpm).toBeUndefined();
+    expect(commands.elevator).toBeUndefined();
+  });
+
   it('leaves altitude and VS targets unchanged when VNAV has no active constraint', () => {
     const s = createInitialState(B737_800_SPEC);
     s.position.lat = 47.45;

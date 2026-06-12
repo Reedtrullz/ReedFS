@@ -252,18 +252,23 @@ export function computeAutopilotCommands(
   const cmd: AutopilotCommands = {};
 
   // ── Pitch target ──
-  let pitchTargetDeg = radToDeg(state.attitude.theta); // default: hold current pitch
+  let pitchTargetDeg: number | undefined;
 
   if (hasVerticalGuidance(t)) {
     if (t.verticalActive === 'ALT_HOLD') {
       pitchTargetDeg = altitudeToPitch(targetAltFt, state, dt);
-    } else if (t.verticalActive === 'VS' || t.verticalActive === 'VNAV' || t.verticalActive === 'VNAV_PTH' || t.verticalActive === 'ALT*') {
+    } else if (t.verticalActive === 'VS') {
       const vs = finiteOrUndefined(targetVerticalSpeedFpm) ?? finiteOrUndefined(ap.boeing.verticalSpeed) ?? 0;
       pitchTargetDeg = vsToPitch(vs, state, dt);
+    } else if (t.verticalActive === 'VNAV' || t.verticalActive === 'VNAV_PTH' || t.verticalActive === 'ALT*') {
+      const vs = finiteOrUndefined(targetVerticalSpeedFpm);
+      if (vs !== undefined) pitchTargetDeg = vsToPitch(vs, state, dt);
     }
 
-    pitchTargetDeg = clamp(pitchTargetDeg, PITCH_MIN_DEG, PITCH_MAX_DEG);
-    cmd.elevator = pitchHold(pitchTargetDeg, state, dt);
+    if (pitchTargetDeg !== undefined) {
+      pitchTargetDeg = clamp(pitchTargetDeg, PITCH_MIN_DEG, PITCH_MAX_DEG);
+      cmd.elevator = pitchHold(pitchTargetDeg, state, dt);
+    }
   }
 
   // ── Bank target ──
