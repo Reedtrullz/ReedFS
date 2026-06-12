@@ -9,6 +9,14 @@ describe('EngineStrip', () => {
   });
 
   it('labels actual engine/configuration state separately from commanded pilot controls', () => {
+    useSimStore.setState((s) => ({
+      aircraft: {
+        ...s.aircraft,
+        position: { ...s.aircraft.position, alt: s.aircraft.position.alt + 80 },
+        velocity: { ...s.aircraft.velocity, w: -1.5 },
+        ground: { ...s.aircraft.ground, weightOnWheels: false, contact: 'none', onRunway: false, aglFt: 80, normalForceN: 0 },
+      },
+    }));
     useSimStore.getState().setInput({ throttle1: 0.82, throttle2: 0.82, flapLever: 5, gearLever: 'UP' });
     useSimStore.setState((s) => ({
       aircraft: {

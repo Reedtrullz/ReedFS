@@ -10,7 +10,8 @@ describe('simulation integration', () => {
       aircraft: {
         ...s.aircraft,
         position: { ...s.aircraft.position, alt: 5000 },
-        velocity: { u: 128.6, v: 0, w: 0 },
+        velocity: { u: 128.6, v: 0, w: -1.5 },
+        ground: { ...s.aircraft.ground, weightOnWheels: false, contact: 'none', onRunway: false, aglFt: 5000, normalForceN: 0 },
         config: { ...s.aircraft.config, gearDown: false, flapSetting: 5 },
       },
     }));
@@ -36,7 +37,7 @@ describe('simulation integration', () => {
   });
 
   it('fuel decreases over time', () => {
-    useSimStore.getState().setInput({ throttle1: 0.5, throttle2: 0.5, gearLever: 'UP' });
+    useSimStore.getState().setInput({ throttle1: 0.5, throttle2: 0.5 });
     useSimStore.getState().start();
     const fuelBefore = useSimStore.getState().aircraft.fuel.totalFuel;
     for (let i = 0; i < 300; i++) useSimStore.getState().tick(1000 + i * (1/60) * 1000);

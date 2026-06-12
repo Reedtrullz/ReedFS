@@ -3,6 +3,24 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { useSimStore } from '../../store/simStore';
 import { useCockpitInteractions } from '../useCockpitInteractions';
 
+function establishPositiveRateInStore(): void {
+  useSimStore.setState((s) => {
+    const aircraft = structuredClone(s.aircraft);
+    aircraft.flightPhase = 'TAKEOFF';
+    aircraft.ground = {
+      ...aircraft.ground,
+      weightOnWheels: false,
+      contact: 'none',
+      onRunway: false,
+      aglFt: 80,
+      normalForceN: 0,
+    };
+    aircraft.velocity.w = -1.5;
+    aircraft.position.alt += 80;
+    return { aircraft };
+  });
+}
+
 describe('useCockpitInteractions', () => {
   beforeEach(() => {
     useSimStore.getState().reset();
@@ -10,6 +28,7 @@ describe('useCockpitInteractions', () => {
 
   it('applies click-style cockpit input interactions to pilot controls', () => {
     useSimStore.getState().setInput({ flapLever: 0, gearLever: 'DOWN' });
+    establishPositiveRateInStore();
     const { result } = renderHook(() => useCockpitInteractions());
 
     act(() => {

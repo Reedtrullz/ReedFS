@@ -30,6 +30,8 @@ import {
   type InputActions,
   type InputManagerState,
 } from '../input/InputManager';
+import { resolveGearLeverCommand } from '../input/gearCommand';
+import { isPositiveRateEstablished } from '../sim/flightPhasePredicates';
 import {
   inputActionsIncludeManualApAxis,
   inputManagerForScenario,
@@ -136,6 +138,27 @@ function withoutThrottleApCommands(apCommands: AutopilotCommands): AutopilotComm
 
 function commandsForThrustOwnership(apCommands: AutopilotCommands, ownsThrust: boolean): AutopilotCommands {
   return ownsThrust ? apCommands : withoutThrottleApCommands(apCommands);
+}
+
+function gateGearLeverPatch(
+  partial: Partial<ControlInputs>,
+  currentGearLever: ControlInputs['gearLever'],
+  aircraft: AircraftState,
+): Partial<ControlInputs> {
+  if (partial.gearLever === undefined) return partial;
+
+  const gearCommand = resolveGearLeverCommand({
+    current: currentGearLever,
+    requested: partial.gearLever,
+    positiveRate: isPositiveRateEstablished(aircraft),
+  });
+  if (gearCommand.gearLever === currentGearLever) {
+    const rest = { ...partial };
+    delete rest.gearLever;
+    return rest;
+  }
+
+  return { ...partial, gearLever: gearCommand.gearLever };
 }
 
 function disconnectAutopilot(apState: AutopilotState | null): AutopilotState | null {
@@ -258,8 +281,9 @@ export const useSimStore = create<SimStore>((set, get) => ({
     set((s) => {
       const apActive = apIsEffectivelyEngaged(s);
       const apOwnsThrust = apEffectivelyOwnsThrust(s);
+      const gatedPartial = gateGearLeverPatch(partial, s.pilotInputs.gearLever, s.aircraft);
       const { pilotPatch, shouldDisconnect } = sanitizeSetInputPartial(
-        partial,
+        gatedPartial,
         s.pilotInputs,
         s.effectiveControls,
         apActive,
@@ -308,6 +332,7 @@ export const useSimStore = create<SimStore>((set, get) => ({
           throttle: Math.max(s.pilotInputs.throttle1, s.pilotInputs.throttle2),
         });
       }
+      inputPatch = gateGearLeverPatch(inputPatch, s.pilotInputs.gearLever, s.aircraft);
 
       const trimChanged = inputManager.stabilizerTrimUnits !== s.aircraft.config.stabilizerTrimUnits;
       const aircraft = trimChanged ? structuredClone(s.aircraft) : s.aircraft;

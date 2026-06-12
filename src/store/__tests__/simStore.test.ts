@@ -11,6 +11,8 @@ import {
   createScenarioSnapshot,
   type ScenarioPersistenceStorage,
 } from '../scenarioPersistence';
+import { applyDiscreteKeyInput } from '../../input/keyboardControls';
+import { cockpitInputForInteraction } from '../../viewport/cockpitInteractions';
 
 function minimalApState(): AutopilotState {
   return {
@@ -88,6 +90,24 @@ function tickAtHz(hz: number, seconds: number): void {
   for (let frame = 0; frame < seconds * hz; frame++) {
     useSimStore.getState().tick(startMs + frame * (1000 / hz));
   }
+}
+
+function establishPositiveRateInStore(): void {
+  useSimStore.setState((s) => {
+    const aircraft = structuredClone(s.aircraft);
+    aircraft.flightPhase = 'TAKEOFF';
+    aircraft.ground = {
+      ...aircraft.ground,
+      weightOnWheels: false,
+      contact: 'none',
+      onRunway: false,
+      aglFt: 80,
+      normalForceN: 0,
+    };
+    aircraft.velocity.w = -1.5;
+    aircraft.position.alt += 80;
+    return { aircraft };
+  });
 }
 
 function shortRoutePlan(): FlightPlan {
@@ -864,6 +884,7 @@ describe('useSimStore', () => {
       const effectiveControls = { ...s.pilotInputs, ...apCommands };
       return { apCommands, effectiveControls, inputs: effectiveControls };
     });
+    establishPositiveRateInStore();
 
     useSimStore.getState().setInput({ flapLever: 15, gearLever: 'UP', spoilers: 0.3 });
 
@@ -876,7 +897,7 @@ describe('useSimStore', () => {
     expect(state.effectiveControls.spoilers).toBe(0.3);
   });
 
-  it('gamepad-style input actions latch brake, next-flaps, and gear-toggle commands', () => {
+  it('gamepad-style input actions latch brake and next-flaps while gating gear-toggle commands', () => {
     useSimStore.getState().setInput({ flapLever: 0, gearLever: 'DOWN', brake: 0 });
 
     useSimStore.getState().applyInputActions({ brake: 1, flapNext: true, gearToggle: true }, 1 / 60);
@@ -884,14 +905,60 @@ describe('useSimStore', () => {
     let state = useSimStore.getState();
     expect(state.pilotInputs.brake).toBe(1);
     expect(state.pilotInputs.flapLever).toBe(1);
-    expect(state.pilotInputs.gearLever).toBe('UP');
-    expect(state.effectiveControls).toEqual(expect.objectContaining({ brake: 1, flapLever: 1, gearLever: 'UP' }));
+    expect(state.pilotInputs.gearLever).toBe('DOWN');
+    expect(state.effectiveControls).toEqual(expect.objectContaining({ brake: 1, flapLever: 1, gearLever: 'DOWN' }));
+
+    establishPositiveRateInStore();
 
     useSimStore.getState().applyInputActions({ flapNext: true, gearToggle: true }, 1 / 60);
 
     state = useSimStore.getState();
     expect(state.pilotInputs.flapLever).toBe(2);
+    expect(state.pilotInputs.gearLever).toBe('UP');
+
+    useSimStore.getState().applyInputActions({ gearToggle: true }, 1 / 60);
+
+    expect(useSimStore.getState().pilotInputs.gearLever).toBe('DOWN');
+  });
+
+  it('rejects direct gear-up input before positive rate but still allows gear down', () => {
+    useSimStore.getState().setInput({ gearLever: 'UP' });
+
+    let state = useSimStore.getState();
     expect(state.pilotInputs.gearLever).toBe('DOWN');
+    expect(state.effectiveControls.gearLever).toBe('DOWN');
+
+    establishPositiveRateInStore();
+    useSimStore.getState().setInput({ gearLever: 'UP' });
+
+    state = useSimStore.getState();
+    expect(state.pilotInputs.gearLever).toBe('UP');
+    expect(state.effectiveControls.gearLever).toBe('UP');
+
+    useSimStore.setState((s) => {
+      const aircraft = structuredClone(s.aircraft);
+      aircraft.velocity.w = 2;
+      return { aircraft };
+    });
+    useSimStore.getState().setInput({ gearLever: 'DOWN' });
+
+    state = useSimStore.getState();
+    expect(state.pilotInputs.gearLever).toBe('DOWN');
+    expect(state.effectiveControls.gearLever).toBe('DOWN');
+  });
+
+  it('gates keyboard and cockpit gear-up patches at the store boundary before positive rate', () => {
+    const keyboardPatch = applyDiscreteKeyInput('g', useSimStore.getState().inputs);
+    expect(keyboardPatch).toEqual({ gearLever: 'UP' });
+
+    useSimStore.getState().setInput(keyboardPatch ?? {});
+    expect(useSimStore.getState().pilotInputs.gearLever).toBe('DOWN');
+
+    const cockpitPatch = cockpitInputForInteraction('gear-lever', useSimStore.getState().inputs);
+    expect(cockpitPatch).toEqual({ gearLever: 'UP' });
+
+    useSimStore.getState().setInput(cockpitPatch ?? {});
+    expect(useSimStore.getState().pilotInputs.gearLever).toBe('DOWN');
   });
 
   it('legacy full-object setInput does not copy AP-owned effective axes into pilot inputs', () => {
