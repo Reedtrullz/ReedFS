@@ -72,6 +72,33 @@ describe('guidanceState', () => {
     expect(low.activeTutorialStep?.id).toBe('line-up');
   });
 
+  it('auto-selects the tutorial step that matches the derived flight phase', () => {
+    const rollingAircraft = scenarioAircraft();
+    rollingAircraft.flightPhase = 'TAKEOFF';
+    rollingAircraft.velocity.u = 30;
+
+    expect(buildGuidanceState({
+      scenario: KSEA_TUTORIAL_SCENARIO,
+      status: 'running',
+      aircraft: rollingAircraft,
+      controls: { ...configuredInputs, throttle1: 1, throttle2: 1 },
+    }).activeTutorialStep?.id).toBe('advance-thrust');
+
+    const climbAircraft = structuredClone(rollingAircraft);
+    climbAircraft.flightPhase = 'CLIMB';
+    climbAircraft.ground.weightOnWheels = false;
+    climbAircraft.ground.aglFt = 400;
+    climbAircraft.position.alt += 400;
+    climbAircraft.config.gearDown = false;
+
+    expect(buildGuidanceState({
+      scenario: KSEA_TUTORIAL_SCENARIO,
+      status: 'running',
+      aircraft: climbAircraft,
+      controls: { ...configuredInputs, throttle1: 1, throttle2: 1, gearLever: 'UP' },
+    }).activeTutorialStep?.id).toBe('rotate-positive-rate');
+  });
+
   it('derives the takeoff guidance phase from aircraft and control state', () => {
     const rollingAircraft = scenarioAircraft();
     rollingAircraft.flightPhase = 'TAKEOFF';

@@ -67,19 +67,41 @@ export function deriveGuidancePhase(
   return 'preflight';
 }
 
+function tutorialStepIndexForPhase(scenario: FlightScenario, phase: GuidancePhase): number {
+  const preferredStepId = (() => {
+    switch (phase) {
+      case 'preflight':
+        return 'line-up';
+      case 'takeoff-roll':
+      case 'rotation':
+      case 'rejected-takeoff':
+        return 'advance-thrust';
+      case 'positive-rate':
+      case 'climb':
+        return 'rotate-positive-rate';
+      default:
+        return 'line-up';
+    }
+  })();
+
+  const index = scenario.tutorialSteps.findIndex((step) => step.id === preferredStepId);
+  return index >= 0 ? index : 0;
+}
+
 export function buildGuidanceState({
   scenario,
   status,
   aircraft,
   controls,
-  tutorialStepIndex = 0,
+  tutorialStepIndex,
 }: GuidanceStateInput): GuidanceState {
+  const phase = deriveGuidancePhase(status, aircraft, controls);
   const baseTutorial = createTutorialState(scenario);
+  const requestedTutorialStepIndex = tutorialStepIndex ?? tutorialStepIndexForPhase(scenario, phase);
   const tutorial: TutorialState = {
     ...baseTutorial,
-    stepIndex: clampTutorialStepIndex(baseTutorial, tutorialStepIndex),
+    stepIndex: clampTutorialStepIndex(baseTutorial, requestedTutorialStepIndex),
   };
-  const phase = deriveGuidancePhase(status, aircraft, controls);
 
   return {
     scenarioId: scenario.id,
@@ -95,11 +117,11 @@ export function buildGuidanceState({
 export const createGuidanceState = buildGuidanceState;
 
 export function rebuildGuidanceState(
-  current: GuidanceState,
+  _current: GuidanceState,
   input: Omit<GuidanceStateInput, 'tutorialStepIndex'> & { tutorialStepIndex?: number },
 ): GuidanceState {
   return buildGuidanceState({
     ...input,
-    tutorialStepIndex: input.tutorialStepIndex ?? current.tutorial.stepIndex,
+    tutorialStepIndex: input.tutorialStepIndex,
   });
 }
