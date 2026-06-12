@@ -1,5 +1,5 @@
 import type { SimStatus } from './simulationStatus';
-import { buildTakeoffChecklist, coachMessageForState, type ChecklistItem } from './checklistCoach';
+import { buildGuidanceChecklist, coachMessageForState, type ChecklistItem } from './checklistCoach';
 import type { FlightScenario, ScenarioTutorialStep } from './scenarios';
 import type { AircraftState, ControlInputs } from './types';
 import {
@@ -79,13 +79,14 @@ export function buildGuidanceState({
     ...baseTutorial,
     stepIndex: clampTutorialStepIndex(baseTutorial, tutorialStepIndex),
   };
+  const phase = deriveGuidancePhase(status, aircraft, controls);
 
   return {
     scenarioId: scenario.id,
-    phase: deriveGuidancePhase(status, aircraft, controls),
+    phase,
     tutorial,
     activeTutorialStep: currentTutorialStep(tutorial),
-    checklist: buildTakeoffChecklist(scenario, aircraft, controls),
+    checklist: buildGuidanceChecklist(scenario, aircraft, controls, phase),
     coachMessage: coachMessageForState(status, aircraft, controls, scenario),
     alerts: [],
   };

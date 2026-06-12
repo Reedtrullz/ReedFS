@@ -2,6 +2,8 @@ import type { AircraftState, ControlInputs } from './types';
 import type { FlightScenario } from './scenarios';
 import type { SimStatus } from './simulationStatus';
 
+type GuidanceChecklistPhase = 'preflight' | 'takeoff-roll' | 'rotation' | 'rejected-takeoff' | 'positive-rate' | 'climb';
+
 export interface ChecklistItem {
   id: string;
   label: string;
@@ -44,6 +46,55 @@ export function buildTakeoffChecklist(
       detail: 'Spoilers down for takeoff',
     },
   ];
+}
+
+export function buildGuidanceChecklist(
+  scenario: FlightScenario,
+  aircraft: AircraftState,
+  controls: ControlInputs,
+  phase: GuidanceChecklistPhase,
+): ChecklistItem[] {
+  if (phase === 'positive-rate') {
+    return [
+      {
+        id: 'positive-rate',
+        label: 'Positive rate established',
+        complete: !aircraft.ground.weightOnWheels && aircraft.ground.aglFt > 10,
+        detail: 'Confirm climb before retracting gear',
+      },
+      {
+        id: 'gear-up-after-positive-rate',
+        label: 'Gear up after positive rate',
+        complete: controls.gearLever === 'UP' && !aircraft.config.gearDown,
+        detail: 'Select gear UP after positive rate',
+      },
+    ];
+  }
+
+  if (phase === 'climb') {
+    return [
+      {
+        id: 'positive-rate',
+        label: 'Positive rate established',
+        complete: !aircraft.ground.weightOnWheels && aircraft.ground.aglFt > 10,
+        detail: 'Maintain stable climb',
+      },
+      {
+        id: 'gear-up',
+        label: 'Gear up',
+        complete: controls.gearLever === 'UP' && !aircraft.config.gearDown,
+        detail: 'Gear should be up in initial climb',
+      },
+      {
+        id: 'flaps-takeoff',
+        label: 'Takeoff flaps still set',
+        complete: nearlyEqual(aircraft.config.flapSetting, scenario.flapSetting),
+        detail: `Keep flaps ${scenario.flapSetting} until cleanup altitude`,
+      },
+    ];
+  }
+
+  return buildTakeoffChecklist(scenario, aircraft, controls);
 }
 
 export function coachMessageForState(

@@ -133,4 +133,47 @@ describe('guidanceState', () => {
       controls: { ...takeoffControls, gearLever: 'UP' },
     }).phase).toBe('climb');
   });
+
+  it('shows positive-rate cleanup instead of pre-takeoff gear-down checklist once airborne', () => {
+    const aircraft = scenarioAircraft();
+    aircraft.flightPhase = 'CLIMB';
+    aircraft.ground.weightOnWheels = false;
+    aircraft.ground.aglFt = 75;
+    aircraft.position.alt += 75;
+    aircraft.config.gearDown = true;
+
+    const guidance = buildGuidanceState({
+      scenario: KSEA_TUTORIAL_SCENARIO,
+      status: 'running',
+      aircraft,
+      controls: { ...configuredInputs, throttle1: 1, throttle2: 1, gearLever: 'DOWN' },
+    });
+
+    expect(guidance.phase).toBe('positive-rate');
+    expect(guidance.checklist.map((item) => item.label)).toContain('Gear up after positive rate');
+    expect(guidance.checklist.map((item) => item.label)).not.toContain('Gear down');
+  });
+
+  it('shows climb cleanup complete after gear retraction', () => {
+    const aircraft = scenarioAircraft();
+    aircraft.flightPhase = 'CLIMB';
+    aircraft.ground.weightOnWheels = false;
+    aircraft.ground.aglFt = 400;
+    aircraft.position.alt += 400;
+    aircraft.config.gearDown = false;
+
+    const guidance = buildGuidanceState({
+      scenario: KSEA_TUTORIAL_SCENARIO,
+      status: 'running',
+      aircraft,
+      controls: { ...configuredInputs, throttle1: 1, throttle2: 1, gearLever: 'UP' },
+    });
+
+    expect(guidance.phase).toBe('climb');
+    expect(guidance.checklist).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'gear-up', label: 'Gear up', complete: true }),
+      expect.objectContaining({ id: 'positive-rate', label: 'Positive rate established', complete: true }),
+    ]));
+    expect(guidance.checklist.map((item) => item.label)).not.toContain('Gear down');
+  });
 });
