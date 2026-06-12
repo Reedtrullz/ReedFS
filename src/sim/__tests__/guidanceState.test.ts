@@ -199,7 +199,9 @@ describe('guidanceState', () => {
       controls: { ...configuredInputs, throttle1: 0, throttle2: 0, brake: 1, spoilers: 1 },
     });
     expect(rejected.phase).toBe('rejected-takeoff');
-    expect(rejected.coachMessage).toMatch(/rejected takeoff|hold brakes|RESET/i);
+    expect(rejected.coachMessage).toMatch(/rejected takeoff/i);
+    expect(rejected.coachMessage).toMatch(/hold brakes/i);
+    expect(rejected.coachMessage).toMatch(/RESET/i);
 
     const rejectedStopped = structuredClone(rejectedAircraft);
     rejectedStopped.velocity.u = 0;

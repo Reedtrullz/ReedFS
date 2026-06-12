@@ -53,6 +53,9 @@ describe('takeoffCueText', () => {
 
   it('clears takeoff cue after gear up while airborne', () => {
     const { state } = stateAtIas(155);
+    state.ground.weightOnWheels = false;
+    state.ground.aglFt = 80;
+    state.velocity.w = -1.5;
     state.position.alt += 80;
     state.config.gearDown = false;
     expect(takeoffCueText(state, 155)).toBeNull();
