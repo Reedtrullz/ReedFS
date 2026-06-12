@@ -9,6 +9,7 @@ Current source-of-truth documents:
 - `../roadmap.md` — prioritized necessary enhancements.
 - `../reviews/2026-06-12-comprehensive-project-review-remaining-work.md` — latest comprehensive project review, browser dogfood evidence, and remaining-work roadmap.
 - `../reviews/2026-06-12-comprehensive-remaining-work-review.md` — earlier 2026-06-12 comprehensive remaining-work audit and evidence ledger.
+- `2026-06-12-rfs-ksea-route-approach-manual-handoff-proof.md` — current autonomous slice plan for proving the handoff from backed KSEA final-leg route-coupled approach automation to AP/FMA OFF manual control without hidden AP/AT axis commands.
 - `2026-06-12-rfs-ksea-route-coupled-approach-proof.md` — current autonomous slice plan for proving a final-leg KSEA route-coupled configured-approach gate in browser without claiming full-route/full-flight or landing proof.
 - `2026-06-12-rfs-enva-descent-approach-landing-bridge-proof.md` — current autonomous slice plan for a seeded ENVA descent-to-approach/landing bridge browser proof without claiming full-flight proof.
 - `2026-06-12-rfs-approach-landing-rollout-browser-proof.md` — current autonomous slice plan for truthful landing/rollout guidance plus a scoped approach-to-touchdown/rollout/reset browser proof without claiming full-flight proof.
