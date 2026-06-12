@@ -299,6 +299,7 @@ test.describe('RFS route and LNAV browser proof', () => {
 
     expect(result.reset.flightPlan, routeDebug).toBeNull();
     expect(result.reset.activeLegIndex, routeDebug).toBeNull();
+    expect(result.reset.apStateCleared, routeDebug).toBe(true);
     expect(result.reset.routeName, routeDebug).toBe('NO ROUTE');
     expect(result.reset.lnavAvailable, routeDebug).toBe(false);
     expect(result.reset.autopilotStatus, routeDebug).toBe('OFF');

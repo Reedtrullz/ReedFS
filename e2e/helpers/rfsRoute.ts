@@ -36,6 +36,7 @@ export interface RouteProofSnapshot {
 export interface RouteResetProofSnapshot {
   flightPlan: null;
   activeLegIndex: null;
+  apStateCleared: boolean;
   routeName: string;
   lnavAvailable: boolean;
   lateralActive: string;
@@ -595,6 +596,7 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
         return {
           flightPlan: state.flightPlan,
           activeLegIndex: state.activeLegIndex,
+          apStateCleared: state.apState === null,
           routeName: route.routeName,
           lnavAvailable: route.lnavAvailable,
           lateralActive: state.apState?.truth.lateralActive ?? 'OFF',
@@ -756,6 +758,7 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
             if (
               reset.routeName === 'NO ROUTE'
               && !reset.lnavAvailable
+              && reset.apStateCleared
               && reset.autopilotStatus === 'OFF'
               && reset.fmaAutopilotStatus === 'OFF'
               && reset.lateralActive === 'OFF'
