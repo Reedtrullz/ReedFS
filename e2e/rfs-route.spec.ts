@@ -216,22 +216,34 @@ test.describe('RFS route and LNAV browser proof', () => {
     expect(result.manualHandoff.pilotInputs.throttle1, routeDebug).toBe(result.manualHandoff.effectiveControls.throttle1);
     expect(result.manualHandoff.pilotInputs.throttle2, routeDebug).toBe(result.manualHandoff.effectiveControls.throttle2);
 
-    const approachSamples = result.samples.filter((sample) => sample.autopilotStatus === 'CMD_A');
-    expect(approachSamples.length, routeDebug).toBeGreaterThan(0);
-    for (const sample of approachSamples) {
+    expect(result.samples.length, routeDebug).toBeGreaterThan(1);
+    const handoffSampleIndex = result.samples.length - 1;
+    const configuredApproachSampleIndex = handoffSampleIndex - 1;
+    const preHandoffSamples = result.samples.slice(0, handoffSampleIndex);
+    const afterHandoffSample = result.samples[handoffSampleIndex];
+
+    expect(result.samples[configuredApproachSampleIndex], routeDebug).toEqual(result.configuredApproach);
+    expect(afterHandoffSample, routeDebug).toEqual(result.manualHandoff);
+    expect(preHandoffSamples.length, routeDebug).toBeGreaterThan(0);
+    for (const sample of preHandoffSamples) {
+      expect(sample.autopilotStatus, routeDebug).toBe('CMD_A');
       expect(sample.fmaAutopilotStatus, routeDebug).toBe('CMD_A');
       expect(sample.lateralActive, routeDebug).toBe('LNAV');
       expect(sample.fmaLateralActive, routeDebug).toBe('LNAV');
       expect(sample.thrustActive, routeDebug).toBe('SPEED');
       expect(sample.fmaThrustActive, routeDebug).toBe('SPEED');
+      expect(sample.verticalActive, routeDebug).toBe('OFF');
+      expect(sample.fmaVerticalActive, routeDebug).toBe('OFF');
     }
-    expect(result.samples.some((sample) => (
-      sample.autopilotStatus === 'OFF'
-      && sample.fmaAutopilotStatus === 'OFF'
-      && sample.fmaLateralActive === 'OFF'
-      && sample.fmaThrustActive === 'OFF'
-      && sample.apCommandCount === 0
-    )), routeDebug).toBe(true);
+    expect(afterHandoffSample.autopilotStatus, routeDebug).toBe('OFF');
+    expect(afterHandoffSample.fmaAutopilotStatus, routeDebug).toBe('OFF');
+    expect(afterHandoffSample.lateralActive, routeDebug).toBe('OFF');
+    expect(afterHandoffSample.fmaLateralActive, routeDebug).toBe('OFF');
+    expect(afterHandoffSample.verticalActive, routeDebug).toBe('OFF');
+    expect(afterHandoffSample.fmaVerticalActive, routeDebug).toBe('OFF');
+    expect(afterHandoffSample.thrustActive, routeDebug).toBe('OFF');
+    expect(afterHandoffSample.fmaThrustActive, routeDebug).toBe('OFF');
+    expect(afterHandoffSample.apCommandCount, routeDebug).toBe(0);
     for (const sample of result.samples) {
       expect(sample.weightOnWheels, routeDebug).toBe(false);
       expect(sample.flightPhase, routeDebug).not.toBe('LANDED');
