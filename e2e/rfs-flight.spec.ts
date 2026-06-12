@@ -35,9 +35,11 @@ test.describe('RFS playable flight loops', () => {
     expect(proof.approach.aglFt).toBeGreaterThan(50);
 
     expect(proof.touchdown.weightOnWheels).toBe(true);
+    expect(proof.touchdown.onRunway).toBe(true);
     expect(proof.touchdown.groundContact).toBe('gear');
     expect(proof.touchdown.flightPhase).toBe('LANDED');
     expect(proof.touchdown.touchdownSinkRateMps).toBeGreaterThan(0);
+    expect(proof.touchdown.touchdownSinkRateMps).toBeLessThan(15);
 
     expect(proof.rollout.groundSpeedKt).toBeLessThan(proof.touchdown.groundSpeedKt);
     expect(['landing-rollout', 'landed']).toContain(proof.rollout.guidancePhase);
@@ -73,7 +75,9 @@ test.describe('RFS playable flight loops', () => {
     expect(proof.touchdown.flightPhase).toBe('LANDED');
     expect(proof.touchdown.groundContact).toBe('gear');
     expect(proof.touchdown.weightOnWheels).toBe(true);
+    expect(proof.touchdown.onRunway).toBe(true);
     expect(proof.touchdown.touchdownSinkRateMps).toBeGreaterThan(0);
+    expect(proof.touchdown.touchdownSinkRateMps).toBeLessThan(15);
 
     expect(proof.rollout.groundSpeedKt).toBeLessThan(proof.touchdown.groundSpeedKt);
     expect(['landing-rollout', 'landed']).toContain(proof.rollout.guidancePhase);

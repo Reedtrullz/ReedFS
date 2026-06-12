@@ -20,6 +20,7 @@ export interface LandingSnapshot {
   aglFt: number;
   verticalSpeedFpm: number;
   weightOnWheels: boolean;
+  onRunway: boolean;
   gearDown: boolean;
   gearLever: 'UP' | 'DOWN';
   flapSetting: number;
@@ -383,6 +384,7 @@ export async function flyApproachToLandingRolloutAndReset(page: Page): Promise<L
         aglFt: state.aircraft.ground.aglFt,
         verticalSpeedFpm: derived.vs,
         weightOnWheels: state.aircraft.ground.weightOnWheels,
+        onRunway: state.aircraft.ground.onRunway,
         gearDown: state.aircraft.config.gearDown,
         gearLever: state.inputs.gearLever,
         flapSetting: state.aircraft.config.flapSetting,
@@ -421,7 +423,7 @@ export async function flyApproachToLandingRolloutAndReset(page: Page): Promise<L
       aircraft.position = { ...approachPosition, alt: ENVA_RUNWAY_09.elevationFt + 120 };
       aircraft.attitude = { phi: 0, theta: pitchRad, psi: headingRad };
       aircraft.quaternion = eulerToQuat(aircraft.attitude.phi, aircraft.attitude.theta, aircraft.attitude.psi);
-      aircraft.velocity = { u: 72, v: 0, w: 5.2 };
+      aircraft.velocity = { u: 72, v: 0, w: 2.8 };
       aircraft.angularVel = { p: 0, q: 0, r: 0 };
       aircraft.config = {
         ...aircraft.config,
@@ -485,6 +487,9 @@ export async function flyApproachToLandingRolloutAndReset(page: Page): Promise<L
       stepFrame();
       const current = snapshot();
       if (current.flightPhase === 'LANDED' && current.groundContact === 'gear' && current.weightOnWheels) {
+        if (!current.onRunway || current.touchdownSinkRateMps >= 15) {
+          throw new Error(`Touchdown outside scoped proof bounds: ${JSON.stringify(current)}`);
+        }
         touchdown = current;
         break;
       }
@@ -647,6 +652,7 @@ export async function flyDescentApproachToLandingRolloutAndReset(page: Page): Pr
         aglFt: state.aircraft.ground.aglFt,
         verticalSpeedFpm: derived.vs,
         weightOnWheels: state.aircraft.ground.weightOnWheels,
+        onRunway: state.aircraft.ground.onRunway,
         gearDown: state.aircraft.config.gearDown,
         gearLever: state.inputs.gearLever,
         flapSetting: state.aircraft.config.flapSetting,
@@ -663,15 +669,15 @@ export async function flyDescentApproachToLandingRolloutAndReset(page: Page): Pr
     useSimStore.getState().setScenario('enva-tutorial');
     useSimStore.getState().reset();
 
-    const descentPosition = offsetRunwayPosition(ENVA_RUNWAY_09, -1300, 0);
+    const descentPosition = offsetRunwayPosition(ENVA_RUNWAY_09, -300, 0);
     const headingRad = ENVA_RUNWAY_09.headingDeg * Math.PI / 180;
     const pitchRad = 2 * Math.PI / 180;
     const seedControls: BrowserControlInputs = {
-      throttle1: 0.24,
-      throttle2: 0.24,
+      throttle1: 0.65,
+      throttle2: 0.65,
       flapLever: 5,
       gearLever: 'UP',
-      elevator: 0,
+      elevator: -0.15,
       aileron: 0,
       rudder: 0,
       brake: 0,
@@ -682,10 +688,10 @@ export async function flyDescentApproachToLandingRolloutAndReset(page: Page): Pr
 
     useSimStore.setState((state) => {
       const aircraft = structuredClone(state.aircraft);
-      aircraft.position = { ...descentPosition, alt: ENVA_RUNWAY_09.elevationFt + 520 };
+      aircraft.position = { ...descentPosition, alt: ENVA_RUNWAY_09.elevationFt + 301 };
       aircraft.attitude = { phi: 0, theta: pitchRad, psi: headingRad };
       aircraft.quaternion = eulerToQuat(aircraft.attitude.phi, aircraft.attitude.theta, aircraft.attitude.psi);
-      aircraft.velocity = { u: 72, v: 0, w: 5.2 };
+      aircraft.velocity = { u: 72, v: 0, w: 0.3 };
       aircraft.angularVel = { p: 0, q: 0, r: 0 };
       aircraft.config = {
         ...aircraft.config,
@@ -702,7 +708,7 @@ export async function flyDescentApproachToLandingRolloutAndReset(page: Page): Pr
       ];
       aircraft.ground = {
         ...aircraft.ground,
-        aglFt: 520,
+        aglFt: 301,
         groundAltFt: ENVA_RUNWAY_09.elevationFt,
         weightOnWheels: false,
         normalForceN: 0,
@@ -751,15 +757,15 @@ export async function flyDescentApproachToLandingRolloutAndReset(page: Page): Pr
     }
 
     useSimStore.getState().setInput({
-      throttle1: 0.22,
-      throttle2: 0.22,
+      throttle1: 0.65,
+      throttle2: 0.65,
       flapLever: 30,
       gearLever: 'DOWN',
       brake: 0,
       leftBrake: 0,
       rightBrake: 0,
       spoilers: 0,
-      elevator: 0,
+      elevator: -0.15,
     });
 
     let configuredApproach: LandingSnapshot | null = null;
@@ -786,9 +792,16 @@ export async function flyDescentApproachToLandingRolloutAndReset(page: Page): Pr
 
     let touchdown: LandingSnapshot | null = null;
     for (let frame = 0; frame < 60 * 70; frame += 1) {
+      const beforeTick = snapshot();
+      if (!beforeTick.weightOnWheels && beforeTick.aglFt < 120) {
+        useSimStore.getState().setInput({ throttle1: 0.65, throttle2: 0.65, elevator: -0.8 });
+      }
       stepFrame();
       const current = snapshot();
       if (current.flightPhase === 'LANDED' && current.groundContact === 'gear' && current.weightOnWheels) {
+        if (!current.onRunway || current.touchdownSinkRateMps >= 15) {
+          throw new Error(`Descent proof touchdown outside scoped proof bounds: ${JSON.stringify(current)}`);
+        }
         touchdown = current;
         break;
       }
