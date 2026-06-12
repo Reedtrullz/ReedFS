@@ -60,7 +60,7 @@ function deriveThrustMode(ap: AutopilotState): ThrustMode {
   if (!ap.boeing.autothrottleArm) return 'OFF';
   if (ap.truth.thrustActive === 'SPEED') return ap.boeing.speedMode ? 'SPEED' : 'OFF';
   if (ap.truth.thrustActive === 'N1') return ap.boeing.n1 ? 'N1' : 'OFF';
-  return ap.truth.thrustActive;
+  return 'OFF';
 }
 
 function deriveLateralMode(ap: AutopilotState, routeStatus: RouteStatusSnapshot | null | undefined): LateralMode {
@@ -70,7 +70,7 @@ function deriveLateralMode(ap: AutopilotState, routeStatus: RouteStatusSnapshot 
   }
   if (ap.truth.lateralActive === 'VOR_LOC') return ap.boeing.vorLoc ? 'VOR_LOC' : 'OFF';
   if (ap.truth.lateralActive === 'APP' || ap.truth.lateralActive === 'LOC') return ap.boeing.app ? ap.truth.lateralActive : 'OFF';
-  return ap.truth.lateralActive;
+  return 'OFF';
 }
 
 function deriveVnavMode(
@@ -94,7 +94,7 @@ function deriveVerticalMode(ap: AutopilotState, context: FmaTruthContext): Verti
   if (VNAV_FAMILY.has(ap.truth.verticalActive)) return deriveVnavMode(ap, context);
   if (ap.truth.verticalActive === 'LVL_CHG') return ap.boeing.lvlChg ? 'LVL_CHG' : 'OFF';
   if (ap.truth.verticalActive === 'G_S') return ap.boeing.app ? 'G_S' : 'OFF';
-  return ap.truth.verticalActive;
+  return 'OFF';
 }
 
 export function deriveDisplayFmaTruth(

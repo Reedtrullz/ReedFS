@@ -165,6 +165,19 @@ describe('deriveDisplayFmaTruth', () => {
     expect(fma.thrustActive).toBe('OFF');
   });
 
+  it('downgrades unsupported raw modes instead of displaying unflown guidance', () => {
+    const raw = apState();
+    raw.truth.thrustActive = 'THR_CLB';
+    raw.truth.lateralActive = 'NAV';
+    raw.truth.verticalActive = 'CLB';
+
+    const fma = deriveDisplayFmaTruth(raw, { routeStatus: createNoRouteStatus() });
+
+    expect(fma.thrustActive).toBe('OFF');
+    expect(fma.lateralActive).toBe('OFF');
+    expect(fma.verticalActive).toBe('OFF');
+  });
+
   it('falls back to OFF when raw CMD status is not backed by an engaged AP channel', () => {
     const raw = apState();
     raw.boeing.cmdA = false;
