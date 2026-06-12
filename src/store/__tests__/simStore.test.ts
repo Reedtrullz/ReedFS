@@ -277,7 +277,10 @@ describe('useSimStore', () => {
     expect(useSimStore.getState().inputs.elevator).toBe(0.42);
   });
   it('neutral input-manager frames do not erase separated AP commands', () => {
-    useSimStore.getState().setApState(minimalApState());
+    const ap = minimalApState();
+    ap.boeing.autothrottleArm = true;
+    ap.boeing.speedMode = true;
+    useSimStore.getState().setApState(ap);
     const apCommands: AutopilotCommands = { elevator: 0.42, aileron: -0.2, throttle1: 0.8, throttle2: 0.8 };
     useSimStore.setState((s) => {
       const effectiveControls = { ...s.pilotInputs, ...apCommands };
@@ -299,7 +302,10 @@ describe('useSimStore', () => {
     expect(useSimStore.getState().inputs.throttle2).toBeCloseTo(0.85, 8);
   });
   it('side-specific brake actions update pilot/effective controls without disconnecting AP axes', () => {
-    useSimStore.getState().setApState(minimalApState());
+    const ap = minimalApState();
+    ap.boeing.autothrottleArm = true;
+    ap.boeing.speedMode = true;
+    useSimStore.getState().setApState(ap);
     const apCommands: AutopilotCommands = { elevator: -0.5, aileron: 0.25, throttle1: 0.7, throttle2: 0.7 };
     useSimStore.setState((s) => {
       const effectiveControls = { ...s.pilotInputs, ...apCommands };
@@ -545,6 +551,8 @@ describe('useSimStore', () => {
 
   it('target-only setApState preserves existing AP commands until the next tick recomputes them', () => {
     const initialAp = minimalApState();
+    initialAp.boeing.autothrottleArm = true;
+    initialAp.boeing.speedMode = true;
     useSimStore.getState().setApState(initialAp);
     const apCommands: AutopilotCommands = { elevator: 0.3, aileron: -0.2, throttle1: 0.65, throttle2: 0.65 };
     useSimStore.setState((s) => {
@@ -689,6 +697,37 @@ describe('useSimStore', () => {
     expect(useSimStore.getState().apState?.truth.autopilotStatus).toBe('CMD_A');
   });
 
+  it('releases stale AP throttle commands when SPEED backing disappears', () => {
+    const backed = minimalApState();
+    backed.truth.autopilotStatus = 'CMD_A';
+    backed.truth.thrustActive = 'SPEED';
+    backed.boeing.autothrottleArm = true;
+    backed.boeing.speedMode = true;
+    backed.boeing.cmdA = true;
+    useSimStore.getState().setApState(backed);
+    useSimStore.setState((s) => {
+      const apCommands: AutopilotCommands = { throttle1: 0.8, throttle2: 0.8 };
+      const effectiveControls = { ...s.pilotInputs, ...apCommands };
+      return { apCommands, effectiveControls, inputs: effectiveControls };
+    });
+
+    const unbacked = structuredClone(backed);
+    unbacked.boeing.speedMode = false;
+    useSimStore.getState().setApState(unbacked);
+    expect(useSimStore.getState().apCommands.throttle1).toBeUndefined();
+    expect(useSimStore.getState().apCommands.throttle2).toBeUndefined();
+    expect(useSimStore.getState().effectiveControls.throttle1)
+      .toBe(useSimStore.getState().pilotInputs.throttle1);
+    useSimStore.getState().setInput({ throttle1: 0.3, throttle2: 0.3 });
+
+    const state = useSimStore.getState();
+    expect(state.pilotInputs.throttle1).toBe(0.3);
+    expect(state.pilotInputs.throttle2).toBe(0.3);
+    expect(state.effectiveControls.throttle1).toBe(0.3);
+    expect(state.effectiveControls.throttle2).toBe(0.3);
+    expect(state.apState?.truth.autopilotStatus).toBe('CMD_A');
+  });
+
   it('does not strip throttle input actions when SPEED truth is unbacked', () => {
     const ap = minimalApState();
     ap.truth.thrustActive = 'SPEED';
@@ -719,7 +758,10 @@ describe('useSimStore', () => {
   });
 
   it('pilot-owned gear/flaps/spoilers remain effective while AP commands flight axes', () => {
-    useSimStore.getState().setApState(minimalApState());
+    const ap = minimalApState();
+    ap.boeing.autothrottleArm = true;
+    ap.boeing.speedMode = true;
+    useSimStore.getState().setApState(ap);
     const apCommands: AutopilotCommands = { elevator: -0.5, aileron: 0.25, throttle1: 0.7, throttle2: 0.7 };
     useSimStore.setState((s) => {
       const effectiveControls = { ...s.pilotInputs, ...apCommands };
