@@ -11,9 +11,19 @@ export interface RouteProofSnapshot {
   crossTrackErrorM: number | null;
   lateralActive: string;
   fmaLateralActive: string;
+  verticalActive: string;
+  fmaVerticalActive: string;
   sequenced: boolean;
   altitudeFt: number;
+  aglFt: number;
   iasKt: number;
+  verticalSpeedFpm: number;
+  weightOnWheels: boolean;
+  gearDown: boolean;
+  gearLever: 'UP' | 'DOWN';
+  flapSetting: number;
+  flightPhase: string;
+  guidancePhase: string;
 }
 
 export interface RouteProofResult {
@@ -22,12 +32,52 @@ export interface RouteProofResult {
   samples: RouteProofSnapshot[];
 }
 
+export interface RouteConfiguredApproachProofResult {
+  initial: RouteProofSnapshot;
+  configuredApproach: RouteProofSnapshot;
+  samples: RouteProofSnapshot[];
+}
+
+interface RouteProofControlSetup {
+  elevator: number;
+  aileron: number;
+  rudder: number;
+  throttle1: number;
+  throttle2: number;
+  flapLever: number;
+  gearLever: 'UP' | 'DOWN';
+  spoilers: number;
+  brake: number;
+  leftBrake?: number;
+  rightBrake?: number;
+}
+
+interface RouteConfiguredApproachSetup {
+  routeFrames: number;
+  sampleIntervalFrames: number;
+  controls: Partial<RouteProofControlSetup>;
+}
+
 interface RouteProofSetup {
   initialPosition: { lat: number; lon: number };
   initialHeadingDeg: number;
+  initialPitchDeg?: number;
+  initialAltitudeFt?: number;
+  initialGroundAltFt?: number;
+  initialAglFt?: number;
+  initialVelocity?: { u: number; v: number; w: number };
+  initialGearDown?: boolean;
+  initialFlapSetting?: number;
+  initialFlightPhase?: string;
+  initialControls?: Partial<RouteProofControlSetup>;
+  seedActiveLegIndex?: number;
+  autopilotVerticalActive?: string;
+  autopilotAltHold?: boolean;
+  autopilotSpeedKt?: number;
   routeFrames?: number;
   sampleIntervalFrames: number;
   gates?: RouteProofGateSetup[];
+  configuredApproach?: RouteConfiguredApproachSetup;
 }
 
 interface RouteProofGateSetup {
@@ -88,9 +138,54 @@ const KSEA_MULTI_GATE_PROGRESSION_PROOF: RouteProofSetup = {
   ],
 };
 
-async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<RouteProofResult> {
+const KSEA_FINAL_ROUTE_CONFIGURED_APPROACH_PROOF: RouteProofSetup = {
+  initialPosition: { lat: 45.69, lon: -122.596 },
+  initialHeadingDeg: 183.5,
+  initialPitchDeg: -1.5,
+  initialAltitudeFt: 3_500,
+  initialGroundAltFt: 50,
+  initialAglFt: 3_450,
+  initialVelocity: { u: 96, v: 0, w: 1.5 },
+  initialGearDown: false,
+  initialFlapSetting: 5,
+  initialFlightPhase: 'DESCENT',
+  initialControls: {
+    elevator: 0.22,
+    aileron: 0,
+    rudder: 0,
+    throttle1: 0.35,
+    throttle2: 0.35,
+    flapLever: 5,
+    gearLever: 'UP',
+    spoilers: 0,
+    brake: 0,
+    leftBrake: 0,
+    rightBrake: 0,
+  },
+  seedActiveLegIndex: 2,
+  autopilotVerticalActive: 'OFF',
+  autopilotAltHold: false,
+  autopilotSpeedKt: 180,
+  sampleIntervalFrames: 60,
+  configuredApproach: {
+    routeFrames: 60 * 45,
+    sampleIntervalFrames: 60,
+    controls: {
+      flapLever: 30,
+      gearLever: 'DOWN',
+      brake: 0,
+      leftBrake: 0,
+      rightBrake: 0,
+      spoilers: 0,
+    },
+  },
+};
+
+async function flyKseaRouteProof(page: Page, setup: RouteProofSetup & { configuredApproach: RouteConfiguredApproachSetup }): Promise<RouteConfiguredApproachProofResult>;
+async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<RouteProofResult>;
+async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<RouteProofResult | RouteConfiguredApproachProofResult> {
   return page.evaluate(
-    async ({ fixedStepSeconds, fixedStepMs, proofSetup }): Promise<RouteProofResult> => {
+    async ({ fixedStepSeconds, fixedStepMs, proofSetup }): Promise<RouteProofResult | RouteConfiguredApproachProofResult> => {
       interface BrowserAircraftState {
         position: { lat: number; lon: number; alt: number };
         velocity: { u: number; v: number; w: number };
@@ -170,6 +265,11 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
 
       interface BrowserDerivedState {
         ias: number;
+        vs: number;
+      }
+
+      interface BrowserGuidanceState {
+        phase: string;
       }
 
       interface BrowserSimState {
@@ -180,6 +280,7 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
         activeLegIndex: number | null;
         routeStatus: BrowserRouteStatus;
         wind: unknown;
+        guidance: BrowserGuidanceState;
         status: string;
         lastFrameTime: number;
         fixedStepAccumulatorSeconds: number;
@@ -211,18 +312,27 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
         deriveDisplayFmaTruth: (
           apState: BrowserAutopilotState | null,
           context: { aircraft: BrowserAircraftState; flightPlan: BrowserFlightPlan | null; routeStatus: BrowserRouteStatus },
-        ) => { lateralActive: string };
+        ) => { lateralActive: string; verticalActive: string };
       };
       const { eulerToQuat } = (await import(quaternionModule)) as { eulerToQuat: (phi: number, theta: number, psi: number) => unknown };
 
       const toRad = (deg: number): number => deg * Math.PI / 180;
       const flightPlan = createKseaKpdxFlight();
-      const initialAltitudeFt = 5_000;
+      const initialAltitudeFt = proofSetup.initialAltitudeFt ?? 5_000;
+      const initialGroundAltFt = proofSetup.initialGroundAltFt ?? 500;
+      const initialAglFt = proofSetup.initialAglFt ?? initialAltitudeFt - initialGroundAltFt;
+      const initialFlapSetting = proofSetup.initialFlapSetting ?? 0;
+      const initialGearDown = proofSetup.initialGearDown ?? false;
+      const initialVelocity = proofSetup.initialVelocity ?? { u: 118, v: 0, w: 0 };
       let timestamp = performance.now();
 
       if (fixedStepSeconds <= 0) throw new Error(`Invalid fixed-step duration: ${fixedStepSeconds}`);
-      if (!proofSetup.gates && (!proofSetup.routeFrames || proofSetup.routeFrames <= 0)) throw new Error(`Invalid route frame count: ${proofSetup.routeFrames}`);
+      if (!proofSetup.gates && !proofSetup.configuredApproach && (!proofSetup.routeFrames || proofSetup.routeFrames <= 0)) throw new Error(`Invalid route frame count: ${proofSetup.routeFrames}`);
       if (proofSetup.sampleIntervalFrames <= 0) throw new Error(`Invalid route sample interval: ${proofSetup.sampleIntervalFrames}`);
+      if (proofSetup.configuredApproach) {
+        if (proofSetup.configuredApproach.routeFrames <= 0) throw new Error(`Invalid configured approach frame count: ${proofSetup.configuredApproach.routeFrames}`);
+        if (proofSetup.configuredApproach.sampleIntervalFrames <= 0) throw new Error(`Invalid configured approach sample interval: ${proofSetup.configuredApproach.sampleIntervalFrames}`);
+      }
       for (const gate of proofSetup.gates ?? []) {
         if (gate.routeFrames <= 0) throw new Error(`Invalid gate frame count: ${gate.routeFrames}`);
         if (!Number.isInteger(gate.targetActiveLegIndex) || gate.targetActiveLegIndex < 0) {
@@ -233,7 +343,7 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
       const apState = createDefaultAutopilotState();
       apState.truth.autopilotStatus = 'CMD_A';
       apState.truth.lateralActive = 'LNAV';
-      apState.truth.verticalActive = 'ALT_HOLD';
+      apState.truth.verticalActive = proofSetup.autopilotVerticalActive ?? 'ALT_HOLD';
       apState.truth.thrustActive = 'SPEED';
       apState.boeing.cmdA = true;
       apState.boeing.cmdB = false;
@@ -241,12 +351,12 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
       apState.boeing.cwsB = false;
       apState.boeing.lnav = true;
       apState.boeing.hdgSel = false;
-      apState.boeing.altHold = true;
+      apState.boeing.altHold = proofSetup.autopilotAltHold ?? true;
       apState.boeing.vnav = false;
       apState.boeing.speedMode = true;
       apState.boeing.n1 = false;
       apState.boeing.autothrottleArm = true;
-      apState.boeing.speed = 230;
+      apState.boeing.speed = proofSetup.autopilotSpeedKt ?? 230;
       apState.boeing.heading = proofSetup.initialHeadingDeg;
       apState.boeing.altitude = initialAltitudeFt;
 
@@ -257,27 +367,29 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
         rudder: 0,
         throttle1: 0.55,
         throttle2: 0.55,
-        flapLever: 0,
-        gearLever: 'UP',
+        flapLever: initialFlapSetting,
+        gearLever: initialGearDown ? 'DOWN' : 'UP',
         spoilers: 0,
         brake: 0,
         leftBrake: 0,
         rightBrake: 0,
+        ...proofSetup.initialControls,
       });
 
       const configureAircraft = (position: { lat: number; lon: number }, headingDeg: number): void => {
         const routeHeadingRad = toRad(headingDeg);
+        const pitchRad = toRad(proofSetup.initialPitchDeg ?? 0);
         useSimStore.setState((state) => {
           const aircraft = structuredClone(state.aircraft);
           aircraft.position = { lat: position.lat, lon: position.lon, alt: initialAltitudeFt };
-          aircraft.velocity = { u: 118, v: 0, w: 0 };
-          aircraft.attitude = { phi: 0, theta: 0, psi: routeHeadingRad };
+          aircraft.velocity = initialVelocity;
+          aircraft.attitude = { phi: 0, theta: pitchRad, psi: routeHeadingRad };
           aircraft.quaternion = eulerToQuat(aircraft.attitude.phi, aircraft.attitude.theta, aircraft.attitude.psi);
           aircraft.angularVel = { p: 0, q: 0, r: 0 };
           aircraft.config = {
             ...aircraft.config,
-            gearDown: false,
-            flapSetting: 0,
+            gearDown: initialGearDown,
+            flapSetting: initialFlapSetting,
             spoilersArmed: false,
             spoilersDeployed: false,
             speedBrake: 0,
@@ -288,8 +400,8 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
           ];
           aircraft.ground = {
             ...aircraft.ground,
-            aglFt: 4_500,
-            groundAltFt: 500,
+            aglFt: initialAglFt,
+            groundAltFt: initialGroundAltFt,
             weightOnWheels: false,
             normalForceN: 0,
             contact: 'none',
@@ -301,7 +413,7 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
               weightOnWheel: false,
             })),
           };
-          aircraft.flightPhase = 'CRUISE';
+          aircraft.flightPhase = proofSetup.initialFlightPhase ?? 'CRUISE';
 
           return {
             aircraft,
@@ -316,7 +428,20 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
       configureAircraft(proofSetup.initialPosition, proofSetup.initialHeadingDeg);
 
       useSimStore.getState().setFlightPlan(flightPlan);
+      if (proofSetup.seedActiveLegIndex !== undefined) {
+        useSimStore.setState({ activeLegIndex: proofSetup.seedActiveLegIndex });
+      }
       useSimStore.getState().setApState(apState);
+      if (proofSetup.seedActiveLegIndex !== undefined) {
+        useSimStore.getState().setInput({
+          flapLever: proofSetup.initialControls?.flapLever ?? initialFlapSetting,
+          gearLever: proofSetup.initialControls?.gearLever ?? (initialGearDown ? 'DOWN' : 'UP'),
+          brake: proofSetup.initialControls?.brake ?? 0,
+          leftBrake: proofSetup.initialControls?.leftBrake ?? 0,
+          rightBrake: proofSetup.initialControls?.rightBrake ?? 0,
+          spoilers: proofSetup.initialControls?.spoilers ?? 0,
+        });
+      }
 
       const snapshot = (): RouteProofSnapshot => {
         const state = useSimStore.getState();
@@ -343,17 +468,33 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
           crossTrackErrorM: route.crossTrackErrorM,
           lateralActive: state.apState?.truth.lateralActive ?? 'OFF',
           fmaLateralActive: fma.lateralActive,
+          verticalActive: state.apState?.truth.verticalActive ?? 'OFF',
+          fmaVerticalActive: fma.verticalActive,
           sequenced: route.sequenced,
           altitudeFt: state.aircraft.position.alt,
+          aglFt: state.aircraft.ground.aglFt,
           iasKt: derived.ias,
+          verticalSpeedFpm: derived.vs,
+          weightOnWheels: state.aircraft.ground.weightOnWheels,
+          gearDown: state.aircraft.config.gearDown,
+          gearLever: state.inputs.gearLever,
+          flapSetting: state.aircraft.config.flapSetting,
+          flightPhase: state.aircraft.flightPhase,
+          guidancePhase: state.guidance.phase,
         };
       };
-      const samples: RouteProofSnapshot[] = [snapshot()];
+      const samples: RouteProofSnapshot[] = [];
 
       const tickOnce = (): void => {
         timestamp += fixedStepMs;
         useSimStore.getState().tick(timestamp);
       };
+
+      if (proofSetup.seedActiveLegIndex !== undefined) {
+        tickOnce();
+      }
+
+      samples.push(snapshot());
 
       const runFrames = (routeFrames: number): void => {
         for (let frame = 1; frame <= routeFrames; frame += 1) {
@@ -363,6 +504,44 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
             samples.push(snapshot());
           }
         }
+      };
+
+      const runConfiguredApproach = (approachSetup: RouteConfiguredApproachSetup, initial: RouteProofSnapshot): RouteProofSnapshot => {
+        useSimStore.getState().setInput(approachSetup.controls);
+
+        for (let frame = 1; frame <= approachSetup.routeFrames; frame += 1) {
+          tickOnce();
+          const current = snapshot();
+
+          if (frame % approachSetup.sampleIntervalFrames === 0 || frame === approachSetup.routeFrames) {
+            samples.push(current);
+          }
+
+          if (
+            current.routeName === 'KSEA→KPDX'
+            && current.activeLegIndex === 2
+            && current.fromIdent === 'BTG'
+            && current.nextWaypointIdent === 'KPDX'
+            && current.lnavAvailable
+            && current.fmaLateralActive === 'LNAV'
+            && current.verticalActive === 'OFF'
+            && current.fmaVerticalActive === 'OFF'
+            && current.distanceToNextNm < initial.distanceToNextNm - 0.5
+            && current.altitudeFt < initial.altitudeFt - 100
+            && current.aglFt < initial.aglFt - 100
+            && current.gearDown
+            && current.gearLever === 'DOWN'
+            && current.flapSetting >= 25
+            && !current.weightOnWheels
+            && current.guidancePhase === 'approach'
+            && current.flightPhase !== 'LANDED'
+          ) {
+            if (samples[samples.length - 1] !== current) samples.push(current);
+            return current;
+          }
+        }
+
+        throw new Error(`KSEA final route configured approach proof did not reach target state: ${JSON.stringify({ initial, current: snapshot(), samples }, null, 2)}`);
       };
 
       const runGate = (gate: NonNullable<RouteProofSetup['gates']>[number]): void => {
@@ -397,6 +576,9 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
         for (const gate of proofSetup.gates) {
           runGate(gate);
         }
+      } else if (proofSetup.configuredApproach) {
+        const configuredApproach = runConfiguredApproach(proofSetup.configuredApproach, samples[0]);
+        return { initial: samples[0], configuredApproach, samples };
       } else {
         runFrames(proofSetup.routeFrames ?? 0);
       }
@@ -421,4 +603,11 @@ export async function flyKseaRouteThroughSecondSequence(page: Page): Promise<Rou
 
 export async function flyKseaRouteThroughMultiGateProgression(page: Page): Promise<RouteProofResult> {
   return flyKseaRouteProof(page, KSEA_MULTI_GATE_PROGRESSION_PROOF);
+}
+
+export async function flyKseaFinalRouteToConfiguredApproach(page: Page): Promise<RouteConfiguredApproachProofResult> {
+  if (!KSEA_FINAL_ROUTE_CONFIGURED_APPROACH_PROOF.configuredApproach) {
+    throw new Error('KSEA configured approach proof setup is missing configured approach settings.');
+  }
+  return flyKseaRouteProof(page, KSEA_FINAL_ROUTE_CONFIGURED_APPROACH_PROOF as RouteProofSetup & { configuredApproach: RouteConfiguredApproachSetup });
 }

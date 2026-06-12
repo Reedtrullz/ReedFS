@@ -7,7 +7,7 @@ Latest comprehensive remaining-work audit and next implementation plan:
 - `docs/reviews/2026-06-12-comprehensive-project-review-remaining-work.md`
 - `docs/plans/2026-06-12-rfs-autoflight-truth-and-route-proof.md`
 
-As of the current repository state, the release-hardening/playability sequence through Task 10.4 and the June Tasks 2-11 guidance-truth slice are implemented. AP and FMA now share route-status-derived navigation truth, guidance/checklists/tutorials are phase-aware through landing/rollout/reset states, the ENVA tutorial has deterministic Playwright takeoff-to-clean-climb, scoped short-final approach-to-touchdown/rollout/reset, and seeded DESCENT-to-configured-approach/landing bridge proofs, and the KSEA sample has first/second route-leg sequencing plus a single-store multi-gate route progression browser proof. The remaining roadmap is now advanced realism, full-route/full-flight proof beyond clean climb and seeded approach/landing bridge coverage, visual/layout polish, data quality, and deploy verification.
+As of the current repository state, the release-hardening/playability sequence through Task 10.4 and the June Tasks 2-11 guidance-truth slice are implemented. AP and FMA now share route-status-derived navigation truth, guidance/checklists/tutorials are phase-aware through landing/rollout/reset states, the ENVA tutorial has deterministic Playwright takeoff-to-clean-climb, scoped short-final approach-to-touchdown/rollout/reset, and seeded DESCENT-to-configured-approach/landing bridge proofs, and the KSEA sample has first/second route-leg sequencing, a single-store multi-gate route progression browser proof, and a scoped final BTG->KPDX route-leg configured-approach proof with LNAV coupled and vertical FMA OFF. The remaining roadmap is now advanced realism, full-route/full-flight proof beyond clean climb and seeded approach/landing bridge coverage, visual/layout polish, data quality, and deploy verification.
 
 ## Completed baseline
 
@@ -28,7 +28,7 @@ The completed baseline now includes:
 - LNAV now sequences active route legs at capture radius, passed-waypoint geometry, or bounded turn-anticipation gates; AP LNAV consumes the route-status active leg with a capped cross-track intercept, and AP/FMA route-mode availability comes from the same route-status-to-navigation conversion.
 - Autopilot thrust guidance now includes both SPEED airspeed hold and a conservative phase-based N1 target mode with armed-A/T gating, symmetric rate-limited AP throttle commands, MCP SPD/N1 controls, and FMA truth display.
 - Guidance checklists and tutorial steps auto-select from the current phase through positive-rate, clean-climb, approach, landing-rollout, and landed/reset states, and browser flight tests prove ENVA can take off, raise gear, reach clean climb deterministically, separately run a scoped short-final approach through touchdown, braking rollout, and reset, and run a seeded DESCENT-to-configured-approach/landing bridge without resetting the browser store between descent and landing.
-- KSEA sample route loads in-browser, exposes backed LNAV, keeps FMA LNAV, decreases DTG, sequences the first and second route legs, and proves OLM-to-BTG multi-gate route progression in one browser store session during scoped browser proofs.
+- KSEA sample route loads in-browser, exposes backed LNAV, keeps FMA LNAV, decreases DTG, sequences the first and second route legs, proves OLM-to-BTG multi-gate route progression in one browser store session, and proves a scoped final BTG->KPDX configured approach with CMD A + LNAV + SPEED backed while vertical FMA remains OFF.
 
 Completion records:
 
@@ -72,13 +72,13 @@ Acceptance tests:
 
 ## P2 — Advanced flight guidance and RFMS integration
 
-Why this follows the current guidance pass: active-leg state, route feedback, capped LNAV cross-track intercept, bounded turn-anticipation sequencing, shared AP/FMA route truth, phase-aware guidance/checklists/tutorials through landing/rollout/reset, honest VNAV/SPD/VS, SPEED airspeed hold, conservative N1 thrust mode, deterministic ENVA clean-climb proof, scoped ENVA short-final approach-to-touchdown/rollout/reset proof, seeded ENVA descent-to-approach/landing bridge proof, KSEA first/second route-leg sequencing proofs, and KSEA single-store multi-gate route progression proof are now in place. Remaining RFMS-backed route editing, route modification UI, continuous route-coupled descent/approach/landing proof, and full-route/full-flight proof beyond clean climb, seeded landing bridge, and the route-progression foundation still need fuller avionics integration and selectable cockpit controls.
+Why this follows the current guidance pass: active-leg state, route feedback, capped LNAV cross-track intercept, bounded turn-anticipation sequencing, shared AP/FMA route truth, phase-aware guidance/checklists/tutorials through landing/rollout/reset, honest VNAV/SPD/VS, SPEED airspeed hold, conservative N1 thrust mode, deterministic ENVA clean-climb proof, scoped ENVA short-final approach-to-touchdown/rollout/reset proof, seeded ENVA descent-to-approach/landing bridge proof, KSEA first/second route-leg sequencing proofs, KSEA single-store multi-gate route progression proof, and scoped KSEA final-leg configured-approach proof are now in place. Remaining RFMS-backed route editing, route modification UI, continuous route-coupled descent/approach/landing proof, and full-route/full-flight proof beyond clean climb, seeded landing bridge, and the route-progression/final-leg configured-approach foundation still need fuller avionics integration and selectable cockpit controls.
 
 Remaining scope:
 
 - RFMS-backed route edits and route modification UI.
 - RFMS Flight Mode Annunciator lifecycle integration beyond current truth-mode display.
-- Full-route/full-flight proof beyond the current deterministic ENVA clean-climb, scoped seeded short-final approach-to-touchdown/rollout/reset, seeded descent-to-approach/landing bridge, and KSEA route-progression browser tests, including continuous route-coupled descent/approach/landing coverage, broader manual playability, deeper landing realism, and broader FMS behavior.
+- Full-route/full-flight proof beyond the current deterministic ENVA clean-climb, scoped seeded short-final approach-to-touchdown/rollout/reset, seeded descent-to-approach/landing bridge, KSEA route-progression, and KSEA final-leg configured-approach browser tests, including continuous route-coupled descent/approach/landing coverage, broader manual playability, deeper landing realism, and broader FMS behavior.
 
 Suggested implementation files:
 

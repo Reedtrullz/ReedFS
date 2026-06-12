@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { openRfs } from './helpers/rfsPage';
 import {
+  flyKseaFinalRouteToConfiguredApproach,
   flyKseaRouteThroughFirstSequence,
   flyKseaRouteThroughMultiGateProgression,
   flyKseaRouteThroughSecondSequence,
@@ -104,5 +105,56 @@ test.describe('RFS route and LNAV browser proof', () => {
     }
     expect(firstTransitioned, routeDebug).toBe(true);
     expect(secondTransitioned, routeDebug).toBe(true);
+  });
+
+  test('KSEA final route leg configures approach while LNAV remains coupled and vertical FMA stays off', async ({ page }) => {
+    await openRfs(page);
+
+    const result = await flyKseaFinalRouteToConfiguredApproach(page);
+    const routeDebug = JSON.stringify(result.samples, null, 2);
+
+    expect(result.initial.routeName).toBe('KSEA→KPDX');
+    expect(result.initial.activeLegIndex).toBe(2);
+    expect(result.initial.fromIdent, routeDebug).toBe('BTG');
+    expect(result.initial.nextWaypointIdent, routeDebug).toBe('KPDX');
+    expect(result.initial.lnavAvailable, routeDebug).toBe(true);
+    expect(result.initial.lateralActive, routeDebug).toBe('LNAV');
+    expect(result.initial.fmaLateralActive, routeDebug).toBe('LNAV');
+    expect(result.initial.verticalActive, routeDebug).toBe('OFF');
+    expect(result.initial.fmaVerticalActive, routeDebug).toBe('OFF');
+    expect(result.initial.flightPhase, routeDebug).toBe('DESCENT');
+    expect(result.initial.weightOnWheels, routeDebug).toBe(false);
+    expect(result.initial.gearDown, routeDebug).toBe(false);
+    expect(result.initial.flapSetting, routeDebug).toBeLessThan(25);
+
+    expect(result.configuredApproach.routeName).toBe('KSEA→KPDX');
+    expect(result.configuredApproach.activeLegIndex, routeDebug).toBe(2);
+    expect(result.configuredApproach.fromIdent, routeDebug).toBe('BTG');
+    expect(result.configuredApproach.nextWaypointIdent, routeDebug).toBe('KPDX');
+    expect(result.configuredApproach.lnavAvailable, routeDebug).toBe(true);
+    expect(result.configuredApproach.lateralActive, routeDebug).toBe('LNAV');
+    expect(result.configuredApproach.fmaLateralActive, routeDebug).toBe('LNAV');
+    expect(result.configuredApproach.verticalActive, routeDebug).toBe('OFF');
+    expect(result.configuredApproach.fmaVerticalActive, routeDebug).toBe('OFF');
+    expect(result.configuredApproach.distanceToNextNm, routeDebug).toBeLessThan(result.initial.distanceToNextNm - 0.5);
+    expect(result.configuredApproach.altitudeFt, routeDebug).toBeLessThan(result.initial.altitudeFt - 100);
+    expect(result.configuredApproach.aglFt, routeDebug).toBeLessThan(result.initial.aglFt - 100);
+    expect(result.configuredApproach.gearDown, routeDebug).toBe(true);
+    expect(result.configuredApproach.gearLever, routeDebug).toBe('DOWN');
+    expect(result.configuredApproach.flapSetting, routeDebug).toBeGreaterThanOrEqual(25);
+    expect(result.configuredApproach.weightOnWheels, routeDebug).toBe(false);
+    expect(result.configuredApproach.guidancePhase, routeDebug).toBe('approach');
+
+    expect(result.samples.length).toBeGreaterThan(3);
+    for (const sample of result.samples) {
+      expect(sample.routeName, routeDebug).toBe('KSEA→KPDX');
+      expect(sample.lnavAvailable, routeDebug).toBe(true);
+      expect(sample.fmaLateralActive, routeDebug).toBe('LNAV');
+      expect(sample.weightOnWheels, routeDebug).toBe(false);
+      expect(sample.flightPhase, routeDebug).not.toBe('LANDED');
+    }
+    for (let i = 1; i < result.samples.length; i += 1) {
+      expect(result.samples[i].distanceToNextNm, routeDebug).toBeLessThanOrEqual(result.samples[i - 1].distanceToNextNm + 0.05);
+    }
   });
 });
