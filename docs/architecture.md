@@ -169,7 +169,8 @@ npm run build
 
 Browser proof:
 
-- `e2e/rfs-flight.spec.ts` uses the deterministic helper in `e2e/helpers/rfsFlight.ts` to fly the ENVA tutorial from takeoff roll to clean climb, including phase-aware guidance assertions and gear-up proof. This is a clean-climb proof, not a full-route/full-flight completion claim.
+- `e2e/rfs-flight.spec.ts` proves ENVA takeoff roll to clean climb with phase-aware guidance and gear-up state.
+- `e2e/rfs-route.spec.ts` proves the KSEA sample route loads in-browser, exposes backed LNAV, and decreases DTG while the route leg is flown. These are clean-climb and route-leg proofs, not a full-route/full-flight completion claim.
 
 Deployment pipeline:
 
