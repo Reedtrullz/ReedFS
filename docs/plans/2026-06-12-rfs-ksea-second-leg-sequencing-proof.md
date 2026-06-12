@@ -99,3 +99,10 @@ CI=1 npm run test:visual
 ```
 
 Report this as KSEA first/second leg route-sequencing browser proof only. It is still not full-route proof, full-flight proof, approach/landing proof, CI green, deployed, or live-verified unless those are separately run and checked.
+
+## Implementation evidence
+
+- RED: `CI=1 npx playwright test e2e/rfs-route.spec.ts --project=chromium` failed with `SyntaxError: The requested module './helpers/rfsRoute' does not provide an export named 'flyKseaRouteThroughSecondSequence'` after adding the third browser proof test.
+- GREEN: `npx tsc --ignoreConfig --noEmit --target ES2022 --module ESNext --moduleResolution bundler --strict --skipLibCheck e2e/helpers/rfsRoute.ts` passed with no output.
+- GREEN: `CI=1 npx playwright test e2e/rfs-route.spec.ts --project=chromium` passed with `3 passed`.
+- Hygiene: `git diff --check` passed with no output.

@@ -170,7 +170,7 @@ npm run build
 Browser proof:
 
 - `e2e/rfs-flight.spec.ts` proves ENVA takeoff roll to clean climb with phase-aware guidance and gear-up state.
-- `e2e/rfs-route.spec.ts` proves the KSEA sample route loads in-browser, exposes backed LNAV, and decreases DTG while the route leg is flown. These are clean-climb and route-leg proofs, not a full-route/full-flight completion claim.
+- `e2e/rfs-route.spec.ts` proves the KSEA sample route loads in-browser, exposes backed LNAV, decreases DTG while the route leg is flown, and sequences the first and second KSEA route legs while backed LNAV/FMA truth remains active. These are clean-climb and scoped route-leg sequencing proofs, not a full-route/full-flight completion claim.
 
 Deployment pipeline:
 

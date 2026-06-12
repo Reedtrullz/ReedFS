@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { openRfs } from './helpers/rfsPage';
-import { flyKseaRouteThroughFirstSequence, flyKseaRouteWithLnav } from './helpers/rfsRoute';
+import { flyKseaRouteThroughFirstSequence, flyKseaRouteThroughSecondSequence, flyKseaRouteWithLnav } from './helpers/rfsRoute';
 
 test.describe('RFS route and LNAV browser proof', () => {
   test('KSEA sample route loads, enables LNAV, and decreases DTG while flying', async ({ page }) => {
@@ -42,6 +42,30 @@ test.describe('RFS route and LNAV browser proof', () => {
     expect(result.final.activeLegIndex, routeDebug).toBe(1);
     expect(result.final.fromIdent, routeDebug).toBe('OLM');
     expect(result.final.nextWaypointIdent, routeDebug).toBe('BTG');
+    for (const sample of result.samples) {
+      expect(sample.lnavAvailable, routeDebug).toBe(true);
+      expect(sample.fmaLateralActive, routeDebug).toBe('LNAV');
+    }
+    expect(legTransitioned || sequenced, routeDebug).toBe(true);
+  });
+
+  test('KSEA sample route sequences from BTG to KPDX while LNAV remains backed', async ({ page }) => {
+    await openRfs(page);
+
+    const result = await flyKseaRouteThroughSecondSequence(page);
+    const routeDebug = JSON.stringify(result.samples, null, 2);
+    const legTransitioned = result.samples.some((sample, index) => {
+      return index > 0 && result.samples[index - 1].activeLegIndex === 1 && sample.activeLegIndex === 2;
+    });
+    const sequenced = result.samples.some((sample) => sample.sequenced);
+
+    expect(result.initial.routeName).toBe('KSEA→KPDX');
+    expect(result.initial.activeLegIndex).toBe(1);
+    expect(result.initial.fromIdent, routeDebug).toBe('OLM');
+    expect(result.initial.nextWaypointIdent, routeDebug).toBe('BTG');
+    expect(result.final.activeLegIndex, routeDebug).toBe(2);
+    expect(result.final.fromIdent, routeDebug).toBe('BTG');
+    expect(result.final.nextWaypointIdent, routeDebug).toBe('KPDX');
     for (const sample of result.samples) {
       expect(sample.lnavAvailable, routeDebug).toBe(true);
       expect(sample.fmaLateralActive, routeDebug).toBe('LNAV');
