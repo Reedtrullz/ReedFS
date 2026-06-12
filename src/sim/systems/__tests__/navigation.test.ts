@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { computeLNAV, computeRouteStatus } from '../navigation';
+import {
+  computeLNAV,
+  computeRouteStatus,
+  createNoRouteStatus,
+  routeStatusToNavOutput,
+  type RouteStatusSnapshot,
+} from '../navigation';
 import { createInitialState, B737_800_SPEC } from '../../types';
 import type { FlightPlan } from '@shared/types/fmc';
 
@@ -20,6 +26,32 @@ function makePlan(waypoints: FlightPlan['waypoints']): FlightPlan {
     flightNumber: '123',
     route: waypoints.map((waypoint) => waypoint.ident).join(' '),
     waypoints,
+  };
+}
+
+function routeStatusForNavOutput(overrides: Partial<RouteStatusSnapshot> = {}): RouteStatusSnapshot {
+  return {
+    ...createNoRouteStatus(),
+    routeName: 'KSEA→KPDX',
+    routeValid: true,
+    lnavAvailable: true,
+    lnavUnavailableReason: null,
+    activeLegIndex: 0,
+    activeLegCount: 1,
+    fromWaypointIndex: 0,
+    toWaypointIndex: 1,
+    fromIdent: 'KSEA',
+    nextWaypointIdent: 'OLM',
+    distanceToNextM: 18_520,
+    distanceToNextNm: 10,
+    desiredTrackRad: Math.PI / 2,
+    desiredTrackDegTrue: 90,
+    crossTrackErrorM: 926,
+    alongTrackM: 4_000,
+    legLengthM: 18_520,
+    waypointReached: false,
+    sequenced: false,
+    ...overrides,
   };
 }
 
@@ -138,6 +170,33 @@ describe('computeLNAV', () => {
     // activeWptIndex 5 is out of range, should clamp to last waypoint (index 1)
     const nav = computeLNAV(s, fp, 5);
     expect(nav.activeWaypointIndex).toBe(1);
+  });
+});
+
+describe('routeStatusToNavOutput', () => {
+  it('converts an available route status into VNAV/LNAV NavOutput using remaining distance', () => {
+    const nav = routeStatusToNavOutput(routeStatusForNavOutput());
+
+    expect(nav).toEqual({
+      crossTrackError: 926,
+      alongTrackDist: 18_520,
+      desiredTrack: Math.PI / 2,
+      activeWaypointIndex: 1,
+      waypointReached: false,
+    });
+  });
+
+  it('can apply the LNAV intercept correction used by AP heading targets', () => {
+    const nav = routeStatusToNavOutput(routeStatusForNavOutput(), { maxInterceptDeg: 25 });
+
+    expect(nav).not.toBeNull();
+    expect(nav!.desiredTrack * 180 / Math.PI).toBeCloseTo(77.5, 5);
+  });
+
+  it('returns null for unavailable or under-specified route status', () => {
+    expect(routeStatusToNavOutput(createNoRouteStatus())).toBeNull();
+    expect(routeStatusToNavOutput(routeStatusForNavOutput({ desiredTrackRad: null }))).toBeNull();
+    expect(routeStatusToNavOutput(routeStatusForNavOutput({ toWaypointIndex: null, activeLegIndex: null }))).toBeNull();
   });
 });
 

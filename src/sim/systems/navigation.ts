@@ -285,6 +285,10 @@ function sequencingReasonForLeg(
   return distanceToWaypointM <= boundedLeadM ? 'turnAnticipation' : null;
 }
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
 export function createNoRouteStatus(
   flightPlan: FlightPlan | null = null,
   reason = 'no flight plan loaded',
@@ -315,6 +319,36 @@ export function createNoRouteStatus(
     etaMinutes: null,
     waypointReached: false,
     sequenced: false,
+  };
+}
+
+export interface RouteStatusToNavOutputOptions {
+  maxInterceptDeg?: number;
+}
+
+export function routeStatusToNavOutput(
+  routeStatus: RouteStatusSnapshot | null | undefined,
+  options: RouteStatusToNavOutputOptions = {},
+): NavOutput | null {
+  if (!routeStatus?.lnavAvailable || routeStatus.desiredTrackRad === null) return null;
+
+  const activeWaypointIndex = routeStatus.toWaypointIndex ?? routeStatus.activeLegIndex;
+  if (activeWaypointIndex === null || !Number.isFinite(activeWaypointIndex)) return null;
+
+  const crossTrackError = routeStatus.crossTrackErrorM ?? 0;
+  const maxInterceptRad = Math.max(0, options.maxInterceptDeg ?? 0) * Math.PI / 180;
+  const interceptCorrectionRad = maxInterceptRad > 0
+    ? clamp(crossTrackError / M_PER_NM, -1, 1) * maxInterceptRad
+    : 0;
+
+  return {
+    crossTrackError,
+    // NavOutput.alongTrackDist is consumed by VNAV as distance remaining to the active constraint.
+    // Do not prefer RouteStatusSnapshot.alongTrackM here; that field is progress from leg start.
+    alongTrackDist: routeStatus.distanceToNextM ?? routeStatus.alongTrackM ?? 0,
+    desiredTrack: normalizeRad(routeStatus.desiredTrackRad - interceptCorrectionRad),
+    activeWaypointIndex,
+    waypointReached: routeStatus.waypointReached,
   };
 }
 
