@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { openRfs } from './helpers/rfsPage';
 import {
+  flyKseaFinalRouteApproachManualHandoffAndReset,
   flyKseaFinalRouteApproachToManualHandoff,
   flyKseaFinalRouteToConfiguredApproach,
   flyKseaRouteThroughFirstSequence,
@@ -248,5 +249,98 @@ test.describe('RFS route and LNAV browser proof', () => {
       expect(sample.weightOnWheels, routeDebug).toBe(false);
       expect(sample.flightPhase, routeDebug).not.toBe('LANDED');
     }
+  });
+
+  test('KSEA final route manual handoff can reset without stale route or automation truth', async ({ page }) => {
+    await openRfs(page);
+
+    const result = await flyKseaFinalRouteApproachManualHandoffAndReset(page);
+    const routeDebug = JSON.stringify(result, null, 2);
+
+    expect(result.configuredApproach.routeName).toBe('KSEA→KPDX');
+    expect(result.configuredApproach.activeLegIndex, routeDebug).toBe(2);
+    expect(result.configuredApproach.fromIdent, routeDebug).toBe('BTG');
+    expect(result.configuredApproach.nextWaypointIdent, routeDebug).toBe('KPDX');
+    expect(result.configuredApproach.lnavAvailable, routeDebug).toBe(true);
+    expect(result.configuredApproach.lateralActive, routeDebug).toBe('LNAV');
+    expect(result.configuredApproach.fmaLateralActive, routeDebug).toBe('LNAV');
+    expect(result.configuredApproach.autopilotStatus, routeDebug).toBe('CMD_A');
+    expect(result.configuredApproach.fmaAutopilotStatus, routeDebug).toBe('CMD_A');
+    expect(result.configuredApproach.thrustActive, routeDebug).toBe('SPEED');
+    expect(result.configuredApproach.fmaThrustActive, routeDebug).toBe('SPEED');
+    expect(result.configuredApproach.verticalActive, routeDebug).toBe('OFF');
+    expect(result.configuredApproach.fmaVerticalActive, routeDebug).toBe('OFF');
+    expect(result.configuredApproach.gearDown, routeDebug).toBe(true);
+    expect(result.configuredApproach.gearLever, routeDebug).toBe('DOWN');
+    expect(result.configuredApproach.flapSetting, routeDebug).toBeGreaterThanOrEqual(25);
+    expect(result.configuredApproach.weightOnWheels, routeDebug).toBe(false);
+    expect(result.configuredApproach.flightPhase, routeDebug).not.toBe('LANDED');
+
+    expect(result.manualHandoff.routeName).toBe('KSEA→KPDX');
+    expect(result.manualHandoff.activeLegIndex, routeDebug).toBe(2);
+    expect(result.manualHandoff.fromIdent, routeDebug).toBe('BTG');
+    expect(result.manualHandoff.nextWaypointIdent, routeDebug).toBe('KPDX');
+    expect(result.manualHandoff.lnavAvailable, routeDebug).toBe(true);
+    expect(result.manualHandoff.lateralActive, routeDebug).toBe('OFF');
+    expect(result.manualHandoff.fmaLateralActive, routeDebug).toBe('OFF');
+    expect(result.manualHandoff.autopilotStatus, routeDebug).toBe('OFF');
+    expect(result.manualHandoff.fmaAutopilotStatus, routeDebug).toBe('OFF');
+    expect(result.manualHandoff.thrustActive, routeDebug).toBe('OFF');
+    expect(result.manualHandoff.fmaThrustActive, routeDebug).toBe('OFF');
+    expect(result.manualHandoff.verticalActive, routeDebug).toBe('OFF');
+    expect(result.manualHandoff.fmaVerticalActive, routeDebug).toBe('OFF');
+    expect(result.manualHandoff.apCommandCount, routeDebug).toBe(0);
+    expect(result.manualHandoff.pilotInputs.elevator, routeDebug).toBe(result.manualHandoff.effectiveControls.elevator);
+    expect(result.manualHandoff.pilotInputs.aileron, routeDebug).toBe(result.manualHandoff.effectiveControls.aileron);
+    expect(result.manualHandoff.pilotInputs.throttle1, routeDebug).toBe(result.manualHandoff.effectiveControls.throttle1);
+    expect(result.manualHandoff.pilotInputs.throttle2, routeDebug).toBe(result.manualHandoff.effectiveControls.throttle2);
+    expect(result.manualHandoff.weightOnWheels, routeDebug).toBe(false);
+    expect(result.manualHandoff.flightPhase, routeDebug).not.toBe('LANDED');
+
+    expect(result.reset.flightPlan, routeDebug).toBeNull();
+    expect(result.reset.activeLegIndex, routeDebug).toBeNull();
+    expect(result.reset.routeName, routeDebug).toBe('NO ROUTE');
+    expect(result.reset.lnavAvailable, routeDebug).toBe(false);
+    expect(result.reset.autopilotStatus, routeDebug).toBe('OFF');
+    expect(result.reset.fmaAutopilotStatus, routeDebug).toBe('OFF');
+    expect(result.reset.lateralActive, routeDebug).toBe('OFF');
+    expect(result.reset.fmaLateralActive, routeDebug).toBe('OFF');
+    expect(result.reset.verticalActive, routeDebug).toBe('OFF');
+    expect(result.reset.fmaVerticalActive, routeDebug).toBe('OFF');
+    expect(result.reset.thrustActive, routeDebug).toBe('OFF');
+    expect(result.reset.fmaThrustActive, routeDebug).toBe('OFF');
+    expect(result.reset.apCommandCount, routeDebug).toBe(0);
+    expect(result.reset.status, routeDebug).toBe('stopped');
+    expect(result.reset.guidancePhase, routeDebug).toBe('preflight');
+    expect(result.reset.weightOnWheels, routeDebug).toBe(true);
+
+    expect(result.samples.length, routeDebug).toBeGreaterThan(1);
+    expect(result.samples).not.toContainEqual(result.reset);
+    const handoffSampleIndex = result.samples.length - 1;
+    const preHandoffSamples = result.samples.slice(0, handoffSampleIndex);
+    const afterHandoffSample = result.samples[handoffSampleIndex];
+
+    expect(afterHandoffSample, routeDebug).toEqual(result.manualHandoff);
+    expect(preHandoffSamples.length, routeDebug).toBeGreaterThan(0);
+    for (const sample of preHandoffSamples) {
+      expect(sample.routeName, routeDebug).toBe('KSEA→KPDX');
+      expect(sample.autopilotStatus, routeDebug).toBe('CMD_A');
+      expect(sample.fmaAutopilotStatus, routeDebug).toBe('CMD_A');
+      expect(sample.lateralActive, routeDebug).toBe('LNAV');
+      expect(sample.fmaLateralActive, routeDebug).toBe('LNAV');
+      expect(sample.thrustActive, routeDebug).toBe('SPEED');
+      expect(sample.fmaThrustActive, routeDebug).toBe('SPEED');
+      expect(sample.verticalActive, routeDebug).toBe('OFF');
+      expect(sample.fmaVerticalActive, routeDebug).toBe('OFF');
+    }
+    expect(afterHandoffSample.autopilotStatus, routeDebug).toBe('OFF');
+    expect(afterHandoffSample.fmaAutopilotStatus, routeDebug).toBe('OFF');
+    expect(afterHandoffSample.lateralActive, routeDebug).toBe('OFF');
+    expect(afterHandoffSample.fmaLateralActive, routeDebug).toBe('OFF');
+    expect(afterHandoffSample.verticalActive, routeDebug).toBe('OFF');
+    expect(afterHandoffSample.fmaVerticalActive, routeDebug).toBe('OFF');
+    expect(afterHandoffSample.thrustActive, routeDebug).toBe('OFF');
+    expect(afterHandoffSample.fmaThrustActive, routeDebug).toBe('OFF');
+    expect(afterHandoffSample.apCommandCount, routeDebug).toBe(0);
   });
 });
