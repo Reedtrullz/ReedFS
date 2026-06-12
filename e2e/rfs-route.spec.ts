@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { openRfs } from './helpers/rfsPage';
 import {
+  flyKseaFinalRouteExtendedDescentToKpdxLandingAndReset,
   flyKseaFinalRouteHandoffToKpdxLandingAndReset,
   flyKseaFinalRouteApproachManualHandoffAndReset,
   flyKseaFinalRouteApproachToManualHandoff,
@@ -454,6 +455,143 @@ test.describe('RFS route and LNAV browser proof', () => {
     expect(result.rollout.thrustActive, routeDebug).toBe('OFF');
     expect(result.rollout.fmaThrustActive, routeDebug).toBe('OFF');
     expect(result.rollout.apCommandCount, routeDebug).toBe(0);
+
+    expect(result.reset.flightPlan, routeDebug).toBeNull();
+    expect(result.reset.activeLegIndex, routeDebug).toBeNull();
+    expect(result.reset.apStateCleared, routeDebug).toBe(true);
+    expect(result.reset.routeName, routeDebug).toBe('NO ROUTE');
+    expect(result.reset.lnavAvailable, routeDebug).toBe(false);
+    expect(result.reset.autopilotStatus, routeDebug).toBe('OFF');
+    expect(result.reset.fmaAutopilotStatus, routeDebug).toBe('OFF');
+    expect(result.reset.lateralActive, routeDebug).toBe('OFF');
+    expect(result.reset.fmaLateralActive, routeDebug).toBe('OFF');
+    expect(result.reset.verticalActive, routeDebug).toBe('OFF');
+    expect(result.reset.fmaVerticalActive, routeDebug).toBe('OFF');
+    expect(result.reset.thrustActive, routeDebug).toBe('OFF');
+    expect(result.reset.fmaThrustActive, routeDebug).toBe('OFF');
+    expect(result.reset.apCommandCount, routeDebug).toBe(0);
+    expect(result.reset.status, routeDebug).toBe('stopped');
+    expect(result.reset.guidancePhase, routeDebug).toBe('preflight');
+    expect(result.reset.weightOnWheels, routeDebug).toBe(true);
+  });
+
+  test('KSEA final route extended descent can bridge to KPDX landing without hidden automation', async ({ page }) => {
+    await openRfs(page);
+
+    const result = await flyKseaFinalRouteExtendedDescentToKpdxLandingAndReset(page);
+    const routeDebug = JSON.stringify(result, null, 2);
+    const expectLoadedBtgKpdx = (sample: typeof result.configuredApproach): void => {
+      expect(sample.routeName, routeDebug).toBe('KSEA→KPDX');
+      expect(sample.activeLegIndex, routeDebug).toBe(2);
+      expect(sample.fromIdent, routeDebug).toBe('BTG');
+      expect(sample.nextWaypointIdent, routeDebug).toBe('KPDX');
+      expect(sample.lnavAvailable, routeDebug).toBe(true);
+    };
+    const expectCoupledApproachTruth = (sample: typeof result.configuredApproach): void => {
+      expect(sample.autopilotStatus, routeDebug).toBe('CMD_A');
+      expect(sample.fmaAutopilotStatus, routeDebug).toBe('CMD_A');
+      expect(sample.lateralActive, routeDebug).toBe('LNAV');
+      expect(sample.fmaLateralActive, routeDebug).toBe('LNAV');
+      expect(sample.thrustActive, routeDebug).toBe('SPEED');
+      expect(sample.fmaThrustActive, routeDebug).toBe('SPEED');
+      expect(sample.verticalActive, routeDebug).toBe('OFF');
+      expect(sample.fmaVerticalActive, routeDebug).toBe('OFF');
+    };
+    const expectManualTruth = (sample: typeof result.manualHandoff): void => {
+      expect(sample.autopilotStatus, routeDebug).toBe('OFF');
+      expect(sample.fmaAutopilotStatus, routeDebug).toBe('OFF');
+      expect(sample.lateralActive, routeDebug).toBe('OFF');
+      expect(sample.fmaLateralActive, routeDebug).toBe('OFF');
+      expect(sample.verticalActive, routeDebug).toBe('OFF');
+      expect(sample.fmaVerticalActive, routeDebug).toBe('OFF');
+      expect(sample.thrustActive, routeDebug).toBe('OFF');
+      expect(sample.fmaThrustActive, routeDebug).toBe('OFF');
+      expect(sample.apCommandCount, routeDebug).toBe(0);
+    };
+    const expectManualControls = (sample: typeof result.manualHandoff): void => {
+      expect(sample.pilotInputs.elevator, routeDebug).toBe(sample.effectiveControls.elevator);
+      expect(sample.pilotInputs.aileron, routeDebug).toBe(sample.effectiveControls.aileron);
+      expect(sample.pilotInputs.throttle1, routeDebug).toBe(sample.effectiveControls.throttle1);
+      expect(sample.pilotInputs.throttle2, routeDebug).toBe(sample.effectiveControls.throttle2);
+    };
+    const expectAirborneApproach = (sample: typeof result.configuredApproach): void => {
+      expect(sample.gearDown, routeDebug).toBe(true);
+      expect(sample.gearLever, routeDebug).toBe('DOWN');
+      expect(sample.flapSetting, routeDebug).toBeGreaterThanOrEqual(25);
+      expect(sample.guidancePhase, routeDebug).toBe('approach');
+      expect(sample.weightOnWheels, routeDebug).toBe(false);
+      expect(sample.flightPhase, routeDebug).not.toBe('LANDED');
+    };
+    const sampleMatches = (sample: typeof result.configuredApproach, expected: typeof result.configuredApproach): boolean => sample.distanceToNextNm === expected.distanceToNextNm && sample.altitudeFt === expected.altitudeFt;
+
+    expectLoadedBtgKpdx(result.configuredApproach);
+    expectCoupledApproachTruth(result.configuredApproach);
+    expectAirborneApproach(result.configuredApproach);
+
+    expectLoadedBtgKpdx(result.extendedDescent);
+    expectCoupledApproachTruth(result.extendedDescent);
+    expect(result.extendedDescent.distanceToNextNm, routeDebug).toBeLessThanOrEqual(result.configuredApproach.distanceToNextNm - 1.0);
+    expect(result.extendedDescent.altitudeFt, routeDebug).toBeLessThanOrEqual(result.configuredApproach.altitudeFt - 300);
+    expect(result.extendedDescent.aglFt, routeDebug).toBeLessThanOrEqual(result.configuredApproach.aglFt - 300);
+    expectAirborneApproach(result.extendedDescent);
+
+    const configuredApproachSampleIndex = result.samples.findIndex((sample) => sampleMatches(sample, result.configuredApproach));
+    const extendedDescentSampleIndex = result.samples.findIndex((sample) => sampleMatches(sample, result.extendedDescent));
+    expect(configuredApproachSampleIndex, routeDebug).toBeGreaterThanOrEqual(0);
+    expect(extendedDescentSampleIndex, routeDebug).toBeGreaterThan(configuredApproachSampleIndex);
+    const preHandoffSamples = result.samples.slice(configuredApproachSampleIndex, extendedDescentSampleIndex + 1);
+    expect(preHandoffSamples[0], routeDebug).toEqual(result.configuredApproach);
+    expect(preHandoffSamples[preHandoffSamples.length - 1], routeDebug).toEqual(result.extendedDescent);
+    for (const sample of preHandoffSamples) {
+      expectLoadedBtgKpdx(sample);
+      expectCoupledApproachTruth(sample);
+      expect(sample.weightOnWheels, routeDebug).toBe(false);
+      expect(sample.flightPhase, routeDebug).not.toBe('LANDED');
+    }
+    for (let i = 1; i < preHandoffSamples.length; i += 1) {
+      expect(preHandoffSamples[i].distanceToNextNm, routeDebug).toBeLessThanOrEqual(preHandoffSamples[i - 1].distanceToNextNm + 0.05);
+    }
+
+    expectLoadedBtgKpdx(result.manualHandoff);
+    expectManualTruth(result.manualHandoff);
+    expectManualControls(result.manualHandoff);
+    expect(result.manualHandoff.weightOnWheels, routeDebug).toBe(false);
+    expect(result.manualHandoff.flightPhase, routeDebug).not.toBe('LANDED');
+
+    expect(result.samples.slice(-5), routeDebug).toEqual([
+      result.extendedDescent,
+      result.manualHandoff,
+      result.landingApproach,
+      result.touchdown,
+      result.rollout,
+    ]);
+    expect(result.samples.some((sample) => sample.routeName === 'NO ROUTE'), routeDebug).toBe(false);
+    expect(result.samples, routeDebug).not.toContainEqual(result.reset);
+
+    expectLoadedBtgKpdx(result.landingApproach);
+    expectManualTruth(result.landingApproach);
+    expect(result.landingApproach.surfaceAirport, routeDebug).toBe('KPDX');
+    expect(result.landingApproach.surfaceRunwayId, routeDebug).toBe('10L');
+    expect(result.landingApproach.gearDown, routeDebug).toBe(true);
+    expect(result.landingApproach.flapSetting, routeDebug).toBeGreaterThanOrEqual(25);
+    expect(result.landingApproach.guidancePhase, routeDebug).toBe('approach');
+    expect(result.landingApproach.weightOnWheels, routeDebug).toBe(false);
+    expect(result.landingApproach.flightPhase, routeDebug).not.toBe('LANDED');
+
+    expect(result.touchdown.flightPhase, routeDebug).toBe('LANDED');
+    expect(result.touchdown.groundContact, routeDebug).toBe('gear');
+    expect(result.touchdown.weightOnWheels, routeDebug).toBe(true);
+    expect(result.touchdown.onRunway, routeDebug).toBe(true);
+    expect(result.touchdown.surfaceAirport, routeDebug).toBe('KPDX');
+    expect(result.touchdown.surfaceRunwayId, routeDebug).toBe('10L');
+    expect(result.touchdown.touchdownSinkRateMps, routeDebug).toBeGreaterThan(0);
+    expect(result.touchdown.touchdownSinkRateMps, routeDebug).toBeLessThan(15);
+    expectLoadedBtgKpdx(result.touchdown);
+    expectManualTruth(result.touchdown);
+
+    expect(result.rollout.groundSpeedKt, routeDebug).toBeLessThan(result.touchdown.groundSpeedKt);
+    expect(['landing-rollout', 'landed'], routeDebug).toContain(result.rollout.guidancePhase);
+    expectManualTruth(result.rollout);
 
     expect(result.reset.flightPlan, routeDebug).toBeNull();
     expect(result.reset.activeLegIndex, routeDebug).toBeNull();
