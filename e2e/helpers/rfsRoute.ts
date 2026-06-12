@@ -11,6 +11,10 @@ export interface RouteProofSnapshot {
   crossTrackErrorM: number | null;
   lateralActive: string;
   fmaLateralActive: string;
+  autopilotStatus: string;
+  fmaAutopilotStatus: string;
+  thrustActive: string;
+  fmaThrustActive: string;
   verticalActive: string;
   fmaVerticalActive: string;
   sequenced: boolean;
@@ -312,7 +316,7 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
         deriveDisplayFmaTruth: (
           apState: BrowserAutopilotState | null,
           context: { aircraft: BrowserAircraftState; flightPlan: BrowserFlightPlan | null; routeStatus: BrowserRouteStatus },
-        ) => { lateralActive: string; verticalActive: string };
+        ) => { autopilotStatus: string; lateralActive: string; verticalActive: string; thrustActive: string };
       };
       const { eulerToQuat } = (await import(quaternionModule)) as { eulerToQuat: (phi: number, theta: number, psi: number) => unknown };
 
@@ -468,6 +472,10 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
           crossTrackErrorM: route.crossTrackErrorM,
           lateralActive: state.apState?.truth.lateralActive ?? 'OFF',
           fmaLateralActive: fma.lateralActive,
+          autopilotStatus: state.apState?.truth.autopilotStatus ?? 'OFF',
+          fmaAutopilotStatus: fma.autopilotStatus,
+          thrustActive: state.apState?.truth.thrustActive ?? 'OFF',
+          fmaThrustActive: fma.thrustActive,
           verticalActive: state.apState?.truth.verticalActive ?? 'OFF',
           fmaVerticalActive: fma.verticalActive,
           sequenced: route.sequenced,
@@ -524,6 +532,10 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
             && current.nextWaypointIdent === 'KPDX'
             && current.lnavAvailable
             && current.fmaLateralActive === 'LNAV'
+            && current.autopilotStatus === 'CMD_A'
+            && current.fmaAutopilotStatus === 'CMD_A'
+            && current.thrustActive === 'SPEED'
+            && current.fmaThrustActive === 'SPEED'
             && current.verticalActive === 'OFF'
             && current.fmaVerticalActive === 'OFF'
             && current.distanceToNextNm < initial.distanceToNextNm - 0.5

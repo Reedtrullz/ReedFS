@@ -120,6 +120,10 @@ test.describe('RFS route and LNAV browser proof', () => {
     expect(result.initial.lnavAvailable, routeDebug).toBe(true);
     expect(result.initial.lateralActive, routeDebug).toBe('LNAV');
     expect(result.initial.fmaLateralActive, routeDebug).toBe('LNAV');
+    expect(result.initial.autopilotStatus, routeDebug).toBe('CMD_A');
+    expect(result.initial.fmaAutopilotStatus, routeDebug).toBe('CMD_A');
+    expect(result.initial.thrustActive, routeDebug).toBe('SPEED');
+    expect(result.initial.fmaThrustActive, routeDebug).toBe('SPEED');
     expect(result.initial.verticalActive, routeDebug).toBe('OFF');
     expect(result.initial.fmaVerticalActive, routeDebug).toBe('OFF');
     expect(result.initial.flightPhase, routeDebug).toBe('DESCENT');
@@ -134,6 +138,10 @@ test.describe('RFS route and LNAV browser proof', () => {
     expect(result.configuredApproach.lnavAvailable, routeDebug).toBe(true);
     expect(result.configuredApproach.lateralActive, routeDebug).toBe('LNAV');
     expect(result.configuredApproach.fmaLateralActive, routeDebug).toBe('LNAV');
+    expect(result.configuredApproach.autopilotStatus, routeDebug).toBe('CMD_A');
+    expect(result.configuredApproach.fmaAutopilotStatus, routeDebug).toBe('CMD_A');
+    expect(result.configuredApproach.thrustActive, routeDebug).toBe('SPEED');
+    expect(result.configuredApproach.fmaThrustActive, routeDebug).toBe('SPEED');
     expect(result.configuredApproach.verticalActive, routeDebug).toBe('OFF');
     expect(result.configuredApproach.fmaVerticalActive, routeDebug).toBe('OFF');
     expect(result.configuredApproach.distanceToNextNm, routeDebug).toBeLessThan(result.initial.distanceToNextNm - 0.5);
@@ -150,6 +158,12 @@ test.describe('RFS route and LNAV browser proof', () => {
       expect(sample.routeName, routeDebug).toBe('KSEA→KPDX');
       expect(sample.lnavAvailable, routeDebug).toBe(true);
       expect(sample.fmaLateralActive, routeDebug).toBe('LNAV');
+      expect(sample.autopilotStatus, routeDebug).toBe('CMD_A');
+      expect(sample.fmaAutopilotStatus, routeDebug).toBe('CMD_A');
+      expect(sample.thrustActive, routeDebug).toBe('SPEED');
+      expect(sample.fmaThrustActive, routeDebug).toBe('SPEED');
+      expect(sample.verticalActive, routeDebug).toBe('OFF');
+      expect(sample.fmaVerticalActive, routeDebug).toBe('OFF');
       expect(sample.weightOnWheels, routeDebug).toBe(false);
       expect(sample.flightPhase, routeDebug).not.toBe('LANDED');
     }
