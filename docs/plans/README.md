@@ -8,7 +8,7 @@ Current source-of-truth documents:
 - `../physics-invariants.md` — active physics contracts and regression checklist.
 - `../roadmap.md` — prioritized necessary enhancements.
 - `../reviews/2026-06-12-comprehensive-remaining-work-review.md` — latest comprehensive remaining-work audit and evidence ledger.
-- `2026-06-12-rfs-guidance-truth-full-flight-proof.md` — current next-slice plan for AP/FMA route truth, phase-aware guidance, and ENVA full-flight browser proof.
+- `2026-06-12-rfs-guidance-truth-full-flight-proof.md` — current next-slice plan for AP/FMA route truth, phase-aware guidance, and ENVA takeoff-to-clean-climb browser proof.
 - `../reviews/2026-05-26-comprehensive-gameplay-review.md` — completed May comprehensive gameplay/realism/visual/cockpit audit and historical status record.
 - `../reviews/templates/playability-dogfood-checklist.md` — browser dogfood checklist/report template for future playable claims.
 - `2026-05-26-rfs-comprehensive-usability-realism-plan.md` — completed/current status record for usability, realism, aircraft visuals, cockpit, UI, and guidance; phases 0 through 5.5 are complete.
