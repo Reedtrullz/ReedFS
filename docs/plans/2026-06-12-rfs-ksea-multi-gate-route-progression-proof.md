@@ -105,3 +105,9 @@ CI=1 npm run test:visual
 ```
 
 Report this as KSEA multi-gate route progression browser proof only. It is still not full-route proof, full-flight proof, approach/landing proof, broad manual playability proof, CI green, deployed, or live-verified unless those are separately run and checked.
+
+## Implementation evidence
+
+- RED: `source ~/.nvm/nvm.sh && nvm use 22 >/dev/null && CI=1 npx playwright test e2e/rfs-route.spec.ts --project=chromium` failed with `SyntaxError: The requested module './helpers/rfsRoute' does not provide an export named 'flyKseaRouteThroughMultiGateProgression'` after the fourth test was added.
+- GREEN: `source ~/.nvm/nvm.sh && nvm use 22 >/dev/null && npx tsc --ignoreConfig --noEmit --target ES2022 --module ESNext --moduleResolution bundler --strict --skipLibCheck e2e/helpers/rfsRoute.ts` passed.
+- GREEN: `source ~/.nvm/nvm.sh && nvm use 22 >/dev/null && CI=1 npx playwright test e2e/rfs-route.spec.ts --project=chromium` passed 4 Chromium route proof tests.

@@ -25,8 +25,18 @@ export interface RouteProofResult {
 interface RouteProofSetup {
   initialPosition: { lat: number; lon: number };
   initialHeadingDeg: number;
-  routeFrames: number;
+  routeFrames?: number;
   sampleIntervalFrames: number;
+  gates?: RouteProofGateSetup[];
+}
+
+interface RouteProofGateSetup {
+  targetActiveLegIndex: number;
+  routeFrames: number;
+  reposition?: {
+    position: { lat: number; lon: number };
+    headingDeg: number;
+  };
 }
 
 const FIXED_STEP_SECONDS = 1 / 60;
@@ -56,6 +66,26 @@ const KSEA_SECOND_SEQUENCE_PROOF: RouteProofSetup = {
   initialHeadingDeg: 170.05376346096932,
   routeFrames: SECOND_SEQUENCE_FRAMES,
   sampleIntervalFrames: SEQUENCE_SAMPLE_INTERVAL_FRAMES,
+};
+
+const KSEA_MULTI_GATE_PROGRESSION_PROOF: RouteProofSetup = {
+  initialPosition: KSEA_FIRST_SEQUENCE_PROOF.initialPosition,
+  initialHeadingDeg: KSEA_FIRST_SEQUENCE_PROOF.initialHeadingDeg,
+  sampleIntervalFrames: SEQUENCE_SAMPLE_INTERVAL_FRAMES,
+  gates: [
+    {
+      targetActiveLegIndex: 1,
+      routeFrames: FIRST_SEQUENCE_FRAMES,
+    },
+    {
+      targetActiveLegIndex: 2,
+      routeFrames: SECOND_SEQUENCE_FRAMES,
+      reposition: {
+        position: KSEA_SECOND_SEQUENCE_PROOF.initialPosition,
+        headingDeg: KSEA_SECOND_SEQUENCE_PROOF.initialHeadingDeg,
+      },
+    },
+  ],
 };
 
 async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<RouteProofResult> {
@@ -147,6 +177,7 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
         inputs: BrowserControlInputs;
         apState: BrowserAutopilotState | null;
         flightPlan: BrowserFlightPlan | null;
+        activeLegIndex: number | null;
         routeStatus: BrowserRouteStatus;
         wind: unknown;
         status: string;
@@ -187,12 +218,17 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
       const toRad = (deg: number): number => deg * Math.PI / 180;
       const flightPlan = createKseaKpdxFlight();
       const initialAltitudeFt = 5_000;
-      const routeHeadingRad = toRad(proofSetup.initialHeadingDeg);
       let timestamp = performance.now();
 
       if (fixedStepSeconds <= 0) throw new Error(`Invalid fixed-step duration: ${fixedStepSeconds}`);
-      if (proofSetup.routeFrames <= 0) throw new Error(`Invalid route frame count: ${proofSetup.routeFrames}`);
+      if (!proofSetup.gates && (!proofSetup.routeFrames || proofSetup.routeFrames <= 0)) throw new Error(`Invalid route frame count: ${proofSetup.routeFrames}`);
       if (proofSetup.sampleIntervalFrames <= 0) throw new Error(`Invalid route sample interval: ${proofSetup.sampleIntervalFrames}`);
+      for (const gate of proofSetup.gates ?? []) {
+        if (gate.routeFrames <= 0) throw new Error(`Invalid gate frame count: ${gate.routeFrames}`);
+        if (!Number.isInteger(gate.targetActiveLegIndex) || gate.targetActiveLegIndex < 0) {
+          throw new Error(`Invalid target active leg index: ${gate.targetActiveLegIndex}`);
+        }
+      }
 
       const apState = createDefaultAutopilotState();
       apState.truth.autopilotStatus = 'CMD_A';
@@ -229,50 +265,55 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
         rightBrake: 0,
       });
 
-      useSimStore.setState((state) => {
-        const aircraft = structuredClone(state.aircraft);
-        aircraft.position = { lat: proofSetup.initialPosition.lat, lon: proofSetup.initialPosition.lon, alt: initialAltitudeFt };
-        aircraft.velocity = { u: 118, v: 0, w: 0 };
-        aircraft.attitude = { phi: 0, theta: 0, psi: routeHeadingRad };
-        aircraft.quaternion = eulerToQuat(aircraft.attitude.phi, aircraft.attitude.theta, aircraft.attitude.psi);
-        aircraft.angularVel = { p: 0, q: 0, r: 0 };
-        aircraft.config = {
-          ...aircraft.config,
-          gearDown: false,
-          flapSetting: 0,
-          spoilersArmed: false,
-          spoilersDeployed: false,
-          speedBrake: 0,
-        };
-        aircraft.engines = [
-          { ...aircraft.engines[0], n1: 62, n2: 66, egt: 720, running: true },
-          { ...aircraft.engines[1], n1: 62, n2: 66, egt: 720, running: true },
-        ];
-        aircraft.ground = {
-          ...aircraft.ground,
-          aglFt: 4_500,
-          groundAltFt: 500,
-          weightOnWheels: false,
-          normalForceN: 0,
-          contact: 'none',
-          onRunway: false,
-          gearStations: aircraft.ground.gearStations.map((station) => ({
-            ...station,
-            compressionM: 0,
+      const configureAircraft = (position: { lat: number; lon: number }, headingDeg: number): void => {
+        const routeHeadingRad = toRad(headingDeg);
+        useSimStore.setState((state) => {
+          const aircraft = structuredClone(state.aircraft);
+          aircraft.position = { lat: position.lat, lon: position.lon, alt: initialAltitudeFt };
+          aircraft.velocity = { u: 118, v: 0, w: 0 };
+          aircraft.attitude = { phi: 0, theta: 0, psi: routeHeadingRad };
+          aircraft.quaternion = eulerToQuat(aircraft.attitude.phi, aircraft.attitude.theta, aircraft.attitude.psi);
+          aircraft.angularVel = { p: 0, q: 0, r: 0 };
+          aircraft.config = {
+            ...aircraft.config,
+            gearDown: false,
+            flapSetting: 0,
+            spoilersArmed: false,
+            spoilersDeployed: false,
+            speedBrake: 0,
+          };
+          aircraft.engines = [
+            { ...aircraft.engines[0], n1: 62, n2: 66, egt: 720, running: true },
+            { ...aircraft.engines[1], n1: 62, n2: 66, egt: 720, running: true },
+          ];
+          aircraft.ground = {
+            ...aircraft.ground,
+            aglFt: 4_500,
+            groundAltFt: 500,
+            weightOnWheels: false,
             normalForceN: 0,
-            weightOnWheel: false,
-          })),
-        };
-        aircraft.flightPhase = 'CRUISE';
+            contact: 'none',
+            onRunway: false,
+            gearStations: aircraft.ground.gearStations.map((station) => ({
+              ...station,
+              compressionM: 0,
+              normalForceN: 0,
+              weightOnWheel: false,
+            })),
+          };
+          aircraft.flightPhase = 'CRUISE';
 
-        return {
-          aircraft,
-          status: 'running',
-          lastFrameTime: timestamp,
-          fixedStepAccumulatorSeconds: 0,
-          droppedSimulationTimeSeconds: 0,
-        };
-      });
+          return {
+            aircraft,
+            status: 'running',
+            lastFrameTime: timestamp,
+            fixedStepAccumulatorSeconds: 0,
+            droppedSimulationTimeSeconds: 0,
+          };
+        });
+      };
+
+      configureAircraft(proofSetup.initialPosition, proofSetup.initialHeadingDeg);
 
       useSimStore.getState().setFlightPlan(flightPlan);
       useSimStore.getState().setApState(apState);
@@ -282,7 +323,7 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
         const route = state.routeStatus;
         const fma = deriveDisplayFmaTruth(state.apState, {
           aircraft: state.aircraft,
-          flightPlan,
+          flightPlan: state.flightPlan,
           routeStatus: route,
         });
         const derived = computeDerived(state.aircraft, state.wind);
@@ -307,16 +348,57 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
           iasKt: derived.ias,
         };
       };
-
       const samples: RouteProofSnapshot[] = [snapshot()];
 
-      for (let frame = 1; frame <= proofSetup.routeFrames; frame += 1) {
+      const tickOnce = (): void => {
         timestamp += fixedStepMs;
         useSimStore.getState().tick(timestamp);
+      };
 
-        if (frame % proofSetup.sampleIntervalFrames === 0 || frame === proofSetup.routeFrames) {
-          samples.push(snapshot());
+      const runFrames = (routeFrames: number): void => {
+        for (let frame = 1; frame <= routeFrames; frame += 1) {
+          tickOnce();
+
+          if (frame % proofSetup.sampleIntervalFrames === 0 || frame === routeFrames) {
+            samples.push(snapshot());
+          }
         }
+      };
+
+      const runGate = (gate: NonNullable<RouteProofSetup['gates']>[number]): void => {
+        if (gate.reposition) {
+          configureAircraft(gate.reposition.position, gate.reposition.headingDeg);
+        }
+
+        const startingLeg = useSimStore.getState().routeStatus.activeLegIndex;
+        if (startingLeg === gate.targetActiveLegIndex) {
+          throw new Error(`KSEA route gate already at target leg ${gate.targetActiveLegIndex}: ${JSON.stringify(snapshot())}`);
+        }
+
+        for (let frame = 1; frame <= gate.routeFrames; frame += 1) {
+          const previousLeg = useSimStore.getState().routeStatus.activeLegIndex;
+          tickOnce();
+          const currentLeg = useSimStore.getState().routeStatus.activeLegIndex;
+
+          if (currentLeg !== previousLeg || frame % proofSetup.sampleIntervalFrames === 0 || frame === gate.routeFrames) {
+            samples.push(snapshot());
+          }
+
+          if (currentLeg === gate.targetActiveLegIndex) return;
+          if (currentLeg !== null && currentLeg > gate.targetActiveLegIndex) {
+            throw new Error(`KSEA route gate skipped target leg ${gate.targetActiveLegIndex}: ${JSON.stringify(snapshot())}`);
+          }
+        }
+
+        throw new Error(`KSEA route gate did not reach target leg ${gate.targetActiveLegIndex}: ${JSON.stringify(samples, null, 2)}`);
+      };
+
+      if (proofSetup.gates) {
+        for (const gate of proofSetup.gates) {
+          runGate(gate);
+        }
+      } else {
+        runFrames(proofSetup.routeFrames ?? 0);
       }
 
       return { initial: samples[0], final: samples[samples.length - 1], samples };
@@ -335,4 +417,8 @@ export async function flyKseaRouteThroughFirstSequence(page: Page): Promise<Rout
 
 export async function flyKseaRouteThroughSecondSequence(page: Page): Promise<RouteProofResult> {
   return flyKseaRouteProof(page, KSEA_SECOND_SEQUENCE_PROOF);
+}
+
+export async function flyKseaRouteThroughMultiGateProgression(page: Page): Promise<RouteProofResult> {
+  return flyKseaRouteProof(page, KSEA_MULTI_GATE_PROGRESSION_PROOF);
 }
