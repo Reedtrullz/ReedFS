@@ -340,8 +340,8 @@ export function routeStatusToNavOutput(
   const crossTrackError = isFiniteNumber(routeStatus.crossTrackErrorM)
     ? routeStatus.crossTrackErrorM
     : 0;
-  const maxInterceptDeg = isFiniteNumber(options.maxInterceptDeg) && options.maxInterceptDeg > 0
-    ? options.maxInterceptDeg
+  const maxInterceptDeg = isFiniteNumber(options.maxInterceptDeg)
+    ? clamp(options.maxInterceptDeg, 0, 180)
     : 0;
   const maxInterceptRad = maxInterceptDeg * Math.PI / 180;
   const interceptCorrectionRad = maxInterceptRad > 0

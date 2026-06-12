@@ -241,11 +241,16 @@ describe('routeStatusToNavOutput', () => {
       maxInterceptDeg: Number.POSITIVE_INFINITY,
     });
     const negativeInterceptNav = routeStatusToNavOutput(routeStatusForNavOutput(), { maxInterceptDeg: -25 });
+    const hugeFiniteInterceptNav = routeStatusToNavOutput(routeStatusForNavOutput({ crossTrackErrorM: 0 }), {
+      maxInterceptDeg: Number.MAX_VALUE,
+    });
 
     expect(nav).not.toBeNull();
     expect(nav!.desiredTrack).toBeCloseTo(Math.PI, 5);
     expect(Number.isFinite(nav!.desiredTrack)).toBe(true);
     expect(negativeInterceptNav?.desiredTrack).toBe(Math.PI / 2);
+    expect(hugeFiniteInterceptNav?.desiredTrack).toBe(Math.PI / 2);
+    expect(Number.isFinite(hugeFiniteInterceptNav?.desiredTrack)).toBe(true);
   });
 });
 
