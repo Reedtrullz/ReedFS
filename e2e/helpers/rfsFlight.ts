@@ -458,6 +458,11 @@ export async function flyApproachToLandingRolloutAndReset(page: Page): Promise<L
       };
     });
 
+    // Direct state seeding intentionally bypasses store actions; immediately
+    // re-apply the same pilot controls through the store so guidance derives
+    // from the seeded APPROACH/running aircraft before the first physics tick.
+    useSimStore.getState().setInput(approachControls);
+
     syncManualClock();
     stepFrame();
     const approach = snapshot();
