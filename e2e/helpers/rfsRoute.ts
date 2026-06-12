@@ -40,7 +40,6 @@ export interface RouteLandingBridgeSnapshot extends RouteProofSnapshot {
   touchdownSinkRateMps: number;
   surfaceAirport?: string;
   surfaceRunwayId?: string;
-  sameStoreSession: boolean;
 }
 
 export interface RouteResetProofSnapshot {
@@ -649,7 +648,6 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
           touchdownSinkRateMps: state.aircraft.ground.lastTouchdownSinkRateMps,
           surfaceAirport: surface.airport,
           surfaceRunwayId: surface.runwayId,
-          sameStoreSession: true,
         };
       };
 

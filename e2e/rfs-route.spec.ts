@@ -393,7 +393,14 @@ test.describe('RFS route and LNAV browser proof', () => {
     expect(result.manualHandoff.weightOnWheels, routeDebug).toBe(false);
     expect(result.manualHandoff.flightPhase, routeDebug).not.toBe('LANDED');
 
-    expect(result.landingApproach.sameStoreSession, routeDebug).toBe(true);
+    expect(result.samples.slice(-4), routeDebug).toEqual([
+      result.manualHandoff,
+      result.landingApproach,
+      result.touchdown,
+      result.rollout,
+    ]);
+    expect(result.samples.some((sample) => sample.routeName === 'NO ROUTE'), routeDebug).toBe(false);
+    expect(result.samples, routeDebug).not.toContainEqual(result.reset);
     expect(result.landingApproach.routeName, routeDebug).toBe('KSEA→KPDX');
     expect(result.landingApproach.activeLegIndex, routeDebug).toBe(2);
     expect(result.landingApproach.fromIdent, routeDebug).toBe('BTG');
