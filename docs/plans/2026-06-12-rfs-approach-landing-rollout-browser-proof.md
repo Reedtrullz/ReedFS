@@ -147,3 +147,15 @@ CI=1 npm run test:visual
 ```
 
 Report this as scoped approach/landing-rollout/reset browser proof only. It is still not full-flight proof, full-route proof, continuous descent/approach proof, broad manual playability proof, CI green, deployed, or live-verified unless those are separately run and checked.
+
+## Implementation evidence
+
+- Added RED unit coverage for approach/descent guidance, landed rollout/near-stop phase selection, and landed rollout coach copy; initial targeted run failed as expected with `positive-rate`/`takeoff-roll` phases and takeoff-oriented copy.
+- Implemented `approach`, `landing-rollout`, and `landed` guidance phases ahead of generic airborne/takeoff fallback, plus landing/rollout/reset checklist and coach copy that does not request takeoff thrust once landed.
+- Added the Playwright browser proof test RED by importing `flyApproachToLandingRolloutAndReset()` before the helper existed; initial browser run failed with the expected missing export.
+- Implemented `flyApproachToLandingRolloutAndReset()` as one browser `page.evaluate()` helper using the real Zustand sim store, `computeDerived()`, `eulerToQuat()`, and ENVA runway data. The helper seeds only the initial short-final APPROACH state; touchdown, gear contact, LANDED phase, braking rollout deceleration, and reset state come from the existing runtime/physics/store paths.
+- Final targeted verification passed:
+  - `npm run test -- src/sim/__tests__/guidanceState.test.ts src/sim/__tests__/checklistCoach.test.ts`
+  - `npx tsc --ignoreConfig --noEmit --target ES2022 --module ESNext --moduleResolution bundler --strict --skipLibCheck e2e/helpers/rfsFlight.ts`
+  - `CI=1 npx playwright test e2e/rfs-flight.spec.ts --project=chromium`
+- Non-claim remains: this is scoped ENVA clean-climb plus seeded short-final approach-to-touchdown/rollout/reset browser proof, not continuous full-flight/full-route/descent/approach completion proof, broader manual playability proof, CI/deploy proof, or live verification.

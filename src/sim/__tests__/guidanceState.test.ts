@@ -279,4 +279,55 @@ describe('guidanceState', () => {
     ]));
     expect(guidance.checklist.map((item) => item.label)).not.toContain('Gear down');
   });
+
+  it('derives approach guidance for airborne approach and descent states with gear down', () => {
+    for (const flightPhase of ['APPROACH', 'DESCENT'] as const) {
+      const aircraft = scenarioAircraft();
+      aircraft.flightPhase = flightPhase;
+      aircraft.ground.weightOnWheels = false;
+      aircraft.ground.aglFt = 250;
+      aircraft.position.alt += 250;
+      aircraft.config.gearDown = true;
+      aircraft.velocity.u = 70;
+
+      expect(buildGuidanceState({
+        scenario: KSEA_TUTORIAL_SCENARIO,
+        status: 'running',
+        aircraft,
+        controls: { ...configuredInputs, throttle1: 0.35, throttle2: 0.35, flapLever: 30 },
+      }).phase).toBe('approach');
+    }
+  });
+
+  it('derives landing rollout while landed on gear above taxi speed', () => {
+    const aircraft = scenarioAircraft();
+    aircraft.flightPhase = 'LANDED';
+    aircraft.ground.weightOnWheels = true;
+    aircraft.ground.aglFt = 0;
+    aircraft.ground.contact = 'gear';
+    aircraft.velocity.u = 20;
+
+    expect(buildGuidanceState({
+      scenario: KSEA_TUTORIAL_SCENARIO,
+      status: 'running',
+      aircraft,
+      controls: { ...configuredInputs, throttle1: 0.1, throttle2: 0.1, brake: 0.7 },
+    }).phase).toBe('landing-rollout');
+  });
+
+  it('derives landed guidance while landed on gear near stop', () => {
+    const aircraft = scenarioAircraft();
+    aircraft.flightPhase = 'LANDED';
+    aircraft.ground.weightOnWheels = true;
+    aircraft.ground.aglFt = 0;
+    aircraft.ground.contact = 'gear';
+    aircraft.velocity.u = 1;
+
+    expect(buildGuidanceState({
+      scenario: KSEA_TUTORIAL_SCENARIO,
+      status: 'running',
+      aircraft,
+      controls: { ...configuredInputs, throttle1: 0, throttle2: 0, brake: 1 },
+    }).phase).toBe('landed');
+  });
 });

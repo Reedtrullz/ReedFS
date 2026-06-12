@@ -61,4 +61,26 @@ describe('checklistCoach', () => {
 
     expect(coachMessageForState('running', aircraft, { ...configuredInputs, throttle1: 1, throttle2: 1, gearLever: 'UP' }, KSEA_TUTORIAL_SCENARIO)).toMatch(/climb stable/i);
   });
+
+  it('coaches landed rollout toward braking and reset without takeoff thrust instructions', () => {
+    const aircraft = createAircraftStateForScenario(B737_800_SPEC, KSEA_TUTORIAL_SCENARIO);
+    aircraft.flightPhase = 'LANDED';
+    aircraft.ground.weightOnWheels = true;
+    aircraft.ground.aglFt = 0;
+    aircraft.ground.contact = 'gear';
+    aircraft.velocity.u = 18;
+
+    const message = coachMessageForState('running', aircraft, {
+      ...configuredInputs,
+      throttle1: 0,
+      throttle2: 0,
+      brake: 0.8,
+      spoilers: 1,
+    }, KSEA_TUTORIAL_SCENARIO);
+
+    expect(message).toMatch(/landing|landed/i);
+    expect(message).toMatch(/rollout|brak/i);
+    expect(message).toMatch(/reset/i);
+    expect(message).not.toMatch(/takeoff thrust/i);
+  });
 });

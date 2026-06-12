@@ -2,7 +2,16 @@ import type { AircraftState, ControlInputs } from './types';
 import type { FlightScenario } from './scenarios';
 import type { SimStatus } from './simulationStatus';
 
-type GuidanceChecklistPhase = 'preflight' | 'takeoff-roll' | 'rotation' | 'rejected-takeoff' | 'positive-rate' | 'climb';
+type GuidanceChecklistPhase =
+  | 'preflight'
+  | 'takeoff-roll'
+  | 'rotation'
+  | 'rejected-takeoff'
+  | 'positive-rate'
+  | 'climb'
+  | 'approach'
+  | 'landing-rollout'
+  | 'landed';
 
 export interface ChecklistItem {
   id: string;
@@ -14,6 +23,9 @@ export interface ChecklistItem {
 function nearlyEqual(a: number, b: number, epsilon = 0.15): boolean {
   return Math.abs(a - b) <= epsilon;
 }
+
+const MS_TO_KT = 1.94384449;
+const LANDED_RESET_READY_SPEED_KT = 15;
 
 export function buildTakeoffChecklist(
   scenario: FlightScenario,
@@ -54,6 +66,69 @@ export function buildGuidanceChecklist(
   controls: ControlInputs,
   phase: GuidanceChecklistPhase,
 ): ChecklistItem[] {
+  if (phase === 'approach') {
+    return [
+      {
+        id: 'landing-gear-down',
+        label: 'Landing gear down',
+        complete: controls.gearLever === 'DOWN' && aircraft.config.gearDown,
+        detail: 'Confirm three green before touchdown',
+      },
+      {
+        id: 'landing-flaps',
+        label: 'Landing flaps set',
+        complete: controls.flapLever >= 25 && aircraft.config.flapSetting >= 25,
+        detail: 'Use landing flaps for the approach',
+      },
+      {
+        id: 'speedbrakes-ready',
+        label: 'Speedbrakes ready for rollout',
+        complete: controls.spoilers <= 0.05 && !aircraft.config.spoilersDeployed,
+        detail: 'Keep spoilers retracted until touchdown, then deploy for rollout',
+      },
+    ];
+  }
+
+  if (phase === 'landing-rollout') {
+    return [
+      {
+        id: 'weight-on-wheels',
+        label: 'Weight on wheels',
+        complete: aircraft.ground.weightOnWheels && aircraft.ground.contact === 'gear',
+        detail: 'Gear contact confirmed after touchdown',
+      },
+      {
+        id: 'rollout-spoilers-brakes',
+        label: 'Spoilers and brakes for rollout',
+        complete: controls.spoilers >= 0.8 && controls.brake >= 0.5,
+        detail: 'Deploy spoilers and hold braking while tracking the runway',
+      },
+      {
+        id: 'reset-after-stop',
+        label: 'Reset after stopped',
+        complete: Math.max(0, aircraft.velocity.u) * MS_TO_KT <= LANDED_RESET_READY_SPEED_KT,
+        detail: 'Use RESET once the landing rollout is stopped',
+      },
+    ];
+  }
+
+  if (phase === 'landed') {
+    return [
+      {
+        id: 'landing-complete',
+        label: 'Landing rollout complete',
+        complete: aircraft.ground.weightOnWheels && aircraft.ground.contact === 'gear',
+        detail: 'Aircraft is on gear and near stopped',
+      },
+      {
+        id: 'reset-ready',
+        label: 'Reset ready',
+        complete: Math.max(0, aircraft.velocity.u) * MS_TO_KT <= LANDED_RESET_READY_SPEED_KT,
+        detail: 'Use RESET for a clean playable state',
+      },
+    ];
+  }
+
   if (phase === 'positive-rate') {
     return [
       {
@@ -115,6 +190,18 @@ export function coachMessageForState(
 
   const rejectedTakeoff = aircraft.flightPhase === 'TAKEOFF' && controls.brake >= 0.8 && throttle <= 0.2 && controls.spoilers >= 0.95;
   if (rejectedTakeoff) return 'Rejected takeoff: hold brakes, keep centerline, and use RESET once stopped.';
+
+  if (aircraft.flightPhase === 'LANDED' && aircraft.ground.weightOnWheels) {
+    const speedKt = Math.max(0, aircraft.velocity.u) * MS_TO_KT;
+    if (speedKt > LANDED_RESET_READY_SPEED_KT) {
+      return 'Landing rollout: keep spoilers deployed, hold braking, track centerline, and use RESET once stopped.';
+    }
+    return 'Landed and stopped: keep brakes set and use RESET for a clean playable state.';
+  }
+
+  if ((aircraft.flightPhase === 'APPROACH' || aircraft.flightPhase === 'DESCENT') && !aircraft.ground.weightOnWheels) {
+    return 'Approach: gear down, landing flaps set, stabilize descent, and prepare for touchdown rollout.';
+  }
 
   if (aircraft.ground.weightOnWheels && scenario) {
     const checklist = buildTakeoffChecklist(scenario, aircraft, controls);

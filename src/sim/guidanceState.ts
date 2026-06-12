@@ -9,7 +9,16 @@ import {
   type TutorialState,
 } from './tutorialState';
 
-export type GuidancePhase = 'preflight' | 'takeoff-roll' | 'rotation' | 'rejected-takeoff' | 'positive-rate' | 'climb';
+export type GuidancePhase =
+  | 'preflight'
+  | 'takeoff-roll'
+  | 'rotation'
+  | 'rejected-takeoff'
+  | 'positive-rate'
+  | 'climb'
+  | 'approach'
+  | 'landing-rollout'
+  | 'landed';
 
 export interface GuidanceNotice {
   id: string;
@@ -38,6 +47,7 @@ export interface GuidanceStateInput {
 const MS_TO_KT = 1.94384449;
 const ROTATION_SPEED_KT = 135;
 const ROTATION_PITCH_RAD = 5 * Math.PI / 180;
+const ROLLOUT_SPEED_THRESHOLD_KT = 15;
 
 export function deriveGuidancePhase(
   status: SimStatus,
@@ -46,12 +56,19 @@ export function deriveGuidancePhase(
 ): GuidancePhase {
   if (status === 'stopped') return 'preflight';
 
+  const speedKt = Math.max(0, aircraft.velocity.u) * MS_TO_KT;
+  const onGear = aircraft.ground.contact === 'gear' || aircraft.ground.weightOnWheels;
+  if (aircraft.flightPhase === 'LANDED' && onGear) {
+    return speedKt > ROLLOUT_SPEED_THRESHOLD_KT ? 'landing-rollout' : 'landed';
+  }
+
+  if (aircraft.flightPhase === 'APPROACH' || aircraft.flightPhase === 'DESCENT') return 'approach';
+
   const airborne = !aircraft.ground.weightOnWheels || aircraft.ground.aglFt > 5;
   if (airborne) {
     return aircraft.config.gearDown || controls.gearLever === 'DOWN' ? 'positive-rate' : 'climb';
   }
 
-  const speedKt = Math.max(0, aircraft.velocity.u) * MS_TO_KT;
   const rejectedTakeoff = status === 'running'
     && aircraft.flightPhase === 'TAKEOFF'
     && controls.brake >= 0.8
@@ -78,6 +95,9 @@ function tutorialStepIndexForPhase(scenario: FlightScenario, phase: GuidancePhas
       case 'rotation':
       case 'positive-rate':
       case 'climb':
+      case 'approach':
+      case 'landing-rollout':
+      case 'landed':
         return 'rotate-positive-rate';
       default:
         return 'line-up';
