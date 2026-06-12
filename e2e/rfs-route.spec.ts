@@ -16,6 +16,9 @@ test.describe('RFS route and LNAV browser proof', () => {
     expect(result.final.lnavAvailable).toBe(true);
     expect(result.final.distanceToNextNm).toBeLessThan(result.initial.distanceToNextNm - 0.2);
     expect(result.final.activeLegIndex).toBeGreaterThanOrEqual(result.initial.activeLegIndex);
+    for (let i = 1; i < result.samples.length; i += 1) {
+      expect(result.samples[i].activeLegIndex).toBeGreaterThanOrEqual(result.samples[i - 1].activeLegIndex);
+    }
     expect(result.samples.length).toBeGreaterThan(3);
   });
 });
