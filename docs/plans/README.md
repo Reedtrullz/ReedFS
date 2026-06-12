@@ -7,11 +7,13 @@ Current source-of-truth documents:
 - `../architecture.md` — current implementation architecture.
 - `../physics-invariants.md` — active physics contracts and regression checklist.
 - `../roadmap.md` — prioritized necessary enhancements.
-- `../reviews/2026-05-26-comprehensive-gameplay-review.md` — latest comprehensive gameplay/realism/visual/cockpit audit.
+- `../reviews/2026-06-12-comprehensive-remaining-work-review.md` — latest comprehensive remaining-work audit and evidence ledger.
+- `2026-06-12-rfs-guidance-truth-full-flight-proof.md` — current next-slice plan for AP/FMA route truth, phase-aware guidance, and ENVA full-flight browser proof.
+- `../reviews/2026-05-26-comprehensive-gameplay-review.md` — completed May comprehensive gameplay/realism/visual/cockpit audit and historical status record.
 - `../reviews/templates/playability-dogfood-checklist.md` — browser dogfood checklist/report template for future playable claims.
-- `2026-05-26-rfs-comprehensive-usability-realism-plan.md` — current comprehensive implementation plan/status for usability, realism, aircraft visuals, cockpit, UI, and guidance; phases 0 through 5.5 are complete.
-- `2026-05-26-rfs-next-phases-release-hardening-and-realism.md` — next-phases execution plan for Phase 6 release hardening, deterministic visual proof, fixed timestep/worker prep, audio, and later gear/guidance/data/product phases.
-- `2026-05-27-rfs-advanced-gear-tire-ground-handling.md` — current P1 follow-up plan/status for tire side-load/cornering stiffness, asymmetric braking/anti-skid groundwork, dynamic oleo loads, crosswind/weathercocking runway guards, and gear-up runway-tangent belly/crash slide behavior.
+- `2026-05-26-rfs-comprehensive-usability-realism-plan.md` — completed/current status record for usability, realism, aircraft visuals, cockpit, UI, and guidance; phases 0 through 5.5 are complete.
+- `2026-05-26-rfs-next-phases-release-hardening-and-realism.md` — completed/current status record for Phase 6 release hardening, deterministic visual proof, fixed timestep/worker prep, audio, and later gear/guidance/data/product phases.
+- `2026-05-27-rfs-advanced-gear-tire-ground-handling.md` — completed/current status record for tire side-load/cornering stiffness, asymmetric braking/anti-skid groundwork, dynamic oleo loads, crosswind/weathercocking runway guards, and gear-up runway-tangent belly/crash slide behavior.
 - `2026-05-27-rfs-surface-aware-ground-handling.md` — completed/current status record for the original KSEA-only surface-aware ground-handling slice, off-runway friction scaling, and prepared-runway `onRunway` semantics.
 - `2026-05-27-rfs-rollout-taxi-crosswind-controls.md` — completed/current status record for rollout/taxi/crosswind landing regressions, optional side-specific brake channels, and `Space`/`Z`/`X` player brake controls.
 - `2026-05-27-rfs-multi-airport-surface-coverage.md` — completed/current status record for supported KSEA/KPDX prepared-runway rectangles, the generic runtime sampler, KPDX regressions, and KSEA wrapper compatibility.

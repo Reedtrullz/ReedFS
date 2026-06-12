@@ -1,14 +1,13 @@
 # RFS Enhancement Roadmap
 
-This roadmap lists the enhancements that remain after the foundation stabilization and first gameplay/usability productization pass. It is ordered by dependency and risk: finish gear/tire physics and guidance fidelity, then worker timing, visual regression/release hardening, data quality, and immersion.
+This roadmap lists the enhancements that remain after the foundation stabilization and first gameplay/usability productization pass. It is ordered by dependency and risk: deepen gear/tire physics and guidance proof, then worker timing, visual regression/release hardening, data quality, and immersion.
 
-Latest comprehensive gameplay/cockpit/realism audit, implementation plan, and release-hardening dogfood report:
+Latest comprehensive remaining-work audit and next implementation plan:
 
-- `docs/reviews/2026-05-26-comprehensive-gameplay-review.md`
-- `docs/plans/2026-05-26-rfs-comprehensive-usability-realism-plan.md`
-- `docs/reviews/2026-05-26-rfs-release-hardening-playability-review.md`
+- `docs/reviews/2026-06-12-comprehensive-remaining-work-review.md`
+- `docs/plans/2026-06-12-rfs-guidance-truth-full-flight-proof.md`
 
-As of the current repository state, the release-hardening/playability sequence through Task 10.4 is implemented and locally dogfooded. The remaining roadmap is now advanced realism, AP/route phase honesty, visual/layout polish, and deploy verification.
+As of the current repository state, the release-hardening/playability sequence through Task 10.4 and the June Tasks 2-11 guidance-truth slice are implemented. AP and FMA now share route-status-derived navigation truth, guidance/checklists/tutorials are phase-aware, and the ENVA tutorial has a deterministic Playwright takeoff-to-clean-climb proof. The remaining roadmap is now advanced realism, full-route/full-flight proof beyond clean climb, visual/layout polish, data quality, and deploy verification.
 
 ## Completed baseline
 
@@ -25,9 +24,10 @@ The completed baseline now includes:
 - Scenario-level takeoff/climb helpers and envelope tests exist.
 - Ground state, supported KSEA/KPDX prepared-runway/off-runway rectangle sampling, runway-normal contact, off-runway friction scaling, normal-force liftoff, and flight-phase decoupling are implemented.
 - Input dynamics, pilot/AP/effective-control separation, stabilizer trim, CG pitch moment, and data-backed aero/engine envelope work are implemented.
-- Aircraft visual contract, persistent renderer, visual animation state, Cesium runway layer, cockpit shell, overlay modes, PFD/FMA, cockpit interaction hooks, scenario/tutorial/checklist/coach flow, guidance state, active-leg route status, LNAV feedback, conservative VNAV/SPD/VS behavior, conservative N1 thrust mode, rejected-takeoff abort flow, scenario persistence, controls settings, deterministic gusts, rollout/taxi/crosswind landing regressions, player differential brake controls, versioned B737 data, trim fixtures, and performance-card assertions are implemented.
-- LNAV now sequences active route legs at capture radius, passed-waypoint geometry, or bounded turn-anticipation gates; AP LNAV consumes the route-status active leg with a capped cross-track intercept.
+- Aircraft visual contract, persistent renderer, visual animation state, Cesium runway layer, cockpit shell, overlay modes, PFD/FMA, cockpit interaction hooks, scenario/tutorial/checklist/coach flow, phase-aware guidance state, active-leg route status, LNAV feedback, conservative VNAV/SPD/VS behavior, conservative N1 thrust mode, rejected-takeoff abort flow, scenario persistence, controls settings, deterministic gusts, rollout/taxi/crosswind landing regressions, player differential brake controls, versioned B737 data, trim fixtures, and performance-card assertions are implemented.
+- LNAV now sequences active route legs at capture radius, passed-waypoint geometry, or bounded turn-anticipation gates; AP LNAV consumes the route-status active leg with a capped cross-track intercept, and AP/FMA route-mode availability comes from the same route-status-to-navigation conversion.
 - Autopilot thrust guidance now includes both SPEED airspeed hold and a conservative phase-based N1 target mode with armed-A/T gating, symmetric rate-limited AP throttle commands, MCP SPD/N1 controls, and FMA truth display.
+- Guidance checklists and tutorial steps auto-select from the current phase through positive-rate and clean-climb states, and the browser flight test proves ENVA can take off, raise gear, and reach clean climb deterministically.
 
 Completion records:
 
@@ -71,12 +71,13 @@ Acceptance tests:
 
 ## P2 — Advanced flight guidance and RFMS integration
 
-Why this follows the current guidance pass: active-leg state, route feedback, capped LNAV cross-track intercept, bounded turn-anticipation sequencing, honest VNAV/SPD/VS, SPEED airspeed hold, and conservative N1 thrust mode are now in place. Remaining RFMS-backed route editing and full RFMS/FMA lifecycle integration still need fuller avionics integration and selectable cockpit controls.
+Why this follows the current guidance pass: active-leg state, route feedback, capped LNAV cross-track intercept, bounded turn-anticipation sequencing, shared AP/FMA route truth, phase-aware guidance/checklists/tutorials, honest VNAV/SPD/VS, SPEED airspeed hold, conservative N1 thrust mode, and deterministic ENVA clean-climb proof are now in place. Remaining RFMS-backed route editing, route modification UI, and full-route/full-flight proof beyond clean climb still need fuller avionics integration and selectable cockpit controls.
 
 Remaining scope:
 
 - RFMS-backed route edits and route modification UI.
 - RFMS Flight Mode Annunciator lifecycle integration beyond current truth-mode display.
+- Scenario-route/full-flight proof beyond the current deterministic ENVA clean-climb browser test.
 
 Suggested implementation files:
 
@@ -192,7 +193,9 @@ Remaining scope:
 - Bundle splitting for Cesium-heavy chunks.
 - More complete cockpit/interior model, instrument layout, and audio immersion.
 
-## Immediate follow-ups from the 2026-05-26 dogfood
+## 2026-06-12 note on completed May dogfood follow-ups
+
+The immediate follow-ups from the 2026-05-26 dogfood are completed historical records. The June next slice now focuses on AP/FMA truth plus full-flight proof beyond the already-implemented ENVA clean-climb browser proof.
 
 Completed in the follow-up pass after Task 10.4:
 

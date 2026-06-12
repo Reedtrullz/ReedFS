@@ -25,7 +25,7 @@ src/App.tsx
     -> src/store/simStore.ts tick()
       -> structuredClone(aircraft)
       -> computeRouteStatus(state, flightPlan, activeLegIndex)
-      -> computeAutopilotCommandsForState(state, apState, flightPlan, dt, activeLegIndex)
+      -> computeAutopilotCommandsForState(state, apState, flightPlan, dt, routeStatus.activeLegIndex, routeStatus)
       -> compose pilot inputs + AP-owned axis/throttle commands into effectiveControls
       -> src/sim/physics/integrate.ts
         1. updateEngines(state, effectiveControls, spec, dt)
@@ -36,7 +36,7 @@ src/App.tsx
         6. integrate angular rates, quaternion, velocity, and position
         7. sample supported-airport runway/off-runway surface, then update ground/contact state and flight phase
       -> recompute routeStatus / activeLegIndex
-      -> rebuild GuidanceState from aircraft, scenario, status, and effective controls
+      -> rebuild phase-aware GuidanceState/checklist/tutorial state from aircraft, scenario, status, and effective controls
       -> commit next Zustand aircraft/control/guidance snapshot
 ```
 
@@ -46,7 +46,7 @@ The system order is intentional:
 - Aero receives wind as an input and computes air-relative values without mutating state.
 - Surface sampling and friction scaling are ground-contact-only concerns: they may change tire/brake/side forces, but they must not mutate wind inputs or air-relative velocity.
 - Pilot inputs, AP commands, and effective controls are separate store fields; AP can own elevator/aileron/throttle without mutating pilot-authored inputs.
-- Route status is store-owned and computed before and after integration so LNAV/VNAV use the active leg instead of hardcoded waypoint fallbacks.
+- Route status is store-owned and computed before and after integration. The pre-integration route status is passed into AP command resolution, and AP/FMA route-mode logic both use the shared route-status-to-`NavOutput` conversion instead of hardcoded waypoint fallbacks.
 
 ## State model
 
@@ -109,13 +109,13 @@ Known rendering follow-up:
 RFS bridges RFMS-compatible avionics state into native physics and player-facing feedback:
 
 - `RfsMCP.tsx` edits RFMS-compatible selected speed/heading/altitude/vertical-speed targets, creates an unbacked default AP state for target/FD switch clicks, backs CMD A only when a real AP mode is engaged, exposes clickable FD L/R, SPD, and N1 buttons because those backed controls now exist, keeps the Boeing `speedMode` and `n1` flags mutually exclusive, and keeps unsupported modes hidden.
-- `RfsPFD.tsx` renders readable speed/altitude tapes, attitude/heading, low-altitude radio-altitude awareness, selected MCP target strip/tape/footer bugs, honest FD command bars for supported direct HDG SEL/ALT HOLD modes, and an FMA row from the same truth modes the servo laws use; `N1` is shown from `apState.truth.thrustActive`, not from a cosmetic flag. PFD/debug telemetry selectors subscribe to primitive/derived values instead of the full `aircraft` object snapshot.
+- `RfsPFD.tsx` renders readable speed/altitude tapes, attitude/heading, low-altitude radio-altitude awareness, selected MCP target strip/tape/footer bugs, honest FD command bars for supported direct HDG SEL/ALT HOLD modes, and an FMA row from the same truth modes the servo laws use. Route-mode FMA truth uses the same route-status-to-`NavOutput` conversion as AP LNAV/VNAV; `N1` is shown from `apState.truth.thrustActive`, not from a cosmetic flag. PFD/debug telemetry selectors subscribe to primitive/derived values instead of the full `aircraft` object snapshot.
 - `App.tsx` can load the KSEA -> OLM -> BTG -> KPDX sample route. LOAD PLAN applies the safe LNAV + SPEED + ALT_HOLD defaults only in the stopped/PARKED preflight state; during a running takeoff it stores the route without auto-commanding AP modes.
 - `navigation.ts` validates route geometry, computes cross-track/along-track/desired-track/turn metrics, and sequences legs on capture radius, passed-waypoint geometry, or a bounded turn-anticipation gate.
 - `RouteStatus.tsx` exposes active leg, next waypoint, DTG, track, ETA, and LNAV unavailable reasons.
-- `autopilot.ts` maps active RFMS truth modes to AP-owned control commands. AP LNAV consumes the store-owned/route-status active leg, uses a capped cross-track intercept law, and does not fall back to invalid routes; VNAV uses the active route leg constraints. AP thrust modes include SPEED airspeed hold and a separate conservative phase-based N1 target mode; both write rate-limited AP-owned throttle commands, and N1 only commands symmetric throttles when `boeing.autothrottleArm` is true, using target N1 versus average current engine N1 instead of the SPEED airspeed-error law.
+- `autopilot.ts` maps active RFMS truth modes to AP-owned control commands. AP LNAV consumes the pre-integration store-owned route status passed by the simulation step, converts it through the shared `routeStatusToNavOutput()` helper, uses a capped cross-track intercept law, and does not fall back to invalid routes; VNAV uses the active route leg constraints. AP thrust modes include SPEED airspeed hold and a separate conservative phase-based N1 target mode; both write rate-limited AP-owned throttle commands, and N1 only commands symmetric throttles when `boeing.autothrottleArm` is true, using target N1 versus average current engine N1 instead of the SPEED airspeed-error law.
 - `vnav.ts` reports VNAV availability, unavailable reasons, altitude targets, target vertical speed, speed constraints, and the conservative VNAV_PTH -> ALT* -> ALT_HOLD path lifecycle for actionable altitude constraints.
-- `GuidanceState` combines scenario phase, tutorial, checklist, coach messages, and alerts for the player-facing flow; route status and AP truth remain adjacent store-owned state used by `RouteStatus`, `RfsPFD`, and the servo laws.
+- `GuidanceState` combines scenario phase, tutorial, checklist, coach messages, and alerts for the player-facing flow. It derives preflight/takeoff-roll/rotation/rejected-takeoff/positive-rate/climb phases and uses those phases to auto-select checklist and tutorial state while preserving explicit tutorial-step overrides. Route status and AP truth remain adjacent store-owned state used by `RouteStatus`, `RfsPFD`, and the servo laws.
 - `scenarioPersistence.ts` saves cloneable scenario snapshots to `localStorage`, and `ScenarioPanel` exposes SAVE/LOAD controls with visible ignored/corrupt-save feedback. Running saves restore as paused so training loops do not surprise-resume.
 - `controlBindings.ts`, `ControlsHelp`, and collapsed-by-default `ControlsSettings` provide a validated, visible keyboard/gamepad binding model for repeated play without covering primary instruments unless expanded; `Space` remains symmetric brakes while `Z`/`X` are momentary left/right brake controls that clear on release, blur, visibility change, and cleanup. Manual AP disconnect/override clears stale Boeing thrust flags for both `speedMode` and `n1`.
 
@@ -166,6 +166,10 @@ npm run typecheck
 npm run test
 npm run build
 ```
+
+Browser proof:
+
+- `e2e/rfs-flight.spec.ts` uses the deterministic helper in `e2e/helpers/rfsFlight.ts` to fly the ENVA tutorial from takeoff roll to clean climb, including phase-aware guidance assertions and gear-up proof. This is a clean-climb proof, not a full-route/full-flight completion claim.
 
 Deployment pipeline:
 
