@@ -99,6 +99,28 @@ describe('computeAutopilotCommandsForState effective truth gating', () => {
     expect(commands.aileron).toBeDefined();
     expect(commands.elevator).toBeUndefined();
   });
+
+  it('does not command VOR_LOC aileron even when the mode is backed', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.velocity.u = 128.6;
+    const ap = makeAp('VOR_LOC', 'OFF', 'OFF');
+    ap.boeing.vorLoc = true;
+
+    const commands = computeAutopilotCommandsForState(s, ap, null, 1 / 60, null, createNoRouteStatus());
+
+    expect(commands.aileron).toBeUndefined();
+  });
+
+  it('does not command LVL_CHG elevator even when the mode is backed', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.velocity.u = 128.6;
+    const ap = makeAp('OFF', 'LVL_CHG', 'OFF');
+    ap.boeing.lvlChg = true;
+
+    const commands = computeAutopilotCommandsForState(s, ap, null, 1 / 60, null, createNoRouteStatus());
+
+    expect(commands.elevator).toBeUndefined();
+  });
 });
 
 describe('computeAutopilotCommands HDG_SEL', () => {

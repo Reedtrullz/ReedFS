@@ -87,11 +87,15 @@ function apWithEffectiveTruth(ap: AutopilotState, truth: AutoflightTruthState): 
 }
 
 function hasVerticalGuidance(truth: AutoflightTruthState): boolean {
-  return truth.verticalActive !== 'OFF';
+  return truth.verticalActive === 'ALT_HOLD'
+    || truth.verticalActive === 'VS'
+    || truth.verticalActive === 'VNAV'
+    || truth.verticalActive === 'VNAV_PTH'
+    || truth.verticalActive === 'ALT*';
 }
 
 function hasLateralGuidance(truth: AutoflightTruthState): boolean {
-  return truth.lateralActive !== 'OFF';
+  return truth.lateralActive === 'HDG_SEL' || truth.lateralActive === 'LNAV';
 }
 
 export function computeN1TargetPercent(state: AircraftState): number {
