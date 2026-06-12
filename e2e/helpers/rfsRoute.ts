@@ -437,6 +437,7 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
       const autopilotModule = '/src/instruments/defaultAutopilotState.ts';
       const derivedModule = '/src/sim/physics/derived.ts';
       const fmaTruthModule = '/src/sim/systems/fmaTruth.ts';
+      const navigationModule = '/src/sim/systems/navigation.ts';
       const quaternionModule = '/src/sim/physics/quaternion.ts';
       const runwayDataModule = '/src/viewport/runwayData.ts';
       const runwaySurfaceModule = '/src/sim/runwaySurface.ts';
@@ -450,6 +451,9 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
           apState: BrowserAutopilotState | null,
           context: { aircraft: BrowserAircraftState; flightPlan: BrowserFlightPlan | null; routeStatus: BrowserRouteStatus },
         ) => { autopilotStatus: string; lateralActive: string; verticalActive: string; thrustActive: string };
+      };
+      const { computeRouteStatus } = (await import(navigationModule)) as {
+        computeRouteStatus: (aircraft: BrowserAircraftState, flightPlan: BrowserFlightPlan | null, activeLegIndex: number | null) => BrowserRouteStatus;
       };
       const { eulerToQuat } = (await import(quaternionModule)) as { eulerToQuat: (phi: number, theta: number, psi: number) => unknown };
       const { KPDX_RUNWAY_10L } = (await import(runwayDataModule)) as { KPDX_RUNWAY_10L: RunwayReference };
@@ -921,6 +925,7 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
             })),
           };
           aircraft.flightPhase = 'APPROACH';
+          const routeStatus = computeRouteStatus(aircraft, state.flightPlan, 2);
 
           return {
             aircraft,
@@ -929,7 +934,8 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
             effectiveControls: approachControls,
             apCommands: {},
             apState: null,
-            activeLegIndex: 2,
+            activeLegIndex: routeStatus.activeLegIndex,
+            routeStatus,
             status: 'running',
             lastFrameTime: timestamp,
             fixedStepAccumulatorSeconds: 0,
@@ -955,6 +961,7 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
           || landingApproach.thrustActive !== 'OFF'
           || landingApproach.fmaThrustActive !== 'OFF'
           || landingApproach.apCommandCount !== 0
+          || landingApproach.distanceToNextNm >= 1.0
           || landingApproach.surfaceAirport !== runway.airport
           || landingApproach.surfaceRunwayId !== runway.id
           || !landingApproach.gearDown

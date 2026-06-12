@@ -423,6 +423,8 @@ test.describe('RFS route and LNAV browser proof', () => {
     expect(result.landingApproach.guidancePhase, routeDebug).toBe('approach');
     expect(result.landingApproach.weightOnWheels, routeDebug).toBe(false);
     expect(result.landingApproach.flightPhase, routeDebug).not.toBe('LANDED');
+    expect(result.landingApproach.distanceToNextNm, routeDebug).toBeLessThan(1.0);
+    expect(result.landingApproach.distanceToNextNm, routeDebug).toBeLessThanOrEqual(result.manualHandoff.distanceToNextNm - 3.0);
 
     expect(result.touchdown.flightPhase, routeDebug).toBe('LANDED');
     expect(result.touchdown.groundContact, routeDebug).toBe('gear');
@@ -443,6 +445,7 @@ test.describe('RFS route and LNAV browser proof', () => {
     expect(result.touchdown.apCommandCount, routeDebug).toBe(0);
     expect(result.touchdown.routeName, routeDebug).toBe('KSEA→KPDX');
     expect(result.touchdown.activeLegIndex, routeDebug).toBe(2);
+    expect(result.touchdown.distanceToNextNm, routeDebug).toBeLessThan(1.0);
 
     expect(result.rollout.groundSpeedKt, routeDebug).toBeLessThan(result.touchdown.groundSpeedKt);
     expect(['landing-rollout', 'landed'], routeDebug).toContain(result.rollout.guidancePhase);
@@ -455,6 +458,7 @@ test.describe('RFS route and LNAV browser proof', () => {
     expect(result.rollout.thrustActive, routeDebug).toBe('OFF');
     expect(result.rollout.fmaThrustActive, routeDebug).toBe('OFF');
     expect(result.rollout.apCommandCount, routeDebug).toBe(0);
+    expect(result.rollout.distanceToNextNm, routeDebug).toBeLessThan(1.0);
 
     expect(result.reset.flightPlan, routeDebug).toBeNull();
     expect(result.reset.activeLegIndex, routeDebug).toBeNull();
@@ -577,6 +581,8 @@ test.describe('RFS route and LNAV browser proof', () => {
     expect(result.landingApproach.guidancePhase, routeDebug).toBe('approach');
     expect(result.landingApproach.weightOnWheels, routeDebug).toBe(false);
     expect(result.landingApproach.flightPhase, routeDebug).not.toBe('LANDED');
+    expect(result.landingApproach.distanceToNextNm, routeDebug).toBeLessThan(1.0);
+    expect(result.landingApproach.distanceToNextNm, routeDebug).toBeLessThanOrEqual(result.manualHandoff.distanceToNextNm - 3.0);
 
     expect(result.touchdown.flightPhase, routeDebug).toBe('LANDED');
     expect(result.touchdown.groundContact, routeDebug).toBe('gear');
@@ -588,10 +594,12 @@ test.describe('RFS route and LNAV browser proof', () => {
     expect(result.touchdown.touchdownSinkRateMps, routeDebug).toBeLessThan(15);
     expectLoadedBtgKpdx(result.touchdown);
     expectManualTruth(result.touchdown);
+    expect(result.touchdown.distanceToNextNm, routeDebug).toBeLessThan(1.0);
 
     expect(result.rollout.groundSpeedKt, routeDebug).toBeLessThan(result.touchdown.groundSpeedKt);
     expect(['landing-rollout', 'landed'], routeDebug).toContain(result.rollout.guidancePhase);
     expectManualTruth(result.rollout);
+    expect(result.rollout.distanceToNextNm, routeDebug).toBeLessThan(1.0);
 
     expect(result.reset.flightPlan, routeDebug).toBeNull();
     expect(result.reset.activeLegIndex, routeDebug).toBeNull();
