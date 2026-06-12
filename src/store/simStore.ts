@@ -600,10 +600,19 @@ export const useSimStore = create<SimStore>((set, get) => ({
   }),
   setFlightPlan: (fp) => set((s) => {
     const activeLegIndex = getInitialActiveLegIndex(fp);
+    const routeStatus = fp ? computeRouteStatus(s.aircraft, fp, activeLegIndex) : createNoRouteStatus();
+    const controlsSlice = composeControlsSlice(s.pilotInputs, s.apCommands, s.apState, {
+      aircraft: s.aircraft,
+      flightPlan: fp,
+      routeStatus,
+    });
+    const scenario = scenarioById(s.selectedScenarioId);
     return {
       flightPlan: fp,
       activeLegIndex,
-      routeStatus: fp ? computeRouteStatus(s.aircraft, fp, activeLegIndex) : createNoRouteStatus(),
+      routeStatus,
+      ...controlsSlice,
+      guidance: syncGuidanceState(s.guidance, scenario, s.status, s.aircraft, controlsSlice.effectiveControls),
     };
   }),
   setWind: (w) => set({ wind: w }),

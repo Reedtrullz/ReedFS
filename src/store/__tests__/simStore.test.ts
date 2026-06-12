@@ -477,6 +477,57 @@ describe('useSimStore', () => {
     expect(state.routeStatus.lnavUnavailableReason).toMatch(/route.*not compatible.*current aircraft position/i);
   });
 
+  it('setFlightPlan clears stale LNAV aileron commands when clearing the route', () => {
+    useSimStore.getState().setInput({ aileron: -0.12 });
+    const startPosition = useSimStore.getState().aircraft.position;
+    const fp: FlightPlan = {
+      origin: 'ORIG',
+      destination: 'DEST',
+      flightNumber: 'TST123',
+      route: 'ORIG DEST',
+      waypoints: [
+        { ident: 'ORIG', lat: startPosition.lat, lon: startPosition.lon, discontinuity: false },
+        { ident: 'DEST', lat: startPosition.lat + 0.1, lon: startPosition.lon, discontinuity: false },
+      ],
+    };
+    useSimStore.getState().setFlightPlan(fp);
+
+    const ap = minimalApState();
+    ap.truth.lateralActive = 'LNAV';
+    ap.truth.verticalActive = 'OFF';
+    ap.truth.thrustActive = 'OFF';
+    ap.boeing.lnav = true;
+    ap.boeing.hdgSel = false;
+    ap.boeing.altHold = false;
+    useSimStore.getState().setApState(ap);
+    useSimStore.setState((s) => {
+      const apCommands: AutopilotCommands = { aileron: 0.42 };
+      const effectiveControls = { ...s.pilotInputs, ...apCommands };
+      return { apCommands, effectiveControls, inputs: effectiveControls };
+    });
+
+    const withRoute = useSimStore.getState();
+    expect(withRoute.routeStatus.lnavAvailable).toBe(true);
+    expect(withRoute.apState?.truth.autopilotStatus).toBe('CMD_A');
+    expect(withRoute.apState?.truth.lateralActive).toBe('LNAV');
+    expect(withRoute.apState?.boeing.lnav).toBe(true);
+    expect(withRoute.apCommands.aileron).toBe(0.42);
+    expect(withRoute.effectiveControls.aileron).toBe(0.42);
+    expect(withRoute.pilotInputs.aileron).toBe(-0.12);
+
+    useSimStore.getState().setFlightPlan(null);
+
+    const withoutRoute = useSimStore.getState();
+    expect(withoutRoute.flightPlan).toBeNull();
+    expect(withoutRoute.activeLegIndex).toBeNull();
+    expect(withoutRoute.routeStatus.lnavAvailable).toBe(false);
+    expect(withoutRoute.routeStatus.lnavUnavailableReason).toMatch(/no flight plan/i);
+    expect(withoutRoute.apCommands.aileron).toBeUndefined();
+    expect(withoutRoute.effectiveControls.aileron).toBe(withoutRoute.pilotInputs.aileron);
+    expect(withoutRoute.effectiveControls).toEqual(withoutRoute.pilotInputs);
+    expect(withoutRoute.inputs).toBe(withoutRoute.effectiveControls);
+  });
+
   it('tick advances the active leg and refreshes route feedback as the aircraft progresses', () => {
     const fp = shortRoutePlan();
     useSimStore.getState().setFlightPlan(fp);
