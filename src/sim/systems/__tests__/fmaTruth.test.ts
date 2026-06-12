@@ -122,6 +122,25 @@ describe('deriveDisplayFmaTruth', () => {
     expect(fma.verticalActive).toBe('VNAV_PTH');
   });
 
+  it('uses route-status distance fallback when along-track distance is unavailable', () => {
+    const aircraft = aircraftAtRoute();
+    const flightPlan = constrainedRoute();
+    const routeStatus = computeRouteStatus(aircraft, flightPlan, 0);
+    const fallbackOnlyRouteStatus = {
+      ...routeStatus,
+      alongTrackM: null,
+      distanceToNextM: 18_520,
+    };
+
+    const fma = deriveDisplayFmaTruth(apState(), {
+      aircraft,
+      flightPlan,
+      routeStatus: fallbackOnlyRouteStatus,
+    });
+
+    expect(fma.verticalActive).toBe('VNAV_PTH');
+  });
+
   it('downgrades VNAV-family truth when the active waypoint has no actionable VNAV constraint', () => {
     const aircraft = aircraftAtRoute();
     const flightPlan = unconstrainedRoute();

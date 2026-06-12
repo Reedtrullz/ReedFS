@@ -7,7 +7,7 @@ import type {
 } from '@shared/autopilot/autopilotTypes';
 import type { FlightPlan } from '@shared/types/fmc';
 import type { AircraftState } from '../types';
-import type { NavOutput, RouteStatusSnapshot } from './navigation';
+import { routeStatusToNavOutput, type RouteStatusSnapshot } from './navigation';
 import { computeVNAV } from './vnav';
 
 const VNAV_FAMILY = new Set<VerticalMode>(['VNAV', 'VNAV_PTH', 'ALT*']);
@@ -73,20 +73,6 @@ function deriveLateralMode(ap: AutopilotState, routeStatus: RouteStatusSnapshot 
   return ap.truth.lateralActive;
 }
 
-function navOutputFromRouteStatus(routeStatus: RouteStatusSnapshot): NavOutput | null {
-  if (!routeStatus.lnavAvailable || routeStatus.desiredTrackRad === null) return null;
-  const activeWaypointIndex = routeStatus.toWaypointIndex ?? routeStatus.activeLegIndex;
-  if (activeWaypointIndex === null || !Number.isFinite(activeWaypointIndex)) return null;
-
-  return {
-    crossTrackError: routeStatus.crossTrackErrorM ?? 0,
-    alongTrackDist: routeStatus.distanceToNextM ?? routeStatus.alongTrackM ?? 0,
-    desiredTrack: routeStatus.desiredTrackRad,
-    activeWaypointIndex,
-    waypointReached: routeStatus.waypointReached,
-  };
-}
-
 function deriveVnavMode(
   ap: AutopilotState,
   context: FmaTruthContext,
@@ -96,7 +82,7 @@ function deriveVnavMode(
   const flightPlan = context.flightPlan;
   const routeStatus = context.routeStatus;
   if (!aircraft || !flightPlan || !routeStatus?.lnavAvailable) return 'OFF';
-  const nav = navOutputFromRouteStatus(routeStatus);
+  const nav = routeStatusToNavOutput(routeStatus);
   if (!nav) return 'OFF';
   const vnav = computeVNAV(aircraft, flightPlan, nav);
   return vnav.available && vnav.verticalMode ? vnav.verticalMode : 'OFF';
