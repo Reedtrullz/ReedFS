@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { RfsMCP } from '../RfsMCP';
 import { RfsPFD } from '../RfsPFD';
+import { createDefaultAutopilotState } from '../defaultAutopilotState';
 import { useSimStore } from '../../store/simStore';
 import { eulerToQuat } from '../../sim/physics/quaternion';
 
@@ -84,6 +86,20 @@ describe('RfsMCP', () => {
     expect(ap?.truth.autopilotStatus).toBe('CMD_A');
     expect(ap?.truth.thrustActive).toBe('SPEED');
     expect(ap?.boeing.speedMode).toBe(true);
+  });
+
+  it('does not highlight SPEED when raw SPEED truth is not backed by speedMode', () => {
+    const ap = createDefaultAutopilotState();
+    ap.truth.autopilotStatus = 'CMD_A';
+    ap.boeing.cmdA = true;
+    ap.truth.thrustActive = 'SPEED';
+    ap.boeing.autothrottleArm = true;
+    ap.boeing.speedMode = false;
+    useSimStore.getState().setApState(ap);
+
+    render(<RfsMCP />);
+
+    expect(screen.getByRole('button', { name: 'SPD' })).toHaveStyle({ background: '#333' });
   });
 
   it('first N1 click creates AP state and honestly engages N1', () => {

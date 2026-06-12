@@ -1,6 +1,7 @@
 import { useSimStore } from '../store/simStore';
 import type { AutopilotState, LateralMode, ThrustMode, VerticalMode } from '@shared/autopilot/autopilotTypes';
 import { createDefaultAutopilotState } from './defaultAutopilotState';
+import { deriveEffectiveAutoflightTruth } from '../sim/systems/effectiveAutoflightTruth';
 
 const btnStyle: React.CSSProperties = {
   background: '#333',
@@ -142,6 +143,8 @@ function applyMcpMode(apState: AutopilotState, mode: EnabledMcpMode): void {
 
 export function RfsMCP() {
   const apState = useSimStore((s) => s.apState);
+  const aircraft = useSimStore((s) => s.aircraft);
+  const flightPlan = useSimStore((s) => s.flightPlan);
   const routeStatus = useSimStore((s) => s.routeStatus);
 
   const toggleMode = (mode: EnabledMcpMode) => {
@@ -166,9 +169,10 @@ export function RfsMCP() {
     useSimStore.getState().setApState(next);
   };
 
-  const latActive = apState?.truth.lateralActive ?? 'OFF';
-  const vertActive = apState?.truth.verticalActive ?? 'OFF';
-  const thrActive = apState?.truth.thrustActive ?? 'OFF';
+  const effectiveTruth = deriveEffectiveAutoflightTruth(apState, { aircraft, flightPlan, routeStatus });
+  const latActive = effectiveTruth.lateralActive;
+  const vertActive = effectiveTruth.verticalActive;
+  const thrActive = effectiveTruth.thrustActive;
   const fdLeft = apState?.boeing.fdLeft ?? false;
   const fdRight = apState?.boeing.fdRight ?? false;
   const lnavAvailable = routeStatus.lnavAvailable;
