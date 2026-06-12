@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
 import type { FlightPlan } from '@shared/types/fmc';
 import { createInitialState, B737_800_SPEC } from '../../types';
-import { computeRouteStatus } from '../navigation';
+import { computeRouteStatus, createNoRouteStatus } from '../navigation';
 import {
   deriveEffectiveAutoflightTruth,
   effectiveAutopilotIsEngaged,
@@ -104,7 +104,7 @@ describe('effective autoflight truth', () => {
     expect(effective.verticalActive).toBe('OFF');
     expect(effective.lastModeChangeTimestamps).toEqual({ thrust: 1, lateral: 2, vertical: 3 });
     expect(effective.vsEntry).toBe(700);
-    expect(effectiveAutopilotIsEngaged(ap)).toBe(false);
+    expect(effectiveAutopilotIsEngaged(ap, { routeStatus: createNoRouteStatus() })).toBe(false);
   });
 
   it('keeps backed CMD_A while rejecting unbacked mode flags', () => {
@@ -119,7 +119,7 @@ describe('effective autoflight truth', () => {
     expect(effective.thrustActive).toBe('OFF');
     expect(effective.lateralActive).toBe('OFF');
     expect(effective.verticalActive).toBe('OFF');
-    expect(effectiveAutopilotIsEngaged(ap)).toBe(true);
+    expect(effectiveAutopilotIsEngaged(ap, { routeStatus: createNoRouteStatus() })).toBe(true);
   });
 
   it('derives backed LNAV, VNAV_PTH, SPEED, and CMD_A for a valid constrained route', () => {

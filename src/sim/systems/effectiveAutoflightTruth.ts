@@ -56,8 +56,11 @@ function autopilotStatusIsBacked(ap: AutopilotState): boolean {
   }
 }
 
-export function effectiveAutopilotIsEngaged(apState: AutopilotState | null | undefined): boolean {
-  return apState ? autopilotStatusIsBacked(apState) : false;
+export function effectiveAutopilotIsEngaged(
+  apState: AutopilotState | null | undefined,
+  context: EffectiveAutoflightTruthContext = {},
+): boolean {
+  return deriveEffectiveAutoflightTruth(apState, context).autopilotStatus !== 'OFF';
 }
 
 function deriveThrustMode(ap: AutopilotState): ThrustMode {
@@ -107,7 +110,7 @@ export function deriveEffectiveAutoflightTruth(
 ): AutoflightTruthState {
   if (!apState) return offAutoflightTruth(apState);
 
-  const backedAp = effectiveAutopilotIsEngaged(apState);
+  const backedAp = autopilotStatusIsBacked(apState);
   const thrustActive = deriveThrustMode(apState);
   if (!backedAp) {
     return offAutoflightTruth(apState);
