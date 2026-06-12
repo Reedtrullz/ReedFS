@@ -28,6 +28,9 @@ export interface RouteProofSnapshot {
   flapSetting: number;
   flightPhase: string;
   guidancePhase: string;
+  pilotInputs: RouteProofControlSnapshot;
+  effectiveControls: RouteProofControlSnapshot;
+  apCommandCount: number;
 }
 
 export interface RouteProofResult {
@@ -40,6 +43,26 @@ export interface RouteConfiguredApproachProofResult {
   initial: RouteProofSnapshot;
   configuredApproach: RouteProofSnapshot;
   samples: RouteProofSnapshot[];
+}
+
+export interface RouteManualHandoffProofResult {
+  configuredApproach: RouteProofSnapshot;
+  manualHandoff: RouteProofSnapshot;
+  samples: RouteProofSnapshot[];
+}
+
+export interface RouteProofControlSnapshot {
+  elevator: number;
+  aileron: number;
+  rudder: number;
+  throttle1: number;
+  throttle2: number;
+  flapLever: number;
+  gearLever: 'UP' | 'DOWN';
+  spoilers: number;
+  brake: number;
+  leftBrake?: number;
+  rightBrake?: number;
 }
 
 interface RouteProofControlSetup {
@@ -62,6 +85,10 @@ interface RouteConfiguredApproachSetup {
   controls: Partial<RouteProofControlSetup>;
 }
 
+interface RouteManualHandoffSetup {
+  elevator: number;
+}
+
 interface RouteProofSetup {
   initialPosition: { lat: number; lon: number };
   initialHeadingDeg: number;
@@ -82,6 +109,7 @@ interface RouteProofSetup {
   sampleIntervalFrames: number;
   gates?: RouteProofGateSetup[];
   configuredApproach?: RouteConfiguredApproachSetup;
+  manualHandoff?: RouteManualHandoffSetup;
 }
 
 interface RouteProofGateSetup {
@@ -185,11 +213,16 @@ const KSEA_FINAL_ROUTE_CONFIGURED_APPROACH_PROOF: RouteProofSetup = {
   },
 };
 
+const KSEA_FINAL_ROUTE_MANUAL_HANDOFF_PROOF: RouteManualHandoffSetup = {
+  elevator: -0.35,
+};
+
+async function flyKseaRouteProof(page: Page, setup: RouteProofSetup & { configuredApproach: RouteConfiguredApproachSetup; manualHandoff: RouteManualHandoffSetup }): Promise<RouteManualHandoffProofResult>;
 async function flyKseaRouteProof(page: Page, setup: RouteProofSetup & { configuredApproach: RouteConfiguredApproachSetup }): Promise<RouteConfiguredApproachProofResult>;
 async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<RouteProofResult>;
-async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<RouteProofResult | RouteConfiguredApproachProofResult> {
+async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<RouteProofResult | RouteConfiguredApproachProofResult | RouteManualHandoffProofResult> {
   return page.evaluate(
-    async ({ fixedStepSeconds, fixedStepMs, proofSetup }): Promise<RouteProofResult | RouteConfiguredApproachProofResult> => {
+    async ({ fixedStepSeconds, fixedStepMs, proofSetup }): Promise<RouteProofResult | RouteConfiguredApproachProofResult | RouteManualHandoffProofResult> => {
       interface BrowserAircraftState {
         position: { lat: number; lon: number; alt: number };
         velocity: { u: number; v: number; w: number };
@@ -223,6 +256,8 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
         leftBrake?: number;
         rightBrake?: number;
       }
+
+      type BrowserAutopilotCommands = Partial<Pick<BrowserControlInputs, 'elevator' | 'aileron' | 'throttle1' | 'throttle2'>>;
 
       interface BrowserAutopilotState {
         boeing: {
@@ -279,6 +314,9 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
       interface BrowserSimState {
         aircraft: BrowserAircraftState;
         inputs: BrowserControlInputs;
+        pilotInputs: BrowserControlInputs;
+        apCommands: BrowserAutopilotCommands;
+        effectiveControls: BrowserControlInputs;
         apState: BrowserAutopilotState | null;
         flightPlan: BrowserFlightPlan | null;
         activeLegIndex: number | null;
@@ -461,6 +499,20 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
           throw new Error(`Expected active KSEA route status, received ${JSON.stringify(route)}`);
         }
 
+        const controlSnapshot = (controls: BrowserControlInputs): RouteProofControlSnapshot => ({
+          elevator: controls.elevator,
+          aileron: controls.aileron,
+          rudder: controls.rudder,
+          throttle1: controls.throttle1,
+          throttle2: controls.throttle2,
+          flapLever: controls.flapLever,
+          gearLever: controls.gearLever,
+          spoilers: controls.spoilers,
+          brake: controls.brake,
+          leftBrake: controls.leftBrake,
+          rightBrake: controls.rightBrake,
+        });
+
         return {
           routeName: route.routeName,
           lnavAvailable: route.lnavAvailable,
@@ -489,6 +541,9 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
           flapSetting: state.aircraft.config.flapSetting,
           flightPhase: state.aircraft.flightPhase,
           guidancePhase: state.guidance.phase,
+          pilotInputs: controlSnapshot(state.pilotInputs),
+          effectiveControls: controlSnapshot(state.effectiveControls),
+          apCommandCount: Object.keys(state.apCommands).length,
         };
       };
       const samples: RouteProofSnapshot[] = [];
@@ -556,6 +611,41 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
         throw new Error(`KSEA final route configured approach proof did not reach target state: ${JSON.stringify({ initial, current: snapshot(), samples }, null, 2)}`);
       };
 
+      const runManualHandoff = (handoffSetup: RouteManualHandoffSetup): RouteProofSnapshot => {
+        useSimStore.getState().setInput({ elevator: handoffSetup.elevator });
+        tickOnce();
+
+        const current = snapshot();
+        samples.push(current);
+
+        if (
+          current.routeName === 'KSEA→KPDX'
+          && current.activeLegIndex === 2
+          && current.fromIdent === 'BTG'
+          && current.nextWaypointIdent === 'KPDX'
+          && current.lnavAvailable
+          && current.autopilotStatus === 'OFF'
+          && current.fmaAutopilotStatus === 'OFF'
+          && current.lateralActive === 'OFF'
+          && current.fmaLateralActive === 'OFF'
+          && current.verticalActive === 'OFF'
+          && current.fmaVerticalActive === 'OFF'
+          && current.thrustActive === 'OFF'
+          && current.fmaThrustActive === 'OFF'
+          && current.apCommandCount === 0
+          && current.pilotInputs.elevator === current.effectiveControls.elevator
+          && current.pilotInputs.aileron === current.effectiveControls.aileron
+          && current.pilotInputs.throttle1 === current.effectiveControls.throttle1
+          && current.pilotInputs.throttle2 === current.effectiveControls.throttle2
+          && !current.weightOnWheels
+          && current.flightPhase !== 'LANDED'
+        ) {
+          return current;
+        }
+
+        throw new Error(`KSEA final route manual handoff proof did not reach target state: ${JSON.stringify({ current, samples }, null, 2)}`);
+      };
+
       const runGate = (gate: NonNullable<RouteProofSetup['gates']>[number]): void => {
         if (gate.reposition) {
           configureAircraft(gate.reposition.position, gate.reposition.headingDeg);
@@ -590,6 +680,10 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
         }
       } else if (proofSetup.configuredApproach) {
         const configuredApproach = runConfiguredApproach(proofSetup.configuredApproach, samples[0]);
+        if (proofSetup.manualHandoff) {
+          const manualHandoff = runManualHandoff(proofSetup.manualHandoff);
+          return { configuredApproach, manualHandoff, samples };
+        }
         return { initial: samples[0], configuredApproach, samples };
       } else {
         runFrames(proofSetup.routeFrames ?? 0);
@@ -622,4 +716,14 @@ export async function flyKseaFinalRouteToConfiguredApproach(page: Page): Promise
     throw new Error('KSEA configured approach proof setup is missing configured approach settings.');
   }
   return flyKseaRouteProof(page, KSEA_FINAL_ROUTE_CONFIGURED_APPROACH_PROOF as RouteProofSetup & { configuredApproach: RouteConfiguredApproachSetup });
+}
+
+export async function flyKseaFinalRouteApproachToManualHandoff(page: Page): Promise<RouteManualHandoffProofResult> {
+  if (!KSEA_FINAL_ROUTE_CONFIGURED_APPROACH_PROOF.configuredApproach) {
+    throw new Error('KSEA configured approach proof setup is missing configured approach settings.');
+  }
+  return flyKseaRouteProof(page, {
+    ...KSEA_FINAL_ROUTE_CONFIGURED_APPROACH_PROOF,
+    manualHandoff: KSEA_FINAL_ROUTE_MANUAL_HANDOFF_PROOF,
+  } as RouteProofSetup & { configuredApproach: RouteConfiguredApproachSetup; manualHandoff: RouteManualHandoffSetup });
 }
