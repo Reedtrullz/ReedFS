@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { KSEA_TUTORIAL_SCENARIO, createAircraftStateForScenario } from '../scenarios';
 import { B737_800_SPEC, type ControlInputs } from '../types';
-import { buildGuidanceState } from '../guidanceState';
+import { buildGuidanceState, rebuildGuidanceState } from '../guidanceState';
 
 const configuredInputs: ControlInputs = {
   elevator: 0,
@@ -84,6 +84,16 @@ describe('guidanceState', () => {
       controls: { ...configuredInputs, throttle1: 1, throttle2: 1 },
     }).activeTutorialStep?.id).toBe('advance-thrust');
 
+    const rotatingAircraft = structuredClone(rollingAircraft);
+    rotatingAircraft.velocity.u = 75;
+
+    expect(buildGuidanceState({
+      scenario: KSEA_TUTORIAL_SCENARIO,
+      status: 'running',
+      aircraft: rotatingAircraft,
+      controls: { ...configuredInputs, throttle1: 1, throttle2: 1 },
+    }).activeTutorialStep?.id).toBe('rotate-positive-rate');
+
     const climbAircraft = structuredClone(rollingAircraft);
     climbAircraft.flightPhase = 'CLIMB';
     climbAircraft.ground.weightOnWheels = false;
@@ -97,6 +107,72 @@ describe('guidanceState', () => {
       aircraft: climbAircraft,
       controls: { ...configuredInputs, throttle1: 1, throttle2: 1, gearLever: 'UP' },
     }).activeTutorialStep?.id).toBe('rotate-positive-rate');
+  });
+
+  it('auto-advances an automatic tutorial step when rebuilding after a phase change', () => {
+    const rollingAircraft = scenarioAircraft();
+    rollingAircraft.flightPhase = 'TAKEOFF';
+    rollingAircraft.velocity.u = 30;
+    const takeoffControls = { ...configuredInputs, throttle1: 1, throttle2: 1 };
+    const current = buildGuidanceState({
+      scenario: KSEA_TUTORIAL_SCENARIO,
+      status: 'running',
+      aircraft: rollingAircraft,
+      controls: takeoffControls,
+    });
+    expect(current.phase).toBe('takeoff-roll');
+    expect(current.activeTutorialStep?.id).toBe('advance-thrust');
+
+    const climbAircraft = structuredClone(rollingAircraft);
+    climbAircraft.flightPhase = 'CLIMB';
+    climbAircraft.ground.weightOnWheels = false;
+    climbAircraft.ground.aglFt = 400;
+    climbAircraft.position.alt += 400;
+    climbAircraft.config.gearDown = false;
+
+    const rebuilt = rebuildGuidanceState(current, {
+      scenario: KSEA_TUTORIAL_SCENARIO,
+      status: 'running',
+      aircraft: climbAircraft,
+      controls: { ...takeoffControls, gearLever: 'UP' },
+    });
+
+    expect(rebuilt.phase).toBe('climb');
+    expect(rebuilt.activeTutorialStep?.id).toBe('rotate-positive-rate');
+  });
+
+  it('preserves a manually selected tutorial step when rebuilding without a requested index', () => {
+    const rollingAircraft = scenarioAircraft();
+    rollingAircraft.flightPhase = 'TAKEOFF';
+    rollingAircraft.velocity.u = 30;
+    const takeoffControls = { ...configuredInputs, throttle1: 1, throttle2: 1 };
+    const current = buildGuidanceState({
+      scenario: KSEA_TUTORIAL_SCENARIO,
+      status: 'running',
+      aircraft: rollingAircraft,
+      controls: takeoffControls,
+      tutorialStepIndex: 0,
+    });
+    expect(current.phase).toBe('takeoff-roll');
+    expect(current.activeTutorialStep?.id).toBe('line-up');
+
+    const climbAircraft = structuredClone(rollingAircraft);
+    climbAircraft.flightPhase = 'CLIMB';
+    climbAircraft.ground.weightOnWheels = false;
+    climbAircraft.ground.aglFt = 400;
+    climbAircraft.position.alt += 400;
+    climbAircraft.config.gearDown = false;
+
+    const rebuilt = rebuildGuidanceState(current, {
+      scenario: KSEA_TUTORIAL_SCENARIO,
+      status: 'running',
+      aircraft: climbAircraft,
+      controls: { ...takeoffControls, gearLever: 'UP' },
+    });
+
+    expect(rebuilt.phase).toBe('climb');
+    expect(rebuilt.tutorial.stepIndex).toBe(0);
+    expect(rebuilt.activeTutorialStep?.id).toBe('line-up');
   });
 
   it('derives the takeoff guidance phase from aircraft and control state', () => {

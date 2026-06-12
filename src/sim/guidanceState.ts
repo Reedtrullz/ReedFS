@@ -73,9 +73,9 @@ function tutorialStepIndexForPhase(scenario: FlightScenario, phase: GuidancePhas
       case 'preflight':
         return 'line-up';
       case 'takeoff-roll':
-      case 'rotation':
       case 'rejected-takeoff':
         return 'advance-thrust';
+      case 'rotation':
       case 'positive-rate':
       case 'climb':
         return 'rotate-positive-rate';
@@ -117,11 +117,22 @@ export function buildGuidanceState({
 export const createGuidanceState = buildGuidanceState;
 
 export function rebuildGuidanceState(
-  _current: GuidanceState,
+  current: GuidanceState,
   input: Omit<GuidanceStateInput, 'tutorialStepIndex'> & { tutorialStepIndex?: number },
 ): GuidanceState {
+  const baseTutorial = createTutorialState(input.scenario);
+  const previousAutomaticIndex = clampTutorialStepIndex(
+    baseTutorial,
+    tutorialStepIndexForPhase(input.scenario, current.phase),
+  );
+  const tutorialStepIndex = input.tutorialStepIndex !== undefined
+    ? input.tutorialStepIndex
+    : current.tutorial.stepIndex === previousAutomaticIndex
+      ? undefined
+      : current.tutorial.stepIndex;
+
   return buildGuidanceState({
     ...input,
-    tutorialStepIndex: input.tutorialStepIndex,
+    tutorialStepIndex,
   });
 }
