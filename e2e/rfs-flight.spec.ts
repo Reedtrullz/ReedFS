@@ -4,6 +4,7 @@ import {
   flyApproachToLandingRolloutAndReset,
   flyDescentApproachToLandingRolloutAndReset,
   flyEnvaTakeoffToCleanClimb,
+  flyKpdxShortFinalToLandingRolloutAndReset,
 } from './helpers/rfsFlight';
 
 test.describe('RFS playable flight loops', () => {
@@ -76,6 +77,38 @@ test.describe('RFS playable flight loops', () => {
     expect(proof.touchdown.groundContact).toBe('gear');
     expect(proof.touchdown.weightOnWheels).toBe(true);
     expect(proof.touchdown.onRunway).toBe(true);
+    expect(proof.touchdown.touchdownSinkRateMps).toBeGreaterThan(0);
+    expect(proof.touchdown.touchdownSinkRateMps).toBeLessThan(15);
+
+    expect(proof.rollout.groundSpeedKt).toBeLessThan(proof.touchdown.groundSpeedKt);
+    expect(['landing-rollout', 'landed']).toContain(proof.rollout.guidancePhase);
+
+    expect(proof.reset.status).toBe('stopped');
+    expect(proof.reset.guidancePhase).toBe('preflight');
+    expect(proof.reset.weightOnWheels).toBe(true);
+    expect(proof.reset.autopilotCleared).toBe(true);
+    expect(proof.reset.routeCleared).toBe(true);
+  });
+
+  test('KPDX short-final approach touches down on prepared runway, rolls out, and resets cleanly', async ({ page }) => {
+    await openRfs(page);
+
+    const proof = await flyKpdxShortFinalToLandingRolloutAndReset(page);
+
+    expect(proof.approach.guidancePhase).toBe('approach');
+    expect(proof.approach.gearDown).toBe(true);
+    expect(proof.approach.gearLever).toBe('DOWN');
+    expect(proof.approach.weightOnWheels).toBe(false);
+    expect(proof.approach.aglFt).toBeGreaterThan(50);
+    expect(proof.approach.autopilotCleared).toBe(true);
+    expect(proof.approach.routeCleared).toBe(true);
+
+    expect(proof.touchdown.flightPhase).toBe('LANDED');
+    expect(proof.touchdown.groundContact).toBe('gear');
+    expect(proof.touchdown.weightOnWheels).toBe(true);
+    expect(proof.touchdown.onRunway).toBe(true);
+    expect(proof.touchdown.surfaceAirport).toBe('KPDX');
+    expect(proof.touchdown.surfaceRunwayId).toBe('10L');
     expect(proof.touchdown.touchdownSinkRateMps).toBeGreaterThan(0);
     expect(proof.touchdown.touchdownSinkRateMps).toBeLessThan(15);
 

@@ -31,6 +31,8 @@ export interface LandingSnapshot {
   guidancePhase: string;
   autopilotCleared: boolean;
   routeCleared: boolean;
+  surfaceAirport?: string;
+  surfaceRunwayId?: string;
 }
 
 export interface LandingProofResult {
@@ -49,6 +51,7 @@ export interface DescentLandingProofResult {
 }
 
 type FlightHelperMode = 'configure' | 'fly';
+type ShortFinalAirport = 'ENVA' | 'KPDX';
 
 const FIXED_STEP_SECONDS = 1 / 60;
 const FIXED_STEP_MS = 1000 / 60;
@@ -251,8 +254,8 @@ export async function flyEnvaTakeoffToCleanClimb(page: Page): Promise<FlightSnap
   return snapshot;
 }
 
-export async function flyApproachToLandingRolloutAndReset(page: Page): Promise<LandingProofResult> {
-  return page.evaluate(async ({ fixedStepMs }): Promise<LandingProofResult> => {
+export async function flyApproachToLandingRolloutAndReset(page: Page, targetAirport: ShortFinalAirport = 'ENVA'): Promise<LandingProofResult> {
+  return page.evaluate(async ({ fixedStepMs, targetAirport }): Promise<LandingProofResult> => {
     interface BrowserAircraftState {
       position: { lat: number; lon: number; alt: number };
       velocity: { u: number; v: number; w: number };
@@ -332,15 +335,23 @@ export async function flyApproachToLandingRolloutAndReset(page: Page): Promise<L
     }
 
     interface RunwayReference {
+      airport: string;
+      id: string;
       start: { lat: number; lon: number; altFt: number };
       headingDeg: number;
       elevationFt: number;
+    }
+
+    interface SurfaceSample {
+      airport?: string;
+      runwayId?: string;
     }
 
     const simStoreModule = '/src/store/simStore.ts';
     const derivedModule = '/src/sim/physics/derived.ts';
     const quaternionModule = '/src/sim/physics/quaternion.ts';
     const runwayDataModule = '/src/viewport/runwayData.ts';
+    const runwaySurfaceModule = '/src/sim/runwaySurface.ts';
     const simStoreImport = (await import(simStoreModule)) as { useSimStore: BrowserSimStore };
     const derivedImport = (await import(derivedModule)) as {
       computeDerived: (aircraft: BrowserAircraftState, wind: unknown) => BrowserDerivedState;
@@ -348,11 +359,16 @@ export async function flyApproachToLandingRolloutAndReset(page: Page): Promise<L
     const quaternionImport = (await import(quaternionModule)) as {
       eulerToQuat: (phi: number, theta: number, psi: number) => BrowserAircraftState['quaternion'];
     };
-    const runwayDataImport = (await import(runwayDataModule)) as { ENVA_RUNWAY_09: RunwayReference };
+    const runwayDataImport = (await import(runwayDataModule)) as { ENVA_RUNWAY_09: RunwayReference; KPDX_RUNWAY_10L: RunwayReference };
+    const runwaySurfaceImport = (await import(runwaySurfaceModule)) as {
+      sampleSupportedAirportSurface: (position: BrowserAircraftState['position']) => SurfaceSample;
+    };
     const { useSimStore } = simStoreImport;
     const { computeDerived } = derivedImport;
     const { eulerToQuat } = quaternionImport;
-    const { ENVA_RUNWAY_09 } = runwayDataImport;
+    const { ENVA_RUNWAY_09, KPDX_RUNWAY_10L } = runwayDataImport;
+    const { sampleSupportedAirportSurface } = runwaySurfaceImport;
+    const runway = targetAirport === 'KPDX' ? KPDX_RUNWAY_10L : ENVA_RUNWAY_09;
 
     let timestamp = performance.now();
     const syncManualClock = (): void => {
@@ -377,6 +393,7 @@ export async function flyApproachToLandingRolloutAndReset(page: Page): Promise<L
     const snapshot = (): LandingSnapshot => {
       const state = useSimStore.getState();
       const derived = computeDerived(state.aircraft, state.wind);
+      const surface = sampleSupportedAirportSurface(state.aircraft.position);
       return {
         iasKt: derived.ias,
         groundSpeedKt: derived.gs,
@@ -395,14 +412,16 @@ export async function flyApproachToLandingRolloutAndReset(page: Page): Promise<L
         guidancePhase: state.guidance.phase,
         autopilotCleared: state.apState === null,
         routeCleared: state.flightPlan === null && state.activeLegIndex === null,
+        surfaceAirport: surface.airport,
+        surfaceRunwayId: surface.runwayId,
       };
     };
 
     useSimStore.getState().setScenario('enva-tutorial');
     useSimStore.getState().reset();
 
-    const approachPosition = offsetRunwayPosition(ENVA_RUNWAY_09, 220, 0);
-    const headingRad = ENVA_RUNWAY_09.headingDeg * Math.PI / 180;
+    const approachPosition = offsetRunwayPosition(runway, 220, 0);
+    const headingRad = runway.headingDeg * Math.PI / 180;
     const pitchRad = 2 * Math.PI / 180;
     const approachControls: BrowserControlInputs = {
       throttle1: 0.22,
@@ -420,7 +439,7 @@ export async function flyApproachToLandingRolloutAndReset(page: Page): Promise<L
 
     useSimStore.setState((state) => {
       const aircraft = structuredClone(state.aircraft);
-      aircraft.position = { ...approachPosition, alt: ENVA_RUNWAY_09.elevationFt + 120 };
+      aircraft.position = { ...approachPosition, alt: runway.elevationFt + 120 };
       aircraft.attitude = { phi: 0, theta: pitchRad, psi: headingRad };
       aircraft.quaternion = eulerToQuat(aircraft.attitude.phi, aircraft.attitude.theta, aircraft.attitude.psi);
       aircraft.velocity = { u: 72, v: 0, w: 2.8 };
@@ -441,7 +460,7 @@ export async function flyApproachToLandingRolloutAndReset(page: Page): Promise<L
       aircraft.ground = {
         ...aircraft.ground,
         aglFt: 120,
-        groundAltFt: ENVA_RUNWAY_09.elevationFt,
+        groundAltFt: runway.elevationFt,
         weightOnWheels: false,
         normalForceN: 0,
         lastTouchdownSinkRateMps: 0,
@@ -478,8 +497,16 @@ export async function flyApproachToLandingRolloutAndReset(page: Page): Promise<L
     syncManualClock();
     stepFrame();
     const approach = snapshot();
-    if (approach.guidancePhase !== 'approach' || approach.weightOnWheels || approach.aglFt <= 50) {
-      throw new Error(`Unable to seed airborne approach proof state: ${JSON.stringify(approach)}`);
+    if (
+      approach.guidancePhase !== 'approach'
+      || approach.weightOnWheels
+      || approach.aglFt <= 50
+      || !approach.autopilotCleared
+      || !approach.routeCleared
+      || approach.surfaceAirport !== runway.airport
+      || approach.surfaceRunwayId !== runway.id
+    ) {
+      throw new Error(`Unable to seed airborne ${runway.airport} approach proof state: ${JSON.stringify(approach)}`);
     }
 
     let touchdown: LandingSnapshot | null = null;
@@ -487,8 +514,14 @@ export async function flyApproachToLandingRolloutAndReset(page: Page): Promise<L
       stepFrame();
       const current = snapshot();
       if (current.flightPhase === 'LANDED' && current.groundContact === 'gear' && current.weightOnWheels) {
-        if (!current.onRunway || current.touchdownSinkRateMps >= 15) {
-          throw new Error(`Touchdown outside scoped proof bounds: ${JSON.stringify(current)}`);
+        if (
+          !current.onRunway
+          || current.touchdownSinkRateMps <= 0
+          || current.touchdownSinkRateMps >= 15
+          || current.surfaceAirport !== runway.airport
+          || current.surfaceRunwayId !== runway.id
+        ) {
+          throw new Error(`Touchdown outside scoped ${runway.airport} proof bounds: ${JSON.stringify(current)}`);
         }
         touchdown = current;
         break;
@@ -516,7 +549,11 @@ export async function flyApproachToLandingRolloutAndReset(page: Page): Promise<L
     const reset = snapshot();
 
     return { approach, touchdown, rollout, reset };
-  }, { fixedStepMs: FIXED_STEP_MS });
+  }, { fixedStepMs: FIXED_STEP_MS, targetAirport });
+}
+
+export async function flyKpdxShortFinalToLandingRolloutAndReset(page: Page): Promise<LandingProofResult> {
+  return flyApproachToLandingRolloutAndReset(page, 'KPDX');
 }
 
 export async function flyDescentApproachToLandingRolloutAndReset(page: Page): Promise<DescentLandingProofResult> {
@@ -600,15 +637,23 @@ export async function flyDescentApproachToLandingRolloutAndReset(page: Page): Pr
     }
 
     interface RunwayReference {
+      airport: string;
+      id: string;
       start: { lat: number; lon: number; altFt: number };
       headingDeg: number;
       elevationFt: number;
+    }
+
+    interface SurfaceSample {
+      airport?: string;
+      runwayId?: string;
     }
 
     const simStoreModule = '/src/store/simStore.ts';
     const derivedModule = '/src/sim/physics/derived.ts';
     const quaternionModule = '/src/sim/physics/quaternion.ts';
     const runwayDataModule = '/src/viewport/runwayData.ts';
+    const runwaySurfaceModule = '/src/sim/runwaySurface.ts';
     const simStoreImport = (await import(simStoreModule)) as { useSimStore: BrowserSimStore };
     const derivedImport = (await import(derivedModule)) as {
       computeDerived: (aircraft: BrowserAircraftState, wind: unknown) => BrowserDerivedState;
@@ -617,10 +662,14 @@ export async function flyDescentApproachToLandingRolloutAndReset(page: Page): Pr
       eulerToQuat: (phi: number, theta: number, psi: number) => BrowserAircraftState['quaternion'];
     };
     const runwayDataImport = (await import(runwayDataModule)) as { ENVA_RUNWAY_09: RunwayReference };
+    const runwaySurfaceImport = (await import(runwaySurfaceModule)) as {
+      sampleSupportedAirportSurface: (position: BrowserAircraftState['position']) => SurfaceSample;
+    };
     const { useSimStore } = simStoreImport;
     const { computeDerived } = derivedImport;
     const { eulerToQuat } = quaternionImport;
     const { ENVA_RUNWAY_09 } = runwayDataImport;
+    const { sampleSupportedAirportSurface } = runwaySurfaceImport;
 
     let timestamp = performance.now();
     const syncManualClock = (): void => {
@@ -645,6 +694,7 @@ export async function flyDescentApproachToLandingRolloutAndReset(page: Page): Pr
     const snapshot = (): LandingSnapshot => {
       const state = useSimStore.getState();
       const derived = computeDerived(state.aircraft, state.wind);
+      const surface = sampleSupportedAirportSurface(state.aircraft.position);
       return {
         iasKt: derived.ias,
         groundSpeedKt: derived.gs,
@@ -663,6 +713,8 @@ export async function flyDescentApproachToLandingRolloutAndReset(page: Page): Pr
         guidancePhase: state.guidance.phase,
         autopilotCleared: state.apState === null,
         routeCleared: state.flightPlan === null && state.activeLegIndex === null,
+        surfaceAirport: surface.airport,
+        surfaceRunwayId: surface.runwayId,
       };
     };
 
