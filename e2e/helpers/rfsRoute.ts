@@ -33,6 +33,16 @@ export interface RouteProofSnapshot {
   apCommandCount: number;
 }
 
+export interface RouteLandingBridgeSnapshot extends RouteProofSnapshot {
+  groundSpeedKt: number;
+  onRunway: boolean;
+  groundContact: string;
+  touchdownSinkRateMps: number;
+  surfaceAirport?: string;
+  surfaceRunwayId?: string;
+  sameStoreSession: boolean;
+}
+
 export interface RouteResetProofSnapshot {
   flightPlan: null;
   activeLegIndex: null;
@@ -77,6 +87,16 @@ export interface RouteManualHandoffProofResult {
 export interface RouteManualHandoffResetProofResult {
   configuredApproach: RouteProofSnapshot;
   manualHandoff: RouteProofSnapshot;
+  reset: RouteResetProofSnapshot;
+  samples: RouteProofSnapshot[];
+}
+
+export interface RouteLandingBridgeProofResult {
+  configuredApproach: RouteProofSnapshot;
+  manualHandoff: RouteProofSnapshot;
+  landingApproach: RouteLandingBridgeSnapshot;
+  touchdown: RouteLandingBridgeSnapshot;
+  rollout: RouteLandingBridgeSnapshot;
   reset: RouteResetProofSnapshot;
   samples: RouteProofSnapshot[];
 }
@@ -141,6 +161,7 @@ interface RouteProofSetup {
   configuredApproach?: RouteConfiguredApproachSetup;
   manualHandoff?: RouteManualHandoffSetup;
   resetAfterManualHandoff?: boolean;
+  landingBridgeAfterManualHandoff?: boolean;
 }
 
 interface RouteProofGateSetup {
@@ -248,26 +269,28 @@ const KSEA_FINAL_ROUTE_MANUAL_HANDOFF_PROOF: RouteManualHandoffSetup = {
   elevator: -0.35,
 };
 
+async function flyKseaRouteProof(page: Page, setup: RouteProofSetup & { configuredApproach: RouteConfiguredApproachSetup; manualHandoff: RouteManualHandoffSetup; landingBridgeAfterManualHandoff: true }): Promise<RouteLandingBridgeProofResult>;
 async function flyKseaRouteProof(page: Page, setup: RouteProofSetup & { configuredApproach: RouteConfiguredApproachSetup; manualHandoff: RouteManualHandoffSetup; resetAfterManualHandoff: true }): Promise<RouteManualHandoffResetProofResult>;
 async function flyKseaRouteProof(page: Page, setup: RouteProofSetup & { configuredApproach: RouteConfiguredApproachSetup; manualHandoff: RouteManualHandoffSetup }): Promise<RouteManualHandoffProofResult>;
 async function flyKseaRouteProof(page: Page, setup: RouteProofSetup & { configuredApproach: RouteConfiguredApproachSetup }): Promise<RouteConfiguredApproachProofResult>;
 async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<RouteProofResult>;
-async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<RouteProofResult | RouteConfiguredApproachProofResult | RouteManualHandoffProofResult | RouteManualHandoffResetProofResult> {
+async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<RouteProofResult | RouteConfiguredApproachProofResult | RouteManualHandoffProofResult | RouteManualHandoffResetProofResult | RouteLandingBridgeProofResult> {
   return page.evaluate(
-    async ({ fixedStepSeconds, fixedStepMs, proofSetup }): Promise<RouteProofResult | RouteConfiguredApproachProofResult | RouteManualHandoffProofResult | RouteManualHandoffResetProofResult> => {
+    async ({ fixedStepSeconds, fixedStepMs, proofSetup }): Promise<RouteProofResult | RouteConfiguredApproachProofResult | RouteManualHandoffProofResult | RouteManualHandoffResetProofResult | RouteLandingBridgeProofResult> => {
       interface BrowserAircraftState {
         position: { lat: number; lon: number; alt: number };
         velocity: { u: number; v: number; w: number };
         attitude: { phi: number; theta: number; psi: number };
         quaternion: unknown;
         angularVel: { p: number; q: number; r: number };
-        config: { gearDown: boolean; flapSetting: number; spoilersArmed: boolean; spoilersDeployed: boolean; speedBrake: number };
+        config: { gearDown: boolean; flapSetting: number; spoilersArmed: boolean; spoilersDeployed: boolean; speedBrake: number; stabilizerTrimUnits: number };
         engines: [{ n1: number; n2: number; egt: number; fuelFlow: number; thrust: number; running: boolean }, { n1: number; n2: number; egt: number; fuelFlow: number; thrust: number; running: boolean }];
         ground: {
           aglFt: number;
           groundAltFt: number;
           weightOnWheels: boolean;
           normalForceN: number;
+          lastTouchdownSinkRateMps: number;
           contact: string;
           onRunway: boolean;
           gearStations: Array<{ compressionM: number; normalForceN: number; weightOnWheel: boolean }>;
@@ -336,7 +359,21 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
 
       interface BrowserDerivedState {
         ias: number;
+        gs: number;
         vs: number;
+      }
+
+      interface RunwayReference {
+        airport: string;
+        id: string;
+        start: { lat: number; lon: number; altFt: number };
+        headingDeg: number;
+        elevationFt: number;
+      }
+
+      interface SurfaceSample {
+        airport?: string;
+        runwayId?: string;
       }
 
       interface BrowserGuidanceState {
@@ -378,6 +415,8 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
       const derivedModule = '/src/sim/physics/derived.ts';
       const fmaTruthModule = '/src/sim/systems/fmaTruth.ts';
       const quaternionModule = '/src/sim/physics/quaternion.ts';
+      const runwayDataModule = '/src/viewport/runwayData.ts';
+      const runwaySurfaceModule = '/src/sim/runwaySurface.ts';
 
       const { useSimStore } = (await import(simStoreModule)) as { useSimStore: BrowserSimStore };
       const { createKseaKpdxFlight } = (await import(flightPlanModule)) as { createKseaKpdxFlight: () => BrowserFlightPlan };
@@ -390,6 +429,10 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
         ) => { autopilotStatus: string; lateralActive: string; verticalActive: string; thrustActive: string };
       };
       const { eulerToQuat } = (await import(quaternionModule)) as { eulerToQuat: (phi: number, theta: number, psi: number) => unknown };
+      const { KPDX_RUNWAY_10L } = (await import(runwayDataModule)) as { KPDX_RUNWAY_10L: RunwayReference };
+      const { sampleSupportedAirportSurface } = (await import(runwaySurfaceModule)) as {
+        sampleSupportedAirportSurface: (position: BrowserAircraftState['position']) => SurfaceSample;
+      };
 
       const toRad = (deg: number): number => deg * Math.PI / 180;
       const flightPlan = createKseaKpdxFlight();
@@ -532,6 +575,19 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
         rightBrake: controls.rightBrake,
       });
 
+      const offsetRunwayPosition = (runway: RunwayReference, alongTrackM: number, lateralOffsetM: number): { lat: number; lon: number; alt: number } => {
+        const headingRad = runway.headingDeg * Math.PI / 180;
+        const northM = Math.cos(headingRad) * alongTrackM - Math.sin(headingRad) * lateralOffsetM;
+        const eastM = Math.sin(headingRad) * alongTrackM + Math.cos(headingRad) * lateralOffsetM;
+        const metersPerDegreeLat = 111_320;
+        const metersPerDegreeLon = 111_320 * Math.cos(runway.start.lat * Math.PI / 180);
+        return {
+          lat: runway.start.lat + northM / metersPerDegreeLat,
+          lon: runway.start.lon + eastM / metersPerDegreeLon,
+          alt: runway.elevationFt,
+        };
+      };
+
       const snapshot = (): RouteProofSnapshot => {
         const state = useSimStore.getState();
         const route = state.routeStatus;
@@ -577,6 +633,23 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
           pilotInputs: controlSnapshot(state.pilotInputs),
           effectiveControls: controlSnapshot(state.effectiveControls),
           apCommandCount: Object.keys(state.apCommands).length,
+        };
+      };
+
+      const landingBridgeSnapshot = (): RouteLandingBridgeSnapshot => {
+        const state = useSimStore.getState();
+        const derived = computeDerived(state.aircraft, state.wind);
+        const surface = sampleSupportedAirportSurface(state.aircraft.position);
+
+        return {
+          ...snapshot(),
+          groundSpeedKt: derived.gs,
+          onRunway: state.aircraft.ground.onRunway,
+          groundContact: state.aircraft.ground.contact,
+          touchdownSinkRateMps: state.aircraft.ground.lastTouchdownSinkRateMps,
+          surfaceAirport: surface.airport,
+          surfaceRunwayId: surface.runwayId,
+          sameStoreSession: true,
         };
       };
 
@@ -716,6 +789,190 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
         throw new Error(`KSEA final route manual handoff proof did not reach target state: ${JSON.stringify({ current, samples }, null, 2)}`);
       };
 
+      const runLandingBridge = (): Pick<RouteLandingBridgeProofResult, 'landingApproach' | 'touchdown' | 'rollout' | 'reset'> => {
+        const runway = KPDX_RUNWAY_10L;
+        const approachPosition = offsetRunwayPosition(runway, 220, 0);
+        const headingRad = runway.headingDeg * Math.PI / 180;
+        const pitchRad = 2 * Math.PI / 180;
+        const approachControls: BrowserControlInputs = {
+          throttle1: 0.22,
+          throttle2: 0.22,
+          flapLever: 30,
+          gearLever: 'DOWN',
+          elevator: 0,
+          aileron: 0,
+          rudder: 0,
+          brake: 0,
+          leftBrake: 0,
+          rightBrake: 0,
+          spoilers: 0,
+        };
+
+        useSimStore.setState((state) => {
+          const aircraft = structuredClone(state.aircraft);
+          aircraft.position = { ...approachPosition, alt: runway.elevationFt + 120 };
+          aircraft.attitude = { phi: 0, theta: pitchRad, psi: headingRad };
+          aircraft.quaternion = eulerToQuat(aircraft.attitude.phi, aircraft.attitude.theta, aircraft.attitude.psi);
+          aircraft.velocity = { u: 72, v: 0, w: 2.8 };
+          aircraft.angularVel = { p: 0, q: 0, r: 0 };
+          aircraft.config = {
+            ...aircraft.config,
+            gearDown: true,
+            flapSetting: 30,
+            spoilersArmed: false,
+            spoilersDeployed: false,
+            speedBrake: 0,
+            stabilizerTrimUnits: 5,
+          };
+          aircraft.engines = [
+            { ...aircraft.engines[0], n1: 38, n2: 42, egt: 580, fuelFlow: 0, thrust: 0, running: true },
+            { ...aircraft.engines[1], n1: 38, n2: 42, egt: 580, fuelFlow: 0, thrust: 0, running: true },
+          ];
+          aircraft.ground = {
+            ...aircraft.ground,
+            aglFt: 120,
+            groundAltFt: runway.elevationFt,
+            weightOnWheels: false,
+            normalForceN: 0,
+            lastTouchdownSinkRateMps: 0,
+            onRunway: false,
+            contact: 'none',
+            gearStations: aircraft.ground.gearStations.map((station) => ({
+              ...station,
+              compressionM: 0,
+              normalForceN: 0,
+              weightOnWheel: false,
+            })),
+          };
+          aircraft.flightPhase = 'APPROACH';
+
+          return {
+            aircraft,
+            inputs: approachControls,
+            pilotInputs: approachControls,
+            effectiveControls: approachControls,
+            apCommands: {},
+            apState: null,
+            activeLegIndex: 2,
+            status: 'running',
+            lastFrameTime: timestamp,
+            fixedStepAccumulatorSeconds: 0,
+          };
+        });
+
+        useSimStore.getState().setInput(approachControls);
+        tickOnce();
+        const landingApproach = landingBridgeSnapshot();
+        samples.push(landingApproach);
+        if (
+          landingApproach.routeName !== 'KSEA→KPDX'
+          || landingApproach.activeLegIndex !== 2
+          || landingApproach.fromIdent !== 'BTG'
+          || landingApproach.nextWaypointIdent !== 'KPDX'
+          || !landingApproach.lnavAvailable
+          || landingApproach.autopilotStatus !== 'OFF'
+          || landingApproach.fmaAutopilotStatus !== 'OFF'
+          || landingApproach.lateralActive !== 'OFF'
+          || landingApproach.fmaLateralActive !== 'OFF'
+          || landingApproach.verticalActive !== 'OFF'
+          || landingApproach.fmaVerticalActive !== 'OFF'
+          || landingApproach.thrustActive !== 'OFF'
+          || landingApproach.fmaThrustActive !== 'OFF'
+          || landingApproach.apCommandCount !== 0
+          || landingApproach.surfaceAirport !== runway.airport
+          || landingApproach.surfaceRunwayId !== runway.id
+          || !landingApproach.gearDown
+          || landingApproach.flapSetting < 25
+          || landingApproach.guidancePhase !== 'approach'
+          || landingApproach.weightOnWheels
+          || landingApproach.flightPhase === 'LANDED'
+        ) {
+          throw new Error(`Unable to seed same-session KPDX landing bridge approach state: ${JSON.stringify(landingApproach)}`);
+        }
+
+        let touchdown: RouteLandingBridgeSnapshot | null = null;
+        for (let frame = 0; frame < 60 * 45; frame += 1) {
+          tickOnce();
+          const current = landingBridgeSnapshot();
+          if (current.flightPhase === 'LANDED' && current.groundContact === 'gear' && current.weightOnWheels) {
+            if (
+              !current.onRunway
+              || current.touchdownSinkRateMps <= 0
+              || current.touchdownSinkRateMps >= 15
+              || current.surfaceAirport !== runway.airport
+              || current.surfaceRunwayId !== runway.id
+              || current.routeName !== 'KSEA→KPDX'
+              || current.activeLegIndex !== 2
+              || current.autopilotStatus !== 'OFF'
+              || current.fmaAutopilotStatus !== 'OFF'
+              || current.lateralActive !== 'OFF'
+              || current.fmaLateralActive !== 'OFF'
+              || current.verticalActive !== 'OFF'
+              || current.fmaVerticalActive !== 'OFF'
+              || current.thrustActive !== 'OFF'
+              || current.fmaThrustActive !== 'OFF'
+              || current.apCommandCount !== 0
+            ) {
+              throw new Error(`KPDX landing bridge touchdown outside scoped proof bounds: ${JSON.stringify(current)}`);
+            }
+            touchdown = current;
+            samples.push(current);
+            break;
+          }
+        }
+        if (!touchdown) throw new Error(`Unable to reach KPDX landing bridge touchdown: ${JSON.stringify(landingBridgeSnapshot())}`);
+
+        useSimStore.getState().setInput({ throttle1: 0, throttle2: 0, brake: 1, leftBrake: 1, rightBrake: 1, spoilers: 1, elevator: 0 });
+        let rollout = landingBridgeSnapshot();
+        for (let frame = 0; frame < 60 * 35; frame += 1) {
+          tickOnce();
+          rollout = landingBridgeSnapshot();
+          if (
+            rollout.groundSpeedKt < touchdown.groundSpeedKt - 8
+            && (rollout.guidancePhase === 'landing-rollout' || rollout.guidancePhase === 'landed')
+            && rollout.autopilotStatus === 'OFF'
+            && rollout.fmaAutopilotStatus === 'OFF'
+            && rollout.lateralActive === 'OFF'
+            && rollout.fmaLateralActive === 'OFF'
+            && rollout.verticalActive === 'OFF'
+            && rollout.fmaVerticalActive === 'OFF'
+            && rollout.thrustActive === 'OFF'
+            && rollout.fmaThrustActive === 'OFF'
+            && rollout.apCommandCount === 0
+          ) {
+            break;
+          }
+        }
+        if (rollout.groundSpeedKt >= touchdown.groundSpeedKt - 8) {
+          throw new Error(`Unable to slow KPDX landing bridge rollout under braking: ${JSON.stringify({ touchdown, rollout })}`);
+        }
+        samples.push(rollout);
+
+        useSimStore.getState().reset();
+        const reset = resetSnapshot();
+        if (
+          reset.routeName !== 'NO ROUTE'
+          || reset.lnavAvailable
+          || !reset.apStateCleared
+          || reset.autopilotStatus !== 'OFF'
+          || reset.fmaAutopilotStatus !== 'OFF'
+          || reset.lateralActive !== 'OFF'
+          || reset.fmaLateralActive !== 'OFF'
+          || reset.verticalActive !== 'OFF'
+          || reset.fmaVerticalActive !== 'OFF'
+          || reset.thrustActive !== 'OFF'
+          || reset.fmaThrustActive !== 'OFF'
+          || reset.apCommandCount !== 0
+          || reset.status !== 'stopped'
+          || reset.guidancePhase !== 'preflight'
+          || !reset.weightOnWheels
+        ) {
+          throw new Error(`KSEA to KPDX landing bridge reset proof did not reach target state: ${JSON.stringify({ reset, samples }, null, 2)}`);
+        }
+
+        return { landingApproach, touchdown, rollout, reset };
+      };
+
       const runGate = (gate: NonNullable<RouteProofSetup['gates']>[number]): void => {
         if (gate.reposition) {
           configureAircraft(gate.reposition.position, gate.reposition.headingDeg);
@@ -752,6 +1009,10 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
         const configuredApproach = runConfiguredApproach(proofSetup.configuredApproach, samples[0]);
         if (proofSetup.manualHandoff) {
           const manualHandoff = runManualHandoff(proofSetup.manualHandoff);
+          if (proofSetup.landingBridgeAfterManualHandoff) {
+            const { landingApproach, touchdown, rollout, reset } = runLandingBridge();
+            return { configuredApproach, manualHandoff, landingApproach, touchdown, rollout, reset, samples };
+          }
           if (proofSetup.resetAfterManualHandoff) {
             useSimStore.getState().reset();
             const reset = resetSnapshot();
@@ -831,4 +1092,15 @@ export async function flyKseaFinalRouteApproachManualHandoffAndReset(page: Page)
     manualHandoff: KSEA_FINAL_ROUTE_MANUAL_HANDOFF_PROOF,
     resetAfterManualHandoff: true,
   } as RouteProofSetup & { configuredApproach: RouteConfiguredApproachSetup; manualHandoff: RouteManualHandoffSetup; resetAfterManualHandoff: true });
+}
+
+export async function flyKseaFinalRouteHandoffToKpdxLandingAndReset(page: Page): Promise<RouteLandingBridgeProofResult> {
+  if (!KSEA_FINAL_ROUTE_CONFIGURED_APPROACH_PROOF.configuredApproach) {
+    throw new Error('KSEA configured approach proof setup is missing configured approach settings.');
+  }
+  return flyKseaRouteProof(page, {
+    ...KSEA_FINAL_ROUTE_CONFIGURED_APPROACH_PROOF,
+    manualHandoff: KSEA_FINAL_ROUTE_MANUAL_HANDOFF_PROOF,
+    landingBridgeAfterManualHandoff: true,
+  } as RouteProofSetup & { configuredApproach: RouteConfiguredApproachSetup; manualHandoff: RouteManualHandoffSetup; landingBridgeAfterManualHandoff: true });
 }
