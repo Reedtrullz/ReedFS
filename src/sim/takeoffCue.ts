@@ -21,11 +21,11 @@ export function takeoffCueText(state: AircraftState, iasKt: number, scenarioId?:
     return null;
   }
 
-  if (isPositiveRateEstablished(state) && state.config.gearDown) {
+  if (isPositiveRateEstablished(state)) {
     return 'POSITIVE RATE — gear up';
   }
 
-  if (iasKt >= rotateSpeedKtForScenario(scenarioId) && state.config.gearDown) {
+  if (iasKt >= rotateSpeedKtForScenario(scenarioId)) {
     return 'ROTATE — hold W';
   }
 

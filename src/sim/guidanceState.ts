@@ -65,18 +65,18 @@ export function deriveGuidancePhase(
 
   if (aircraft.flightPhase === 'APPROACH' || aircraft.flightPhase === 'DESCENT') return 'approach';
 
-  const airborne = !aircraft.ground.weightOnWheels || aircraft.ground.aglFt > 5;
-  if (airborne) {
-    if (!isPositiveRateEstablished(aircraft)) return 'rotation';
-    return aircraft.config.gearDown || controls.gearLever === 'DOWN' ? 'positive-rate' : 'climb';
-  }
-
   const rejectedTakeoff = status === 'running'
     && aircraft.flightPhase === 'TAKEOFF'
     && controls.brake >= 0.8
     && Math.max(controls.throttle1, controls.throttle2) <= 0.2
     && controls.spoilers >= 0.95;
   if (rejectedTakeoff) return 'rejected-takeoff';
+
+  const airborne = !aircraft.ground.weightOnWheels || aircraft.ground.aglFt > 5;
+  if (airborne) {
+    if (!isPositiveRateEstablished(aircraft)) return 'rotation';
+    return aircraft.config.gearDown || controls.gearLever === 'DOWN' ? 'positive-rate' : 'climb';
+  }
 
   if (speedKt >= ROTATION_SPEED_KT || aircraft.attitude.theta >= ROTATION_PITCH_RAD) return 'rotation';
 

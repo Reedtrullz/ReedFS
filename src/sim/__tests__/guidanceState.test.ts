@@ -248,6 +248,26 @@ describe('guidanceState', () => {
     expect(deriveGuidancePhase('running', descendingAirborneGearDown, takeoffControls)).toBe('rotation');
   });
 
+  it('keeps rejected takeoff prioritized when TAKEOFF briefly reports airborne', () => {
+    for (const aglFt of [8, 25, 80]) {
+      const aircraft = scenarioAircraft();
+      aircraft.flightPhase = 'TAKEOFF';
+      aircraft.velocity.u = 45;
+      aircraft.velocity.w = 2;
+      aircraft.ground.weightOnWheels = false;
+      aircraft.ground.aglFt = aglFt;
+      aircraft.position.alt += aglFt;
+
+      expect(deriveGuidancePhase('running', aircraft, {
+        ...configuredInputs,
+        throttle1: 0,
+        throttle2: 0,
+        brake: 1,
+        spoilers: 1,
+      })).toBe('rejected-takeoff');
+    }
+  });
+
   it('shows positive-rate cleanup instead of pre-takeoff gear-down checklist once airborne', () => {
     const aircraft = scenarioAircraft();
     aircraft.flightPhase = 'CLIMB';
