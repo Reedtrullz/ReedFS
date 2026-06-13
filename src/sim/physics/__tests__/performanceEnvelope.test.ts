@@ -3,8 +3,11 @@ import {
   b737TakeoffProfiles,
   type TakeoffEnvelope,
 } from '../../data/performance/b737TakeoffProfiles';
+import { findPerformanceCardForScenario } from '../../data/performance/b737PerformanceCards';
 import { B737_800_SPEC, createInitialState, type AircraftState } from '../../types';
 import { takeoffRollInputs } from '../../__tests__/scenarioHelpers';
+import { ENVA_TUTORIAL_SCENARIO, createAircraftStateForScenario } from '../../scenarios';
+import { isPositiveRateEstablished } from '../../flightPhasePredicates';
 import { KSEA_RUNWAY_16L } from '../../../viewport/runwayData';
 import { computeDerived } from '../derived';
 import { integrate } from '../integrate';
@@ -19,6 +22,7 @@ const LIFTOFF_TIMEOUT_SECONDS = 20;
 const INITIAL_CLIMB_SAMPLE_SECONDS = 8;
 const INITIAL_CLIMB_PITCH_TARGET_DEG = 10;
 const PITCH_DEADBAND_RAD = 0.25 * Math.PI / 180;
+const ENVA_MANUAL_TAKEOFF_TIMEOUT_SECONDS = 90;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
@@ -33,9 +37,19 @@ interface EnvelopeSample {
   weightOnWheels: boolean;
 }
 
+interface EnvaInitialClimbSample {
+  liftoffIasKt: number;
+  maxPitchDeg: number;
+  maxVerticalSpeedFpm: number;
+  minIasAfterLiftoffKt: number;
+  secondsSampledAfterLiftoff: number;
+}
+
 function midpoint([min, max]: [number, number]): number {
   return (min + max) / 2;
 }
+
+const ENVA_PERFORMANCE_CARD = findPerformanceCardForScenario(ENVA_TUTORIAL_SCENARIO.id);
 
 function createProfileState(profile: TakeoffEnvelope): AircraftState {
   const state = createInitialState(B737_800_SPEC);
@@ -165,6 +179,79 @@ function runEnvelopeScenario(profile: TakeoffEnvelope): EnvelopeSample {
   };
 }
 
+function runEnvaTakeoffForSeconds(options: {
+  seconds: number;
+  throttle: number;
+  rotateAtKt: number;
+}): EnvaInitialClimbSample {
+  const state = createAircraftStateForScenario(B737_800_SPEC, ENVA_TUTORIAL_SCENARIO);
+  const targetPitchRad = ENVA_PERFORMANCE_CARD.initialClimbPitchDeg * Math.PI / 180;
+  const sampleFrames = Math.ceil(options.seconds * HZ);
+  const maxFrames = Math.ceil((ENVA_MANUAL_TAKEOFF_TIMEOUT_SECONDS + options.seconds) * HZ);
+  let rotating = false;
+  let liftedOff = false;
+  let liftoffIasKt = 0;
+  let sampledFrames = 0;
+  let maxPitchDeg = Number.NEGATIVE_INFINITY;
+  let maxVerticalSpeedFpm = Number.NEGATIVE_INFINITY;
+  let minIasAfterLiftoffKt = Number.POSITIVE_INFINITY;
+
+  state.flightPhase = 'TAKEOFF';
+
+  for (let frame = 0; frame < maxFrames; frame += 1) {
+    const before = computeDerived(state);
+    if (!rotating && before.ias >= options.rotateAtKt) rotating = true;
+
+    const elevator = (() => {
+      if (!rotating) return 0;
+      if (state.ground.weightOnWheels) return -1;
+      return holdInitialClimbPitch(state, targetPitchRad);
+    })();
+    const gearLever = isPositiveRateEstablished(state) ? 'UP' : 'DOWN';
+
+    integrate(
+      state,
+      takeoffRollInputs({
+        elevator,
+        throttle1: options.throttle,
+        throttle2: options.throttle,
+        flapLever: ENVA_PERFORMANCE_CARD.flapSetting,
+        gearLever,
+      }),
+      B737_800_SPEC,
+      DT,
+    );
+
+    if (!state.ground.weightOnWheels) {
+      const after = computeDerived(state);
+      if (!liftedOff) {
+        liftedOff = true;
+        liftoffIasKt = after.ias;
+      }
+      sampledFrames += 1;
+      maxPitchDeg = Math.max(maxPitchDeg, radToDeg(state.attitude.theta));
+      maxVerticalSpeedFpm = Math.max(maxVerticalSpeedFpm, after.vs);
+      minIasAfterLiftoffKt = Math.min(minIasAfterLiftoffKt, after.ias);
+
+      if (sampledFrames >= sampleFrames) break;
+    }
+  }
+
+  if (!rotating) throw new Error(`ENVA tutorial did not reach rotate speed ${options.rotateAtKt} kt`);
+  if (!liftedOff) throw new Error('ENVA tutorial did not lift off after rotation');
+  if (sampledFrames < sampleFrames) {
+    throw new Error(`ENVA tutorial sampled only ${(sampledFrames / HZ).toFixed(2)}s after liftoff`);
+  }
+
+  return {
+    liftoffIasKt,
+    maxPitchDeg,
+    maxVerticalSpeedFpm,
+    minIasAfterLiftoffKt,
+    secondsSampledAfterLiftoff: sampledFrames / HZ,
+  };
+}
+
 function expectWithinRange(value: number, range: [number, number], label: string): void {
   expect(value, `${label} ${value} is below ${range[0]}`).toBeGreaterThanOrEqual(range[0]);
   expect(value, `${label} ${value} is above ${range[1]}`).toBeLessThanOrEqual(range[1]);
@@ -202,5 +289,19 @@ describe('B737 takeoff performance envelopes', () => {
     expectWithinRange(sample.initialClimbAoADeg, profile.initialClimbAoADeg, `${profile.name} initial climb AoA`);
     expect(sample.gearDown).toBe(true);
     expect(sample.weightOnWheels).toBe(false);
+  });
+
+  it('ENVA tutorial manual climb stays inside a bounded initial climb envelope', () => {
+    const sample = runEnvaTakeoffForSeconds({
+      seconds: 20,
+      throttle: 1,
+      rotateAtKt: ENVA_PERFORMANCE_CARD.vSpeeds.vrKt,
+    });
+
+    expect(sample.liftoffIasKt).toBeGreaterThanOrEqual(125);
+    expect(sample.maxPitchDeg).toBeLessThanOrEqual(18);
+    expect(sample.maxVerticalSpeedFpm).toBeLessThanOrEqual(4_200);
+    expect(sample.minIasAfterLiftoffKt).toBeGreaterThanOrEqual(125);
+    expect(sample.secondsSampledAfterLiftoff).toBeGreaterThanOrEqual(20);
   });
 });

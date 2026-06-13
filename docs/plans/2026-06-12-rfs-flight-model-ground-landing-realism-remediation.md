@@ -313,6 +313,8 @@ Expected: FAIL for the missing behavior, not a syntax/import error.
 const card = findPerformanceCardForScenario('enva-tutorial');
 ```
 
+P0 truth/playability Task 8 follow-up (2026-06-13): initial-climb sampling found the previous placeholder gear drag allowed the full-back gear-down rotation helper to reach 4932 fpm at 18.6° pitch. The P0 fix tuned the data-owned placeholder `gearCd` from 0.06 to 0.08 and added bounded ENVA initial-climb coverage; this remains gameplay-calibrated, not source-backed FDM proof. When executing this Task 6 later, replace or validate the drag/initial-climb cards with source-lineaged data rather than treating the P0 tuning as final realism evidence.
+
 **Step 4: Run test to verify pass**
 
 Run: `source ~/.nvm/nvm.sh && nvm use 22 >/dev/null && npx vitest run src/sim/physics/__tests__/performanceEnvelope.test.ts`

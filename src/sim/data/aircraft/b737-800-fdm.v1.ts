@@ -57,7 +57,9 @@ export const B737_800_FDM: VersionedAircraftFdmData = {
       { detent: 30, alphaZeroLiftRad: -0.190, clAlpha: 5.10, clMax: 2.45, cd0: 0.095, k: 0.095, deltaCm: -0.110, stallDragRise: 1.20 },
       { detent: 40, alphaZeroLiftRad: -0.200, clAlpha: 5.00, clMax: 2.55, cd0: 0.125, k: 0.115, deltaCm: -0.145, stallDragRise: 1.35 },
     ],
-    gearCd: 0.06,
+    // Gameplay-calibrated placeholder: keeps gear-down initial-climb samples
+    // below the documented P0 envelope until source-backed drag data replaces it.
+    gearCd: 0.08,
     speedBrakeCd: 0.04,
     cm0: 0.08,
     cmAlpha: -1.2,
