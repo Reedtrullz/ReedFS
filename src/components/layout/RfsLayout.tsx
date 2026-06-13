@@ -30,8 +30,9 @@ export function RfsLayout({
   fpsMonitor,
 }: RfsLayoutProps) {
   return (
-    <div className="rfs-layout" data-testid="rfs-layout">
+    <main className="rfs-layout" data-testid="rfs-layout" aria-labelledby="rfs-simulator-heading">
       <style>{layoutCss}</style>
+      <h1 id="rfs-simulator-heading" className="rfs-layout__heading">Reed Flight Simulator</h1>
       <div className="rfs-layout__scene" data-rfs-layer="scene">
         {viewport}
         {sceneLayers}
@@ -68,10 +69,14 @@ export function RfsLayout({
         </div>
       )}
 
-      {controls && <div className="rfs-layout__controls" data-rfs-panel="controls">{controls}</div>}
+      {controls && (
+        <div className="rfs-layout__controls" data-rfs-panel="controls" role="region" aria-label="Simulator controls">
+          {controls}
+        </div>
+      )}
       {buildWatermark && <div className="rfs-layout__watermark" data-rfs-panel="build-watermark">{buildWatermark}</div>}
       {fpsMonitor && <div className="rfs-layout__fps" data-rfs-panel="fps">{fpsMonitor}</div>}
-    </div>
+    </main>
   );
 }
 
@@ -82,6 +87,18 @@ const layoutCss = `
   overflow: hidden;
   background: #000;
   isolation: isolate;
+}
+
+.rfs-layout__heading {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .rfs-layout__scene {

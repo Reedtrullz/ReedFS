@@ -15,6 +15,8 @@ describe('ScenarioPanel', () => {
     render(<ScenarioPanel />);
 
     expect(screen.getByLabelText('Scenario')).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Scenario and tutorial' })).toBeTruthy();
+    expect(screen.getByLabelText('Coach status').getAttribute('aria-live')).toBe('polite');
     expect(screen.getByText(KSEA_TUTORIAL_SCENARIO.name)).toBeTruthy();
     expect(screen.getByText('Tutorial')).toBeTruthy();
     expect(screen.getByText('Line up and configure')).toBeTruthy();

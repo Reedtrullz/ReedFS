@@ -43,7 +43,7 @@ export function ScenarioPanel() {
   const pickerDisabled = status === 'running';
 
   return (
-    <div aria-label="Scenario and tutorial panel" style={panelStyle}>
+    <section aria-label="Scenario and tutorial" style={panelStyle}>
       <label htmlFor="scenario-picker" style={{ display: 'block', color: '#9ddcff', fontSize: 12, fontWeight: 800, letterSpacing: 1.2 }}>
         Scenario
       </label>
@@ -123,8 +123,8 @@ export function ScenarioPanel() {
 
       <div style={{ marginTop: 12, borderTop: '1px solid rgba(157,220,255,0.18)', paddingTop: 10 }}>
         <div style={{ color: '#9ddcff', fontSize: 12, fontWeight: 800, letterSpacing: 1.2 }}>Coach</div>
-        <div style={{ color: '#cfe5ef', fontSize: 12, lineHeight: 1.45, marginTop: 4 }}>{coach}</div>
+        <div aria-label="Coach status" aria-live="polite" style={{ color: '#cfe5ef', fontSize: 12, lineHeight: 1.45, marginTop: 4 }}>{coach}</div>
       </div>
-    </div>
+    </section>
   );
 }

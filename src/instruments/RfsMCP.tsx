@@ -275,7 +275,8 @@ export function RfsMCP() {
   const verticalSpeedTarget = selectedVerticalSpeedFpm(displayApState);
 
   return (
-    <div
+    <section
+      aria-label="Mode control panel"
       style={{
         position: 'fixed',
         top: 400,
@@ -416,6 +417,6 @@ export function RfsMCP() {
           OFF
         </button>
       </div>
-    </div>
+    </section>
   );
 }

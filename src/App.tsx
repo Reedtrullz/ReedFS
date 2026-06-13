@@ -321,12 +321,14 @@ export function App() {
             </button>
             <button
               onClick={() => setOverlayMode(nextOverlayMode)}
+              aria-pressed={shouldShowFlightInstruments(overlayMode)}
               style={btnStyle}
             >
               OVL: {overlayMode.toUpperCase()}
             </button>
             <button
               onClick={handleToggleAudio}
+              aria-pressed={audioEnabled}
               style={btnStyle}
             >
               {audioButtonLabel}

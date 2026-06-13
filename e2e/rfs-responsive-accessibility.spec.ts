@@ -135,4 +135,31 @@ test.describe('RFS responsive layout and attribution safety', () => {
       expectNoOverlap([...boxes, ...(await visibleCesiumCreditBoxes(page))]);
     }
   });
+
+  test('landmarks expose named simulator regions, button states, and live status', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: VIEWPORT_HEIGHT });
+    await openRfs(page);
+
+    await expect(page.getByRole('main', { name: /reed flight simulator/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /reed flight simulator/i, level: 1 })).toBeVisible();
+    await expect(page.getByRole('region', { name: /scenario and tutorial/i })).toBeVisible();
+    await expect(page.getByRole('region', { name: /takeoff setup/i })).toBeVisible();
+    await expect(page.getByRole('region', { name: /route status/i })).toHaveAttribute('aria-live', 'polite');
+    await expect(page.getByRole('region', { name: /primary flight display/i })).toBeVisible();
+    await expect(page.getByRole('region', { name: /mode control panel/i })).toBeVisible();
+    await expect(page.getByRole('region', { name: /simulator controls/i })).toBeVisible();
+
+    await expect(page.getByRole('button', { name: /^LNAV$/ })).toHaveAttribute('aria-disabled', 'true');
+    await expect(page.getByRole('button', { name: /^LNAV$/ })).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.getByRole('button', { name: /^FD L$/ })).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.getByRole('button', { name: /^AUDIO: OFF$/ })).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.getByRole('button', { name: /^OVL: FLIGHT$/ })).toHaveAttribute('aria-pressed', 'true');
+
+    await expect(page.getByLabel('Coach status')).toHaveAttribute('aria-live', 'polite');
+    await expect(page.getByLabel('Route status')).toHaveAttribute('aria-live', 'polite');
+
+    await page.getByLabel('Scenario', { exact: true }).selectOption('ksea-tutorial');
+    await clickButton(page, /^LOAD PLAN$/);
+    await expect(page.getByRole('status', { name: 'Route load result' })).toContainText(/route loaded/i);
+  });
 });

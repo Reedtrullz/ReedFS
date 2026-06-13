@@ -65,6 +65,9 @@ describe('RouteStatus', () => {
 
     render(<RouteStatus />);
 
+    const routeRegion = screen.getByRole('region', { name: 'Route status' });
+    expect(routeRegion).toBeTruthy();
+    expect(routeRegion.getAttribute('aria-live')).toBe('polite');
     expect(screen.getByLabelText('Route status')).toBeTruthy();
     expect(screen.getByText('MOCKA→MOCKB')).toBeTruthy();
     expect(screen.getByText(/LEG 8\/8/i)).toBeTruthy();

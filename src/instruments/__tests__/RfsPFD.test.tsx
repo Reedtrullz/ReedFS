@@ -175,6 +175,7 @@ describe('RfsPFD', () => {
     render(<RfsPFD />);
 
     expect(screen.getByLabelText('Primary flight display')).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Primary flight display' })).toBeTruthy();
     expect(screen.getByLabelText('Airspeed tape')).toBeTruthy();
     expect(screen.getByLabelText('Altitude tape')).toBeTruthy();
     expect(screen.getByText('IAS')).toBeTruthy();

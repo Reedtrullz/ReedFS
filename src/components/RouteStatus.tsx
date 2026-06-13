@@ -78,7 +78,7 @@ export function RouteStatus() {
   const unavailableReason = routeStatus.lnavUnavailableReason ?? 'unknown route status';
 
   return (
-    <div aria-label="Route status" style={panelStyle}>
+    <section aria-label="Route status" aria-live="polite" style={panelStyle}>
       <div style={labelStyle}>Route status</div>
       <div style={routeNameStyle}>{routeStatus.routeName}</div>
 
@@ -121,6 +121,6 @@ export function RouteStatus() {
           LNAV unavailable: {unavailableReason}
         </div>
       )}
-    </div>
+    </section>
   );
 }

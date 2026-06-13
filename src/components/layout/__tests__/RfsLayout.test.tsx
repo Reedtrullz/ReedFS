@@ -24,6 +24,9 @@ describe('RfsLayout', () => {
     );
 
     expect(screen.getByTestId('viewport')).toBeTruthy();
+    expect(screen.getByRole('main', { name: 'Reed Flight Simulator' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Reed Flight Simulator', level: 1 })).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Simulator controls' })).toBeTruthy();
     for (const panel of ['scenario', 'takeoff-setup', 'route', 'pfd', 'mcp', 'engine', 'controls']) {
       expect(document.querySelector(`[data-rfs-panel="${panel}"]`)).toBeTruthy();
     }

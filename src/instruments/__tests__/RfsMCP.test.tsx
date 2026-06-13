@@ -55,6 +55,7 @@ describe('RfsMCP', () => {
 
   it('first FD L click creates AP state without engaging any autopilot mode', () => {
     render(<RfsMCP />);
+    expect(screen.getByRole('region', { name: 'Mode control panel' })).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: 'FD L' }));
 

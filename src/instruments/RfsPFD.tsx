@@ -597,7 +597,7 @@ export function RfsPFD() {
   });
 
   return (
-    <div
+    <section
       aria-label="Primary flight display"
       style={{
         ...glass,
@@ -762,6 +762,6 @@ export function RfsPFD() {
           selectedBug={hasMcpTargets ? { ariaLabel: 'Altitude selected bug', label: 'ALT BUG', value: selectedAltitude } : undefined}
         />
       </div>
-    </div>
+    </section>
   );
 }
