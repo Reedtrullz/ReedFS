@@ -3,6 +3,7 @@ import type { ControlInputs } from '../../sim/types';
 import {
   COCKPIT_INTERACTIONS,
   cockpitInputForInteraction,
+  cockpitActionForInteraction,
   interactionForObjectName,
 } from '../cockpitInteractions';
 
@@ -46,8 +47,25 @@ describe('cockpitInteractions', () => {
     expect(cockpitInputForInteraction('throttle-levers', { ...baseInputs, throttle1: 0.98, throttle2: 0.99 })).toEqual({ throttle1: 1, throttle2: 1 });
   });
 
-  it('leaves drag-only placeholders to the future raycast drag handler', () => {
-    expect(cockpitInputForInteraction('yoke', baseInputs)).toBeNull();
-    expect(cockpitInputForInteraction('mcp-panel', baseInputs)).toBeNull();
+  it('classifies real, MCP, and unavailable cockpit hotspots without null/no-op actions', () => {
+    const yoke = interactionForObjectName('yoke');
+    const mcp = interactionForObjectName('mcpPanel');
+
+    expect(yoke).toMatchObject({
+      id: 'yoke',
+      availability: 'unavailable',
+      unavailableReason: expect.stringMatching(/keyboard|gamepad/i),
+    });
+    expect(mcp).toMatchObject({
+      id: 'mcp-panel',
+      availability: 'available',
+    });
+    expect(cockpitActionForInteraction('mcp-panel', baseInputs)).toEqual({
+      kind: 'mcp-toggle-fd-left',
+    });
+    expect(cockpitActionForInteraction('yoke', baseInputs)).toEqual({
+      kind: 'unavailable',
+      reason: yoke?.unavailableReason,
+    });
   });
 });

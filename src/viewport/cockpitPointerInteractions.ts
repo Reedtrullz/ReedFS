@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { CockpitInteractionId, CockpitInteractionMetadata } from './cockpitInteractions';
+import type { CockpitInteractionActivationResult, CockpitInteractionId, CockpitInteractionMetadata } from './cockpitInteractions';
 
 export interface CockpitPointerScene {
   scene: THREE.Scene;
@@ -8,7 +8,7 @@ export interface CockpitPointerScene {
 }
 
 export interface CockpitPointerInstallOptions extends CockpitPointerScene {
-  onActivate: (interactionId: CockpitInteractionId) => boolean;
+  onActivate: (interactionId: CockpitInteractionId) => CockpitInteractionActivationResult;
 }
 
 function normalizedPointer(canvas: HTMLCanvasElement, clientX: number, clientY: number): THREE.Vector2 {
@@ -56,8 +56,8 @@ export function installCockpitPointerInteractions(options: CockpitPointerInstall
   const onPointerDown = (event: PointerEvent) => {
     const interaction = cockpitInteractionAtCanvasPoint(options, event.clientX, event.clientY);
     if (!interaction) return;
-    const activated = options.onActivate(interaction.id);
-    if (!activated) return;
+    const activation = options.onActivate(interaction.id);
+    if (activation.status !== 'applied' && activation.status !== 'unavailable') return;
     event.preventDefault();
     event.stopPropagation();
   };
