@@ -519,7 +519,7 @@ describe('integrate', () => {
     expect(touchdownOnRunway).toBe(true);
     expect(touchdownSinkRateMps).toBeGreaterThan(0.5);
     expect(touchdownSideVelocityMps).toBeGreaterThan(ktToMs(4));
-    expect(state.flightPhase).toBe('LANDED');
+    expect(state.flightPhase).toBe('ROLLOUT');
     expect(state.ground.contact).toBe('gear');
     expect(state.ground.weightOnWheels).toBe(true);
     expect(state.ground.onRunway).toBe(true);
@@ -679,13 +679,13 @@ describe('integrate', () => {
   it('touches down into a damped rollout and decelerates on brakes', () => {
     const s = createInitialState(B737_800_SPEC);
     const approachPitchRad = 2 * Math.PI / 180;
-    const targetSinkRateMps = 1.6;
-    s.position = ksea16LPositionMeters(600, 0, KSEA_RUNWAY_ALT_FT + 1);
+    const targetSinkRateMps = 1.5;
     setAttitude(s, { phi: 0, theta: approachPitchRad, psi: ksea16LHeadingRad() });
     s.flightPhase = 'APPROACH';
+    s.position = ksea16LPositionMeters(400, 0, KSEA_RUNWAY_ALT_FT + 1.2);
     s.ground = {
       ...s.ground,
-      aglFt: 1,
+      aglFt: 1.2,
       weightOnWheels: false,
       normalForceN: 0,
       lastTouchdownSinkRateMps: 0,
@@ -724,11 +724,179 @@ describe('integrate', () => {
     expect(touchdownSinkRateMps).toBeGreaterThan(0.5);
     expect(touchdownSinkRateMps).toBeLessThan(4);
     expect(s.ground.weightOnWheels).toBe(true);
-    expect(s.flightPhase).toBe('LANDED');
+    expect(['ROLLOUT', 'TAXI', 'STOPPED']).toContain(s.flightPhase);
+    expect(s.flightPhase).not.toBe('LANDED');
     expect(s.position.alt).toBeGreaterThan(KSEA_RUNWAY_ALT_FT + 7);
     expect(s.position.alt).toBeLessThan(KSEA_RUNWAY_ALT_FT + 13);
     expect(s.velocity.u).toBeLessThan(touchdownSpeedMps - 10);
     expect(Math.abs(derived.vs)).toBeLessThan(300);
+  });
+
+  it('records explicit touchdown, derotation, rollout, and stopped phases during a landing stop', () => {
+    const state = createInitialState(B737_800_SPEC);
+    const approachPitchRad = 4 * Math.PI / 180;
+    const targetSinkRateMps = 1.4;
+    setAttitude(state, { phi: 0, theta: approachPitchRad, psi: ksea16LHeadingRad() });
+    state.flightPhase = 'APPROACH';
+    state.position = ksea16LPositionMeters(450, 0, KSEA_RUNWAY_ALT_FT + 2.0);
+    state.ground = {
+      ...state.ground,
+      aglFt: 2.0,
+      weightOnWheels: false,
+      normalForceN: 0,
+      lastTouchdownSinkRateMps: 0,
+      onRunway: false,
+      contact: 'none',
+      gearStations: createB737GearStations(0, false),
+    };
+    state.config.gearDown = true;
+    state.config.flapSetting = 30;
+    state.velocity.u = ktToMs(112);
+    state.velocity.v = 0;
+    state.velocity.w = (targetSinkRateMps + Math.sin(approachPitchRad) * state.velocity.u) / Math.cos(approachPitchRad);
+
+    const brakingRollout: ControlInputs = {
+      ...idle,
+      flapLever: 30,
+      gearLever: 'DOWN',
+      spoilers: 1,
+      brake: 1,
+    };
+    const observedPhases: string[] = [];
+    for (let i = 0; i < 35 * 120; i += 1) {
+      integrate(state, brakingRollout, B737_800_SPEC, 1 / 120);
+      if (observedPhases.at(-1) !== state.flightPhase) observedPhases.push(state.flightPhase);
+      if ((state.flightPhase as string) === 'STOPPED') break;
+    }
+
+    expect(observedPhases).toEqual(expect.arrayContaining(['TOUCHDOWN', 'DEROTATION', 'ROLLOUT', 'STOPPED']));
+    expect(observedPhases).not.toContain('LANDED');
+    expect(observedPhases.indexOf('TOUCHDOWN')).toBeLessThan(observedPhases.indexOf('DEROTATION'));
+    expect(observedPhases.indexOf('DEROTATION')).toBeLessThan(observedPhases.indexOf('ROLLOUT'));
+    expect(observedPhases.indexOf('ROLLOUT')).toBeLessThan(observedPhases.indexOf('STOPPED'));
+    expect(state.ground.weightOnWheels).toBe(true);
+    expect(Math.max(0, state.velocity.u) * 1.94384449).toBeLessThan(2.5);
+  });
+
+  it('keeps touchdown and derotation observable across multiple fixed steps', () => {
+    const state = createInitialState(B737_800_SPEC);
+    const approachPitchRad = 4 * Math.PI / 180;
+    const targetSinkRateMps = 1.4;
+    setAttitude(state, { phi: 0, theta: approachPitchRad, psi: ksea16LHeadingRad() });
+    state.flightPhase = 'APPROACH';
+    state.position = ksea16LPositionMeters(450, 0, KSEA_RUNWAY_ALT_FT + 2.0);
+    state.ground = {
+      ...state.ground,
+      aglFt: 2.0,
+      weightOnWheels: false,
+      normalForceN: 0,
+      lastTouchdownSinkRateMps: 0,
+      onRunway: false,
+      contact: 'none',
+      gearStations: createB737GearStations(0, false),
+    };
+    state.config.gearDown = true;
+    state.config.flapSetting = 30;
+    state.velocity.u = ktToMs(112);
+    state.velocity.v = 0;
+    state.velocity.w = (targetSinkRateMps + Math.sin(approachPitchRad) * state.velocity.u) / Math.cos(approachPitchRad);
+
+    const brakingRollout: ControlInputs = {
+      ...idle,
+      flapLever: 30,
+      gearLever: 'DOWN',
+      spoilers: 1,
+      brake: 1,
+    };
+
+    integrate(state, brakingRollout, B737_800_SPEC, 1 / 120);
+    expect(state.flightPhase).toBe('TOUCHDOWN');
+    for (let i = 0; i < 5; i += 1) integrate(state, brakingRollout, B737_800_SPEC, 1 / 120);
+    expect(state.flightPhase).toBe('TOUCHDOWN');
+
+    for (let i = 0; i < 80 && (state.flightPhase as string) !== 'DEROTATION'; i += 1) {
+      integrate(state, brakingRollout, B737_800_SPEC, 1 / 120);
+    }
+    expect(state.flightPhase).toBe('DEROTATION');
+    for (let i = 0; i < 5; i += 1) integrate(state, brakingRollout, B737_800_SPEC, 1 / 120);
+    expect(state.flightPhase).toBe('DEROTATION');
+  });
+
+  it('re-arms landing touchdown sequencing after a rollout bounce loses gear contact', () => {
+    const state = createInitialState(B737_800_SPEC);
+    setAttitude(state, { phi: 0, theta: 3 * Math.PI / 180, psi: ksea16LHeadingRad() });
+    state.flightPhase = 'ROLLOUT';
+    state.position = ksea16LPositionMeters(450, 0, KSEA_RUNWAY_ALT_FT + 40);
+    state.ground = {
+      ...state.ground,
+      aglFt: 40,
+      weightOnWheels: false,
+      normalForceN: 0,
+      onRunway: false,
+      contact: 'none',
+      gearStations: createB737GearStations(0, false),
+    };
+    state.config.gearDown = true;
+    state.velocity.u = ktToMs(90);
+    state.velocity.v = 0;
+    state.velocity.w = 0;
+
+    const landingControls = { ...idle, flapLever: 30, gearLever: 'DOWN' as const, spoilers: 0, brake: 0 };
+    integrate(state, landingControls, B737_800_SPEC, 1 / 120);
+    expect(state.flightPhase).toBe('APPROACH');
+
+    state.position = ksea16LPositionMeters(460, 0, KSEA_RUNWAY_ALT_FT + 1.5);
+    state.ground = {
+      ...state.ground,
+      aglFt: 1.5,
+      weightOnWheels: false,
+      normalForceN: 0,
+      contact: 'none',
+      gearStations: createB737GearStations(0, false),
+    };
+    state.velocity.w = (1.5 + Math.sin(state.attitude.theta) * state.velocity.u) / Math.cos(state.attitude.theta);
+
+    integrate(state, landingControls, B737_800_SPEC, 1 / 120);
+    expect(state.flightPhase).toBe('TOUCHDOWN');
+  });
+
+  it('re-arms landing touchdown sequencing after a post-landing taxi bounce loses gear contact', () => {
+    const state = createInitialState(B737_800_SPEC);
+    setAttitude(state, { phi: 0, theta: 2 * Math.PI / 180, psi: ksea16LHeadingRad() });
+    state.flightPhase = 'TAXI';
+    state.position = ksea16LPositionMeters(520, 0, KSEA_RUNWAY_ALT_FT + 25);
+    state.ground = {
+      ...state.ground,
+      aglFt: 25,
+      weightOnWheels: false,
+      normalForceN: 0,
+      lastTouchdownSinkRateMps: 1.2,
+      onRunway: false,
+      contact: 'none',
+      gearStations: createB737GearStations(0, false),
+    };
+    state.config.gearDown = true;
+    state.velocity.u = ktToMs(10);
+    state.velocity.v = 0;
+    state.velocity.w = 0;
+
+    const landingControls = { ...idle, flapLever: 30, gearLever: 'DOWN' as const, spoilers: 0, brake: 0 };
+    integrate(state, landingControls, B737_800_SPEC, 1 / 120);
+    expect(state.flightPhase).toBe('APPROACH');
+
+    state.position = ksea16LPositionMeters(530, 0, KSEA_RUNWAY_ALT_FT + 1.5);
+    state.ground = {
+      ...state.ground,
+      aglFt: 1.5,
+      weightOnWheels: false,
+      normalForceN: 0,
+      contact: 'none',
+      gearStations: createB737GearStations(0, false),
+    };
+    state.velocity.w = (1.2 + Math.sin(state.attitude.theta) * state.velocity.u) / Math.cos(state.attitude.theta);
+
+    integrate(state, landingControls, B737_800_SPEC, 1 / 120);
+    expect(state.flightPhase).toBe('TOUCHDOWN');
   });
 
   it('ignores gear-up command while weight-on-wheels but allows it after liftoff', () => {

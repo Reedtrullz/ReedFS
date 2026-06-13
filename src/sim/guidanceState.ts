@@ -19,7 +19,11 @@ export type GuidancePhase =
   | 'positive-rate'
   | 'climb'
   | 'approach'
+  | 'touchdown'
+  | 'derotation'
   | 'landing-rollout'
+  | 'taxi'
+  | 'stopped'
   | 'landed';
 
 export interface GuidanceNotice {
@@ -65,8 +69,15 @@ export function deriveGuidancePhase(
   const speedKt = Math.max(0, aircraft.velocity.u) * MS_TO_KT;
   const rotationSpeedKt = rotateSpeedKtForScenario(scenarioId);
   const onGear = aircraft.ground.contact === 'gear' || aircraft.ground.weightOnWheels;
-  if (aircraft.flightPhase === 'LANDED' && onGear) {
-    return speedKt > ROLLOUT_SPEED_THRESHOLD_KT ? 'landing-rollout' : 'landed';
+  if (onGear) {
+    if (aircraft.flightPhase === 'TOUCHDOWN') return 'touchdown';
+    if (aircraft.flightPhase === 'DEROTATION') return 'derotation';
+    if (aircraft.flightPhase === 'ROLLOUT') return 'landing-rollout';
+    if (aircraft.flightPhase === 'TAXI') return 'taxi';
+    if (aircraft.flightPhase === 'STOPPED') return 'stopped';
+    if (aircraft.flightPhase === 'LANDED') {
+      return speedKt > ROLLOUT_SPEED_THRESHOLD_KT ? 'landing-rollout' : 'landed';
+    }
   }
 
   if (aircraft.flightPhase === 'APPROACH' || aircraft.flightPhase === 'DESCENT') return 'approach';
@@ -104,7 +115,11 @@ function tutorialStepIndexForPhase(scenario: FlightScenario, phase: GuidancePhas
       case 'positive-rate':
       case 'climb':
       case 'approach':
+      case 'touchdown':
+      case 'derotation':
       case 'landing-rollout':
+      case 'taxi':
+      case 'stopped':
       case 'landed':
         return 'rotate-positive-rate';
       default:

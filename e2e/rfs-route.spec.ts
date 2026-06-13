@@ -13,6 +13,17 @@ import {
   loadKseaRouteAndVerifyStoppedAutomationGatingThroughUi,
 } from './helpers/rfsRoute';
 
+const EXPECTED_LANDING_PHASES = ['TOUCHDOWN', 'DEROTATION', 'ROLLOUT', 'STOPPED'];
+const ROLLOUT_GUIDANCE_PHASES = ['landing-rollout', 'taxi', 'stopped'];
+
+function expectExplicitLandingSequence(phases: string[], routeDebug: string): void {
+  expect(phases, routeDebug).toEqual(expect.arrayContaining(EXPECTED_LANDING_PHASES));
+  expect(phases, routeDebug).not.toContain('LANDED');
+  expect(phases.indexOf('TOUCHDOWN'), routeDebug).toBeLessThan(phases.indexOf('DEROTATION'));
+  expect(phases.indexOf('DEROTATION'), routeDebug).toBeLessThan(phases.indexOf('ROLLOUT'));
+  expect(phases.indexOf('ROLLOUT'), routeDebug).toBeLessThan(phases.indexOf('STOPPED'));
+}
+
 test.describe('RFS route and LNAV browser proof', () => {
   test('KSEA route is loaded and stopped AP mode clicks remain gated through visible controls', async ({ page }) => {
     await openRfs(page);
@@ -433,7 +444,7 @@ test.describe('RFS route and LNAV browser proof', () => {
     expect(result.landingApproach.distanceToNextNm, routeDebug).toBeLessThan(1.0);
     expect(result.landingApproach.distanceToNextNm, routeDebug).toBeLessThanOrEqual(result.manualHandoff.distanceToNextNm - 3.0);
 
-    expect(result.touchdown.flightPhase, routeDebug).toBe('LANDED');
+    expect(result.touchdown.flightPhase, routeDebug).toBe('TOUCHDOWN');
     expect(result.touchdown.groundContact, routeDebug).toBe('gear');
     expect(result.touchdown.weightOnWheels, routeDebug).toBe(true);
     expect(result.touchdown.onRunway, routeDebug).toBe(true);
@@ -455,7 +466,8 @@ test.describe('RFS route and LNAV browser proof', () => {
     expect(result.touchdown.distanceToNextNm, routeDebug).toBeLessThan(1.0);
 
     expect(result.rollout.groundSpeedKt, routeDebug).toBeLessThan(result.touchdown.groundSpeedKt);
-    expect(['landing-rollout', 'landed'], routeDebug).toContain(result.rollout.guidancePhase);
+    expect(ROLLOUT_GUIDANCE_PHASES, routeDebug).toContain(result.rollout.guidancePhase);
+    expectExplicitLandingSequence(result.landingPhases, routeDebug);
     expect(result.rollout.autopilotStatus, routeDebug).toBe('OFF');
     expect(result.rollout.fmaAutopilotStatus, routeDebug).toBe('OFF');
     expect(result.rollout.lateralActive, routeDebug).toBe('OFF');
@@ -591,7 +603,7 @@ test.describe('RFS route and LNAV browser proof', () => {
     expect(result.landingApproach.distanceToNextNm, routeDebug).toBeLessThan(1.0);
     expect(result.landingApproach.distanceToNextNm, routeDebug).toBeLessThanOrEqual(result.manualHandoff.distanceToNextNm - 3.0);
 
-    expect(result.touchdown.flightPhase, routeDebug).toBe('LANDED');
+    expect(result.touchdown.flightPhase, routeDebug).toBe('TOUCHDOWN');
     expect(result.touchdown.groundContact, routeDebug).toBe('gear');
     expect(result.touchdown.weightOnWheels, routeDebug).toBe(true);
     expect(result.touchdown.onRunway, routeDebug).toBe(true);
@@ -604,7 +616,8 @@ test.describe('RFS route and LNAV browser proof', () => {
     expect(result.touchdown.distanceToNextNm, routeDebug).toBeLessThan(1.0);
 
     expect(result.rollout.groundSpeedKt, routeDebug).toBeLessThan(result.touchdown.groundSpeedKt);
-    expect(['landing-rollout', 'landed'], routeDebug).toContain(result.rollout.guidancePhase);
+    expect(ROLLOUT_GUIDANCE_PHASES, routeDebug).toContain(result.rollout.guidancePhase);
+    expectExplicitLandingSequence(result.landingPhases, routeDebug);
     expectManualTruth(result.rollout);
     expect(result.rollout.distanceToNextNm, routeDebug).toBeLessThan(1.0);
 

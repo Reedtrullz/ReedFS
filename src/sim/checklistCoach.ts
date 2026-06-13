@@ -11,7 +11,11 @@ type GuidanceChecklistPhase =
   | 'positive-rate'
   | 'climb'
   | 'approach'
+  | 'touchdown'
+  | 'derotation'
   | 'landing-rollout'
+  | 'taxi'
+  | 'stopped'
   | 'landed';
 
 export interface ChecklistItem {
@@ -90,6 +94,40 @@ export function buildGuidanceChecklist(
     ];
   }
 
+  if (phase === 'touchdown') {
+    return [
+      {
+        id: 'touchdown-confirmed',
+        label: 'Touchdown confirmed',
+        complete: aircraft.ground.weightOnWheels && aircraft.ground.contact === 'gear',
+        detail: 'Main gear contact is established; hold centerline and stabilize the flare',
+      },
+      {
+        id: 'spoilers-brakes-ready',
+        label: 'Spoilers and brakes ready',
+        complete: controls.spoilers >= 0.8 || controls.brake >= 0.5,
+        detail: 'Deploy spoilers and begin braking after touchdown',
+      },
+    ];
+  }
+
+  if (phase === 'derotation') {
+    return [
+      {
+        id: 'derotation-in-progress',
+        label: 'Derotation in progress',
+        complete: aircraft.ground.weightOnWheels && aircraft.ground.contact === 'gear',
+        detail: 'Lower the nose gently before full rollout braking',
+      },
+      {
+        id: 'centerline-control',
+        label: 'Centerline control',
+        complete: aircraft.ground.onRunway,
+        detail: 'Track the runway centerline during derotation',
+      },
+    ];
+  }
+
   if (phase === 'landing-rollout') {
     return [
       {
@@ -109,6 +147,41 @@ export function buildGuidanceChecklist(
         label: 'Reset after stopped',
         complete: Math.max(0, aircraft.velocity.u) * MS_TO_KT <= LANDED_RESET_READY_SPEED_KT,
         detail: 'Use RESET once the landing rollout is stopped',
+      },
+    ];
+  }
+
+  if (phase === 'taxi') {
+    if (aircraft.ground.lastTouchdownSinkRateMps <= 0) return buildTakeoffChecklist(scenario, aircraft, controls);
+    return [
+      {
+        id: 'taxi-speed',
+        label: 'Taxi speed',
+        complete: Math.max(0, aircraft.velocity.u) * MS_TO_KT <= LANDED_RESET_READY_SPEED_KT,
+        detail: 'Slow to taxi speed before leaving the runway or resetting',
+      },
+      {
+        id: 'runway-clearance',
+        label: 'Runway taxi clearance',
+        complete: aircraft.ground.weightOnWheels && aircraft.ground.contact === 'gear',
+        detail: 'Taxi clear of the runway when able',
+      },
+    ];
+  }
+
+  if (phase === 'stopped') {
+    return [
+      {
+        id: 'stopped',
+        label: 'Stopped after landing',
+        complete: Math.max(0, aircraft.velocity.u) * MS_TO_KT <= 2.5,
+        detail: 'Aircraft is stopped on the gear',
+      },
+      {
+        id: 'reset-ready',
+        label: 'Reset ready',
+        complete: aircraft.ground.weightOnWheels && aircraft.ground.contact === 'gear',
+        detail: 'Use RESET for a clean playable state',
       },
     ];
   }
@@ -191,6 +264,29 @@ export function coachMessageForState(
 
   const rejectedTakeoff = aircraft.flightPhase === 'TAKEOFF' && controls.brake >= 0.8 && throttle <= 0.2 && controls.spoilers >= 0.95;
   if (rejectedTakeoff) return 'Rejected takeoff: hold brakes, keep centerline, and use RESET once stopped.';
+
+  if (aircraft.flightPhase === 'TOUCHDOWN' && aircraft.ground.weightOnWheels) {
+    return 'Touchdown: keep the landing attitude, hold centerline, deploy spoilers, and begin braking.';
+  }
+
+  if (aircraft.flightPhase === 'DEROTATION' && aircraft.ground.weightOnWheels) {
+    return 'Derotation: lower the nose gently, keep centerline, and maintain rollout braking.';
+  }
+
+  if (aircraft.flightPhase === 'ROLLOUT' && aircraft.ground.weightOnWheels) {
+    return 'Landing rollout: keep spoilers deployed, hold braking, track centerline, and slow to taxi speed.';
+  }
+
+  if (aircraft.flightPhase === 'TAXI' && aircraft.ground.weightOnWheels) {
+    if (aircraft.ground.lastTouchdownSinkRateMps > 0) {
+      return 'Taxi after landing: keep taxi speed, clear the runway when able, and use RESET once stopped.';
+    }
+    return 'Taxi: complete takeoff setup, line up carefully, then advance thrust when cleared.';
+  }
+
+  if (aircraft.flightPhase === 'STOPPED' && aircraft.ground.weightOnWheels) {
+    return 'Stopped after landing: keep brakes set and use RESET for a clean playable state.';
+  }
 
   if (aircraft.flightPhase === 'LANDED' && aircraft.ground.weightOnWheels) {
     const speedKt = Math.max(0, aircraft.velocity.u) * MS_TO_KT;

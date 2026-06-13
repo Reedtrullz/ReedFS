@@ -1,4 +1,4 @@
-import type { AircraftState, AircraftSpec, ControlInputs } from '../types';
+import type { AircraftState, AircraftSpec, ControlInputs, FlightPhase } from '../types';
 import { computeAero } from './aero';
 import { updateEngines } from '../systems/engine';
 import { updateFuel } from '../systems/fuel';
@@ -15,6 +15,12 @@ import { computeAirRelativeVelocity } from '../systems/environment';
 
 const G = 9.80665;
 const TAKEOFF_ASSIST_MIN_HEIGHT_FT = 50;
+const MS_TO_KT = 1.94384449;
+const TAXI_SPEED_THRESHOLD_KT = 15;
+const STOPPED_SPEED_THRESHOLD_KT = 2.5;
+const TOUCHDOWN_MIN_DWELL_MS = 120;
+const DEROTATION_MIN_DWELL_MS = 120;
+const DEROTATION_COMPLETE_PITCH_RAD = 2.5 * Math.PI / 180;
 // Release only when the gear is almost unloaded and the aircraft has both
 // plausible 737 takeoff energy and a positive rotation attitude. This prevents
 // fake liftoff from pitch projection or low-speed over-rotation.
@@ -31,22 +37,82 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
+function setFlightPhase(state: AircraftState, phase: FlightPhase): void {
+  if (state.flightPhase !== phase) {
+    state.flightPhase = phase;
+    state.flightPhaseStartedMs = state.simTime;
+  }
+}
+
+function phaseElapsedMs(state: AircraftState): number {
+  return Math.max(0, state.simTime - (state.flightPhaseStartedMs ?? state.simTime));
+}
+
+function hasLandingTouchdownRecord(state: AircraftState): boolean {
+  return state.ground.lastTouchdownSinkRateMps > 0;
+}
+
 function updateTakeoffPhase(state: AircraftState): void {
   const heightAboveRunwayFt = state.position.alt - state.ground.groundAltFt;
   const positiveRate = bodyToNed(state.velocity, state.attitude).down < -0.25;
 
   if (state.flightPhase === 'TAKEOFF' && heightAboveRunwayFt >= TAKEOFF_ASSIST_MIN_HEIGHT_FT && !state.ground.weightOnWheels && positiveRate) {
-    state.flightPhase = 'CLIMB';
+    setFlightPhase(state, 'CLIMB');
   }
 }
 
-function updateLandingPhase(state: AircraftState): void {
-  if (
-    (state.flightPhase === 'APPROACH' || state.flightPhase === 'DESCENT') &&
-    state.ground.weightOnWheels &&
-    state.ground.contact === 'gear'
-  ) {
-    state.flightPhase = 'LANDED';
+function groundSpeedKt(state: AircraftState): number {
+  return Math.max(0, Math.hypot(state.velocity.u, state.velocity.v)) * MS_TO_KT;
+}
+
+function noseGearHasWeight(state: AircraftState): boolean {
+  return state.ground.gearStations.some((station) => station.id === 'nose' && station.weightOnWheel && station.normalForceN > 1);
+}
+
+function rolloutPhaseForSpeed(state: AircraftState): 'ROLLOUT' | 'TAXI' | 'STOPPED' {
+  const speedKt = groundSpeedKt(state);
+  if (speedKt <= STOPPED_SPEED_THRESHOLD_KT) return 'STOPPED';
+  if (speedKt <= TAXI_SPEED_THRESHOLD_KT) return 'TAXI';
+  return 'ROLLOUT';
+}
+
+function updateLandingPhase(state: AircraftState, context: { wasPostLandingTaxiBeforeGroundContact?: boolean } = {}): void {
+  const onLandingGear = state.ground.weightOnWheels && state.ground.contact === 'gear';
+  const postLandingTaxi = state.flightPhase === 'TAXI'
+    && (hasLandingTouchdownRecord(state) || context.wasPostLandingTaxiBeforeGroundContact);
+  const landingGroundPhase = state.flightPhase === 'TOUCHDOWN'
+    || state.flightPhase === 'DEROTATION'
+    || state.flightPhase === 'ROLLOUT'
+    || state.flightPhase === 'STOPPED'
+    || postLandingTaxi;
+
+  if (!onLandingGear) {
+    if (landingGroundPhase) setFlightPhase(state, 'APPROACH');
+    return;
+  }
+
+  if (state.flightPhase === 'APPROACH' || state.flightPhase === 'DESCENT') {
+    setFlightPhase(state, 'TOUCHDOWN');
+    return;
+  }
+
+  if (state.flightPhase === 'TOUCHDOWN') {
+    if (phaseElapsedMs(state) >= TOUCHDOWN_MIN_DWELL_MS) setFlightPhase(state, 'DEROTATION');
+    return;
+  }
+
+  if (state.flightPhase === 'DEROTATION') {
+    if (
+      phaseElapsedMs(state) >= DEROTATION_MIN_DWELL_MS
+      && (noseGearHasWeight(state) || state.attitude.theta <= DEROTATION_COMPLETE_PITCH_RAD)
+    ) {
+      setFlightPhase(state, rolloutPhaseForSpeed(state));
+    }
+    return;
+  }
+
+  if (state.flightPhase === 'ROLLOUT' || postLandingTaxi || state.flightPhase === 'STOPPED' || state.flightPhase === 'LANDED') {
+    setFlightPhase(state, rolloutPhaseForSpeed(state));
   }
 }
 
@@ -201,6 +267,7 @@ export function integrate(
   // Sample supported-airport runway/off-runway rectangles and use the resulting
   // ground surface as a post-solve constraint so free-flight equations and
   // wind/velocity sign conventions remain unchanged.
+  const wasPostLandingTaxiBeforeGroundContact = state.flightPhase === 'TAXI' && hasLandingTouchdownRecord(state);
   const groundSurface = sampleSupportedAirportSurface(state.position);
   const groundContact = applyGroundContact(state, controls, dt, groundSurface.groundAltFt, {
     allowLiftoff,
@@ -214,7 +281,7 @@ export function integrate(
   // ── Config ──
   applyPilotConfiguration(state, controls, groundContact.weightOnWheels);
   updateTakeoffPhase(state);
-  updateLandingPhase(state);
+  updateLandingPhase(state, { wasPostLandingTaxiBeforeGroundContact });
 
   // ── Clock ──
   state.simTime += dt * 1000;

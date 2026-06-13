@@ -25,6 +25,10 @@ function setIasKt(aircraft: ReturnType<typeof scenarioAircraft>, iasKt: number) 
   aircraft.velocity.u = iasKt * KT_TO_MS;
 }
 
+function setFlightPhaseForTest(aircraft: ReturnType<typeof scenarioAircraft>, phase: string) {
+  aircraft.flightPhase = phase as typeof aircraft.flightPhase;
+}
+
 describe('guidanceState', () => {
   it('derives tutorial, active step, checklist, coach, alerts, and preflight phase in one pure state', () => {
     const aircraft = scenarioAircraft();
@@ -382,6 +386,58 @@ describe('guidanceState', () => {
         controls: { ...configuredInputs, throttle1: 0.35, throttle2: 0.35, flapLever: 30 },
       }).phase).toBe('approach');
     }
+  });
+
+  it('derives explicit landing guidance phases for touchdown through stopped rollout', () => {
+    const cases = [
+      ['TOUCHDOWN', 'touchdown', 115],
+      ['DEROTATION', 'derotation', 90],
+      ['ROLLOUT', 'landing-rollout', 45],
+      ['TAXI', 'taxi', 9],
+      ['STOPPED', 'stopped', 0.5],
+    ] as const;
+
+    for (const [flightPhase, expectedGuidancePhase, speedKt] of cases) {
+      const aircraft = scenarioAircraft();
+      setFlightPhaseForTest(aircraft, flightPhase);
+      aircraft.ground.weightOnWheels = true;
+      aircraft.ground.aglFt = 0;
+      aircraft.ground.contact = 'gear';
+      aircraft.velocity.u = speedKt * KT_TO_MS;
+
+      const guidance = buildGuidanceState({
+        scenario: KSEA_TUTORIAL_SCENARIO,
+        status: 'running',
+        aircraft,
+        controls: { ...configuredInputs, throttle1: 0, throttle2: 0, brake: flightPhase === 'STOPPED' ? 1 : 0.7, spoilers: 1 },
+      });
+
+      expect(guidance.phase).toBe(expectedGuidancePhase);
+      expect(guidance.coachMessage).not.toMatch(/takeoff thrust/i);
+    }
+  });
+
+  it('keeps pre-departure taxi guidance separate from post-landing taxi/reset coaching', () => {
+    const aircraft = scenarioAircraft();
+    aircraft.flightPhase = 'TAXI';
+    aircraft.ground.weightOnWheels = true;
+    aircraft.ground.aglFt = 0;
+    aircraft.ground.contact = 'gear';
+    aircraft.ground.lastTouchdownSinkRateMps = 0;
+    aircraft.velocity.u = 8 * KT_TO_MS;
+
+    const guidance = buildGuidanceState({
+      scenario: KSEA_TUTORIAL_SCENARIO,
+      status: 'running',
+      aircraft,
+      controls: { ...configuredInputs, throttle1: 0.15, throttle2: 0.15, brake: 0, spoilers: 0 },
+    });
+
+    expect(guidance.phase).toBe('taxi');
+    expect(guidance.checklist.map((item) => item.label)).toContain('Flaps set for takeoff');
+    expect(guidance.checklist.map((item) => item.label)).not.toContain('Reset ready');
+    expect(guidance.coachMessage).toMatch(/taxi|line up|flaps|trim/i);
+    expect(guidance.coachMessage).not.toMatch(/after landing|reset/i);
   });
 
   it('derives landing rollout while landed on gear above taxi speed', () => {

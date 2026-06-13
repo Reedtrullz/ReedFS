@@ -149,7 +149,19 @@ export interface AircraftConfig {
 
 // ── Full Aircraft State ──
 
-export type FlightPhase = 'PARKED' | 'TAXI' | 'TAKEOFF' | 'CLIMB' | 'CRUISE' | 'DESCENT' | 'APPROACH' | 'LANDED';
+export type FlightPhase =
+  | 'PARKED'
+  | 'TAXI'
+  | 'TAKEOFF'
+  | 'CLIMB'
+  | 'CRUISE'
+  | 'DESCENT'
+  | 'APPROACH'
+  | 'TOUCHDOWN'
+  | 'DEROTATION'
+  | 'ROLLOUT'
+  | 'STOPPED'
+  | 'LANDED';
 
 export interface AircraftState {
   position: GeoPosition;
@@ -171,6 +183,7 @@ export interface AircraftState {
   simTime: number; // ms
   timeOfDay: number; // hours (0-24)
   flightPhase: FlightPhase;
+  flightPhaseStartedMs?: number;
 }
 
 // ── Aircraft Spec (737-800 approx) ──
@@ -272,6 +285,7 @@ export function createInitialState(spec: AircraftSpec): AircraftState {
     simTime: 0,
     timeOfDay: 12,
     flightPhase: 'PARKED',
+    flightPhaseStartedMs: 0,
   };
 }
 

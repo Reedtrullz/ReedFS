@@ -15,6 +15,10 @@ const configuredInputs: ControlInputs = {
   brake: 0,
 };
 
+function setFlightPhaseForTest(aircraft: ReturnType<typeof createAircraftStateForScenario>, phase: string) {
+  aircraft.flightPhase = phase as typeof aircraft.flightPhase;
+}
+
 describe('checklistCoach', () => {
   it('marks runway setup items complete for a configured tutorial scenario', () => {
     const aircraft = createAircraftStateForScenario(B737_800_SPEC, KSEA_TUTORIAL_SCENARIO);
@@ -97,6 +101,40 @@ describe('checklistCoach', () => {
 
     expect(message).not.toMatch(/positive rate: raise the gear/i);
     expect(message).toMatch(/rotate|climb/i);
+  });
+
+  it('coaches explicit landing phase machine without takeoff instructions', () => {
+    const cases = [
+      ['TOUCHDOWN', 'touchdown', /touchdown/i],
+      ['DEROTATION', 'derotation', /derotation|lower the nose/i],
+      ['ROLLOUT', 'landing-rollout', /rollout|brak/i],
+      ['TAXI', 'taxi', /taxi/i],
+      ['STOPPED', 'stopped', /stopped|reset/i],
+    ] as const;
+
+    for (const [flightPhase, checklistPhase, expectedMessage] of cases) {
+      const aircraft = createAircraftStateForScenario(B737_800_SPEC, KSEA_TUTORIAL_SCENARIO);
+      setFlightPhaseForTest(aircraft, flightPhase);
+      aircraft.ground.weightOnWheels = true;
+      aircraft.ground.contact = 'gear';
+      aircraft.ground.aglFt = 0;
+      aircraft.ground.lastTouchdownSinkRateMps = 1.2;
+      aircraft.velocity.u = flightPhase === 'STOPPED' ? 0.4 : 18;
+
+      const controls = { ...configuredInputs, throttle1: 0, throttle2: 0, spoilers: 1, brake: 0.8 };
+      const checklist = buildGuidanceChecklist(
+        KSEA_TUTORIAL_SCENARIO,
+        aircraft,
+        controls,
+        checklistPhase as Parameters<typeof buildGuidanceChecklist>[3],
+      );
+      const message = coachMessageForState('running', aircraft, controls, KSEA_TUTORIAL_SCENARIO);
+
+      expect(checklist.length).toBeGreaterThan(0);
+      expect(checklist.map((item) => item.label).join(' ')).toMatch(/touchdown|derotation|rollout|taxi|reset|stopped/i);
+      expect(message).toMatch(expectedMessage);
+      expect(message).not.toMatch(/takeoff thrust/i);
+    }
   });
 
   it('coaches landed rollout toward braking and reset without takeoff thrust instructions', () => {

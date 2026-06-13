@@ -41,6 +41,7 @@ export interface LandingProofResult {
   touchdown: LandingSnapshot;
   rollout: LandingSnapshot;
   reset: LandingSnapshot;
+  landingPhases: string[];
 }
 
 export interface DescentLandingProofResult {
@@ -49,6 +50,7 @@ export interface DescentLandingProofResult {
   touchdown: LandingSnapshot;
   rollout: LandingSnapshot;
   reset: LandingSnapshot;
+  landingPhases: string[];
 }
 
 type FlightHelperMode = 'configure' | 'fly';
@@ -516,11 +518,20 @@ export async function flyApproachToLandingRolloutAndReset(page: Page, targetAirp
       throw new Error(`Unable to seed airborne ${runway.airport} approach proof state: ${JSON.stringify(approach)}`);
     }
 
+    const explicitLandingPhases = ['TOUCHDOWN', 'DEROTATION', 'ROLLOUT', 'TAXI', 'STOPPED'];
+    const explicitRolloutGuidancePhases = ['landing-rollout', 'taxi', 'stopped'];
+    const landingPhases: string[] = [];
+    const recordLandingPhase = (current: LandingSnapshot): void => {
+      if (explicitLandingPhases.includes(current.flightPhase) && landingPhases.at(-1) !== current.flightPhase) {
+        landingPhases.push(current.flightPhase);
+      }
+    };
     let touchdown: LandingSnapshot | null = null;
     for (let frame = 0; frame < 60 * 45; frame += 1) {
       stepFrame();
       const current = snapshot();
-      if (current.flightPhase === 'LANDED' && current.groundContact === 'gear' && current.weightOnWheels) {
+      recordLandingPhase(current);
+      if (current.flightPhase === 'TOUCHDOWN' && current.groundContact === 'gear' && current.weightOnWheels) {
         if (
           !current.onRunway
           || current.touchdownSinkRateMps <= 0
@@ -541,9 +552,11 @@ export async function flyApproachToLandingRolloutAndReset(page: Page, targetAirp
     for (let frame = 0; frame < 60 * 35; frame += 1) {
       stepFrame();
       rollout = snapshot();
+      recordLandingPhase(rollout);
       if (
         rollout.groundSpeedKt < touchdown.groundSpeedKt - 8
-        && (rollout.guidancePhase === 'landing-rollout' || rollout.guidancePhase === 'landed')
+        && explicitRolloutGuidancePhases.includes(rollout.guidancePhase)
+        && landingPhases.includes('STOPPED')
       ) {
         break;
       }
@@ -555,7 +568,7 @@ export async function flyApproachToLandingRolloutAndReset(page: Page, targetAirp
     useSimStore.getState().reset();
     const reset = snapshot();
 
-    return { approach, touchdown, rollout, reset };
+    return { approach, touchdown, rollout, reset, landingPhases };
   }, { fixedStepMs: FIXED_STEP_MS, targetAirport });
 }
 
@@ -849,6 +862,14 @@ export async function flyDescentApproachToLandingRolloutAndReset(page: Page): Pr
       throw new Error(`Unable to configure descent proof approach: ${JSON.stringify({ descent, current: snapshot() })}`);
     }
 
+    const explicitLandingPhases = ['TOUCHDOWN', 'DEROTATION', 'ROLLOUT', 'TAXI', 'STOPPED'];
+    const explicitRolloutGuidancePhases = ['landing-rollout', 'taxi', 'stopped'];
+    const landingPhases: string[] = [];
+    const recordLandingPhase = (current: LandingSnapshot): void => {
+      if (explicitLandingPhases.includes(current.flightPhase) && landingPhases.at(-1) !== current.flightPhase) {
+        landingPhases.push(current.flightPhase);
+      }
+    };
     let touchdown: LandingSnapshot | null = null;
     for (let frame = 0; frame < 60 * 70; frame += 1) {
       const beforeTick = snapshot();
@@ -857,7 +878,8 @@ export async function flyDescentApproachToLandingRolloutAndReset(page: Page): Pr
       }
       stepFrame();
       const current = snapshot();
-      if (current.flightPhase === 'LANDED' && current.groundContact === 'gear' && current.weightOnWheels) {
+      recordLandingPhase(current);
+      if (current.flightPhase === 'TOUCHDOWN' && current.groundContact === 'gear' && current.weightOnWheels) {
         if (!current.onRunway || current.touchdownSinkRateMps >= 15) {
           throw new Error(`Descent proof touchdown outside scoped proof bounds: ${JSON.stringify(current)}`);
         }
@@ -872,9 +894,11 @@ export async function flyDescentApproachToLandingRolloutAndReset(page: Page): Pr
     for (let frame = 0; frame < 60 * 35; frame += 1) {
       stepFrame();
       rollout = snapshot();
+      recordLandingPhase(rollout);
       if (
         rollout.groundSpeedKt < touchdown.groundSpeedKt - 8
-        && (rollout.guidancePhase === 'landing-rollout' || rollout.guidancePhase === 'landed')
+        && explicitRolloutGuidancePhases.includes(rollout.guidancePhase)
+        && landingPhases.includes('STOPPED')
       ) {
         break;
       }
@@ -886,6 +910,6 @@ export async function flyDescentApproachToLandingRolloutAndReset(page: Page): Pr
     useSimStore.getState().reset();
     const reset = snapshot();
 
-    return { descent, configuredApproach, touchdown, rollout, reset };
+    return { descent, configuredApproach, touchdown, rollout, reset, landingPhases };
   }, { fixedStepMs: FIXED_STEP_MS });
 }

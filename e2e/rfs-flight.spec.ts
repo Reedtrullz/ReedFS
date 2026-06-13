@@ -7,6 +7,17 @@ import {
   flyKpdxShortFinalToLandingRolloutAndReset,
 } from './helpers/rfsFlight';
 
+const EXPECTED_LANDING_PHASES = ['TOUCHDOWN', 'DEROTATION', 'ROLLOUT', 'STOPPED'];
+const ROLLOUT_GUIDANCE_PHASES = ['landing-rollout', 'taxi', 'stopped'];
+
+function expectExplicitLandingSequence(phases: string[]): void {
+  expect(phases).toEqual(expect.arrayContaining(EXPECTED_LANDING_PHASES));
+  expect(phases).not.toContain('LANDED');
+  expect(phases.indexOf('TOUCHDOWN')).toBeLessThan(phases.indexOf('DEROTATION'));
+  expect(phases.indexOf('DEROTATION')).toBeLessThan(phases.indexOf('ROLLOUT'));
+  expect(phases.indexOf('ROLLOUT')).toBeLessThan(phases.indexOf('STOPPED'));
+}
+
 test.describe('RFS playable flight loops', () => {
   test('ENVA tutorial reaches clean climb with phase-aware guidance', async ({ page }) => {
     await openRfs(page);
@@ -25,7 +36,7 @@ test.describe('RFS playable flight loops', () => {
     expect(snapshot.checklistLabels).not.toContain('Gear down');
   });
 
-  test('ENVA short-final approach touches down, rolls out under braking, and resets cleanly', async ({ page }) => {
+  test('ENVA short-final landing approach touches down, rolls out under braking, and resets cleanly', async ({ page }) => {
     await openRfs(page);
 
     const proof = await flyApproachToLandingRolloutAndReset(page);
@@ -38,12 +49,13 @@ test.describe('RFS playable flight loops', () => {
     expect(proof.touchdown.weightOnWheels).toBe(true);
     expect(proof.touchdown.onRunway).toBe(true);
     expect(proof.touchdown.groundContact).toBe('gear');
-    expect(proof.touchdown.flightPhase).toBe('LANDED');
+    expect(proof.touchdown.flightPhase).toBe('TOUCHDOWN');
     expect(proof.touchdown.touchdownSinkRateMps).toBeGreaterThan(0);
     expect(proof.touchdown.touchdownSinkRateMps).toBeLessThan(15);
 
     expect(proof.rollout.groundSpeedKt).toBeLessThan(proof.touchdown.groundSpeedKt);
-    expect(['landing-rollout', 'landed']).toContain(proof.rollout.guidancePhase);
+    expect(ROLLOUT_GUIDANCE_PHASES).toContain(proof.rollout.guidancePhase);
+    expectExplicitLandingSequence(proof.landingPhases);
 
     expect(proof.reset.status).toBe('stopped');
     expect(proof.reset.guidancePhase).toBe('preflight');
@@ -73,7 +85,7 @@ test.describe('RFS playable flight loops', () => {
     expect(proof.configuredApproach.verticalSpeedFpm).toBeLessThan(0);
     expect(proof.configuredApproach.iasKt).toBeGreaterThan(110);
 
-    expect(proof.touchdown.flightPhase).toBe('LANDED');
+    expect(proof.touchdown.flightPhase).toBe('TOUCHDOWN');
     expect(proof.touchdown.groundContact).toBe('gear');
     expect(proof.touchdown.weightOnWheels).toBe(true);
     expect(proof.touchdown.onRunway).toBe(true);
@@ -81,7 +93,8 @@ test.describe('RFS playable flight loops', () => {
     expect(proof.touchdown.touchdownSinkRateMps).toBeLessThan(15);
 
     expect(proof.rollout.groundSpeedKt).toBeLessThan(proof.touchdown.groundSpeedKt);
-    expect(['landing-rollout', 'landed']).toContain(proof.rollout.guidancePhase);
+    expect(ROLLOUT_GUIDANCE_PHASES).toContain(proof.rollout.guidancePhase);
+    expectExplicitLandingSequence(proof.landingPhases);
 
     expect(proof.reset.status).toBe('stopped');
     expect(proof.reset.guidancePhase).toBe('preflight');
@@ -103,7 +116,7 @@ test.describe('RFS playable flight loops', () => {
     expect(proof.approach.autopilotCleared).toBe(true);
     expect(proof.approach.routeCleared).toBe(true);
 
-    expect(proof.touchdown.flightPhase).toBe('LANDED');
+    expect(proof.touchdown.flightPhase).toBe('TOUCHDOWN');
     expect(proof.touchdown.groundContact).toBe('gear');
     expect(proof.touchdown.weightOnWheels).toBe(true);
     expect(proof.touchdown.onRunway).toBe(true);
@@ -113,7 +126,8 @@ test.describe('RFS playable flight loops', () => {
     expect(proof.touchdown.touchdownSinkRateMps).toBeLessThan(15);
 
     expect(proof.rollout.groundSpeedKt).toBeLessThan(proof.touchdown.groundSpeedKt);
-    expect(['landing-rollout', 'landed']).toContain(proof.rollout.guidancePhase);
+    expect(ROLLOUT_GUIDANCE_PHASES).toContain(proof.rollout.guidancePhase);
+    expectExplicitLandingSequence(proof.landingPhases);
 
     expect(proof.reset.status).toBe('stopped');
     expect(proof.reset.guidancePhase).toBe('preflight');

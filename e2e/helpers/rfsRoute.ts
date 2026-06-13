@@ -97,6 +97,7 @@ export interface RouteLandingBridgeProofResult {
   touchdown: RouteLandingBridgeSnapshot;
   rollout: RouteLandingBridgeSnapshot;
   reset: RouteResetProofSnapshot;
+  landingPhases: string[];
   samples: RouteProofSnapshot[];
 }
 
@@ -108,6 +109,7 @@ export interface RouteExtendedLandingBridgeProofResult {
   touchdown: RouteLandingBridgeSnapshot;
   rollout: RouteLandingBridgeSnapshot;
   reset: RouteResetProofSnapshot;
+  landingPhases: string[];
   samples: RouteProofSnapshot[];
 }
 
@@ -887,7 +889,7 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
         throw new Error(`KSEA final route manual handoff proof did not reach target state: ${JSON.stringify({ current, samples }, null, 2)}`);
       };
 
-      const runLandingBridge = (): Pick<RouteLandingBridgeProofResult, 'landingApproach' | 'touchdown' | 'rollout' | 'reset'> => {
+      const runLandingBridge = (): Pick<RouteLandingBridgeProofResult, 'landingApproach' | 'touchdown' | 'rollout' | 'reset' | 'landingPhases'> => {
         const runway = KPDX_RUNWAY_10L;
         // Stay on the KPDX 10L footprint while remaining just outside the synthetic KPDX
         // waypoint capture radius so route-complete truth is not hidden by the seed.
@@ -993,11 +995,20 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
           throw new Error(`Unable to seed same-session KPDX landing bridge approach state: ${JSON.stringify(landingApproach)}`);
         }
 
+        const explicitLandingPhases = ['TOUCHDOWN', 'DEROTATION', 'ROLLOUT', 'TAXI', 'STOPPED'];
+        const explicitRolloutGuidancePhases = ['landing-rollout', 'taxi', 'stopped'];
+        const landingPhases: string[] = [];
+        const recordLandingPhase = (current: RouteLandingBridgeSnapshot): void => {
+          if (explicitLandingPhases.includes(current.flightPhase) && landingPhases.at(-1) !== current.flightPhase) {
+            landingPhases.push(current.flightPhase);
+          }
+        };
         let touchdown: RouteLandingBridgeSnapshot | null = null;
         for (let frame = 0; frame < 60 * 45; frame += 1) {
           tickOnce();
           const current = landingBridgeSnapshot();
-          if (current.flightPhase === 'LANDED' && current.groundContact === 'gear' && current.weightOnWheels) {
+          recordLandingPhase(current);
+          if (current.flightPhase === 'TOUCHDOWN' && current.groundContact === 'gear' && current.weightOnWheels) {
             if (
               !current.onRunway
               || current.touchdownSinkRateMps <= 0
@@ -1030,9 +1041,11 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
         for (let frame = 0; frame < 60 * 35; frame += 1) {
           tickOnce();
           rollout = landingBridgeSnapshot();
+          recordLandingPhase(rollout);
           if (
             rollout.groundSpeedKt < touchdown.groundSpeedKt - 8
-            && (rollout.guidancePhase === 'landing-rollout' || rollout.guidancePhase === 'landed')
+            && explicitRolloutGuidancePhases.includes(rollout.guidancePhase)
+            && landingPhases.includes('STOPPED')
             && rollout.autopilotStatus === 'OFF'
             && rollout.fmaAutopilotStatus === 'OFF'
             && rollout.lateralActive === 'OFF'
@@ -1073,7 +1086,7 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
           throw new Error(`KSEA to KPDX landing bridge reset proof did not reach target state: ${JSON.stringify({ reset, samples }, null, 2)}`);
         }
 
-        return { landingApproach, touchdown, rollout, reset };
+        return { landingApproach, touchdown, rollout, reset, landingPhases };
       };
 
       const runGate = (gate: NonNullable<RouteProofSetup['gates']>[number]): void => {
@@ -1114,11 +1127,11 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
         if (proofSetup.manualHandoff) {
           const manualHandoff = runManualHandoff(proofSetup.manualHandoff);
           if (proofSetup.landingBridgeAfterManualHandoff) {
-            const { landingApproach, touchdown, rollout, reset } = runLandingBridge();
+            const { landingApproach, touchdown, rollout, reset, landingPhases } = runLandingBridge();
             if (extendedDescent) {
-              return { configuredApproach, extendedDescent, manualHandoff, landingApproach, touchdown, rollout, reset, samples };
+              return { configuredApproach, extendedDescent, manualHandoff, landingApproach, touchdown, rollout, reset, landingPhases, samples };
             }
-            return { configuredApproach, manualHandoff, landingApproach, touchdown, rollout, reset, samples };
+            return { configuredApproach, manualHandoff, landingApproach, touchdown, rollout, reset, landingPhases, samples };
           }
           if (proofSetup.resetAfterManualHandoff) {
             useSimStore.getState().reset();
