@@ -37,8 +37,24 @@ export function createKseaKpdxFlight(): FlightPlan {
     waypoints: [
       { ident: 'KSEA', lat: 47.45, lon: -122.31, coordinateSource: 'synthetic', discontinuity: false },
       { ident: 'OLM', lat: 46.97, lon: -122.90, coordinateSource: 'synthetic', discontinuity: false },
-      { ident: 'BTG', lat: 45.75, lon: -122.59, coordinateSource: 'synthetic', discontinuity: false },
-      { ident: 'KPDX', lat: 45.59, lon: -122.60, coordinateSource: 'synthetic', discontinuity: false },
+      {
+        ident: 'BTG',
+        lat: 45.75,
+        lon: -122.59,
+        coordinateSource: 'synthetic',
+        discontinuity: false,
+        altitudeConstraint: { type: 'AT_OR_BELOW', altitude: 12000 },
+        speedConstraint: { type: 'AT_OR_BELOW', speed: 280 },
+      },
+      {
+        ident: 'KPDX',
+        lat: 45.59,
+        lon: -122.60,
+        coordinateSource: 'synthetic',
+        discontinuity: false,
+        altitudeConstraint: { type: 'AT', altitude: 3000 },
+        speedConstraint: { type: 'AT_OR_BELOW', speed: 210 },
+      },
     ],
   };
 }

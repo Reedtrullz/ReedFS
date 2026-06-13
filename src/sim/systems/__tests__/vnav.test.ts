@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { computeVNAV } from '../vnav';
 import { createInitialState, B737_800_SPEC } from '../../types';
+import { createKseaKpdxFlight } from '../../flightPlanLoader';
 import type { FlightPlan } from '@shared/types/fmc';
 
 const navOut = {
@@ -81,6 +82,24 @@ describe('computeVNAV', () => {
     expect(v.speedConstraint).toBe(true);
     expect(v.targetSpeedKt).toBe(220);
     expect(v.altitudeConstraint).toBe(false);
+  });
+
+  it('reports VNAV available for a constrained KSEA sample route waypoint', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.position.alt = 18000;
+    s.velocity.u = 128.6;
+    const fp = createKseaKpdxFlight();
+    const btgIndex = fp.waypoints.findIndex((waypoint) => waypoint.ident === 'BTG');
+
+    const v = computeVNAV(s, fp, { ...navOut, activeWaypointIndex: btgIndex });
+
+    expect(btgIndex).toBeGreaterThanOrEqual(0);
+    expect(v.available).toBe(true);
+    expect(v.unavailableReason).toBeNull();
+    expect(v.altitudeConstraint).toBe(true);
+    expect(v.speedConstraint).toBe(true);
+    expect(v.targetAlt).toBe(12000);
+    expect(v.targetSpeedKt).toBe(280);
   });
 
   it('reports VNAV_PTH while tracking a distant altitude constraint', () => {
