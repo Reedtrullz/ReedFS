@@ -190,10 +190,33 @@ jobs:
             set -eu
             IMAGE_REF=ghcr.io/reedtrullz/rfs:sha-${{ github.sha }}
             EXPECTED_COMMIT=${{ github.sha }}
+            EXPECTED_IMAGE_DIGEST=${{ needs.publish.outputs.image_digest }}
+            VERSION_METADATA_DIR="${HOME}/rfs-release-metadata"
+            mkdir -p "$VERSION_METADATA_DIR"
+            VERSION_METADATA_PATH="$VERSION_METADATA_DIR/rfs-version-${EXPECTED_COMMIT}.json"
+            if [ -z "$EXPECTED_IMAGE_DIGEST" ] || [ "$EXPECTED_IMAGE_DIGEST" = "unknown" ]; then
+              echo "Publish job did not provide an immutable image digest"
+              exit 1
+            fi
+            cat > "$VERSION_METADATA_PATH" <<EOF
+            {
+              "name": "rfs",
+              "version": "$EXPECTED_COMMIT",
+              "commit": "$EXPECTED_COMMIT",
+              "imageRef": "$IMAGE_REF",
+              "imageDigest": "$EXPECTED_IMAGE_DIGEST"
+            }
+            EOF
             PREVIOUS_IMAGE_ID="$(docker inspect -f '{{.Image}}' rfs 2>/dev/null || true)"
             PREVIOUS_IMAGE_REF="$(docker inspect -f '{{.Config.Image}}' rfs 2>/dev/null || true)"
             PREVIOUS_PUBLIC_VERSION_JSON="$(curl -fsS https://fly.reidar.tech/rfs-version.json 2>/dev/null || true)"
             PREVIOUS_PUBLIC_COMMIT="$(printf '%s\n' "$PREVIOUS_PUBLIC_VERSION_JSON" | sed -n 's/.*"commit"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1)"
+            PREVIOUS_VERSION_METADATA_PATH="$VERSION_METADATA_DIR/rfs-version-previous-${EXPECTED_COMMIT}.json"
+            PREVIOUS_VERSION_MOUNT_ARGS=""
+            if [ -n "$PREVIOUS_PUBLIC_VERSION_JSON" ]; then
+              printf '%s\n' "$PREVIOUS_PUBLIC_VERSION_JSON" > "$PREVIOUS_VERSION_METADATA_PATH"
+              PREVIOUS_VERSION_MOUNT_ARGS="-v $PREVIOUS_VERSION_METADATA_PATH:/usr/share/nginx/html/rfs-version.json:ro"
+            fi
             PREVIOUS_IMAGE="$PREVIOUS_IMAGE_ID"
             if [ -z "$PREVIOUS_IMAGE" ] || [ "$PREVIOUS_IMAGE" = "<no value>" ]; then
               PREVIOUS_IMAGE="$PREVIOUS_IMAGE_REF"
@@ -222,6 +245,7 @@ jobs:
                 -p 127.0.0.1:3005:8080 \
                 --memory 256m --cpus 1.0 \
                 --log-driver json-file --log-opt max-size=10m --log-opt max-file=3 \
+                $PREVIOUS_VERSION_MOUNT_ARGS \
                 "$PREVIOUS_IMAGE"; then
                 echo "Rollback container start failed!"
                 return 1
@@ -266,6 +290,7 @@ jobs:
               --user 101:101 \
               --memory 256m --cpus 1.0 \
               -p 127.0.0.1:3004:8080 \
+              -v "$VERSION_METADATA_PATH:/usr/share/nginx/html/rfs-version.json:ro" \
               "$IMAGE_REF"
 
             # Canary health and version checks.
@@ -281,7 +306,9 @@ jobs:
               fi
               sleep 3
             done
-            if ! curl -fsS http://localhost:3004/rfs-version.json | grep -F "$EXPECTED_COMMIT" > /dev/null; then
+            if ! CANARY_VERSION_JSON="$(curl -fsS http://localhost:3004/rfs-version.json)" || \
+              ! printf '%s\n' "$CANARY_VERSION_JSON" | grep -F "$EXPECTED_COMMIT" > /dev/null || \
+              ! printf '%s\n' "$CANARY_VERSION_JSON" | grep -F "$EXPECTED_IMAGE_DIGEST" > /dev/null; then
               echo "Canary version check failed!"
               docker logs --tail=50 rfs_canary
               docker rm -f rfs_canary
@@ -302,6 +329,7 @@ jobs:
               -p 127.0.0.1:3005:8080 \
               --memory 256m --cpus 1.0 \
               --log-driver json-file --log-opt max-size=10m --log-opt max-file=3 \
+              -v "$VERSION_METADATA_PATH:/usr/share/nginx/html/rfs-version.json:ro" \
               "$IMAGE_REF"; then
               if ! rollback; then
                 docker rm -f rfs_canary
@@ -319,7 +347,9 @@ jobs:
               fi
               exit 1
             fi
-            if ! curl -fsS https://fly.reidar.tech/rfs-version.json | grep -F "$EXPECTED_COMMIT" > /dev/null; then
+            if ! PUBLIC_VERSION_JSON="$(curl -fsS https://fly.reidar.tech/rfs-version.json)" || \
+              ! printf '%s\n' "$PUBLIC_VERSION_JSON" | grep -F "$EXPECTED_COMMIT" > /dev/null || \
+              ! printf '%s\n' "$PUBLIC_VERSION_JSON" | grep -F "$EXPECTED_IMAGE_DIGEST" > /dev/null; then
               echo "Public post-promotion version check failed; rolling back."
               if ! rollback; then
                 exit 1

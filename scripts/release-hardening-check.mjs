@@ -59,6 +59,12 @@ check(!/docker run[^\n]*ghcr\.io\/reedtrullz\/rfs:latest/.test(ci), "deploy must
 check(ci.includes("curl -fsS https://fly.reidar.tech/"), "workflow must verify the public domain after promotion");
 check(ci.includes("https://fly.reidar.tech/rfs-version.json"), "workflow must verify public version metadata");
 check(ci.includes("org.opencontainers.image.revision"), "workflow Docker build must include OCI labels");
+check(ci.includes("EXPECTED_IMAGE_DIGEST=${{ needs.publish.outputs.image_digest }}"), "deploy must source expected image digest from the publish job output");
+check(ci.includes("VERSION_METADATA_PATH") && ci.includes('"imageDigest": "$EXPECTED_IMAGE_DIGEST"'), "deploy must write post-push release metadata containing the immutable image digest");
+check(ci.includes('-v "$VERSION_METADATA_PATH:/usr/share/nginx/html/rfs-version.json:ro"'), "deploy must mount post-push release metadata into canary and production containers");
+check(ci.includes('grep -F "$EXPECTED_IMAGE_DIGEST"'), "deploy must verify served /rfs-version.json contains the immutable image digest");
+check(ci.includes('if ! CANARY_VERSION_JSON="$(curl -fsS http://localhost:3004/rfs-version.json)"') && ci.includes('if ! PUBLIC_VERSION_JSON="$(curl -fsS https://fly.reidar.tech/rfs-version.json)"'), "deploy metadata fetch failures must enter cleanup/rollback paths under set -e");
+check(!ci.includes("RFS_IMAGE_DIGEST=${{ steps.build.outputs.digest }}"), "workflow must not pass the build output digest back into the same Docker build");
 check(ci.includes("PREVIOUS_IMAGE_ID=\"$(docker inspect -f '{{.Image}}' rfs") && ci.includes("PREVIOUS_IMAGE_REF=\"$(docker inspect -f '{{.Config.Image}}' rfs"), "deploy rollback must capture previous image ID and Config.Image fallback");
 check(!ci.includes('"$PREVIOUS_IMAGE" || true'), "deploy rollback container start failure must be fatal");
 check(ci.includes("PREVIOUS_PUBLIC_COMMIT"), "deploy rollback must capture the previous public version commit before promotion");
@@ -109,6 +115,7 @@ check(playbook.includes("existing_prod.container.Image | default(existing_prod.c
 check(existsSync(resolve(root, "scripts/write-version-metadata.mjs")), "release metadata generator script must exist");
 check(packageJson.scripts?.build === "tsc -b && vite build && node scripts/write-version-metadata.mjs dist/rfs-version.json", "build must write release metadata into dist after Vite build");
 check(read("scripts/write-version-metadata.mjs").includes('argv[2] ?? "dist/rfs-version.json"'), "release metadata generator must default to dist/rfs-version.json and accept an output path argument");
+check(read("scripts/write-version-metadata.mjs").includes("RFS_REQUIRE_IMAGE_DIGEST"), "release metadata generator must support a release-mode guard that rejects unknown image digests");
 check(!existsSync(resolve(root, "public/rfs-version.json")), "public/rfs-version.json must not be tracked or generated in the source tree");
 
 if (failures.length > 0) {
