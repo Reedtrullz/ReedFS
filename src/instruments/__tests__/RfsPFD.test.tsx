@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
 import type { FlightPlan } from '@shared/types/fmc';
-import { RfsPFD } from '../RfsPFD';
+import { RfsPFD, deriveFlightDirectorCue } from '../RfsPFD';
 import { useSimStore } from '../../store/simStore';
 import { computeRouteStatus } from '../../sim/systems/navigation';
 import { eulerToQuat } from '../../sim/physics/quaternion';
@@ -306,6 +306,46 @@ describe('RfsPFD', () => {
     expect(screen.getByText('HDG BUG 185')).toBeTruthy();
     expect(screen.getByLabelText('Vertical speed selected bug')).toBeTruthy();
     expect(screen.getByText('VS BUG +700')).toBeTruthy();
+  });
+
+  it('derives FD command bars from a supplied shared target object rather than recomputing route state', () => {
+    const aircraft = structuredClone(useSimStore.getState().aircraft);
+    aircraft.position.alt = 9_000;
+    aircraft.velocity.u = 128.6;
+
+    const cue = deriveFlightDirectorCue({
+      enabled: true,
+      lateralMode: 'OFF',
+      verticalMode: 'OFF',
+      currentHeadingDeg: 180,
+      currentRollDeg: 0,
+      currentPitchDeg: 0,
+      currentVerticalSpeedFpm: 0,
+      altitudeFt: 9_000,
+      selectedHeadingDeg: null,
+      selectedAltitudeFt: null,
+      selectedVerticalSpeedFpm: null,
+      aircraft,
+      flightPlan: null,
+      routeStatus: null,
+      guidanceTargets: {
+        truth: {
+          thrustActive: 'OFF',
+          lateralActive: 'LNAV',
+          verticalActive: 'VS',
+          autopilotStatus: 'CMD_A',
+          lastModeChangeTimestamps: { thrust: 0, lateral: 0, vertical: 0 },
+        },
+        lateral: { mode: 'LNAV', targetHeadingRad: 90 * Math.PI / 180 },
+        vertical: { mode: 'VS', targetVerticalSpeedFpm: 700 },
+        thrust: null,
+      },
+    } as Parameters<typeof deriveFlightDirectorCue>[0] & { guidanceTargets: unknown });
+
+    expect(cue.roll?.mode).toBe('LNAV');
+    expect(cue.roll?.commandDeg).toBeCloseTo(-25.2, 1);
+    expect(cue.pitch?.mode).toBe('VS');
+    expect(cue.pitch?.commandDeg).toBeCloseTo(0.105, 3);
   });
 
   it('shows Flight Director pitch and roll command bars when FD switches and supported AFDS modes exist', () => {

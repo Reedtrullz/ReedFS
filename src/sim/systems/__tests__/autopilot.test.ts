@@ -390,6 +390,7 @@ describe('computeAutopilotCommands VS', () => {
       targets.targetVerticalSpeedFpm,
     );
 
+    expect(targets.targetAltFt).toBe(s.position.alt);
     expect(targets.targetVerticalSpeedFpm).toBe(1000);
     // First VS engagement should not full-deflect the elevator; derivative kick must be bounded.
     expect(commands.elevator).toBeLessThan(0);

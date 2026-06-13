@@ -5,6 +5,7 @@ import { quatToEuler } from '../sim/physics/quaternion';
 import { deriveDisplayFmaTruth } from '../sim/systems/fmaTruth';
 import { routeStatusToNavOutput, type RouteStatusSnapshot } from '../sim/systems/navigation';
 import { computeVNAV } from '../sim/systems/vnav';
+import { resolveGuidanceTargets, type SharedGuidanceTargets } from '../sim/systems/guidanceTargets';
 import { maybeFindPerformanceCardForScenario, type B737VSpeeds } from '../sim/data/performance/b737PerformanceCards';
 import { takeoffCueText } from '../sim/takeoffCue';
 import type { AircraftState } from '../sim/types';
@@ -146,6 +147,7 @@ export interface FlightDirectorCueInput {
   aircraft: AircraftState;
   flightPlan: FlightPlan | null;
   routeStatus: RouteStatusSnapshot | null;
+  guidanceTargets?: SharedGuidanceTargets | null;
 }
 
 const VNAV_FD_MODES: ReadonlySet<VnavFlightDirectorMode> = new Set(['VNAV', 'VNAV_PTH', 'ALT*']);
@@ -190,8 +192,16 @@ function pitchCommandForVerticalSpeedTarget(targetVerticalSpeedFpm: number, curr
 export function deriveFlightDirectorCue(input: FlightDirectorCueInput): FlightDirectorCue {
   if (!input.enabled) return { roll: null, pitch: null };
 
+  const sharedTargets = input.guidanceTargets;
   let roll: FlightDirectorAxisCue | null = null;
-  if (input.lateralMode === 'HDG_SEL') {
+  if (sharedTargets) {
+    if (sharedTargets.lateral) {
+      roll = {
+        commandDeg: rollCommandForHeadingTarget((sharedTargets.lateral.targetHeadingRad * 180) / Math.PI, input.currentHeadingDeg, input.currentRollDeg),
+        mode: sharedTargets.lateral.mode,
+      };
+    }
+  } else if (input.lateralMode === 'HDG_SEL') {
     const selectedHeading = finiteNumber(input.selectedHeadingDeg);
     if (selectedHeading !== null) {
       roll = {
@@ -210,7 +220,20 @@ export function deriveFlightDirectorCue(input: FlightDirectorCueInput): FlightDi
   }
 
   let pitch: FlightDirectorAxisCue | null = null;
-  if (input.verticalMode === 'ALT_HOLD') {
+  if (sharedTargets) {
+    const target = sharedTargets.vertical;
+    if (target?.mode === 'ALT_HOLD' && Number.isFinite(target.targetAltitudeFt)) {
+      pitch = {
+        commandDeg: pitchCommandForAltitudeTarget(target.targetAltitudeFt as number, input.altitudeFt, input.currentPitchDeg),
+        mode: target.mode,
+      };
+    } else if (target && (target.mode === 'VS' || target.mode === 'VNAV_PTH' || target.mode === 'ALT*') && Number.isFinite(target.targetVerticalSpeedFpm)) {
+      pitch = {
+        commandDeg: pitchCommandForVerticalSpeedTarget(target.targetVerticalSpeedFpm as number, input.currentVerticalSpeedFpm, input.currentPitchDeg),
+        mode: target.mode,
+      };
+    }
+  } else if (input.verticalMode === 'ALT_HOLD') {
     const selectedAltitude = finiteNumber(input.selectedAltitudeFt);
     if (selectedAltitude !== null && selectedAltitude > 0) {
       pitch = {
@@ -492,6 +515,7 @@ function useManagedSpeedKt(): number | null {
 export function RfsPFD() {
   const flightPlan = useSimStore((s) => s.flightPlan);
   const routeStatus = useSimStore((s) => s.routeStatus);
+  const apStateForGuidance = useSimStore((s) => s.apState);
   const ias = useSimStore((s) => Math.max(0, computeDerived(s.aircraft, s.wind).ias));
   const altitude = useSimStore((s) => Math.max(0, s.aircraft.position.alt));
   const latitude = useSimStore((s) => s.aircraft.position.lat);
@@ -546,7 +570,14 @@ export function RfsPFD() {
   const aircraftForVnav = {
     position: { lat: latitude, lon: longitude, alt: altitude },
     velocity: { u: velocityU, v: velocityV, w: velocityW },
+    flightPhase,
   } as AircraftState;
+  const sharedGuidanceTargets = resolveGuidanceTargets({
+    aircraft: aircraftForVnav,
+    apState: apStateForGuidance,
+    flightPlan,
+    routeStatus,
+  });
   const fdCue = deriveFlightDirectorCue({
     enabled: flightDirectorEnabled,
     lateralMode,
@@ -562,6 +593,7 @@ export function RfsPFD() {
     aircraft: aircraftForVnav,
     flightPlan,
     routeStatus,
+    guidanceTargets: sharedGuidanceTargets,
   });
 
   return (

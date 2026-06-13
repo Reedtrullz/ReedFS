@@ -4,14 +4,15 @@ import type { FlightPlan } from '@shared/types/fmc';
 import type { WindInfo } from '../weather';
 import {
   computeRouteStatus,
-  routeStatusToNavOutput,
-  type NavOutput,
   type RouteStatusSnapshot,
 } from './navigation';
-import { computeVNAV } from './vnav';
+import {
+  computeN1TargetPercent as computeSharedN1TargetPercent,
+  resolveGuidanceTargets,
+} from './guidanceTargets';
 import { bodyToNed } from '../physics/frames';
 import { computeDerived } from '../physics/derived';
-import { deriveEffectiveAutoflightTruth, type ManagedAltitudeCaptureTruth } from './effectiveAutoflightTruth';
+import { deriveEffectiveAutoflightTruth } from './effectiveAutoflightTruth';
 
 // ── Module-level PID state ──────────────────────────────────────────────
 
@@ -35,12 +36,6 @@ function clampSigned(v: number): number { return clamp(v, -1, 1); }
 function clamp01(v: number): number { return clamp(v, 0, 1); }
 function finiteOrUndefined(v: number | undefined | null): number | undefined {
   return typeof v === 'number' && Number.isFinite(v) ? v : undefined;
-}
-function managedCaptureAltitudeFt(truth: AutoflightTruthState): number | undefined {
-  const managedTruth = truth as ManagedAltitudeCaptureTruth;
-  if (managedTruth.targetAltitudeSource !== 'VNAV_CONSTRAINT') return undefined;
-  const captureTarget = finiteOrUndefined(managedTruth.captureTargetAltFt);
-  return captureTarget !== undefined && captureTarget > 0 ? captureTarget : undefined;
 }
 function radToDeg(r: number): number { return r * 180 / Math.PI; }
 function headingErrorRad(target: number, current: number): number {
@@ -111,11 +106,7 @@ function hasThrustGuidance(truth: AutoflightTruthState): boolean {
 }
 
 export function computeN1TargetPercent(state: AircraftState): number {
-  if (state.flightPhase === 'TAKEOFF') return 92;
-  if (state.flightPhase === 'CLIMB') return 88;
-  if (state.flightPhase === 'CRUISE' || state.position.alt > 18_000) return 72;
-  if (state.flightPhase === 'DESCENT' || state.flightPhase === 'APPROACH' || state.flightPhase === 'LANDED') return 55;
-  return 20;
+  return computeSharedN1TargetPercent(state);
 }
 
 // ── Target resolution ───────────────────────────────────────────────────
@@ -135,75 +126,26 @@ export function resolveAutopilotTargets(
   activeLegIndex?: number | null,
   routeStatusOverride?: RouteStatusSnapshot | null,
 ): Targets {
-  let hdg = state.attitude.psi;
-  let alt = state.position.alt;
-  const selSpd = finiteOrUndefined(ap.boeing.speed);
-  let spd = selSpd ?? 250;
-  let vs: number | undefined;
-  let n1: number | undefined;
-  let navCache: NavOutput | null | undefined;
+  const shared = resolveGuidanceTargets({
+    aircraft: state,
+    apState: ap,
+    flightPlan: flightPlan ?? null,
+    activeLegIndex,
+    routeStatus: routeStatusOverride ?? null,
+    truthOverride: ap.truth,
+  });
 
-  const nav = (): NavOutput | null => {
-    if (navCache !== undefined) return navCache;
-    if (routeStatusOverride) {
-      navCache = routeStatusToNavOutput(routeStatusOverride, { maxInterceptDeg: 25 });
-      return navCache;
-    }
+  const targetAltFt = shared.vertical?.mode === 'VS'
+    ? state.position.alt
+    : shared.vertical?.targetAltitudeFt ?? state.position.alt;
 
-    const idx = typeof activeLegIndex === 'number' && Number.isFinite(activeLegIndex) && activeLegIndex >= 0 ? activeLegIndex : null;
-    if (!flightPlan || idx === null) { navCache = null; return null; }
-    navCache = routeStatusToNavOutput(computeRouteStatus(state, flightPlan, idx), { maxInterceptDeg: 25 });
-    return navCache;
+  return {
+    targetHeadingRad: shared.lateral?.targetHeadingRad ?? state.attitude.psi,
+    targetAltFt,
+    targetSpeedKt: shared.thrust?.targetSpeedKt ?? finiteOrUndefined(ap.boeing.speed) ?? 250,
+    targetVerticalSpeedFpm: shared.vertical?.targetVerticalSpeedFpm,
+    targetN1Percent: shared.thrust?.targetN1Percent,
   };
-
-  if (ap.truth.lateralActive === 'HDG_SEL') {
-    hdg = (finiteOrUndefined(ap.boeing.heading) ?? 0) * Math.PI / 180;
-  }
-  if (ap.truth.verticalActive === 'ALT_HOLD') {
-    const managedCaptureAlt = managedCaptureAltitudeFt(ap.truth);
-    const sa = finiteOrUndefined(ap.boeing.altitude);
-    if (managedCaptureAlt !== undefined) alt = managedCaptureAlt;
-    else if (sa !== undefined && sa > 0) alt = sa;
-  }
-  if (ap.truth.verticalActive === 'VS') {
-    vs = finiteOrUndefined(ap.boeing.verticalSpeed) ?? 0;
-    // Altitude capture: blend into ALT_HOLD near the MCP altitude window
-    const sa = finiteOrUndefined(ap.boeing.altitude);
-    if (sa !== undefined && sa > 0 && vs !== undefined) {
-      const d = sa - state.position.alt;
-      const windowFt = 500;
-      if (Math.abs(d) < windowFt * 2 && ((vs > 0 && d <= windowFt) || (vs < 0 && d >= -windowFt))) {
-        vs = vs * Math.max(0, Math.abs(d) / windowFt);
-      }
-    }
-  }
-  if (ap.truth.lateralActive === 'LNAV') {
-    const n = nav();
-    if (n) hdg = n.desiredTrack;
-  }
-
-  // ── VNAV: expose targets from the active route leg ──
-  const isVnav = ap.truth.verticalActive === 'VNAV' || ap.truth.verticalActive === 'VNAV_PTH' || ap.truth.verticalActive === 'ALT*';
-  if (isVnav && flightPlan) {
-    const n = nav();
-    if (n) {
-      const v = computeVNAV(state, flightPlan, n);
-      if (v.available) {
-        if (v.altitudeConstraint && v.verticalMode !== 'VNAV') {
-          alt = v.targetAlt;
-          vs = v.targetVs;
-        }
-        if (v.speedConstraint && selSpd === undefined && ap.truth.thrustActive === 'SPEED') {
-          spd = v.targetSpeedKt ?? spd;
-        }
-      }
-    }
-  }
-  if (ap.truth.thrustActive === 'N1' && ap.boeing.autothrottleArm) {
-    n1 = computeN1TargetPercent(state);
-  }
-
-  return { targetHeadingRad: hdg, targetAltFt: alt, targetSpeedKt: spd, targetVerticalSpeedFpm: vs, targetN1Percent: n1 };
 }
 
 // ── Inner loops: attitude control ───────────────────────────────────────
