@@ -12,7 +12,8 @@ import type { AutopilotState, LateralMode, ThrustMode, VerticalMode } from '@sha
 import type { FlightPlan } from '@shared/types/fmc';
 import type { WindInfo } from '../../weather';
 import { computeDerived } from '../../physics/derived';
-import { createNoRouteStatus, type RouteStatusSnapshot } from '../navigation';
+import { createNoRouteStatus, computeRouteStatus, type RouteStatusSnapshot } from '../navigation';
+import { deriveEffectiveAutoflightTruth } from '../effectiveAutoflightTruth';
 
 beforeEach(() => resetAutopilotPID());
 
@@ -457,6 +458,38 @@ describe('resolveAutopilotTargets VNAV', () => {
       expect(targets?.targetVerticalSpeedFpm).toBeUndefined();
     },
   );
+
+  it('keeps the VNAV managed capture altitude through effective ALT_HOLD instead of reverting to MCP altitude', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.position.lat = 47.45;
+    s.position.lon = -122.31;
+    s.position.alt = 10020;
+    s.velocity.u = 128.6;
+    const ap = makeAp('LNAV', 'VNAV', 'SPEED');
+    ap.boeing.lnav = true;
+    ap.boeing.vnav = true;
+    ap.boeing.altitude = 30000;
+    const fp: FlightPlan = {
+      origin: 'KSEA',
+      destination: 'KPDX',
+      flightNumber: 'TST795',
+      route: 'KSEA OLM',
+      waypoints: [
+        { ident: 'KSEA', lat: 47.45, lon: -122.31, discontinuity: false },
+        { ident: 'OLM', lat: 46.97, lon: -122.9, discontinuity: false, altitudeConstraint: { type: 'AT', altitude: 10000 } },
+      ],
+    };
+    const routeStatus = computeRouteStatus(s, fp, 0);
+    const truth = deriveEffectiveAutoflightTruth(ap, { aircraft: s, flightPlan: fp, routeStatus });
+
+    expect(truth.verticalActive).toBe('ALT_HOLD');
+    const targets = resolveAutopilotTargets(s, { ...ap, truth }, fp, 0, routeStatus);
+    const commands = computeAutopilotCommandsForState(s, ap, fp, 1 / 60, 0, routeStatus);
+
+    expect(targets.targetAltFt).toBe(10000);
+    expect(targets.targetAltFt).not.toBe(30000);
+    expect(commands.elevator).toBeGreaterThanOrEqual(0);
+  });
 
   it('uses VNAV_PTH active mode as a path-tracking VNAV command', () => {
     const s = createInitialState(B737_800_SPEC);

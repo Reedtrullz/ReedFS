@@ -141,6 +141,24 @@ describe('deriveDisplayFmaTruth', () => {
     expect(fma.verticalActive).toBe('VNAV_PTH');
   });
 
+  it('shows ALT_HOLD at VNAV managed capture while preserving the managed constraint source', () => {
+    const aircraft = aircraftAtRoute();
+    aircraft.position.alt = 10020;
+    const raw = apState();
+    raw.boeing.altitude = 30000;
+    const flightPlan = constrainedRoute();
+    const routeStatus = computeRouteStatus(aircraft, flightPlan, 0);
+
+    const fma = deriveDisplayFmaTruth(raw, { aircraft, flightPlan, routeStatus }) as ReturnType<typeof deriveDisplayFmaTruth> & {
+      targetAltitudeSource?: string;
+      captureTargetAltFt?: number;
+    };
+
+    expect(fma.verticalActive).toBe('ALT_HOLD');
+    expect(fma.targetAltitudeSource).toBe('VNAV_CONSTRAINT');
+    expect(fma.captureTargetAltFt).toBe(10000);
+  });
+
   it('downgrades VNAV-family truth when the active waypoint has no actionable VNAV constraint', () => {
     const aircraft = aircraftAtRoute();
     const flightPlan = unconstrainedRoute();

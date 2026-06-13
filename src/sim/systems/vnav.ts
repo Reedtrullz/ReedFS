@@ -8,10 +8,14 @@ const MAX_VNAV_VS_FPM = 3000;
 const VNAV_ALT_HOLD_CAPTURE_FT = 50;
 const VNAV_ALT_ACQUIRE_FT = 250;
 
+export type VnavAltitudeTargetSource = 'VNAV_CONSTRAINT';
+
 export interface VnavOutput {
   targetAlt: number;
   targetVs: number;
   altitudeConstraint: boolean;
+  targetAltitudeSource?: VnavAltitudeTargetSource;
+  captureTargetAltFt?: number;
   /** Honest vertical mode implied by the current VNAV path lifecycle. */
   verticalMode: VerticalMode | null;
   /** True only when the active waypoint has an actionable VNAV altitude and/or speed target. */
@@ -110,6 +114,8 @@ export function computeVNAV(
     targetAlt: altitudeTarget ?? state.position.alt,
     targetVs: hasAltitudeTarget ? requiredVerticalSpeedFpm(state, altitudeTarget, nav) : 0,
     altitudeConstraint: hasAltitudeTarget,
+    targetAltitudeSource: hasAltitudeTarget ? 'VNAV_CONSTRAINT' : undefined,
+    captureTargetAltFt: altitudeTarget,
     verticalMode,
     available: true,
     unavailableReason: null,

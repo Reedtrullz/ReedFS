@@ -11,7 +11,7 @@ import {
 import { computeVNAV } from './vnav';
 import { bodyToNed } from '../physics/frames';
 import { computeDerived } from '../physics/derived';
-import { deriveEffectiveAutoflightTruth } from './effectiveAutoflightTruth';
+import { deriveEffectiveAutoflightTruth, type ManagedAltitudeCaptureTruth } from './effectiveAutoflightTruth';
 
 // ── Module-level PID state ──────────────────────────────────────────────
 
@@ -35,6 +35,12 @@ function clampSigned(v: number): number { return clamp(v, -1, 1); }
 function clamp01(v: number): number { return clamp(v, 0, 1); }
 function finiteOrUndefined(v: number | undefined | null): number | undefined {
   return typeof v === 'number' && Number.isFinite(v) ? v : undefined;
+}
+function managedCaptureAltitudeFt(truth: AutoflightTruthState): number | undefined {
+  const managedTruth = truth as ManagedAltitudeCaptureTruth;
+  if (managedTruth.targetAltitudeSource !== 'VNAV_CONSTRAINT') return undefined;
+  const captureTarget = finiteOrUndefined(managedTruth.captureTargetAltFt);
+  return captureTarget !== undefined && captureTarget > 0 ? captureTarget : undefined;
 }
 function radToDeg(r: number): number { return r * 180 / Math.PI; }
 function headingErrorRad(target: number, current: number): number {
@@ -150,8 +156,10 @@ export function resolveAutopilotTargets(
     hdg = (finiteOrUndefined(ap.boeing.heading) ?? 0) * Math.PI / 180;
   }
   if (ap.truth.verticalActive === 'ALT_HOLD') {
+    const managedCaptureAlt = managedCaptureAltitudeFt(ap.truth);
     const sa = finiteOrUndefined(ap.boeing.altitude);
-    if (sa !== undefined && sa > 0) alt = sa;
+    if (managedCaptureAlt !== undefined) alt = managedCaptureAlt;
+    else if (sa !== undefined && sa > 0) alt = sa;
   }
   if (ap.truth.verticalActive === 'VS') {
     vs = finiteOrUndefined(ap.boeing.verticalSpeed) ?? 0;

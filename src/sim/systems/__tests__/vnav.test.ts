@@ -147,6 +147,13 @@ describe('computeVNAV', () => {
     captured.velocity.u = 128.6;
 
     expect(computeVNAV(acquiring, fp, navOut).verticalMode).toBe('ALT*');
-    expect(computeVNAV(captured, fp, navOut).verticalMode).toBe('ALT_HOLD');
+    const capturedVnav = computeVNAV(captured, fp, navOut) as ReturnType<typeof computeVNAV> & {
+      targetAltitudeSource?: string;
+      captureTargetAltFt?: number;
+    };
+    expect(capturedVnav.verticalMode).toBe('ALT_HOLD');
+    expect(capturedVnav.targetAlt).toBe(10000);
+    expect(capturedVnav.targetAltitudeSource).toBe('VNAV_CONSTRAINT');
+    expect(capturedVnav.captureTargetAltFt).toBe(10000);
   });
 });

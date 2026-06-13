@@ -8,9 +8,43 @@ import type {
 import type { FlightPlan } from '@shared/types/fmc';
 import type { AircraftState } from '../types';
 import { routeStatusToNavOutput, type RouteStatusSnapshot } from './navigation';
-import { computeVNAV } from './vnav';
+import { computeVNAV, type VnavOutput } from './vnav';
 
 const VNAV_FAMILY = new Set<VerticalMode>(['VNAV', 'VNAV_PTH', 'ALT*']);
+
+export type ManagedAltitudeCaptureTruth = AutoflightTruthState & {
+  targetAltitudeSource?: VnavOutput['targetAltitudeSource'];
+  captureTargetAltFt?: number;
+};
+
+function omitManagedAltitudeCaptureMetadata(truth: AutoflightTruthState): AutoflightTruthState {
+  const baseTruth = { ...(truth as ManagedAltitudeCaptureTruth) };
+  delete baseTruth.targetAltitudeSource;
+  delete baseTruth.captureTargetAltFt;
+  return baseTruth;
+}
+
+function resolveVnavOutput(
+  ap: AutopilotState,
+  context: EffectiveAutoflightTruthContext,
+): VnavOutput | null {
+  if (!ap.boeing.vnav) return null;
+  const aircraft = context.aircraft;
+  const flightPlan = context.flightPlan;
+  const routeStatus = context.routeStatus;
+  if (!aircraft || !flightPlan || !routeStatus?.lnavAvailable) return null;
+  const nav = routeStatusToNavOutput(routeStatus);
+  if (!nav) return null;
+  return computeVNAV(aircraft, flightPlan, nav);
+}
+
+function vnavManagedAltitudeCaptureMetadata(vnav: VnavOutput | null): Partial<ManagedAltitudeCaptureTruth> {
+  if (!vnav?.available || !vnav.altitudeConstraint || vnav.targetAltitudeSource !== 'VNAV_CONSTRAINT') return {};
+  return {
+    targetAltitudeSource: vnav.targetAltitudeSource,
+    captureTargetAltFt: vnav.captureTargetAltFt,
+  };
+}
 
 export interface EffectiveAutoflightTruthContext {
   aircraft?: AircraftState | null;
@@ -80,25 +114,17 @@ function deriveLateralMode(ap: AutopilotState, routeStatus: RouteStatusSnapshot 
   return 'OFF';
 }
 
-function deriveVnavMode(
-  ap: AutopilotState,
-  context: EffectiveAutoflightTruthContext,
-): VerticalMode {
-  if (!ap.boeing.vnav) return 'OFF';
-  const aircraft = context.aircraft;
-  const flightPlan = context.flightPlan;
-  const routeStatus = context.routeStatus;
-  if (!aircraft || !flightPlan || !routeStatus?.lnavAvailable) return 'OFF';
-  const nav = routeStatusToNavOutput(routeStatus);
-  if (!nav) return 'OFF';
-  const vnav = computeVNAV(aircraft, flightPlan, nav);
-  return vnav.available && vnav.verticalMode ? vnav.verticalMode : 'OFF';
+function deriveVnavMode(vnav: VnavOutput | null): VerticalMode {
+  return vnav?.available && vnav.verticalMode ? vnav.verticalMode : 'OFF';
 }
 
-function deriveVerticalMode(ap: AutopilotState, context: EffectiveAutoflightTruthContext): VerticalMode {
+function deriveVerticalMode(
+  ap: AutopilotState,
+  vnav: VnavOutput | null,
+): VerticalMode {
   if (ap.truth.verticalActive === 'ALT_HOLD') return ap.boeing.altHold ? 'ALT_HOLD' : 'OFF';
   if (ap.truth.verticalActive === 'VS') return ap.boeing.vs ? 'VS' : 'OFF';
-  if (VNAV_FAMILY.has(ap.truth.verticalActive)) return deriveVnavMode(ap, context);
+  if (VNAV_FAMILY.has(ap.truth.verticalActive)) return deriveVnavMode(vnav);
   if (ap.truth.verticalActive === 'LVL_CHG') return ap.boeing.lvlChg ? 'LVL_CHG' : 'OFF';
   if (ap.truth.verticalActive === 'G_S') return ap.boeing.app ? 'G_S' : 'OFF';
   return 'OFF';
@@ -116,11 +142,16 @@ export function deriveEffectiveAutoflightTruth(
     return offAutoflightTruth(apState);
   }
 
+  const vnav = VNAV_FAMILY.has(apState.truth.verticalActive) ? resolveVnavOutput(apState, context) : null;
+  const verticalActive = deriveVerticalMode(apState, vnav);
+  const baseTruth = omitManagedAltitudeCaptureMetadata(apState.truth);
+
   return {
-    ...apState.truth,
+    ...baseTruth,
     autopilotStatus: apState.truth.autopilotStatus,
     thrustActive,
     lateralActive: deriveLateralMode(apState, context.routeStatus),
-    verticalActive: deriveVerticalMode(apState, context),
+    verticalActive,
+    ...vnavManagedAltitudeCaptureMetadata(vnav),
   };
 }
