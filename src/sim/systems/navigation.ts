@@ -21,6 +21,7 @@ export interface NavOutput {
 export interface RouteStatusSnapshot {
   routeName: string;
   routeValid: boolean;
+  routeComplete: boolean;
   lnavAvailable: boolean;
   lnavUnavailableReason: string | null;
   activeLegIndex: number | null;
@@ -296,6 +297,7 @@ export function createNoRouteStatus(
   return {
     routeName: routeNameFor(flightPlan),
     routeValid: false,
+    routeComplete: false,
     lnavAvailable: false,
     lnavUnavailableReason: reason,
     activeLegIndex: null,
@@ -330,7 +332,12 @@ export function routeStatusToNavOutput(
   routeStatus: RouteStatusSnapshot | null | undefined,
   options: RouteStatusToNavOutputOptions = {},
 ): NavOutput | null {
-  if (!routeStatus?.routeValid || !routeStatus.lnavAvailable || !isFiniteNumber(routeStatus.desiredTrackRad)) return null;
+  if (
+    !routeStatus?.routeValid
+    || routeStatus.routeComplete
+    || !routeStatus.lnavAvailable
+    || !isFiniteNumber(routeStatus.desiredTrackRad)
+  ) return null;
 
   const activeWaypointIndex = isFiniteNumber(routeStatus.toWaypointIndex)
     ? routeStatus.toWaypointIndex
@@ -427,12 +434,22 @@ export function computeRouteStatus(
   const turnAngleRad = nextDesiredTrackRad === null ? null : normalizeSignedRad(nextDesiredTrackRad - desiredTrackRad);
   const turnAnticipationDistanceM = computeTurnAnticipationDistanceM(speedMps, turnAngleRad);
   const turnAnticipationDistanceNm = turnAnticipationDistanceM === null ? null : turnAnticipationDistanceM / M_PER_NM;
+  const waypointReached = distanceToNextM <= captureRadiusM;
+  const routeComplete = legIndex === legs.length - 1
+    && sequencingReasonForLeg(
+      state,
+      leg,
+      undefined,
+      captureRadiusM,
+      turnAnticipationEnabled,
+    ) !== null;
 
   return {
     routeName: route.routeName,
     routeValid: true,
-    lnavAvailable: true,
-    lnavUnavailableReason: null,
+    routeComplete,
+    lnavAvailable: !routeComplete,
+    lnavUnavailableReason: routeComplete ? 'route complete' : null,
     activeLegIndex: leg.legIndex,
     activeLegCount: legs.length,
     fromWaypointIndex: leg.fromWaypointIndex,
@@ -452,7 +469,7 @@ export function computeRouteStatus(
     turnAnticipationDistanceM,
     turnAnticipationDistanceNm,
     etaMinutes: speedMps ? distanceToNextM / speedMps / 60 : null,
-    waypointReached: distanceToNextM <= captureRadiusM,
+    waypointReached,
     sequenced,
   };
 }

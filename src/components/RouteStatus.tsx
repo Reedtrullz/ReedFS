@@ -82,7 +82,11 @@ export function RouteStatus() {
       <div style={labelStyle}>Route status</div>
       <div style={routeNameStyle}>{routeStatus.routeName}</div>
 
-      {routeStatus.lnavAvailable ? (
+      {routeStatus.routeComplete ? (
+        <div style={{ color: '#7dffb2', fontSize: 12, lineHeight: 1.45, marginTop: 10 }}>
+          Arrived — route complete
+        </div>
+      ) : routeStatus.lnavAvailable ? (
         <>
           <div style={{ ...rowStyle, marginTop: 10 }}>
             <span style={labelStyle}>Active</span>

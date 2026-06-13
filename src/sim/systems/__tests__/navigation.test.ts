@@ -255,6 +255,27 @@ describe('routeStatusToNavOutput', () => {
 });
 
 describe('computeRouteStatus', () => {
+  it('marks the route complete when capturing the final waypoint on the final leg', () => {
+    const fp = makePlan([
+      { ident: 'ORIG', lat: 47.0, lon: -122.0, discontinuity: false },
+      { ident: 'MID', lat: 47.1, lon: -122.0, discontinuity: false },
+      { ident: 'DEST', lat: 47.2, lon: -122.0, discontinuity: false },
+    ]);
+    const state = makeState(47.2, -122.0);
+
+    const status = computeRouteStatus(state, fp, 1, { captureRadiusM: 100 });
+
+    expect(status.routeValid).toBe(true);
+    expect(status.routeComplete).toBe(true);
+    expect(status.lnavAvailable).toBe(false);
+    expect(status.lnavUnavailableReason).toMatch(/route complete/i);
+    expect(status.activeLegIndex).toBe(1);
+    expect(status.fromIdent).toBe('MID');
+    expect(status.nextWaypointIdent).toBe('DEST');
+    expect(status.waypointReached).toBe(true);
+    expect(routeStatusToNavOutput(status)).toBeNull();
+  });
+
   it('sequences to the next leg inside the capture radius and preserves original waypoint indexes', () => {
     const fp = makePlan([
       { ident: 'ORIG', lat: 47.0, lon: -122.0, discontinuity: false },

@@ -8,6 +8,7 @@ function routeStatus(overrides: Partial<RouteStatusSnapshot> = {}): RouteStatusS
   return {
     routeName: 'KSEA→KPDX',
     routeValid: true,
+    routeComplete: false,
     lnavAvailable: true,
     lnavUnavailableReason: null,
     activeLegIndex: 0,
@@ -113,6 +114,38 @@ describe('RouteStatus', () => {
 
     expect(screen.getByText('KSEA→KPDX')).toBeTruthy();
     expect(screen.getByText(/LNAV unavailable: missing coordinates for waypoint BROKEN/i)).toBeTruthy();
+    expect(screen.queryByText(/DTG/i)).toBeNull();
+  });
+
+  it('renders an arrived route complete state instead of an active LNAV leg', () => {
+    useSimStore.setState({
+      routeStatus: routeStatus({
+        routeComplete: true,
+        lnavAvailable: false,
+        lnavUnavailableReason: 'route complete',
+        activeLegIndex: 1,
+        activeLegCount: 2,
+        fromWaypointIndex: 1,
+        toWaypointIndex: 2,
+        fromIdent: 'OLM',
+        nextWaypointIdent: 'KPDX',
+        distanceToNextM: 0,
+        distanceToNextNm: 0,
+        desiredTrackRad: null,
+        desiredTrackDegTrue: null,
+        etaMinutes: null,
+        waypointReached: true,
+      }),
+    });
+
+    render(<RouteStatus />);
+
+    expect(screen.getByText('KSEA→KPDX')).toBeTruthy();
+    expect(screen.getByText(/arrived/i)).toBeTruthy();
+    expect(screen.getByText(/route complete/i)).toBeTruthy();
+    expect(screen.queryByText(/LNAV unavailable/i)).toBeNull();
+    expect(screen.queryByText(/Active/i)).toBeNull();
+    expect(screen.queryByText(/OLM → KPDX/i)).toBeNull();
     expect(screen.queryByText(/DTG/i)).toBeNull();
   });
 });
