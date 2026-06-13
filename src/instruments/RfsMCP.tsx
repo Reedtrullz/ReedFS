@@ -286,12 +286,14 @@ export function RfsMCP() {
       </div>
       <div>
         <button
+          aria-pressed={displayedLatActive === 'HDG_SEL'}
           onClick={() => toggleMode('HDG_SEL')}
           style={displayedLatActive === 'HDG_SEL' ? activeStyle : btnStyle}
         >
           HDG
         </button>
         <button
+          aria-pressed={displayedLatActive === 'LNAV'}
           disabled={!lnavAvailable}
           title={lnavTitle}
           onClick={() => toggleMode('LNAV')}
@@ -302,6 +304,7 @@ export function RfsMCP() {
       </div>
       <div>
         <button
+          aria-pressed={vertActive === 'ALT_HOLD' && !vnavActive}
           onClick={() => toggleMode('ALT_HOLD')}
           style={vertActive === 'ALT_HOLD' && !vnavActive ? activeStyle : btnStyle}
         >
@@ -309,6 +312,7 @@ export function RfsMCP() {
         </button>
         {vnavAvailable && (
           <button
+            aria-pressed={vnavActive}
             onClick={() => toggleMode('VNAV')}
             style={vnavActive ? activeStyle : btnStyle}
           >
@@ -316,6 +320,7 @@ export function RfsMCP() {
           </button>
         )}
         <button
+          aria-pressed={vertActive === 'VS'}
           onClick={() => toggleMode('VS')}
           style={vertActive === 'VS' ? activeStyle : btnStyle}
         >
@@ -324,12 +329,14 @@ export function RfsMCP() {
       </div>
       <div>
         <button
+          aria-pressed={thrActive === 'SPEED'}
           onClick={() => toggleMode('SPEED')}
           style={thrActive === 'SPEED' ? activeStyle : btnStyle}
         >
           SPD
         </button>
         <button
+          aria-pressed={thrActive === 'N1'}
           onClick={() => toggleMode('N1')}
           style={thrActive === 'N1' ? activeStyle : btnStyle}
         >
