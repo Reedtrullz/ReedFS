@@ -5,6 +5,24 @@ import {
   b737PerformanceCards,
   findPerformanceCardForScenario,
 } from '../performance/b737PerformanceCards';
+import * as b737PerformanceFixtures from '../performance/b737PerformanceCards';
+
+interface FixtureWithOwnership {
+  ownership: {
+    label: string;
+    runtimeConsumers: string[];
+    testConsumers: string[];
+    sourceNote: string;
+  };
+}
+
+const fixtureCollections = [
+  ['stall speed', (b737PerformanceFixtures as { b737StallSpeedFixtures?: FixtureWithOwnership[] }).b737StallSpeedFixtures ?? []],
+  ['clean climb', (b737PerformanceFixtures as { b737CleanClimbFixtures?: FixtureWithOwnership[] }).b737CleanClimbFixtures ?? []],
+  ['cruise trim', (b737PerformanceFixtures as { b737CruiseTrimFixtures?: FixtureWithOwnership[] }).b737CruiseTrimFixtures ?? []],
+  ['approach VREF', (b737PerformanceFixtures as { b737ApproachVrefFixtures?: FixtureWithOwnership[] }).b737ApproachVrefFixtures ?? []],
+  ['engine lapse', (b737PerformanceFixtures as { b737EngineLapseFixtures?: FixtureWithOwnership[] }).b737EngineLapseFixtures ?? []],
+] as const;
 
 describe('B737 performance-card scenario assertions', () => {
   it('defines one takeoff performance card for each playable scenario', () => {
@@ -34,6 +52,17 @@ describe('B737 performance-card scenario assertions', () => {
     expect(card.ownership.runtimeConsumers).toContain('src/instruments/RfsPFD.tsx');
     expect(card.ownership.testConsumers).toContain('src/sim/data/__tests__/performanceCards.test.ts');
     expect(card.ownership.sourceNote).toMatch(/not a certified Boeing AFM table/i);
+  });
+
+  it.each(fixtureCollections)('labels %s fixture ownership as placeholder-only, non-AFM data', (_label, fixtures) => {
+    expect(fixtures.length).toBeGreaterThan(0);
+    for (const fixture of fixtures) {
+      expect(fixture.ownership.label).toBe('placeholder-performance-envelope-fixture');
+      expect(fixture.ownership.runtimeConsumers).toEqual([]);
+      expect(fixture.ownership.testConsumers.length).toBeGreaterThan(0);
+      expect(fixture.ownership.sourceNote).toMatch(/not certified/i);
+      expect(fixture.ownership.sourceNote).toMatch(/not an? AFM/i);
+    }
   });
 
   it('rejects a stale card when the scenario weight or configuration drifts', () => {

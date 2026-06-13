@@ -14,6 +14,61 @@ export interface B737VSpeeds {
   v2Kt: number;
 }
 
+export interface B737StallSpeedFixture {
+  name: string;
+  grossWeightKg: number;
+  altitudeFt: number;
+  iasKt: number;
+  flapSetting: number;
+  gearDown: boolean;
+  expectedStallIasKt: [number, number];
+  expectedClMax: [number, number];
+  expectedPeakAoADeg: [number, number];
+  ownership: B737PerformanceDataOwnership;
+}
+
+export interface B737CleanClimbFixture {
+  name: string;
+  grossWeightKg: number;
+  altitudeFt: number;
+  iasKt: number;
+  n1Percent: number;
+  expectedClimbFpm: [number, number];
+  ownership: B737PerformanceDataOwnership;
+}
+
+export interface B737CruiseTrimFixture {
+  name: string;
+  grossWeightKg: number;
+  altitudeFt: number;
+  iasKt: number;
+  expectedAoADeg: [number, number];
+  ownership: B737PerformanceDataOwnership;
+}
+
+export interface B737ApproachVrefFixture {
+  name: string;
+  grossWeightKg: number;
+  heightAglFt: number;
+  vrefKt: number;
+  targetApproachIasKt: number;
+  flapSetting: number;
+  expectedAoADeg: [number, number];
+  ownership: B737PerformanceDataOwnership;
+}
+
+export interface B737EngineLapseFixture {
+  name: string;
+  n1Percent: number;
+  altitudeFt: number;
+  mach: number;
+  oatC: number;
+  oatModeled: boolean;
+  expectedThrustN: [number, number];
+  expectedSeaLevelStaticRatio: [number, number];
+  ownership: B737PerformanceDataOwnership;
+}
+
 export interface B737CleanClimbEnvelope {
   altitudeFt: number;
   iasKt: number;
@@ -24,6 +79,7 @@ export interface B737CleanClimbEnvelope {
 export interface B737ApproachEnvelope {
   heightAglFt: number;
   iasKt: number;
+  vrefKt: number;
   flapSetting: number;
   expectedAoADeg: [number, number];
 }
@@ -43,6 +99,195 @@ export interface B737TakeoffPerformanceCard {
   notes: string[];
 }
 
+const placeholderFixtureOwnership: B737PerformanceDataOwnership = {
+  label: 'placeholder-performance-envelope-fixture',
+  runtimeConsumers: [],
+  testConsumers: [
+    'src/sim/physics/__tests__/stallEnvelope.test.ts',
+    'src/sim/physics/__tests__/performanceEnvelope.test.ts',
+    'src/sim/systems/__tests__/engine.test.ts',
+    'src/sim/data/__tests__/performanceCards.test.ts',
+  ],
+  sourceNote: 'RFS placeholder gameplay envelope fixture for automated tests only; broad sanity bounds, not certified Boeing data and not an AFM table.',
+};
+
+export const b737StallSpeedFixtures: B737StallSpeedFixture[] = [
+  {
+    name: 'Medium clean stall placeholder - flaps up gear up',
+    grossWeightKg: 62_000,
+    altitudeFt: 5_000,
+    iasKt: 170,
+    flapSetting: 0,
+    gearDown: false,
+    expectedStallIasKt: [135, 145],
+    expectedClMax: [1.45, 1.65],
+    expectedPeakAoADeg: [10, 20],
+    ownership: placeholderFixtureOwnership,
+  },
+  {
+    name: 'Medium landing stall placeholder - flaps 30 gear down',
+    grossWeightKg: 62_000,
+    altitudeFt: 1_500,
+    iasKt: 135,
+    flapSetting: 30,
+    gearDown: true,
+    expectedStallIasKt: [106, 116],
+    expectedClMax: [2.3, 2.6],
+    expectedPeakAoADeg: [8, 22],
+    ownership: placeholderFixtureOwnership,
+  },
+  {
+    name: 'Light landing stall placeholder - flaps 30 gear down',
+    grossWeightKg: 50_413,
+    altitudeFt: 1_500,
+    iasKt: 135,
+    flapSetting: 30,
+    gearDown: true,
+    expectedStallIasKt: [96, 106],
+    expectedClMax: [2.3, 2.6],
+    expectedPeakAoADeg: [8, 22],
+    ownership: placeholderFixtureOwnership,
+  },
+];
+
+export const b737CleanClimbFixtures: B737CleanClimbFixture[] = [
+  {
+    name: 'Light clean climb placeholder - 10k ft / 250 KIAS / 72% N1',
+    grossWeightKg: 50_413,
+    altitudeFt: 10_000,
+    iasKt: 250,
+    n1Percent: 72,
+    expectedClimbFpm: [2_000, 4_500],
+    ownership: placeholderFixtureOwnership,
+  },
+  {
+    name: 'Medium clean climb placeholder - 10k ft / 250 KIAS / 72% N1',
+    grossWeightKg: 61_913,
+    altitudeFt: 10_000,
+    iasKt: 250,
+    n1Percent: 72,
+    expectedClimbFpm: [1_500, 3_500],
+    ownership: placeholderFixtureOwnership,
+  },
+  {
+    name: 'Heavy clean climb placeholder - 10k ft / 250 KIAS / 72% N1',
+    grossWeightKg: 78_000,
+    altitudeFt: 10_000,
+    iasKt: 250,
+    n1Percent: 72,
+    expectedClimbFpm: [500, 2_800],
+    ownership: placeholderFixtureOwnership,
+  },
+];
+
+export const b737CruiseTrimFixtures: B737CruiseTrimFixture[] = [
+  {
+    name: 'Light clean cruise trim placeholder - 8k ft / 240 KIAS',
+    grossWeightKg: 50_413,
+    altitudeFt: 8_000,
+    iasKt: 240,
+    expectedAoADeg: [-1, 3],
+    ownership: placeholderFixtureOwnership,
+  },
+  {
+    name: 'Medium clean cruise trim placeholder - 10k ft / 280 KIAS',
+    grossWeightKg: 61_913,
+    altitudeFt: 10_000,
+    iasKt: 280,
+    expectedAoADeg: [-1, 2.5],
+    ownership: placeholderFixtureOwnership,
+  },
+  {
+    name: 'Medium high-cruise trim placeholder - 30k ft / 260 KIAS',
+    grossWeightKg: 61_913,
+    altitudeFt: 30_000,
+    iasKt: 260,
+    expectedAoADeg: [-1, 3],
+    ownership: placeholderFixtureOwnership,
+  },
+];
+
+export const b737ApproachVrefFixtures: B737ApproachVrefFixture[] = [
+  {
+    name: 'Medium flaps-30 VREF placeholder - VREF 135 plus 5 kt additive',
+    grossWeightKg: 61_913,
+    heightAglFt: 1_500,
+    vrefKt: 135,
+    targetApproachIasKt: 140,
+    flapSetting: 30,
+    expectedAoADeg: [4, 8],
+    ownership: placeholderFixtureOwnership,
+  },
+  {
+    name: 'Light flaps-30 VREF placeholder - VREF 130 plus 5 kt additive',
+    grossWeightKg: 50_413,
+    heightAglFt: 1_500,
+    vrefKt: 130,
+    targetApproachIasKt: 135,
+    flapSetting: 30,
+    expectedAoADeg: [2.5, 6.5],
+    ownership: placeholderFixtureOwnership,
+  },
+];
+
+export const b737EngineLapseFixtures: B737EngineLapseFixture[] = [
+  {
+    name: 'Sea-level takeoff lapse placeholder - 90% N1 / Mach 0.20',
+    n1Percent: 90,
+    altitudeFt: 0,
+    mach: 0.2,
+    oatC: 15,
+    oatModeled: false,
+    expectedThrustN: [95_000, 101_000],
+    expectedSeaLevelStaticRatio: [0.98, 1.02],
+    ownership: placeholderFixtureOwnership,
+  },
+  {
+    name: 'Climb lapse placeholder - 10k ft / Mach 0.45 / 90% N1',
+    n1Percent: 90,
+    altitudeFt: 10_000,
+    mach: 0.45,
+    oatC: -5,
+    oatModeled: false,
+    expectedThrustN: [70_000, 76_000],
+    expectedSeaLevelStaticRatio: [0.70, 0.78],
+    ownership: placeholderFixtureOwnership,
+  },
+  {
+    name: 'Cruise lapse OAT documentation - cold day 35k ft / Mach 0.78',
+    n1Percent: 90,
+    altitudeFt: 35_000,
+    mach: 0.78,
+    oatC: -54,
+    oatModeled: false,
+    expectedThrustN: [32_000, 37_000],
+    expectedSeaLevelStaticRatio: [0.33, 0.38],
+    ownership: placeholderFixtureOwnership,
+  },
+  {
+    name: 'Cruise lapse OAT documentation - hot day 35k ft / Mach 0.78',
+    n1Percent: 90,
+    altitudeFt: 35_000,
+    mach: 0.78,
+    oatC: -20,
+    oatModeled: false,
+    expectedThrustN: [32_000, 37_000],
+    expectedSeaLevelStaticRatio: [0.33, 0.38],
+    ownership: placeholderFixtureOwnership,
+  },
+  {
+    name: 'High-Mach sea-level lapse placeholder - Mach 0.82 / 90% N1',
+    n1Percent: 90,
+    altitudeFt: 0,
+    mach: 0.82,
+    oatC: 15,
+    oatModeled: false,
+    expectedThrustN: [74_000, 79_000],
+    expectedSeaLevelStaticRatio: [0.74, 0.82],
+    ownership: placeholderFixtureOwnership,
+  },
+];
+
 export const b737PerformanceCards: B737TakeoffPerformanceCard[] = [
   {
     scenarioId: 'enva-tutorial',
@@ -61,6 +306,7 @@ export const b737PerformanceCards: B737TakeoffPerformanceCard[] = [
     approach: {
       heightAglFt: 1_500,
       iasKt: 140,
+      vrefKt: 135,
       flapSetting: 30,
       expectedAoADeg: [1, 9],
     },
@@ -95,6 +341,7 @@ export const b737PerformanceCards: B737TakeoffPerformanceCard[] = [
     approach: {
       heightAglFt: 1_500,
       iasKt: 140,
+      vrefKt: 135,
       flapSetting: 30,
       expectedAoADeg: [1, 9],
     },
@@ -129,6 +376,7 @@ export const b737PerformanceCards: B737TakeoffPerformanceCard[] = [
     approach: {
       heightAglFt: 1_500,
       iasKt: 135,
+      vrefKt: 130,
       flapSetting: 30,
       expectedAoADeg: [0, 8],
     },

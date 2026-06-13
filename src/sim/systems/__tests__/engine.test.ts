@@ -3,8 +3,30 @@ import { computeEngineThrustN, updateEngines } from '../engine';
 import { createInitialState, B737_800_SPEC } from '../../types';
 import type { ControlInputs } from '../../types';
 import { eulerToQuat } from '../../physics/quaternion';
+import * as b737PerformanceFixtures from '../../data/performance/b737PerformanceCards';
 
 const idle: ControlInputs = { elevator:0,aileron:0,rudder:0,throttle1:0,throttle2:0,flapLever:0,gearLever:'DOWN',spoilers:0,brake:0 };
+
+interface EngineLapseFixture {
+  name: string;
+  n1Percent: number;
+  altitudeFt: number;
+  mach: number;
+  oatC: number;
+  oatModeled: boolean;
+  expectedThrustN: [number, number];
+  expectedSeaLevelStaticRatio: [number, number];
+  ownership: { sourceNote: string };
+}
+
+const b737EngineLapseFixtures = (
+  b737PerformanceFixtures as { b737EngineLapseFixtures?: EngineLapseFixture[] }
+).b737EngineLapseFixtures ?? [];
+
+function expectWithinRange(value: number, range: [number, number], label: string): void {
+  expect(value, `${label} ${value} is below ${range[0]}`).toBeGreaterThanOrEqual(range[0]);
+  expect(value, `${label} ${value} is above ${range[1]}`).toBeLessThanOrEqual(range[1]);
+}
 
 describe('updateEngines', () => {
   it('N1 spools toward TOGA when commanded', () => {
@@ -27,14 +49,34 @@ describe('updateEngines', () => {
     expect(s.engines[0].fuelFlow).toBeGreaterThan(100);
   });
 
-  it('thrust lapses with altitude and high Mach instead of using positive ram boost', () => {
-    const seaLevel = computeEngineThrustN(90, B737_800_SPEC, 0, 0.2);
-    const highAltitude = computeEngineThrustN(90, B737_800_SPEC, 35_000, 0.2);
-    const highMach = computeEngineThrustN(90, B737_800_SPEC, 0, 0.82);
+  it('defines table-driven engine lapse placeholders with non-AFM metadata', () => {
+    expect(b737EngineLapseFixtures.length).toBeGreaterThanOrEqual(4);
+    for (const fixture of b737EngineLapseFixtures) {
+      expect(fixture.ownership.sourceNote).toMatch(/not certified/i);
+      expect(fixture.ownership.sourceNote).toMatch(/not an? AFM/i);
+      expect(fixture.oatModeled).toBe(false);
+    }
+  });
 
-    expect(highAltitude).toBeLessThan(seaLevel * 0.65);
-    expect(highMach).toBeLessThan(seaLevel);
-    expect(highMach).toBeGreaterThan(seaLevel * 0.5);
+  it.each(b737EngineLapseFixtures)('$name stays inside the placeholder altitude/Mach lapse gate', (fixture) => {
+    const seaLevelStatic = computeEngineThrustN(fixture.n1Percent, B737_800_SPEC, 0, 0.2);
+    const thrust = computeEngineThrustN(fixture.n1Percent, B737_800_SPEC, fixture.altitudeFt, fixture.mach);
+
+    expectWithinRange(thrust, fixture.expectedThrustN, `${fixture.name} thrust`);
+    expectWithinRange(thrust / seaLevelStatic, fixture.expectedSeaLevelStaticRatio, `${fixture.name} sea-level ratio`);
+  });
+
+  it('documents OAT on engine-lapse fixtures without pretending the current placeholder models it', () => {
+    const paired = b737EngineLapseFixtures.filter((fixture) => fixture.name.startsWith('Cruise lapse OAT documentation'));
+    expect(paired).toHaveLength(2);
+
+    const [coldDay, hotDay] = paired;
+    expect(coldDay.oatC).not.toBe(hotDay.oatC);
+    expect(coldDay.oatModeled).toBe(false);
+    expect(hotDay.oatModeled).toBe(false);
+    expect(computeEngineThrustN(coldDay.n1Percent, B737_800_SPEC, coldDay.altitudeFt, coldDay.mach)).toBe(
+      computeEngineThrustN(hotDay.n1Percent, B737_800_SPEC, hotDay.altitudeFt, hotDay.mach),
+    );
   });
 
   it('stores lagged per-engine thrust in newtons from the shared thrust model', () => {

@@ -4,6 +4,24 @@ import { isaAtAltitude } from '../atmosphere';
 import { B737_800_SPEC, createInitialState, type AircraftState } from '../../types';
 import { applyIasFlightCondition } from './fdmFixtureHelpers';
 import { degToRad } from '../units';
+import * as b737PerformanceFixtures from '../../data/performance/b737PerformanceCards';
+
+interface StallSpeedFixture {
+  name: string;
+  grossWeightKg: number;
+  altitudeFt: number;
+  iasKt: number;
+  flapSetting: number;
+  gearDown: boolean;
+  expectedStallIasKt: [number, number];
+  expectedClMax: [number, number];
+  expectedPeakAoADeg: [number, number];
+  ownership: { sourceNote: string };
+}
+
+const b737StallSpeedFixtures = (
+  b737PerformanceFixtures as { b737StallSpeedFixtures?: StallSpeedFixture[] }
+).b737StallSpeedFixtures ?? [];
 
 interface StallSample {
   aoaDeg: number;
@@ -63,7 +81,46 @@ function peakLift(samples: StallSample[]): StallSample {
   return samples.reduce((best, sample) => sample.cl > best.cl ? sample : best, samples[0]);
 }
 
+function stallIasKt(grossWeightKg: number, clMax: number): number {
+  const seaLevelDensityKgM3 = 1.225;
+  const wingLoadingN = grossWeightKg * 9.80665;
+  const stallMs = Math.sqrt((2 * wingLoadingN) / (seaLevelDensityKgM3 * B737_800_SPEC.wingArea * clMax));
+  return stallMs / 0.514444;
+}
+
+function expectWithinRange(value: number, range: [number, number], label: string): void {
+  expect(value, `${label} ${value} is below ${range[0]}`).toBeGreaterThanOrEqual(range[0]);
+  expect(value, `${label} ${value} is above ${range[1]}`).toBeLessThanOrEqual(range[1]);
+}
+
 describe('B737 broad stall envelope smoke tests', () => {
+  it('defines honest stall-speed fixtures with non-AFM metadata', () => {
+    expect(b737StallSpeedFixtures.length).toBeGreaterThanOrEqual(2);
+    for (const fixture of b737StallSpeedFixtures) {
+      expect(fixture.ownership.sourceNote).toMatch(/not certified/i);
+      expect(fixture.ownership.sourceNote).toMatch(/not an? AFM/i);
+      expect(fixture.expectedStallIasKt[0]).toBeGreaterThan(80);
+      expect(fixture.expectedStallIasKt[1]).toBeLessThan(190);
+      expect(fixture.expectedClMax[0]).toBeGreaterThan(1);
+    }
+  });
+
+  it.each(b737StallSpeedFixtures)('$name stays inside the placeholder stall-speed fixture gate', (fixture) => {
+    const samples = sweepStall({
+      iasKt: fixture.iasKt,
+      altitudeFt: fixture.altitudeFt,
+      flapSetting: fixture.flapSetting,
+      gearDown: fixture.gearDown,
+    });
+    const peak = peakLift(samples);
+    const estimatedStallIasKt = stallIasKt(fixture.grossWeightKg, peak.cl);
+
+    expectWithinRange(peak.cl, fixture.expectedClMax, `${fixture.name} CLmax`);
+    expectWithinRange(peak.aoaDeg, fixture.expectedPeakAoADeg, `${fixture.name} peak AoA`);
+    expectWithinRange(estimatedStallIasKt, fixture.expectedStallIasKt, `${fixture.name} estimated stall IAS`);
+    expect(samples.at(-1)!.cl).toBeLessThan(peak.cl);
+  });
+
   it('keeps clean configuration CLmax finite and shows post-stall lift decay', () => {
     const samples = sweepStall({ iasKt: 170, altitudeFt: 5_000, flapSetting: 0, gearDown: false });
     const peak = peakLift(samples);

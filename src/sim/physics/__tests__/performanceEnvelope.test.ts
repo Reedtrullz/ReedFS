@@ -5,14 +5,19 @@ import {
 } from '../../data/performance/b737TakeoffProfiles';
 import { findPerformanceCardForScenario } from '../../data/performance/b737PerformanceCards';
 import { B737_800_SPEC, createInitialState, type AircraftState } from '../../types';
+import type { ControlInputs } from '../../types';
 import { takeoffRollInputs } from '../../__tests__/scenarioHelpers';
 import { ENVA_TUTORIAL_SCENARIO, createAircraftStateForScenario } from '../../scenarios';
 import { isPositiveRateEstablished } from '../../flightPhasePredicates';
 import { KSEA_RUNWAY_16L } from '../../../viewport/runwayData';
+import { computeEngineThrustN } from '../../systems/engine';
+import * as b737PerformanceFixtures from '../../data/performance/b737PerformanceCards';
+import { computeAero } from '../aero';
 import { computeDerived } from '../derived';
 import { integrate } from '../integrate';
 import { eulerToQuat } from '../quaternion';
 import { radToDeg } from '../units';
+import { applyIasFlightCondition } from './fdmFixtureHelpers';
 
 const HZ = 120;
 const DT = 1 / HZ;
@@ -44,6 +49,64 @@ interface EnvaInitialClimbSample {
   minIasAfterLiftoffKt: number;
   secondsSampledAfterLiftoff: number;
 }
+
+interface FixtureOwnership {
+  sourceNote: string;
+}
+
+interface CleanClimbFixture {
+  name: string;
+  grossWeightKg: number;
+  altitudeFt: number;
+  iasKt: number;
+  n1Percent: number;
+  expectedClimbFpm: [number, number];
+  ownership: FixtureOwnership;
+}
+
+interface CruiseTrimFixture {
+  name: string;
+  grossWeightKg: number;
+  altitudeFt: number;
+  iasKt: number;
+  expectedAoADeg: [number, number];
+  ownership: FixtureOwnership;
+}
+
+interface ApproachVrefFixture {
+  name: string;
+  grossWeightKg: number;
+  heightAglFt: number;
+  vrefKt: number;
+  targetApproachIasKt: number;
+  flapSetting: number;
+  expectedAoADeg: [number, number];
+  ownership: FixtureOwnership;
+}
+
+const b737CleanClimbFixtures = (
+  b737PerformanceFixtures as { b737CleanClimbFixtures?: CleanClimbFixture[] }
+).b737CleanClimbFixtures ?? [];
+const b737CruiseTrimFixtures = (
+  b737PerformanceFixtures as { b737CruiseTrimFixtures?: CruiseTrimFixture[] }
+).b737CruiseTrimFixtures ?? [];
+const b737ApproachVrefFixtures = (
+  b737PerformanceFixtures as { b737ApproachVrefFixtures?: ApproachVrefFixture[] }
+).b737ApproachVrefFixtures ?? [];
+
+const neutralControls: ControlInputs = {
+  elevator: 0,
+  aileron: 0,
+  rudder: 0,
+  throttle1: 0,
+  throttle2: 0,
+  flapLever: 0,
+  gearLever: 'UP',
+  spoilers: 0,
+  brake: 0,
+};
+
+const MPS_TO_FPM = 196.850394;
 
 function midpoint([min, max]: [number, number]): number {
   return (min + max) / 2;
@@ -252,12 +315,122 @@ function runEnvaTakeoffForSeconds(options: {
   };
 }
 
+function createAirborneFixtureState(grossWeightKg: number, altitudeFt: number): AircraftState {
+  const state = createInitialState(B737_800_SPEC);
+  state.grossWeight = grossWeightKg;
+  state.cg = 25;
+  state.position.alt = altitudeFt;
+  state.ground = { ...state.ground, groundAltFt: 0, aglFt: altitudeFt, weightOnWheels: false, contact: 'none' };
+  return state;
+}
+
+function estimateExcessPowerClimbFpm(fixture: CleanClimbFixture): number {
+  const state = createAirborneFixtureState(fixture.grossWeightKg, fixture.altitudeFt);
+  applyIasFlightCondition(state, {
+    iasKt: fixture.iasKt,
+    altitudeFt: fixture.altitudeFt,
+    flapSetting: 0,
+    gearDown: false,
+    speedBrake: 0,
+  });
+  const mach = Math.hypot(state.velocity.u, state.velocity.v, state.velocity.w) / 340;
+  const thrustPerEngine = computeEngineThrustN(fixture.n1Percent, B737_800_SPEC, state.position.alt, mach);
+  state.engines[0].thrust = thrustPerEngine;
+  state.engines[1].thrust = thrustPerEngine;
+  const aero = computeAero(state, neutralControls, B737_800_SPEC);
+  const excessForwardForceN = aero.thrust + aero.dragBodyX;
+  return (excessForwardForceN * Math.hypot(state.velocity.u, state.velocity.v, state.velocity.w) / aero.weight) * MPS_TO_FPM;
+}
+
+function findLevelAoADeg(options: {
+  grossWeightKg: number;
+  altitudeFt: number;
+  iasKt: number;
+  flapSetting: number;
+  gearDown: boolean;
+}): number {
+  const state = createAirborneFixtureState(options.grossWeightKg, options.altitudeFt);
+  let low = -5 * Math.PI / 180;
+  let high = 15 * Math.PI / 180;
+
+  for (let i = 0; i < 50; i += 1) {
+    const mid = (low + high) / 2;
+    applyIasFlightCondition(state, {
+      iasKt: options.iasKt,
+      altitudeFt: options.altitudeFt,
+      angleOfAttackRad: mid,
+      flapSetting: options.flapSetting,
+      gearDown: options.gearDown,
+      speedBrake: 0,
+    });
+    const aero = computeAero(state, {
+      ...neutralControls,
+      flapLever: options.flapSetting,
+      gearLever: options.gearDown ? 'DOWN' : 'UP',
+    }, B737_800_SPEC);
+    if (aero.lift / aero.weight < 1) low = mid;
+    else high = mid;
+  }
+
+  return radToDeg((low + high) / 2);
+}
+
 function expectWithinRange(value: number, range: [number, number], label: string): void {
   expect(value, `${label} ${value} is below ${range[0]}`).toBeGreaterThanOrEqual(range[0]);
   expect(value, `${label} ${value} is above ${range[1]}`).toBeLessThanOrEqual(range[1]);
 }
 
 describe('B737 takeoff performance envelopes', () => {
+  it('defines honest clean-climb, cruise-trim, and approach VREF fixtures with non-AFM metadata', () => {
+    expect(b737CleanClimbFixtures.length).toBeGreaterThanOrEqual(2);
+    expect(b737CruiseTrimFixtures.length).toBeGreaterThanOrEqual(2);
+    expect(b737ApproachVrefFixtures.length).toBeGreaterThanOrEqual(2);
+
+    for (const fixture of [
+      ...b737CleanClimbFixtures,
+      ...b737CruiseTrimFixtures,
+      ...b737ApproachVrefFixtures,
+    ]) {
+      expect(fixture.ownership.sourceNote).toMatch(/not certified/i);
+      expect(fixture.ownership.sourceNote).toMatch(/not an? AFM/i);
+    }
+  });
+
+  it.each(b737CleanClimbFixtures)('$name stays inside the placeholder clean-climb gate', (fixture) => {
+    expectWithinRange(
+      estimateExcessPowerClimbFpm(fixture),
+      fixture.expectedClimbFpm,
+      `${fixture.name} excess-power climb`,
+    );
+  });
+
+  it.each(b737CruiseTrimFixtures)('$name stays inside the placeholder cruise-trim AoA gate', (fixture) => {
+    const levelAoADeg = findLevelAoADeg({
+      grossWeightKg: fixture.grossWeightKg,
+      altitudeFt: fixture.altitudeFt,
+      iasKt: fixture.iasKt,
+      flapSetting: 0,
+      gearDown: false,
+    });
+
+    expectWithinRange(levelAoADeg, fixture.expectedAoADeg, `${fixture.name} level AoA`);
+  });
+
+  it.each(b737ApproachVrefFixtures)('$name keeps VREF+additive approach AoA plausible', (fixture) => {
+    expect(fixture.targetApproachIasKt).toBeGreaterThanOrEqual(fixture.vrefKt);
+    expect(fixture.targetApproachIasKt).toBeLessThanOrEqual(fixture.vrefKt + 15);
+
+    const levelAoADeg = findLevelAoADeg({
+      grossWeightKg: fixture.grossWeightKg,
+      altitudeFt: fixture.heightAglFt,
+      iasKt: fixture.targetApproachIasKt,
+      flapSetting: fixture.flapSetting,
+      gearDown: true,
+    });
+
+    expectWithinRange(levelAoADeg, fixture.expectedAoADeg, `${fixture.name} approach AoA`);
+  });
+
   it('defines light, medium, and heavy flaps-5 takeoff fixtures with protective bounds', () => {
     expect(b737TakeoffProfiles).toHaveLength(3);
     expect(b737TakeoffProfiles.map((profile) => profile.name)).toEqual([
