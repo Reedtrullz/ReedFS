@@ -24,6 +24,14 @@ export interface FdmLineageMetadata {
   notes: string[];
 }
 
+export interface FdmSourceMetadata {
+  sourceQuality: SourceClassification;
+  /** Source ids into the parent FDM `lineage.sourceReferences` manifest. */
+  sourceRefs: string[];
+  claimBoundary: string;
+  lastReviewed: string;
+}
+
 export type GearStationId = 'nose' | 'leftMain' | 'rightMain';
 
 export interface BodyStationPositionData {
@@ -32,7 +40,7 @@ export interface BodyStationPositionData {
   z: number;
 }
 
-export interface GearStationDefinition {
+export interface GearStationDefinition extends FdmSourceMetadata {
   id: GearStationId;
   label: string;
   positionBodyM: BodyStationPositionData;
@@ -43,10 +51,12 @@ export interface GearStationDefinition {
   staticLoadFraction: number;
   brakeCapable: boolean;
   steerable: boolean;
+  /** Legacy compatibility alias for runtime consumers that predate `sourceRefs`; keep consistent with `sourceRefs`. */
   sourceReferenceIds: string[];
 }
 
-export interface GroundModelData {
+export interface GroundModelData extends FdmSourceMetadata {
+  /** Legacy compatibility alias for runtime consumers that predate `sourceRefs`; keep consistent with `sourceRefs`. */
   sourceReferenceIds: string[];
   friction: {
     rollingFrictionCoefficient: number;

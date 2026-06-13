@@ -1,6 +1,6 @@
 import type { AeroModel } from '../../systems/AeroModel';
 import { B737_800_AIRCRAFT_DATA } from './b737-800.v1';
-import type { FdmLineageMetadata, GearStationDefinition, GroundModelData } from './fdmTypes';
+import type { FdmLineageMetadata, FdmSourceMetadata, GearStationDefinition, GroundModelData } from './fdmTypes';
 
 export const B737_800_FDM_DATA_VERSION = '1.0.0';
 
@@ -11,7 +11,7 @@ export interface VersionedAircraftFdmData {
   aircraftDataId: string;
   name: string;
   lineage: FdmLineageMetadata;
-  aero: AeroModel;
+  aero: AeroModel & FdmSourceMetadata;
   gearStations: GearStationDefinition[];
   ground: GroundModelData;
 }
@@ -37,6 +37,14 @@ const lineage: FdmLineageMetadata = {
 };
 
 const sourceReferenceIds = [RFS_PLACEHOLDER_SOURCE_ID];
+const sourceRefsForSection = (): string[] => [...sourceReferenceIds];
+
+const sourceMetadataFor = (sectionName: string): FdmSourceMetadata => ({
+  sourceQuality: 'gameplay-calibrated',
+  sourceRefs: sourceRefsForSection(),
+  claimBoundary: `${sectionName} values are gameplay placeholders preserved for RFS simulator behavior only; they are not certified, not AFM data, not Boeing-published operating data, and must not be used to claim real 737-800 performance fidelity.`,
+  lastReviewed: '2026-06-13',
+});
 
 export const B737_800_FDM: VersionedAircraftFdmData = {
   schemaVersion: 1,
@@ -46,6 +54,7 @@ export const B737_800_FDM: VersionedAircraftFdmData = {
   name: 'Boeing 737-800 RFS placeholder FDM',
   lineage,
   aero: {
+    ...sourceMetadataFor('Aerodynamic coefficient and control-response'),
     // Flap polars are intentionally broad B737-ish gameplay values, not certification data.
     // They give the physics a finite CLmax, more drag with high-lift devices, and
     // flap-specific pitch moments so takeoff/climb tuning has real envelopes.
@@ -94,6 +103,7 @@ export const B737_800_FDM: VersionedAircraftFdmData = {
   },
   gearStations: [
     {
+      ...sourceMetadataFor('Nose gear station'),
       id: 'nose',
       label: 'Nose gear',
       positionBodyM: { x: 15.2, y: 0, z: 2.25 },
@@ -104,9 +114,10 @@ export const B737_800_FDM: VersionedAircraftFdmData = {
       staticLoadFraction: 0.10,
       brakeCapable: false,
       steerable: true,
-      sourceReferenceIds,
+      sourceReferenceIds: sourceRefsForSection(),
     },
     {
+      ...sourceMetadataFor('Left main gear station'),
       id: 'leftMain',
       label: 'Left main gear',
       positionBodyM: { x: -2.8, y: -3.15, z: 2.45 },
@@ -117,9 +128,10 @@ export const B737_800_FDM: VersionedAircraftFdmData = {
       staticLoadFraction: 0.45,
       brakeCapable: true,
       steerable: false,
-      sourceReferenceIds,
+      sourceReferenceIds: sourceRefsForSection(),
     },
     {
+      ...sourceMetadataFor('Right main gear station'),
       id: 'rightMain',
       label: 'Right main gear',
       positionBodyM: { x: -2.8, y: 3.15, z: 2.45 },
@@ -130,11 +142,12 @@ export const B737_800_FDM: VersionedAircraftFdmData = {
       staticLoadFraction: 0.45,
       brakeCapable: true,
       steerable: false,
-      sourceReferenceIds,
+      sourceReferenceIds: sourceRefsForSection(),
     },
   ],
   ground: {
-    sourceReferenceIds,
+    ...sourceMetadataFor('Ground handling, tire, brake, contact, and steering model'),
+    sourceReferenceIds: sourceRefsForSection(),
     friction: {
       rollingFrictionCoefficient: 0.35 / 9.80665,
       maxBrakeCoefficient: 6.0 / 9.80665,
