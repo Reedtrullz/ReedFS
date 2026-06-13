@@ -189,7 +189,7 @@ export function resolveAutopilotTargets(
     if (n) {
       const v = computeVNAV(state, flightPlan, n);
       if (v.available) {
-        if (v.altitudeConstraint) {
+        if (v.altitudeConstraint && v.verticalMode !== 'VNAV') {
           alt = v.targetAlt;
           vs = v.targetVs;
         }

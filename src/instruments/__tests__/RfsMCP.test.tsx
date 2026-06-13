@@ -291,7 +291,7 @@ describe('RfsMCP', () => {
     expect(ap?.boeing.vs).toBe(false);
 
     const effective = deriveEffectiveAutoflightTruth(ap, state);
-    expect(effective.verticalActive).toBe('VNAV_PTH');
+    expect(effective.verticalActive).toBe('VNAV');
     expect(vnav).toHaveStyle({ background: '#0a0' });
   });
 

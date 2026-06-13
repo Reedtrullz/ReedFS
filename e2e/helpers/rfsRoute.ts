@@ -210,9 +210,10 @@ export async function loadKseaRouteAndVerifyStoppedAutomationGatingThroughUi(pag
   await expect(routeStatus.getByText('KSEA → OLM')).toBeVisible();
   await expect(routeStatus.getByText('DTG')).toBeVisible();
 
-  await expect(page.getByRole('button', { name: /^LNAV$/ })).toBeEnabled();
-  await page.getByRole('button', { name: /^LNAV$/ }).click();
-  await page.getByRole('button', { name: /^SPD$/ }).click();
+  const lnavButton = page.getByRole('button', { name: /^LNAV$/ });
+  await expect(lnavButton).toBeDisabled();
+  await expect(lnavButton).toHaveAttribute('aria-disabled', 'true');
+  await expect(lnavButton).toHaveAttribute('title', /get airborne first/i);
 
   const primaryFlightDisplay = page.getByLabel('Primary flight display');
   await expect(primaryFlightDisplay.getByText('LNAV')).toHaveCount(0);

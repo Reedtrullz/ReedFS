@@ -17,6 +17,49 @@ import { deriveEffectiveAutoflightTruth } from '../effectiveAutoflightTruth';
 
 beforeEach(() => resetAutopilotPID());
 
+const M_PER_NM = 1852;
+
+function routeWithFutureDescentConstraint(): FlightPlan {
+  return {
+    origin: 'KSEA',
+    destination: 'KPDX',
+    flightNumber: 'TST214',
+    route: 'KSEA OLM BTG KPDX',
+    waypoints: [
+      { ident: 'KSEA', lat: 47.45, lon: -122.31, discontinuity: false },
+      { ident: 'OLM', lat: 46.97, lon: -122.9, discontinuity: false },
+      { ident: 'BTG', lat: 45.75, lon: -122.59, discontinuity: false, altitudeConstraint: { type: 'AT_OR_BELOW', altitude: 12000 }, speedConstraint: { type: 'AT_OR_BELOW', speed: 280 } },
+      { ident: 'KPDX', lat: 45.59, lon: -122.6, discontinuity: false },
+    ],
+  };
+}
+
+function routeStatusBeforeTod(): RouteStatusSnapshot {
+  return {
+    ...createNoRouteStatus(),
+    routeName: 'KSEA→KPDX',
+    routeValid: true,
+    routeComplete: false,
+    lnavAvailable: true,
+    lnavUnavailableReason: null,
+    activeLegIndex: 0,
+    activeLegCount: 3,
+    fromWaypointIndex: 0,
+    toWaypointIndex: 1,
+    fromIdent: 'KSEA',
+    nextWaypointIdent: 'OLM',
+    distanceToNextM: 160 * M_PER_NM,
+    distanceToNextNm: 160,
+    desiredTrackRad: 0,
+    desiredTrackDegTrue: 0,
+    crossTrackErrorM: 0,
+    alongTrackM: 0,
+    legLengthM: 180 * M_PER_NM,
+    waypointReached: false,
+    sequenced: false,
+  };
+}
+
 function makeAp(lateral: LateralMode, vertical: VerticalMode, thrust: ThrustMode): AutopilotState {
   return {
     boeing: { courseL:0,courseR:0,speed:null,mach:null,heading:0,altitude:0,verticalSpeed:null,
@@ -105,6 +148,26 @@ describe('computeAutopilotCommandsForState effective truth gating', () => {
     expect(commands.elevator).toBeUndefined();
     expect(commands.throttle1).toBeUndefined();
     expect(commands.throttle2).toBeUndefined();
+  });
+
+  it('keeps VNAV armed before TOD without commanding pitch or falling back to MCP altitude', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.position.alt = 30000;
+    s.velocity.u = 128.6;
+    const ap = makeAp('LNAV', 'VNAV', 'SPEED');
+    ap.boeing.lnav = true;
+    ap.boeing.vnav = true;
+    ap.boeing.speedMode = true;
+    ap.boeing.autothrottleArm = true;
+    ap.boeing.altitude = 5000;
+    const flightPlan = routeWithFutureDescentConstraint();
+    const routeStatus = routeStatusBeforeTod();
+
+    const truth = deriveEffectiveAutoflightTruth(ap, { aircraft: s, flightPlan, routeStatus });
+    const commands = computeAutopilotCommandsForState(s, ap, flightPlan, 1 / 60, 0, routeStatus);
+
+    expect(truth.verticalActive).toBe('VNAV');
+    expect(commands.elevator).toBeUndefined();
   });
 
   it('does not command VNAV pitch when the active leg has no actionable VNAV constraint', () => {

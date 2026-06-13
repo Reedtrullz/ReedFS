@@ -235,7 +235,7 @@ export function deriveFlightDirectorCue(input: FlightDirectorCueInput): FlightDi
     const nav = routeStatusToNavOutput(input.routeStatus, { maxInterceptDeg: 25 });
     if (nav) {
       const vnav = computeVNAV(input.aircraft, input.flightPlan, nav);
-      if (vnav.available && vnav.altitudeConstraint) {
+      if (vnav.available && vnav.altitudeConstraint && vnav.lifecycle !== 'ARMED') {
         pitch = {
           commandDeg: pitchCommandForVerticalSpeedTarget(vnav.targetVs, input.currentVerticalSpeedFpm, input.currentPitchDeg),
           mode: input.verticalMode,

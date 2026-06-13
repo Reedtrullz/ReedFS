@@ -9,6 +9,7 @@ import { eulerToQuat } from '../../sim/physics/quaternion';
 import { KSEA_TUTORIAL_SCENARIO } from '../../sim/scenarios';
 
 const KNOT_TO_MPS = 0.514444;
+const M_PER_NM = 1852;
 
 function apStateWithModes(): AutopilotState {
   return {
@@ -80,6 +81,53 @@ function routeWithAltitudeConstraint(): FlightPlan {
       { ident: 'OLM', lat: 46.97, lon: -122.9, discontinuity: false, altitudeConstraint: { type: 'AT', altitude: 10000 } },
     ],
   };
+}
+
+function routeWithFutureDescentConstraint(): FlightPlan {
+  return {
+    origin: 'KSEA',
+    destination: 'KPDX',
+    flightNumber: 'TST214',
+    route: 'KSEA OLM BTG KPDX',
+    waypoints: [
+      { ident: 'KSEA', lat: 47.45, lon: -122.31, discontinuity: false },
+      { ident: 'OLM', lat: 46.97, lon: -122.9, discontinuity: false },
+      { ident: 'BTG', lat: 45.75, lon: -122.59, discontinuity: false, altitudeConstraint: { type: 'AT_OR_BELOW', altitude: 12000 }, speedConstraint: { type: 'AT_OR_BELOW', speed: 280 } },
+      { ident: 'KPDX', lat: 45.59, lon: -122.6, discontinuity: false },
+    ],
+  };
+}
+
+function setAircraftBeforeTodFutureConstraint() {
+  const aircraft = structuredClone(useSimStore.getState().aircraft);
+  aircraft.position.lat = 47.45;
+  aircraft.position.lon = -122.31;
+  aircraft.position.alt = 30000;
+  aircraft.velocity.u = 128.6;
+  const flightPlan = routeWithFutureDescentConstraint();
+  const routeStatus = {
+    ...computeRouteStatus(aircraft, flightPlan, 0),
+    routeValid: true,
+    routeComplete: false,
+    lnavAvailable: true,
+    lnavUnavailableReason: null,
+    activeLegIndex: 0,
+    activeLegCount: 3,
+    fromWaypointIndex: 0,
+    toWaypointIndex: 1,
+    fromIdent: 'KSEA',
+    nextWaypointIdent: 'OLM',
+    distanceToNextM: 160 * M_PER_NM,
+    distanceToNextNm: 160,
+    desiredTrackRad: 0,
+    desiredTrackDegTrue: 0,
+    crossTrackErrorM: 0,
+    alongTrackM: 0,
+    legLengthM: 180 * M_PER_NM,
+    waypointReached: false,
+    sequenced: false,
+  };
+  useSimStore.setState({ aircraft, flightPlan, activeLegIndex: 0, routeStatus });
 }
 
 function setAircraftOnKseaRoute() {
@@ -283,6 +331,23 @@ describe('RfsPFD', () => {
 
     expect(screen.getByTestId('fd-pitch-command').getAttribute('data-mode')).toBe('VS');
     expect(screen.getByText('FD PITCH +0.0°')).toBeTruthy();
+  });
+
+  it('shows VNAV armed before TOD without drawing a pitch Flight Director command', () => {
+    setAircraftBeforeTodFutureConstraint();
+    const ap = apStateWithModes();
+    ap.truth.lateralActive = 'LNAV';
+    ap.truth.verticalActive = 'VNAV';
+    ap.boeing.lnav = true;
+    ap.boeing.vnav = true;
+    ap.boeing.fdLeft = true;
+    ap.boeing.fdRight = true;
+    useSimStore.getState().setApState(ap);
+
+    render(<RfsPFD />);
+
+    expect(screen.getByText('VNAV')).toBeTruthy();
+    expect(screen.queryByLabelText('Flight director pitch bar')).toBeNull();
   });
 
   it('draws a Flight Director pitch command for backed VNAV path guidance', () => {

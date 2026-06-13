@@ -11,6 +11,23 @@ const navOut = {
   activeWaypointIndex: 0,
   waypointReached: false,
 };
+const M_PER_NM = 1852;
+const DESCENT_PATH_FT_PER_NM = 318;
+
+function routeWithFutureDescentConstraint(): FlightPlan {
+  return {
+    origin: 'KSEA',
+    destination: 'KPDX',
+    flightNumber: 'TST214',
+    route: 'KSEA OLM BTG KPDX',
+    waypoints: [
+      { ident: 'KSEA', lat: 47.45, lon: -122.31, discontinuity: false },
+      { ident: 'OLM', lat: 46.97, lon: -122.9, discontinuity: false },
+      { ident: 'BTG', lat: 45.75, lon: -122.59, discontinuity: false, altitudeConstraint: { type: 'AT_OR_BELOW', altitude: 12000 }, speedConstraint: { type: 'AT_OR_BELOW', speed: 280 } },
+      { ident: 'KPDX', lat: 45.59, lon: -122.6, discontinuity: false },
+    ],
+  };
+}
 
 describe('computeVNAV', () => {
   it('reports VNAV unavailable with a clear reason when no constraint exists', () => {
@@ -82,6 +99,88 @@ describe('computeVNAV', () => {
     expect(v.speedConstraint).toBe(true);
     expect(v.targetSpeedKt).toBe(220);
     expect(v.altitudeConstraint).toBe(false);
+  });
+
+  it('arms VNAV for a future descent constraint before TOD instead of requiring the active waypoint to be constrained', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.position.alt = 30000;
+    s.velocity.u = 128.6;
+
+    const v = computeVNAV(s, routeWithFutureDescentConstraint(), {
+      ...navOut,
+      activeWaypointIndex: 1,
+      alongTrackDist: 160 * M_PER_NM,
+    }) as ReturnType<typeof computeVNAV> & {
+      lifecycle?: string;
+      targetWaypointIdent?: string;
+      targetWaypointIndex?: number;
+      distanceToTodNm?: number;
+    };
+
+    expect(v.available).toBe(true);
+    expect(v.lifecycle).toBe('ARMED');
+    expect(v.verticalMode).toBe('VNAV');
+    expect(v.targetAlt).toBe(12000);
+    expect(v.targetWaypointIdent).toBe('BTG');
+    expect(v.targetWaypointIndex).toBe(2);
+    expect(v.targetVs).toBe(0);
+    expect(v.distanceToTodNm).toBeGreaterThan(25);
+  });
+
+  it('captures VNAV_PTH at TOD for a descent constraint', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.position.alt = 18000;
+    s.velocity.u = 128.6;
+    const distanceToTodM = ((s.position.alt - 12000) / DESCENT_PATH_FT_PER_NM) * M_PER_NM;
+    const fp: FlightPlan = {
+      origin: 'KSEA',
+      destination: 'KPDX',
+      flightNumber: 'TST215',
+      route: 'KSEA TOD',
+      waypoints: [{
+        ident: 'TOD',
+        lat: 47.5,
+        lon: -122.31,
+        discontinuity: false,
+        altitudeConstraint: { type: 'AT_OR_BELOW', altitude: 12000 },
+      }],
+    };
+
+    const v = computeVNAV(s, fp, { ...navOut, alongTrackDist: distanceToTodM }) as ReturnType<typeof computeVNAV> & {
+      lifecycle?: string;
+      distanceToTodNm?: number;
+    };
+
+    expect(v.available).toBe(true);
+    expect(v.lifecycle).toBe('PATH');
+    expect(v.verticalMode).toBe('VNAV_PTH');
+    expect(v.targetAlt).toBe(12000);
+    expect(v.targetVs).toBeLessThan(-1000);
+    expect(Math.abs(v.distanceToTodNm ?? Number.NaN)).toBeLessThan(0.25);
+  });
+
+  it('reports route-complete VNAV lifecycle without falling back to another target', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.position.alt = 12020;
+    s.velocity.u = 128.6;
+    const fp: FlightPlan = {
+      origin: 'KSEA',
+      destination: 'KPDX',
+      flightNumber: 'TST216',
+      route: 'KSEA KPDX',
+      waypoints: [{ ident: 'KPDX', lat: 45.59, lon: -122.6, discontinuity: false, altitudeConstraint: { type: 'AT', altitude: 12000 } }],
+    };
+
+    const v = computeVNAV(s, fp, { ...navOut, activeWaypointIndex: 0, alongTrackDist: 0, waypointReached: true }) as ReturnType<typeof computeVNAV> & {
+      lifecycle?: string;
+    };
+
+    expect(v.available).toBe(false);
+    expect(v.lifecycle).toBe('COMPLETE');
+    expect(v.unavailableReason).toMatch(/route complete/i);
+    expect(v.verticalMode).toBeNull();
+    expect(v.targetAlt).toBe(s.position.alt);
+    expect(v.targetAltitudeSource).toBeUndefined();
   });
 
   it('reports VNAV available for a constrained KSEA sample route waypoint', () => {
