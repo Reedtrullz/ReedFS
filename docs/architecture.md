@@ -103,7 +103,7 @@ RFS renders with Cesium plus a focused Three.js overlay:
 Known rendering follow-up:
 
 - The dependency guard enforces a single Three.js copy before build/test to avoid `instanceof` and bridge mismatch bugs.
-- Playwright visual regression snapshots cover deterministic initial chase/cockpit views in CI.
+- Playwright visual/browser proof runs single-worker in CI shape, records `test-results/visual-timings.json`, keeps `trace: on-first-retry`, and `scripts/check-visual-timings.mjs` enforces fresh timing artifacts plus per-test/total duration budgets. Visual regression snapshots cover deterministic initial chase/cockpit views in CI, and debug FPS monitoring is guarded against synchronous canvas/WebGL readbacks.
 - Continue improving the procedural 737 and cockpit model fidelity.
 
 ## Avionics and guidance architecture

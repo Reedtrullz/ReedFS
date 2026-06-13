@@ -40,21 +40,31 @@ export async function startRollThroughVisibleControls(page: Page): Promise<void>
   await expect(page.getByRole('button', { name: /^ABORT$/ })).toBeVisible();
 }
 
-export async function configureTakeoffThroughVisibleControls(page: Page): Promise<void> {
+export async function configureTakeoffAirframeThroughVisibleControls(page: Page): Promise<void> {
   const takeoffSetup = page.getByRole('region', { name: 'Takeoff setup' });
   await expect(takeoffSetup).toBeVisible();
   await expect(takeoffSetup.getByRole('button', { name: 'Flaps Next' })).toBeVisible();
   await expect(takeoffSetup.getByRole('button', { name: 'Trim Nose Up' })).toBeVisible();
-  await expect(takeoffSetup.getByRole('button', { name: 'Throttle Up' })).toBeVisible();
 
   for (let press = 0; press < 3; press += 1) await page.keyboard.press('f');
   await expect(takeoffSetup.getByText('Flaps 5')).toBeVisible();
 
   for (let press = 0; press < 50; press += 1) await page.keyboard.press('9');
   await expect(takeoffSetup.getByText('Trim 5.0')).toBeVisible();
+}
+
+export async function advanceTakeoffThrustThroughVisibleControls(page: Page): Promise<void> {
+  const takeoffSetup = page.getByRole('region', { name: 'Takeoff setup' });
+  await expect(takeoffSetup).toBeVisible();
+  await expect(takeoffSetup.getByRole('button', { name: 'Throttle Up' })).toBeVisible();
 
   for (let press = 0; press < 20; press += 1) await page.keyboard.press('ArrowUp');
   await expect(takeoffSetup.getByText('Throttle 100%')).toBeVisible();
+}
+
+export async function configureTakeoffThroughVisibleControls(page: Page): Promise<void> {
+  await configureTakeoffAirframeThroughVisibleControls(page);
+  await advanceTakeoffThrustThroughVisibleControls(page);
 }
 
 export async function readVisibleFlightNumbers(page: Page): Promise<VisibleFlightNumbers> {

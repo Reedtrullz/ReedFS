@@ -103,6 +103,12 @@ async function flightModeBoxes(page: Page): Promise<Box[]> {
   return [...boxes, ...creditBoxes];
 }
 
+async function cycleOverlayToDebug(page: Page): Promise<void> {
+  await page.keyboard.press('o');
+  await page.keyboard.press('o');
+  await expect(page.getByRole('button', { name: /OVL: DEBUG/i })).toBeVisible();
+}
+
 test.describe('RFS responsive layout and attribution safety', () => {
   for (const width of FLIGHT_VIEWPORT_WIDTHS) {
     test(`flight overlay panels and Cesium attribution do not overlap at ${width}px`, async ({ page }) => {
@@ -114,13 +120,11 @@ test.describe('RFS responsive layout and attribution safety', () => {
     });
   }
 
-  test('debug overlay remains inside the responsive layout and avoids primary panels at narrow and desktop widths', async ({ page }) => {
-    for (const width of [1024, 1280] as const) {
+  for (const width of [1024, 1280] as const) {
+    test(`debug overlay remains inside the responsive layout and avoids primary panels at ${width}px`, async ({ page }) => {
       await page.setViewportSize({ width, height: VIEWPORT_HEIGHT });
       await openRfs(page);
-      await clickButton(page, /OVL:/i);
-      await clickButton(page, /OVL:/i);
-      await expect(page.getByRole('button', { name: /OVL: DEBUG/i })).toBeVisible();
+      await cycleOverlayToDebug(page);
       await expect(page.locator('[data-rfs-panel="debug"]')).toBeVisible();
 
       const boxes = await Promise.all([
@@ -133,8 +137,8 @@ test.describe('RFS responsive layout and attribution safety', () => {
         panelBox(page, 'controls'),
       ]);
       expectNoOverlap([...boxes, ...(await visibleCesiumCreditBoxes(page))]);
-    }
-  });
+    });
+  }
 
   test('landmarks expose named simulator regions, button states, and live status', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: VIEWPORT_HEIGHT });

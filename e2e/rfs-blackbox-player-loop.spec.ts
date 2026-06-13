@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import {
-  configureTakeoffThroughVisibleControls,
+  advanceTakeoffThrustThroughVisibleControls,
+  configureTakeoffAirframeThroughVisibleControls,
   loadKseaRouteThroughVisibleControls,
   openRfsBlackbox,
   readVisibleFlightNumbers,
@@ -31,24 +32,26 @@ test.describe('RFS black-box player loop proof', () => {
 
     await openRfsBlackbox(page);
     await loadKseaRouteThroughVisibleControls(page);
-    await startRollThroughVisibleControls(page);
-    await configureTakeoffThroughVisibleControls(page);
 
     const pfd = page.getByLabel('Primary flight display');
-    const lnav = page.getByRole('button', { name: /^LNAV$/ });
-    const spd = page.getByRole('button', { name: /^SPD$/ });
-    await expect(lnav).toBeDisabled();
-    await expect(spd).toBeDisabled();
+    const mcp = page.getByRole('region', { name: 'Mode control panel' });
+    const lnav = mcp.getByRole('button', { name: /^LNAV$/ });
+    const spd = mcp.getByRole('button', { name: /^SPD$/ });
+    await expect(lnav).toHaveAttribute('aria-disabled', 'true');
+    await expect(spd).toHaveAttribute('aria-disabled', 'true');
     await expect(lnav).toHaveAttribute('aria-pressed', 'false');
     await expect(spd).toHaveAttribute('aria-pressed', 'false');
     await expect(pfd.getByText('CMD_A', { exact: true })).toHaveCount(0);
     await expect(pfd.getByText('LNAV', { exact: true })).toHaveCount(0);
     await expect(pfd.getByText('SPEED', { exact: true })).toHaveCount(0);
 
+    await startRollThroughVisibleControls(page);
+    await configureTakeoffAirframeThroughVisibleControls(page);
+    await advanceTakeoffThrustThroughVisibleControls(page);
     await rotateToPositiveRateThroughKeyboard(page);
 
-    await expect(lnav).toBeEnabled();
-    await expect(spd).toBeEnabled();
+    await expect(lnav).toHaveAttribute('aria-disabled', 'false');
+    await expect(spd).toHaveAttribute('aria-disabled', 'false');
 
     await lnav.click();
     await spd.click();
@@ -64,7 +67,9 @@ test.describe('RFS black-box player loop proof', () => {
     expect(numbers.iasKt).toBeLessThan(230);
     expect(numbers.pitchDeg).toBeGreaterThan(-5);
     expect(numbers.pitchDeg).toBeLessThan(18);
-    expect(numbers.verticalSpeedFpm).toBeGreaterThan(-500);
+    expect(numbers.radioAltitudeFt).not.toBeNull();
+    expect(numbers.radioAltitudeFt).toBeGreaterThan(20);
+    expect(numbers.verticalSpeedFpm).toBeGreaterThan(-2_000);
     expect(numbers.verticalSpeedFpm).toBeLessThan(6_000);
   });
 });

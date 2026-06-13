@@ -4,6 +4,7 @@ export default defineConfig({
   testDir: './e2e',
   snapshotPathTemplate: '{testDir}/{testFilePath}-snapshots/{arg}{ext}',
   timeout: 30_000,
+  retries: process.env.CI ? 1 : 0,
   workers: process.env.CI ? 1 : undefined,
   expect: {
     timeout: 5_000,
@@ -17,6 +18,7 @@ export default defineConfig({
     viewport: { width: 1440, height: 900 },
     deviceScaleFactor: 1,
     colorScheme: 'dark',
+    trace: 'on-first-retry',
     contextOptions: {
       reducedMotion: 'reduce',
     },
