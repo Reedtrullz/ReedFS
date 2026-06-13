@@ -71,6 +71,24 @@ describe('RfsMCP', () => {
     expect(screen.getByRole('button', { name: 'FD L' }).getAttribute('aria-pressed')).toBe('true');
   });
 
+  it('marks parked MCP mode buttons unavailable with visible reasons and no active truth', () => {
+    render(<RfsMCP />);
+
+    for (const name of ['LNAV', 'SPD', 'VS', 'N1']) {
+      const button = screen.getByRole('button', { name });
+      expect(button).toHaveAttribute('aria-disabled', 'true');
+      expect(button.getAttribute('title')).toMatch(/unavailable|airborne|route|flight/i);
+    }
+
+    expect(screen.getByText(/MCP modes unavailable/i)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'SPD' }));
+    fireEvent.click(screen.getByRole('button', { name: 'VS' }));
+    fireEvent.click(screen.getByRole('button', { name: 'N1' }));
+
+    const ap = useSimStore.getState().apState;
+    expect(ap).toBeNull();
+  });
+
   it('toggles FD switches independently without clearing active MCP modes', () => {
     setAirborneRuntime();
     render(<RfsMCP />);
@@ -115,17 +133,24 @@ describe('RfsMCP', () => {
     expect(screen.getByText('FD PITCH +0.0°')).toBeTruthy();
   });
 
-  it('first SPD click creates AP state and honestly engages SPEED', () => {
+  it('first SPD click creates A/T-only state and honestly engages SPEED without CMD A', () => {
     setAirborneRuntime();
-    render(<RfsMCP />);
+    render(
+      <>
+        <RfsMCP />
+        <RfsPFD />
+      </>,
+    );
 
     fireEvent.click(screen.getByRole('button', { name: 'SPD' }));
 
     const ap = useSimStore.getState().apState;
     expect(ap).not.toBeNull();
-    expect(ap?.truth.autopilotStatus).toBe('CMD_A');
+    expect(ap?.truth.autopilotStatus).toBe('OFF');
+    expect(ap?.boeing.cmdA).toBe(false);
     expect(ap?.truth.thrustActive).toBe('SPEED');
     expect(ap?.boeing.speedMode).toBe(true);
+    expect(screen.getByText('SPEED')).toBeTruthy();
   });
 
   it('does not highlight SPEED when raw SPEED truth is not backed by speedMode', () => {
@@ -142,7 +167,7 @@ describe('RfsMCP', () => {
     expect(screen.getByRole('button', { name: 'SPD' })).toHaveStyle({ background: '#333' });
   });
 
-  it('first N1 click creates AP state and honestly engages N1', () => {
+  it('first N1 click creates A/T-only state and honestly engages N1 without CMD A', () => {
     setAirborneRuntime();
     render(<RfsMCP />);
 
@@ -150,7 +175,8 @@ describe('RfsMCP', () => {
 
     const ap = useSimStore.getState().apState;
     expect(ap).not.toBeNull();
-    expect(ap?.truth.autopilotStatus).toBe('CMD_A');
+    expect(ap?.truth.autopilotStatus).toBe('OFF');
+    expect(ap?.boeing.cmdA).toBe(false);
     expect(ap?.truth.thrustActive).toBe('N1');
     expect(ap?.boeing.autothrottleArm).toBe(true);
     expect(ap?.boeing.n1).toBe(true);

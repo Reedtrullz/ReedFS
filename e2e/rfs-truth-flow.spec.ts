@@ -105,7 +105,7 @@ test.describe('RFS truth-flow browser proof', () => {
     await page.getByLabel('Scenario', { exact: true }).selectOption('ksea-tutorial');
     await page.getByRole('button', { name: 'LOAD PLAN' }).click();
     await expect(page.getByText(/no default route/i)).toHaveCount(0);
-    await expect(page.getByText('KSEA→KPDX')).toBeVisible();
+    await expect(page.getByText('KSEA→KPDX', { exact: true })).toBeVisible();
 
     const kseaSnapshot = await readTruthSnapshot(page);
     expect(kseaSnapshot.selectedScenarioId).toBe('ksea-tutorial');
@@ -115,7 +115,10 @@ test.describe('RFS truth-flow browser proof', () => {
     expect(kseaSnapshot.lnavAvailable).toBe(true);
     expectFmaOff(kseaSnapshot);
 
-    await page.getByRole('button', { name: /^LNAV$/ }).click();
+    const parkedLnav = page.getByRole('button', { name: /^LNAV$/ });
+    await expect(parkedLnav).toBeDisabled();
+    await expect(parkedLnav).toHaveAttribute('aria-disabled', 'true');
+    await expect(parkedLnav).toHaveAttribute('title', /airborne/i);
     await expect(page.getByLabel('Primary flight display').getByText('LNAV')).toHaveCount(0);
 
     const stoppedLnavSnapshot = await readTruthSnapshot(page);

@@ -42,6 +42,15 @@ type FlightDirectorSide = 'left' | 'right';
 
 type EnabledMcpMode = 'HDG_SEL' | 'LNAV' | 'VNAV' | 'ALT_HOLD' | 'VS' | 'SPEED' | 'N1' | 'OFF';
 
+export interface McpModeAvailability {
+  available: boolean;
+  reason: string | null;
+}
+
+export type McpModeAvailabilityState = Pick<ReturnType<typeof useSimStore.getState>,
+  'status' | 'aircraft' | 'routeStatus' | 'apState' | 'flightPlan'
+>;
+
 const VNAV_DISPLAY_MODES = new Set<VerticalMode>(['VNAV', 'VNAV_PTH', 'ALT*', 'ALT_HOLD']);
 
 function clearBoeingModeFlags(apState: AutopilotState): void {
@@ -116,8 +125,27 @@ function applyMcpTargetDelta(apState: AutopilotState, target: McpTarget, delta: 
   }
 }
 
-function canEngageMcpCommand(state: ReturnType<typeof useSimStore.getState>): boolean {
-  return state.status === 'running' && !state.aircraft.ground.weightOnWheels;
+function mcpFlightAvailabilityReason(state: McpModeAvailabilityState): string | null {
+  if (state.status !== 'running') return 'start the simulator and get airborne first';
+  if (state.aircraft.ground.weightOnWheels) return 'aircraft must be airborne';
+  return null;
+}
+
+export function mcpModeAvailability(state: McpModeAvailabilityState, mode: EnabledMcpMode): McpModeAvailability {
+  if (mode === 'OFF') return { available: true, reason: null };
+
+  const flightReason = mcpFlightAvailabilityReason(state);
+  const routeReason = mode === 'LNAV' && !state.routeStatus.lnavAvailable
+    ? `LNAV unavailable: ${state.routeStatus.lnavUnavailableReason ?? 'route guidance unavailable'}`
+    : null;
+  const vnavReason = mode === 'VNAV' && deriveBackedVnavMode(state.apState, state) === 'OFF'
+    ? 'VNAV unavailable: no active altitude constraint'
+    : null;
+  const reasons = [flightReason, routeReason, vnavReason].filter((reason): reason is string => Boolean(reason));
+  return {
+    available: reasons.length === 0,
+    reason: reasons.length > 0 ? reasons.join('; ') : null,
+  };
 }
 
 function toggleFlightDirectorSwitch(apState: AutopilotState, side: FlightDirectorSide): void {
@@ -137,6 +165,14 @@ function applyMcpMode(apState: AutopilotState, mode: EnabledMcpMode): void {
     clearBoeingModeFlags(apState);
     apState.boeing.cmdA = false;
     apState.boeing.cmdB = false;
+    return;
+  }
+
+  if (mode === 'SPEED' || mode === 'N1') {
+    apState.truth.thrustActive = mode as ThrustMode;
+    apState.boeing.speedMode = mode === 'SPEED';
+    apState.boeing.n1 = mode === 'N1';
+    apState.boeing.autothrottleArm = true;
     return;
   }
 
@@ -162,11 +198,6 @@ function applyMcpMode(apState: AutopilotState, mode: EnabledMcpMode): void {
     apState.boeing.vnav = true;
     apState.boeing.altHold = false;
     apState.boeing.vs = false;
-  } else if (mode === 'SPEED' || mode === 'N1') {
-    apState.truth.thrustActive = mode as ThrustMode;
-    apState.boeing.speedMode = mode === 'SPEED';
-    apState.boeing.n1 = mode === 'N1';
-    apState.boeing.autothrottleArm = true;
   }
 }
 
@@ -176,12 +207,12 @@ export function RfsMCP() {
   const wind = useSimStore((s) => s.wind);
   const flightPlan = useSimStore((s) => s.flightPlan);
   const routeStatus = useSimStore((s) => s.routeStatus);
+  const status = useSimStore((s) => s.status);
 
   const toggleMode = (mode: EnabledMcpMode) => {
     const state = useSimStore.getState();
-    if (mode !== 'OFF' && !canEngageMcpCommand(state)) return;
-    if (mode === 'LNAV' && !state.routeStatus.lnavAvailable) return;
-    if (mode === 'VNAV' && deriveBackedVnavMode(state.apState, state) === 'OFF') return;
+    const availability = mcpModeAvailability(state, mode);
+    if (!availability.available) return;
     const current = state.apState;
     const next = structuredClone(current ?? createDefaultAutopilotStateFromAircraft(state.aircraft, state.wind));
     applyMcpMode(next, mode);
@@ -214,15 +245,30 @@ export function RfsMCP() {
   const fdLeft = apState?.boeing.fdLeft ?? false;
   const fdRight = apState?.boeing.fdRight ?? false;
   const lnavAvailable = routeStatus.lnavAvailable;
-  const lnavUnavailableReason = routeStatus.lnavUnavailableReason ?? 'route guidance unavailable';
   const displayedLatActive = latActive === 'LNAV' && !lnavAvailable ? 'OFF' : latActive;
-  const lnavTitle = lnavAvailable ? 'Engage LNAV' : `LNAV unavailable: ${lnavUnavailableReason}`;
-  const lnavStyle = displayedLatActive === 'LNAV'
-    ? activeStyle
-    : lnavAvailable
+  const displayApState = apState ?? createDefaultAutopilotStateFromAircraft(aircraft, wind);
+  const availabilityState: McpModeAvailabilityState = { status, aircraft, routeStatus, apState, flightPlan };
+  const modeAvailability: Record<EnabledMcpMode, McpModeAvailability> = {
+    HDG_SEL: mcpModeAvailability(availabilityState, 'HDG_SEL'),
+    LNAV: mcpModeAvailability(availabilityState, 'LNAV'),
+    VNAV: mcpModeAvailability(availabilityState, 'VNAV'),
+    ALT_HOLD: mcpModeAvailability(availabilityState, 'ALT_HOLD'),
+    VS: mcpModeAvailability(availabilityState, 'VS'),
+    SPEED: mcpModeAvailability(availabilityState, 'SPEED'),
+    N1: mcpModeAvailability(availabilityState, 'N1'),
+    OFF: mcpModeAvailability(availabilityState, 'OFF'),
+  };
+  const unavailableSummary = [modeAvailability.SPEED, modeAvailability.VS, modeAvailability.N1, modeAvailability.LNAV]
+    .find((availability) => !availability.available)?.reason ?? null;
+  const modeButtonStyle = (mode: EnabledMcpMode, active: boolean): React.CSSProperties => {
+    if (active) return activeStyle;
+    return modeAvailability[mode].available
       ? btnStyle
       : { ...btnStyle, color: '#777', border: '1px solid #444', cursor: 'not-allowed' };
-  const displayApState = apState ?? createDefaultAutopilotStateFromAircraft(aircraft, wind);
+  };
+  const modeTitle = (mode: EnabledMcpMode, availableTitle: string): string => (
+    modeAvailability[mode].available ? availableTitle : `MCP mode unavailable: ${modeAvailability[mode].reason}`
+  );
   const speedTarget = selectedSpeedKt(displayApState);
   const headingTarget = selectedHeadingDeg(displayApState);
   const altitudeTarget = selectedAltitudeFt(displayApState);
@@ -244,6 +290,11 @@ export function RfsMCP() {
       <div style={{ color: '#0f0', fontFamily: 'monospace', fontSize: 10, marginBottom: 4 }}>
         MCP
       </div>
+      {unavailableSummary && (
+        <div role="status" style={{ color: '#f6d365', fontFamily: 'monospace', fontSize: 10, marginBottom: 4, maxWidth: 220 }}>
+          MCP modes unavailable: {unavailableSummary}
+        </div>
+      )}
       <div aria-label="Flight Director switches" style={{ marginBottom: 4 }}>
         <button
           aria-pressed={fdLeft}
@@ -286,59 +337,78 @@ export function RfsMCP() {
       </div>
       <div>
         <button
+          aria-disabled={!modeAvailability.HDG_SEL.available}
           aria-pressed={displayedLatActive === 'HDG_SEL'}
+          disabled={!modeAvailability.HDG_SEL.available}
+          title={modeTitle('HDG_SEL', 'Engage HDG SEL')}
           onClick={() => toggleMode('HDG_SEL')}
-          style={displayedLatActive === 'HDG_SEL' ? activeStyle : btnStyle}
+          style={modeButtonStyle('HDG_SEL', displayedLatActive === 'HDG_SEL')}
         >
           HDG
         </button>
         <button
+          aria-disabled={!modeAvailability.LNAV.available}
           aria-pressed={displayedLatActive === 'LNAV'}
-          disabled={!lnavAvailable}
-          title={lnavTitle}
+          disabled={!modeAvailability.LNAV.available}
+          title={modeTitle('LNAV', 'Engage LNAV')}
           onClick={() => toggleMode('LNAV')}
-          style={lnavStyle}
+          style={modeButtonStyle('LNAV', displayedLatActive === 'LNAV')}
         >
           LNAV
         </button>
       </div>
       <div>
         <button
+          aria-disabled={!modeAvailability.ALT_HOLD.available}
           aria-pressed={vertActive === 'ALT_HOLD' && !vnavActive}
+          disabled={!modeAvailability.ALT_HOLD.available}
+          title={modeTitle('ALT_HOLD', 'Engage altitude hold')}
           onClick={() => toggleMode('ALT_HOLD')}
-          style={vertActive === 'ALT_HOLD' && !vnavActive ? activeStyle : btnStyle}
+          style={modeButtonStyle('ALT_HOLD', vertActive === 'ALT_HOLD' && !vnavActive)}
         >
           ALT
         </button>
         {vnavAvailable && (
           <button
+            aria-disabled={!modeAvailability.VNAV.available}
             aria-pressed={vnavActive}
+            disabled={!modeAvailability.VNAV.available}
+            title={modeTitle('VNAV', 'Engage VNAV')}
             onClick={() => toggleMode('VNAV')}
-            style={vnavActive ? activeStyle : btnStyle}
+            style={modeButtonStyle('VNAV', vnavActive)}
           >
             VNAV
           </button>
         )}
         <button
+          aria-disabled={!modeAvailability.VS.available}
           aria-pressed={vertActive === 'VS'}
+          disabled={!modeAvailability.VS.available}
+          title={modeTitle('VS', 'Engage vertical speed')}
           onClick={() => toggleMode('VS')}
-          style={vertActive === 'VS' ? activeStyle : btnStyle}
+          style={modeButtonStyle('VS', vertActive === 'VS')}
         >
           VS
         </button>
       </div>
       <div>
         <button
+          aria-disabled={!modeAvailability.SPEED.available}
           aria-pressed={thrActive === 'SPEED'}
+          disabled={!modeAvailability.SPEED.available}
+          title={modeTitle('SPEED', 'Engage SPEED autothrottle')}
           onClick={() => toggleMode('SPEED')}
-          style={thrActive === 'SPEED' ? activeStyle : btnStyle}
+          style={modeButtonStyle('SPEED', thrActive === 'SPEED')}
         >
           SPD
         </button>
         <button
+          aria-disabled={!modeAvailability.N1.available}
           aria-pressed={thrActive === 'N1'}
+          disabled={!modeAvailability.N1.available}
+          title={modeTitle('N1', 'Engage N1 autothrottle')}
           onClick={() => toggleMode('N1')}
-          style={thrActive === 'N1' ? activeStyle : btnStyle}
+          style={modeButtonStyle('N1', thrActive === 'N1')}
         >
           N1
         </button>
