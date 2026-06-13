@@ -4,6 +4,7 @@ export default defineConfig({
   testDir: './e2e',
   snapshotPathTemplate: '{testDir}/{testFilePath}-snapshots/{arg}{ext}',
   timeout: 30_000,
+  workers: process.env.CI ? 1 : undefined,
   expect: {
     timeout: 5_000,
     toHaveScreenshot: {

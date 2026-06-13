@@ -11,6 +11,7 @@ export interface FlightSnapshot {
   phase: string;
   coachMessage: string;
   checklistLabels: string[];
+  positiveRate: boolean;
 }
 
 export interface LandingSnapshot {
@@ -121,12 +122,17 @@ async function runFlightHelper(page: Page, mode: FlightHelperMode): Promise<Flig
 
       const simStoreModule = '/src/store/simStore.ts';
       const derivedModule = '/src/sim/physics/derived.ts';
+      const flightPhasePredicatesModule = '/src/sim/flightPhasePredicates.ts';
       const simStoreImport = (await import(simStoreModule)) as { useSimStore: BrowserSimStore };
       const derivedImport = (await import(derivedModule)) as {
         computeDerived: (aircraft: BrowserAircraftState, wind: unknown) => BrowserDerivedState;
       };
+      const flightPhasePredicatesImport = (await import(flightPhasePredicatesModule)) as {
+        isPositiveRateEstablished: (aircraft: BrowserAircraftState) => boolean;
+      };
       const { useSimStore } = simStoreImport;
       const { computeDerived } = derivedImport;
+      const { isPositiveRateEstablished } = flightPhasePredicatesImport;
 
       let timestamp = performance.now();
 
@@ -157,6 +163,7 @@ async function runFlightHelper(page: Page, mode: FlightHelperMode): Promise<Flig
           phase: state.guidance.phase,
           coachMessage: state.guidance.coachMessage,
           checklistLabels: state.guidance.checklist.map((item) => item.label),
+          positiveRate: isPositiveRateEstablished(state.aircraft),
         };
       };
 
@@ -200,20 +207,20 @@ async function runFlightHelper(page: Page, mode: FlightHelperMode): Promise<Flig
           rotated = true;
         }
 
-        if (!gearRaised && !beforeTick.weightOnWheels) {
+        if (!gearRaised && beforeTick.positiveRate) {
           useSimStore.getState().setInput({ elevator: 0, gearLever: 'UP' });
-          gearRaised = true;
         }
 
         stepFrame();
         finalSnapshot = snapshot();
 
-        if (!gearRaised && !finalSnapshot.weightOnWheels) {
+        if (!gearRaised && finalSnapshot.positiveRate) {
           useSimStore.getState().setInput({ elevator: 0, gearLever: 'UP' });
-          gearRaised = true;
           stepFrame();
           finalSnapshot = snapshot();
         }
+
+        gearRaised = finalSnapshot.gearLever === 'UP' || !finalSnapshot.gearDown;
 
         if (
           gearRaised &&
