@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { findPerformanceCardForScenario, type B737LandingPerformanceEnvelope } from '../src/sim/data/performance/b737PerformanceCards';
 import { openRfs, startRoll } from './helpers/rfsPage';
 import {
   flyApproachToLandingRolloutAndReset,
@@ -9,6 +10,36 @@ import {
 
 const EXPECTED_LANDING_PHASES = ['TOUCHDOWN', 'DEROTATION', 'ROLLOUT', 'STOPPED'];
 const ROLLOUT_GUIDANCE_PHASES = ['landing-rollout', 'taxi', 'stopped'];
+const ENVA_LANDING_CARD = findPerformanceCardForScenario('enva-tutorial').landing;
+
+interface LandingPerformanceProofSnapshot {
+  iasKt: number;
+  verticalSpeedFpm: number;
+  touchdownSinkRateMps: number;
+  runwayAlongTrackM?: number;
+}
+
+interface LandingPerformanceProof {
+  touchdown: LandingPerformanceProofSnapshot;
+  rollout: LandingPerformanceProofSnapshot;
+}
+
+function expectRange(value: number | undefined, range: [number, number], label: string): void {
+  expect(value, `${label} must be recorded`).toBeDefined();
+  expect(value, `${label} below ${range[0]}`).toBeGreaterThanOrEqual(range[0]);
+  expect(value, `${label} above ${range[1]}`).toBeLessThanOrEqual(range[1]);
+}
+
+function expectLandingPerformanceWithinCard(proof: LandingPerformanceProof, card: B737LandingPerformanceEnvelope): void {
+  expectRange(proof.touchdown.iasKt, [card.vrefKt, card.targetApproachIasKt + 15], 'touchdown IAS');
+  expectRange(proof.touchdown.touchdownSinkRateMps, card.touchdownSinkRateMps, 'touchdown sink rate');
+  expectRange(proof.touchdown.runwayAlongTrackM, card.touchdownZoneDistanceM, 'touchdown-zone distance');
+  expectRange(
+    (proof.rollout.runwayAlongTrackM ?? Number.NaN) - (proof.touchdown.runwayAlongTrackM ?? Number.NaN),
+    card.stoppingDistanceM,
+    'stopping distance',
+  );
+}
 
 function expectExplicitLandingSequence(phases: string[]): void {
   expect(phases).toEqual(expect.arrayContaining(EXPECTED_LANDING_PHASES));
@@ -56,6 +87,7 @@ test.describe('RFS playable flight loops', () => {
     expect(proof.rollout.groundSpeedKt).toBeLessThan(proof.touchdown.groundSpeedKt);
     expect(ROLLOUT_GUIDANCE_PHASES).toContain(proof.rollout.guidancePhase);
     expectExplicitLandingSequence(proof.landingPhases);
+    expectLandingPerformanceWithinCard(proof, ENVA_LANDING_CARD);
 
     expect(proof.reset.status).toBe('stopped');
     expect(proof.reset.guidancePhase).toBe('preflight');
@@ -128,6 +160,7 @@ test.describe('RFS playable flight loops', () => {
     expect(proof.rollout.groundSpeedKt).toBeLessThan(proof.touchdown.groundSpeedKt);
     expect(ROLLOUT_GUIDANCE_PHASES).toContain(proof.rollout.guidancePhase);
     expectExplicitLandingSequence(proof.landingPhases);
+    expectLandingPerformanceWithinCard(proof, ENVA_LANDING_CARD);
 
     expect(proof.reset.status).toBe('stopped');
     expect(proof.reset.guidancePhase).toBe('preflight');

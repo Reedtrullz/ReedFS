@@ -3,7 +3,7 @@ import {
   b737TakeoffProfiles,
   type TakeoffEnvelope,
 } from '../../data/performance/b737TakeoffProfiles';
-import { findPerformanceCardForScenario } from '../../data/performance/b737PerformanceCards';
+import { b737PerformanceCards, findPerformanceCardForScenario } from '../../data/performance/b737PerformanceCards';
 import { B737_800_SPEC, createInitialState, type AircraftState } from '../../types';
 import type { ControlInputs } from '../../types';
 import { takeoffRollInputs } from '../../__tests__/scenarioHelpers';
@@ -82,6 +82,16 @@ interface ApproachVrefFixture {
   flapSetting: number;
   expectedAoADeg: [number, number];
   ownership: FixtureOwnership;
+}
+
+interface LandingPerformanceCardForEnvelopeTest {
+  vrefKt: number;
+  targetApproachIasKt: number;
+  glidepathDeg: number;
+  sinkRateFpm: [number, number];
+  touchdownSinkRateMps: [number, number];
+  touchdownZoneDistanceM: [number, number];
+  stoppingDistanceM: [number, number];
 }
 
 const b737CleanClimbFixtures = (
@@ -381,6 +391,23 @@ function expectWithinRange(value: number, range: [number, number], label: string
 }
 
 describe('B737 takeoff performance envelopes', () => {
+  it.each(b737PerformanceCards)('$scenarioId defines bounded landing performance acceptance metrics', (card) => {
+    const landing = (card as typeof card & { landing?: LandingPerformanceCardForEnvelopeTest }).landing;
+
+    expect(landing, `${card.scenarioId} missing landing performance card`).toBeDefined();
+    expect(landing?.vrefKt).toBe(card.approach.vrefKt);
+    expect(landing?.targetApproachIasKt).toBe(card.approach.iasKt);
+    expectWithinRange(landing?.glidepathDeg ?? Number.NaN, [2.5, 3.5], `${card.scenarioId} glidepath`);
+    expectWithinRange(landing?.sinkRateFpm[0] ?? Number.NaN, [400, 900], `${card.scenarioId} minimum approach sink`);
+    expectWithinRange(landing?.sinkRateFpm[1] ?? Number.NaN, [500, 1_000], `${card.scenarioId} maximum approach sink`);
+    expectWithinRange(landing?.touchdownSinkRateMps[0] ?? Number.NaN, [0.1, 3], `${card.scenarioId} minimum touchdown sink`);
+    expectWithinRange(landing?.touchdownSinkRateMps[1] ?? Number.NaN, [3, 14.9], `${card.scenarioId} maximum touchdown sink`);
+    expect(landing?.touchdownZoneDistanceM[0]).toBeGreaterThanOrEqual(0);
+    expect(landing?.touchdownZoneDistanceM[1]).toBeLessThanOrEqual(900);
+    expect(landing?.stoppingDistanceM[0]).toBeGreaterThan(0);
+    expect(landing?.stoppingDistanceM[1]).toBeGreaterThan(landing?.stoppingDistanceM[0] ?? 0);
+  });
+
   it('defines honest clean-climb, cruise-trim, and approach VREF fixtures with non-AFM metadata', () => {
     expect(b737CleanClimbFixtures.length).toBeGreaterThanOrEqual(2);
     expect(b737CruiseTrimFixtures.length).toBeGreaterThanOrEqual(2);

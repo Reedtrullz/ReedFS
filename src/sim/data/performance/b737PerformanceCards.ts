@@ -84,6 +84,17 @@ export interface B737ApproachEnvelope {
   expectedAoADeg: [number, number];
 }
 
+export interface B737LandingPerformanceEnvelope {
+  vrefKt: number;
+  targetApproachIasKt: number;
+  glidepathDeg: number;
+  sinkRateFpm: [number, number];
+  touchdownSinkRateMps: [number, number];
+  touchdownZoneDistanceM: [number, number];
+  stoppingDistanceM: [number, number];
+  ownership: B737PerformanceDataOwnership;
+}
+
 export interface B737TakeoffPerformanceCard {
   scenarioId: string;
   runway: string;
@@ -94,6 +105,7 @@ export interface B737TakeoffPerformanceCard {
   vSpeeds: B737VSpeeds;
   cleanClimb: B737CleanClimbEnvelope;
   approach: B737ApproachEnvelope;
+  landing: B737LandingPerformanceEnvelope;
   initialClimbPitchDeg: number;
   ownership: B737PerformanceDataOwnership;
   notes: string[];
@@ -110,6 +122,37 @@ const placeholderFixtureOwnership: B737PerformanceDataOwnership = {
   ],
   sourceNote: 'RFS placeholder gameplay envelope fixture for automated tests only; broad sanity bounds, not certified Boeing data and not an AFM table.',
 };
+
+const landingPerformanceOwnership: B737PerformanceDataOwnership = {
+  label: 'runtime-landing-proof-and-performance-test-card',
+  runtimeConsumers: [],
+  testConsumers: [
+    'src/sim/data/__tests__/performanceCards.test.ts',
+    'src/sim/physics/__tests__/performanceEnvelope.test.ts',
+    'e2e/rfs-flight.spec.ts',
+  ],
+  sourceNote: 'RFS gameplay landing envelope card for automated acceptance only; broad placeholder bounds, not a certified Boeing AFM table.',
+};
+
+function landingPerformanceEnvelope(options: {
+  vrefKt: number;
+  targetApproachIasKt: number;
+  sinkRateFpm: [number, number];
+  touchdownSinkRateMps: [number, number];
+  touchdownZoneDistanceM?: [number, number];
+  stoppingDistanceM?: [number, number];
+}): B737LandingPerformanceEnvelope {
+  return {
+    vrefKt: options.vrefKt,
+    targetApproachIasKt: options.targetApproachIasKt,
+    glidepathDeg: 3,
+    sinkRateFpm: options.sinkRateFpm,
+    touchdownSinkRateMps: options.touchdownSinkRateMps,
+    touchdownZoneDistanceM: options.touchdownZoneDistanceM ?? [0, 900],
+    stoppingDistanceM: options.stoppingDistanceM ?? [300, 1_000],
+    ownership: landingPerformanceOwnership,
+  };
+}
 
 export const b737StallSpeedFixtures: B737StallSpeedFixture[] = [
   {
@@ -310,6 +353,12 @@ export const b737PerformanceCards: B737TakeoffPerformanceCard[] = [
       flapSetting: 30,
       expectedAoADeg: [1, 9],
     },
+    landing: landingPerformanceEnvelope({
+      vrefKt: 135,
+      targetApproachIasKt: 140,
+      sinkRateFpm: [500, 850],
+      touchdownSinkRateMps: [0.5, 14.5],
+    }),
     initialClimbPitchDeg: 10,
     ownership: {
       label: 'runtime-takeoff-cue-and-physics-test-card',
@@ -345,6 +394,12 @@ export const b737PerformanceCards: B737TakeoffPerformanceCard[] = [
       flapSetting: 30,
       expectedAoADeg: [1, 9],
     },
+    landing: landingPerformanceEnvelope({
+      vrefKt: 135,
+      targetApproachIasKt: 140,
+      sinkRateFpm: [500, 850],
+      touchdownSinkRateMps: [0.5, 14.5],
+    }),
     initialClimbPitchDeg: 10,
     ownership: {
       label: 'runtime-takeoff-cue-and-physics-test-card',
@@ -380,6 +435,12 @@ export const b737PerformanceCards: B737TakeoffPerformanceCard[] = [
       flapSetting: 30,
       expectedAoADeg: [0, 8],
     },
+    landing: landingPerformanceEnvelope({
+      vrefKt: 130,
+      targetApproachIasKt: 135,
+      sinkRateFpm: [480, 820],
+      touchdownSinkRateMps: [0.5, 14.5],
+    }),
     initialClimbPitchDeg: 10,
     ownership: {
       label: 'runtime-takeoff-cue-and-physics-test-card',

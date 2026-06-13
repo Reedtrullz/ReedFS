@@ -34,6 +34,7 @@ export interface LandingSnapshot {
   routeCleared: boolean;
   surfaceAirport?: string;
   surfaceRunwayId?: string;
+  runwayAlongTrackM: number;
 }
 
 export interface LandingProofResult {
@@ -399,6 +400,14 @@ export async function flyApproachToLandingRolloutAndReset(page: Page, targetAirp
         alt: runway.elevationFt,
       };
     };
+    const runwayAlongTrackM = (runway: RunwayReference, position: BrowserAircraftState['position']): number => {
+      const metersPerDegreeLat = 111_320;
+      const metersPerDegreeLon = 111_320 * Math.cos(runway.start.lat * Math.PI / 180);
+      const northM = (position.lat - runway.start.lat) * metersPerDegreeLat;
+      const eastM = (position.lon - runway.start.lon) * metersPerDegreeLon;
+      const headingRad = runway.headingDeg * Math.PI / 180;
+      return Math.cos(headingRad) * northM + Math.sin(headingRad) * eastM;
+    };
     const snapshot = (): LandingSnapshot => {
       const state = useSimStore.getState();
       const derived = computeDerived(state.aircraft, state.wind);
@@ -423,6 +432,7 @@ export async function flyApproachToLandingRolloutAndReset(page: Page, targetAirp
         routeCleared: state.flightPlan === null && state.activeLegIndex === null,
         surfaceAirport: surface.airport,
         surfaceRunwayId: surface.runwayId,
+        runwayAlongTrackM: runwayAlongTrackM(runway, state.aircraft.position),
       };
     };
 
@@ -451,7 +461,7 @@ export async function flyApproachToLandingRolloutAndReset(page: Page, targetAirp
       aircraft.position = { ...approachPosition, alt: runway.elevationFt + 120 };
       aircraft.attitude = { phi: 0, theta: pitchRad, psi: headingRad };
       aircraft.quaternion = eulerToQuat(aircraft.attitude.phi, aircraft.attitude.theta, aircraft.attitude.psi);
-      aircraft.velocity = { u: 72, v: 0, w: 2.8 };
+      aircraft.velocity = { u: 77, v: 0, w: 2.8 };
       aircraft.angularVel = { p: 0, q: 0, r: 0 };
       aircraft.config = {
         ...aircraft.config,
@@ -711,6 +721,14 @@ export async function flyDescentApproachToLandingRolloutAndReset(page: Page): Pr
         alt: runway.elevationFt,
       };
     };
+    const runwayAlongTrackM = (runway: RunwayReference, position: BrowserAircraftState['position']): number => {
+      const metersPerDegreeLat = 111_320;
+      const metersPerDegreeLon = 111_320 * Math.cos(runway.start.lat * Math.PI / 180);
+      const northM = (position.lat - runway.start.lat) * metersPerDegreeLat;
+      const eastM = (position.lon - runway.start.lon) * metersPerDegreeLon;
+      const headingRad = runway.headingDeg * Math.PI / 180;
+      return Math.cos(headingRad) * northM + Math.sin(headingRad) * eastM;
+    };
     const snapshot = (): LandingSnapshot => {
       const state = useSimStore.getState();
       const derived = computeDerived(state.aircraft, state.wind);
@@ -735,6 +753,7 @@ export async function flyDescentApproachToLandingRolloutAndReset(page: Page): Pr
         routeCleared: state.flightPlan === null && state.activeLegIndex === null,
         surfaceAirport: surface.airport,
         surfaceRunwayId: surface.runwayId,
+        runwayAlongTrackM: runwayAlongTrackM(ENVA_RUNWAY_09, state.aircraft.position),
       };
     };
 
@@ -763,7 +782,7 @@ export async function flyDescentApproachToLandingRolloutAndReset(page: Page): Pr
       aircraft.position = { ...descentPosition, alt: ENVA_RUNWAY_09.elevationFt + 301 };
       aircraft.attitude = { phi: 0, theta: pitchRad, psi: headingRad };
       aircraft.quaternion = eulerToQuat(aircraft.attitude.phi, aircraft.attitude.theta, aircraft.attitude.psi);
-      aircraft.velocity = { u: 72, v: 0, w: 0.3 };
+      aircraft.velocity = { u: 77, v: 0, w: 2.8 };
       aircraft.angularVel = { p: 0, q: 0, r: 0 };
       aircraft.config = {
         ...aircraft.config,
