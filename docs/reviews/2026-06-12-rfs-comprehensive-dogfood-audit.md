@@ -29,6 +29,7 @@ Overall assessment: RFS is locally buildable/testable and the browser app runs, 
 Local verification actually run in this review:
 - `npm run check`: passed. Evidence: 84 Vitest files passed, 630 tests passed, production build passed. Existing warning: React ESLint settings warning; jsdom canvas getContext notices during unit tests.
 - `CI=1 npm run test:visual`: passed, 17 Playwright visual/browser tests.
+- P0 truth-flow browser proof (local only): `CI=1 npx playwright test e2e/rfs-truth-flow.spec.ts --reporter=line` passed; verified default ENVA LOAD PLAN no-route feedback, KSEA LOAD PLAN route-only with FMA/AP OFF, and keyboard gear-up rejection before positive rate through real browser UI actions. Not CI/live/deploy proof.
 - Browser dogfood script: captured 16 state snapshots and 13 screenshots across initial ENVA, ENVA manual roll/gear command, ENVA LOAD PLAN no-op, KSEA LOAD PLAN, overlay modes, audio, save/load, camera modes, and 1024/1440/1920 responsive screenshots.
 - Console/event capture: Vite/React dev messages plus repeated WebGL ReadPixels stall warnings; no app crash was observed during the scripted local dogfood pass.
 - Live/local check: local HEAD `fc1f88ecce19dd8e421161d56615080af35a44b4`; `origin/master` and live `/rfs-version.json` stayed at `b8457378adef5cf2a3e3f6efbf09214b80ecc39b`; local branch is ahead by 70 commits.
