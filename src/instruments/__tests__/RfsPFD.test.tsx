@@ -83,6 +83,19 @@ function routeWithAltitudeConstraint(): FlightPlan {
   };
 }
 
+function routeWithSpeedOnlyConstraint(): FlightPlan {
+  return {
+    origin: 'KSEA',
+    destination: 'KPDX',
+    flightNumber: 'TST222',
+    route: 'KSEA OLM SPEED',
+    waypoints: [
+      { ident: 'KSEA', lat: 47.45, lon: -122.31, discontinuity: false },
+      { ident: 'OLM', lat: 46.97, lon: -122.9, discontinuity: false, speedConstraint: { type: 'AT_OR_BELOW', speed: 210 } },
+    ],
+  };
+}
+
 function routeWithFutureDescentConstraint(): FlightPlan {
   return {
     origin: 'KSEA',
@@ -96,6 +109,18 @@ function routeWithFutureDescentConstraint(): FlightPlan {
       { ident: 'KPDX', lat: 45.59, lon: -122.6, discontinuity: false },
     ],
   };
+}
+
+function setAircraftOnSpeedOnlyRoute() {
+  const aircraft = structuredClone(useSimStore.getState().aircraft);
+  aircraft.position.lat = 47.45;
+  aircraft.position.lon = -122.31;
+  aircraft.position.alt = 5_000;
+  aircraft.velocity.u = 128.6;
+  aircraft.ground = { ...aircraft.ground, aglFt: 3_000, groundAltFt: 432, weightOnWheels: false };
+  const flightPlan = routeWithSpeedOnlyConstraint();
+  const routeStatus = computeRouteStatus(aircraft, flightPlan, 0);
+  useSimStore.setState({ aircraft, flightPlan, activeLegIndex: 0, routeStatus });
 }
 
 function setAircraftBeforeTodFutureConstraint() {
@@ -228,6 +253,26 @@ describe('RfsPFD', () => {
     expect(screen.getByText('SEL HDG 272')).toBeTruthy();
     expect(screen.getByText('SEL ALT 12000')).toBeTruthy();
     expect(screen.getByText('SEL VS -800')).toBeTruthy();
+  });
+
+  it('shows managed speed from a speed-only VNAV constraint without vertical FMA or pitch guidance', () => {
+    setAircraftOnSpeedOnlyRoute();
+    const ap = apStateWithModes();
+    ap.boeing.speed = null;
+    ap.truth.verticalActive = 'VNAV';
+    ap.boeing.vnav = true;
+    ap.boeing.fdLeft = true;
+    ap.boeing.fdRight = true;
+    useSimStore.getState().setApState(ap);
+
+    render(<RfsPFD />);
+
+    expect(screen.getByText('MAN SPD 210')).toBeTruthy();
+    expect(screen.getByLabelText('Airspeed managed bug')).toBeTruthy();
+    expect(screen.getByText('SPD BUG 210')).toBeTruthy();
+    expect(screen.getByText('OFF')).toBeTruthy();
+    expect(screen.queryByText('VNAV')).toBeNull();
+    expect(screen.queryByLabelText('Flight director pitch bar')).toBeNull();
   });
 
   it('draws selected speed and altitude bugs on the IAS and ALT tapes when targets are in range', () => {

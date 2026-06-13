@@ -15,12 +15,16 @@ const VNAV_FAMILY = new Set<VerticalMode>(['VNAV', 'VNAV_PTH', 'ALT*']);
 export type ManagedAltitudeCaptureTruth = AutoflightTruthState & {
   targetAltitudeSource?: VnavOutput['targetAltitudeSource'];
   captureTargetAltFt?: number;
+  managedSpeedKt?: VnavOutput['managedSpeedKt'];
+  managedSpeedSource?: VnavOutput['managedSpeedSource'];
 };
 
 function omitManagedAltitudeCaptureMetadata(truth: AutoflightTruthState): AutoflightTruthState {
   const baseTruth = { ...(truth as ManagedAltitudeCaptureTruth) };
   delete baseTruth.targetAltitudeSource;
   delete baseTruth.captureTargetAltFt;
+  delete baseTruth.managedSpeedKt;
+  delete baseTruth.managedSpeedSource;
   return baseTruth;
 }
 
@@ -43,6 +47,14 @@ function vnavManagedAltitudeCaptureMetadata(vnav: VnavOutput | null): Partial<Ma
   return {
     targetAltitudeSource: vnav.targetAltitudeSource,
     captureTargetAltFt: vnav.captureTargetAltFt,
+  };
+}
+
+function vnavManagedSpeedMetadata(vnav: VnavOutput | null): Partial<ManagedAltitudeCaptureTruth> {
+  if (!vnav?.available || !vnav.speedConstraint || vnav.managedSpeedSource !== 'VNAV_SPEED_CONSTRAINT') return {};
+  return {
+    managedSpeedKt: vnav.managedSpeedKt,
+    managedSpeedSource: vnav.managedSpeedSource,
   };
 }
 
@@ -156,5 +168,6 @@ export function deriveEffectiveAutoflightTruth(
     lateralActive: deriveLateralMode(apState, context.routeStatus),
     verticalActive,
     ...vnavManagedAltitudeCaptureMetadata(vnav),
+    ...vnavManagedSpeedMetadata(vnav),
   };
 }

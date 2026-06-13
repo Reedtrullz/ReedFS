@@ -303,12 +303,14 @@ function FlightDirectorBars({ cue }: { cue: FlightDirectorCue }) {
 function McpTargetStrip({
   visible,
   speed,
+  speedLabel = 'SEL SPD',
   heading,
   altitude,
   verticalSpeed,
 }: {
   visible: boolean;
   speed: number | null | undefined;
+  speedLabel?: string;
   heading: number | null | undefined;
   altitude: number | null | undefined;
   verticalSpeed: number | null | undefined;
@@ -316,7 +318,7 @@ function McpTargetStrip({
   if (!visible) return null;
 
   const items = [
-    `SEL SPD ${finiteTargetText(speed, '---')}`,
+    `${speedLabel} ${finiteTargetText(speed, '---')}`,
     `SEL HDG ${headingTargetText(heading)}`,
     `SEL ALT ${finiteTargetText(altitude, '-----')}`,
     `SEL VS ${verticalSpeedTargetText(verticalSpeed)}`,
@@ -476,6 +478,17 @@ function useFmaText(kind: 'thrustActive' | 'lateralActive' | 'verticalActive' | 
   })[kind]));
 }
 
+function useManagedSpeedKt(): number | null {
+  return useSimStore((s) => {
+    const truth = deriveDisplayFmaTruth(s.apState, {
+      aircraft: s.aircraft,
+      flightPlan: s.flightPlan,
+      routeStatus: s.routeStatus,
+    }) as ReturnType<typeof deriveDisplayFmaTruth> & { managedSpeedKt?: number };
+    return finiteNumber(truth.managedSpeedKt);
+  });
+}
+
 export function RfsPFD() {
   const flightPlan = useSimStore((s) => s.flightPlan);
   const routeStatus = useSimStore((s) => s.routeStatus);
@@ -514,6 +527,9 @@ export function RfsPFD() {
   const autopilotMode = useFmaText('autopilotStatus');
   const hasMcpTargets = useSimStore((s) => s.apState != null);
   const selectedSpeed = useSimStore((s) => s.apState?.boeing.speed ?? null);
+  const managedSpeed = useManagedSpeedKt();
+  const displaySpeed = finiteNumber(selectedSpeed) ?? managedSpeed;
+  const displaySpeedIsManaged = finiteNumber(selectedSpeed) === null && managedSpeed !== null;
   const selectedHeading = useSimStore((s) => s.apState?.boeing.heading ?? null);
   const selectedAltitude = useSimStore((s) => s.apState?.boeing.altitude ?? null);
   const selectedVerticalSpeed = useSimStore((s) => s.apState?.boeing.verticalSpeed ?? null);
@@ -581,7 +597,8 @@ export function RfsPFD() {
       </div>
       <McpTargetStrip
         visible={hasMcpTargets}
-        speed={selectedSpeed}
+        speed={displaySpeed}
+        speedLabel={displaySpeedIsManaged ? 'MAN SPD' : 'SEL SPD'}
         heading={selectedHeading}
         altitude={selectedAltitude}
         verticalSpeed={selectedVerticalSpeed}
@@ -595,7 +612,11 @@ export function RfsPFD() {
           unit="KT"
           ticks={tapeTicks(ias, 10, 7)}
           align="right"
-          selectedBug={hasMcpTargets ? { ariaLabel: 'Airspeed selected bug', label: 'SPD BUG', value: selectedSpeed } : undefined}
+          selectedBug={hasMcpTargets ? {
+            ariaLabel: displaySpeedIsManaged ? 'Airspeed managed bug' : 'Airspeed selected bug',
+            label: 'SPD BUG',
+            value: displaySpeed,
+          } : undefined}
         />
 
         <div

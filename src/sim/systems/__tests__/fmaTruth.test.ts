@@ -87,6 +87,17 @@ function unconstrainedRoute(): FlightPlan {
   };
 }
 
+function speedOnlyRoute(): FlightPlan {
+  return {
+    ...constrainedRoute(),
+    route: 'KSEA OLM SPEED',
+    waypoints: [
+      { ident: 'KSEA', lat: 47.45, lon: -122.31, discontinuity: false },
+      { ident: 'OLM', lat: 46.97, lon: -122.9, discontinuity: false, speedConstraint: { type: 'AT_OR_BELOW', speed: 210 } },
+    ],
+  };
+}
+
 function aircraftAtRoute() {
   const aircraft = createInitialState(B737_800_SPEC);
   aircraft.position.lat = 47.45;
@@ -120,6 +131,22 @@ describe('deriveDisplayFmaTruth', () => {
 
     expect(fma.lateralActive).toBe('LNAV');
     expect(fma.verticalActive).toBe('VNAV_PTH');
+  });
+
+  it('keeps speed-only VNAV constraints out of the vertical FMA while exposing managed speed', () => {
+    const aircraft = aircraftAtRoute();
+    const flightPlan = speedOnlyRoute();
+    const routeStatus = computeRouteStatus(aircraft, flightPlan, 0);
+
+    const fma = deriveDisplayFmaTruth(apState(), { aircraft, flightPlan, routeStatus }) as ReturnType<typeof deriveDisplayFmaTruth> & {
+      managedSpeedKt?: number;
+      managedSpeedSource?: string;
+    };
+
+    expect(fma.lateralActive).toBe('LNAV');
+    expect(fma.verticalActive).toBe('OFF');
+    expect(fma.managedSpeedKt).toBe(210);
+    expect(fma.managedSpeedSource).toBe('VNAV_SPEED_CONSTRAINT');
   });
 
   it('uses route-status distance fallback when along-track distance is unavailable', () => {

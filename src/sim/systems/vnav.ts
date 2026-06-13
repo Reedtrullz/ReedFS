@@ -12,7 +12,8 @@ const VNAV_DESCENT_PATH_FT_PER_NM = 318;
 const VNAV_TOD_CAPTURE_TOLERANCE_NM = 1;
 
 export type VnavAltitudeTargetSource = 'VNAV_CONSTRAINT';
-export type VnavLifecycle = 'UNAVAILABLE' | 'ARMED' | 'PATH' | 'ALT_CAPTURE' | 'ALT_HOLD' | 'COMPLETE';
+export type VnavManagedSpeedSource = 'VNAV_SPEED_CONSTRAINT';
+export type VnavLifecycle = 'UNAVAILABLE' | 'ARMED' | 'PATH' | 'ALT_CAPTURE' | 'ALT_HOLD' | 'SPEED_ONLY' | 'COMPLETE';
 
 export interface VnavOutput {
   targetAlt: number;
@@ -27,6 +28,9 @@ export interface VnavOutput {
   unavailableReason: string | null;
   speedConstraint: boolean;
   targetSpeedKt?: number;
+  /** Managed speed target from a route speed constraint, independent of vertical VNAV pitch guidance. */
+  managedSpeedKt?: number;
+  managedSpeedSource?: VnavManagedSpeedSource;
   /** Explicit VNAV path lifecycle independent of raw RFMS vertical-mode labels. */
   lifecycle: VnavLifecycle;
   targetWaypointIndex?: number;
@@ -200,7 +204,7 @@ export function computeVNAV(
   const distanceToConstraintNm = Math.max(0, target.distanceM / M_PER_NM);
   const altitudeLifecycle = hasAltitudeTarget
     ? lifecycleForAltitudeTarget(state, target.altitudeTarget as number, distanceToConstraintNm)
-    : { lifecycle: 'ARMED' as VnavLifecycle, verticalMode: 'VNAV' as VerticalMode, todDistanceNm: 0, distanceToTodNm: 0 };
+    : { lifecycle: 'SPEED_ONLY' as VnavLifecycle, verticalMode: null, todDistanceNm: 0, distanceToTodNm: 0 };
   const targetVs = hasAltitudeTarget && altitudeLifecycle.lifecycle !== 'ARMED'
     ? requiredVerticalSpeedFpm(state, target.altitudeTarget as number, target.distanceM)
     : 0;
@@ -216,6 +220,8 @@ export function computeVNAV(
     unavailableReason: null,
     speedConstraint: hasSpeedTarget,
     targetSpeedKt: target.speedTarget,
+    managedSpeedKt: target.speedTarget,
+    managedSpeedSource: hasSpeedTarget ? 'VNAV_SPEED_CONSTRAINT' : undefined,
     lifecycle: altitudeLifecycle.lifecycle,
     targetWaypointIndex: target.index,
     targetWaypointIdent: target.waypoint.ident,

@@ -77,7 +77,7 @@ describe('computeVNAV', () => {
     expect(v.targetVs).toBe(3000);
   });
 
-  it('exposes a speed constraint as a VNAV target speed', () => {
+  it('exposes a speed constraint as managed speed without vertical VNAV pitch guidance', () => {
     const s = createInitialState(B737_800_SPEC);
     const fp: FlightPlan = {
       origin: 'KSEA',
@@ -93,12 +93,19 @@ describe('computeVNAV', () => {
       }],
     };
 
-    const v = computeVNAV(s, fp, navOut);
+    const v = computeVNAV(s, fp, navOut) as ReturnType<typeof computeVNAV> & {
+      managedSpeedKt?: number;
+      managedSpeedSource?: string;
+    };
 
     expect(v.available).toBe(true);
     expect(v.speedConstraint).toBe(true);
     expect(v.targetSpeedKt).toBe(220);
+    expect(v.managedSpeedKt).toBe(220);
+    expect(v.managedSpeedSource).toBe('VNAV_SPEED_CONSTRAINT');
     expect(v.altitudeConstraint).toBe(false);
+    expect(v.verticalMode).toBeNull();
+    expect(v.lifecycle).toBe('SPEED_ONLY');
   });
 
   it('arms VNAV for a future descent constraint before TOD instead of requiring the active waypoint to be constrained', () => {
