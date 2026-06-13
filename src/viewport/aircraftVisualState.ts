@@ -62,12 +62,11 @@ function isPowered(aircraft: AircraftVisualAircraft): boolean {
   return electrical.acBusPowered || electrical.batteryVolts > 20;
 }
 
-function gearExtensionFraction(configGearDown: boolean, lever: ControlInputs['gearLever']): number {
-  if (configGearDown && lever === 'DOWN') return 1;
-  if (!configGearDown && lever === 'UP') return 0;
-  // No dedicated transition timer exists yet. A lever/actual-position mismatch is the
-  // deterministic visual transition fraction until the gear system models transit time.
-  return 0.5;
+function gearExtensionFraction(config: AircraftVisualAircraft['config']): number {
+  const rawPosition = typeof config.gearPosition === 'number' && Number.isFinite(config.gearPosition)
+    ? clamp(config.gearPosition, 0, 1)
+    : config.gearDown ? 1 : 0;
+  return !config.gearDown && rawPosition >= 0.999 ? 0 : rawPosition;
 }
 
 export function createAircraftVisualState(
@@ -75,14 +74,14 @@ export function createAircraftVisualState(
   controls?: Partial<ControlInputs>,
 ): AircraftVisualState {
   const effective = normalizedControls(aircraft, controls);
-  const extensionFraction = gearExtensionFraction(aircraft.config.gearDown, effective.gearLever);
+  const extensionFraction = gearExtensionFraction(aircraft.config);
   const gearVisible = extensionFraction > 0;
   const onCompressibleGear = extensionFraction >= 0.95 && aircraft.ground.weightOnWheels && aircraft.ground.aglFt < 5;
   const powerAvailable = isPowered(aircraft);
   const simSeconds = aircraft.simTime / 1000;
   const beaconPhaseSeconds = ((simSeconds % 1) + 1) % 1;
 
-  const flapFraction = clamp(effective.flapLever / 40, 0, 1);
+  const flapFraction = clamp(aircraft.config.flapSetting / 40, 0, 1);
   const aileron = clamp(effective.aileron, -1, 1);
   const elevator = clamp(effective.elevator, -1, 1);
   const rudder = clamp(effective.rudder, -1, 1);

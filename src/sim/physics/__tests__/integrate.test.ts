@@ -213,30 +213,47 @@ describe('integrate', () => {
     expect(trimmed.attitude.theta).toBeGreaterThan(untrimmed.attitude.theta);
   });
 
-  it('applies pilot configuration controls before the first aero solve of a tick', () => {
-    const laggedConfig = airborneTakeoffConfigState(0);
-    laggedConfig.config.flapSetting = 0;
-    laggedConfig.config.speedBrake = 0;
-    const preconfigured = structuredClone(laggedConfig);
-    preconfigured.config.flapSetting = 30;
-    preconfigured.config.speedBrake = 1;
+  it('moves flap actual toward the commanded detent over time and uses actual flaps for aero', () => {
+    const laggedActual = airborneTakeoffConfigState(0);
+    laggedActual.config.flapSetting = 0;
+    const alreadyExtended = structuredClone(laggedActual);
+    alreadyExtended.config.flapSetting = 30;
     const controls: ControlInputs = {
       ...idle,
       flapLever: 30,
       gearLever: 'UP',
-      spoilers: 1,
       throttle1: 0.7,
       throttle2: 0.7,
     };
 
-    integrate(laggedConfig, controls, B737_800_SPEC, 1 / 60);
-    integrate(preconfigured, controls, B737_800_SPEC, 1 / 60);
+    integrate(laggedActual, controls, B737_800_SPEC, 0.5);
+    integrate(alreadyExtended, controls, B737_800_SPEC, 0.5);
 
-    expect(laggedConfig.config.flapSetting).toBe(30);
-    expect(laggedConfig.config.speedBrake).toBe(1);
-    expect(laggedConfig.velocity.u).toBeCloseTo(preconfigured.velocity.u, 6);
-    expect(laggedConfig.velocity.w).toBeCloseTo(preconfigured.velocity.w, 6);
-    expect(laggedConfig.angularVel.q).toBeCloseTo(preconfigured.angularVel.q, 6);
+    expect(laggedActual.config.flapSetting).toBeGreaterThan(0);
+    expect(laggedActual.config.flapSetting).toBeLessThan(30);
+    expect(laggedActual.velocity.w).toBeGreaterThan(alreadyExtended.velocity.w);
+
+    for (let i = 0; i < 8 * 60; i += 1) {
+      integrate(laggedActual, controls, B737_800_SPEC, 1 / 60);
+    }
+    expect(laggedActual.config.flapSetting).toBe(30);
+  });
+
+  it('moves gear actual position over time instead of snapping to the gear lever', () => {
+    const state = airborneTakeoffConfigState(0);
+    state.config.gearDown = true;
+
+    integrate(state, { ...idle, gearLever: 'UP' }, B737_800_SPEC, 0.5);
+
+    expect(state.config.gearPosition).toBeGreaterThan(0);
+    expect(state.config.gearPosition).toBeLessThan(1);
+    expect(state.config.gearDown).toBe(false);
+
+    for (let i = 0; i < 8 * 60; i += 1) {
+      integrate(state, { ...idle, gearLever: 'UP' }, B737_800_SPEC, 1 / 60);
+    }
+    expect(state.config.gearPosition).toBe(0);
+    expect(state.config.gearDown).toBe(false);
   });
 
   it('accelerates downward in freefall at level attitude', () => {
@@ -956,6 +973,15 @@ describe('integrate', () => {
     const airborne = createInitialState(B737_800_SPEC);
     airborne.position = ksea16LPositionMeters(300, 0, KSEA_RUNWAY_ALT_FT + 1000);
     airborne.config.gearDown = true;
+    airborne.config.gearPosition = 1;
+    airborne.ground = {
+      ...airborne.ground,
+      aglFt: 1000,
+      weightOnWheels: false,
+      normalForceN: 0,
+      contact: 'none',
+      gearStations: createB737GearStations(0, false),
+    };
 
     integrate(airborne, gearUp, B737_800_SPEC, 1 / 60);
 

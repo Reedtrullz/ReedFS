@@ -139,12 +139,34 @@ export interface FuelState {
 // ── Aircraft Config ──
 
 export interface AircraftConfig {
+  /** Actual flap surface position in degrees; pilot command lives in ControlInputs.flapLever. */
   flapSetting: number;
+  /** True only when the landing gear is fully down/locked. Transit/up states are false. */
   gearDown: boolean;
+  /** Actual gear extension, 0=fully up, 1=fully down. Legacy snapshots default from gearDown. */
+  gearPosition: number;
   spoilersArmed: boolean;
   spoilersDeployed: boolean;
   speedBrake: number; // 0-1
   stabilizerTrimUnits: number; // 0-15, increasing nose-up stabilizer trim
+}
+
+export function normalizeAircraftConfig(config: AircraftConfig): AircraftConfig {
+  const legacyGearPosition = (config as AircraftConfig & { gearPosition?: unknown }).gearPosition;
+  let gearPosition = typeof legacyGearPosition === 'number' && Number.isFinite(legacyGearPosition)
+    ? Math.max(0, Math.min(1, legacyGearPosition))
+    : config.gearDown ? 1 : 0;
+  if (!config.gearDown && gearPosition >= 0.999) {
+    // Migration safety: old tests/snapshots/helpers toggled only `gearDown`.
+    // A false boolean with a default full-down position means legacy "gear up".
+    gearPosition = 0;
+  }
+
+  return {
+    ...config,
+    gearPosition,
+    gearDown: gearPosition >= 0.999,
+  };
 }
 
 // ── Full Aircraft State ──
@@ -258,7 +280,7 @@ export function createInitialState(spec: AircraftSpec): AircraftState {
     attitude, // facing south (180°)
     quaternion: eulerToQuat(attitude.phi, attitude.theta, attitude.psi),
     angularVel: { p: 0, q: 0, r: 0 },
-    config: { flapSetting: 0, gearDown: true, spoilersArmed: false, spoilersDeployed: false, speedBrake: 0, stabilizerTrimUnits: 0 },
+    config: { flapSetting: 0, gearDown: true, gearPosition: 1, spoilersArmed: false, spoilersDeployed: false, speedBrake: 0, stabilizerTrimUnits: 0 },
     engines: [
       { n1: 0, n2: 0, egt: 20, fuelFlow: 0, thrust: 0, running: false },
       { n1: 0, n2: 0, egt: 20, fuelFlow: 0, thrust: 0, running: false },

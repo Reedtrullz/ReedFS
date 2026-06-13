@@ -6,12 +6,15 @@ export function EngineStrip() {
   const engines = useSimStore((s) => s.aircraft.engines);
   const flapsActual = useSimStore((s) => s.aircraft.config.flapSetting);
   const gearDownActual = useSimStore((s) => s.aircraft.config.gearDown);
+  const gearPositionActual = useSimStore((s) => s.aircraft.config.gearPosition);
   const controls = useSimStore((s) => s.effectiveControls);
 
   const n1L = Math.round(engines[0].n1 * 10) / 10;
   const n1R = Math.round(engines[1].n1 * 10) / 10;
   const throttleCommandPercent = Math.round(Math.max(controls.throttle1, controls.throttle2) * 100);
   const gearCommand = controls.gearLever;
+  const gearActualLabel = gearTransitLabel(gearDownActual, gearPositionActual);
+  const gearActualColor = gearActualLabel.startsWith('TRN') ? '#f6d365' : gearDownActual ? '#0f0' : '#ff0';
 
   return (
     <div style={containerStyle}>
@@ -50,8 +53,8 @@ export function EngineStrip() {
 
       <div style={indicatorBlock}>
         <span style={labelStyle}>GEAR ACT</span>
-        <span style={{ ...valueStyle, color: gearDownActual ? '#0f0' : '#ff0' }}>
-          {gearDownActual ? 'DN' : 'UP'}
+        <span style={{ ...valueStyle, color: gearActualColor }}>
+          {gearActualLabel}
         </span>
       </div>
 
@@ -63,6 +66,12 @@ export function EngineStrip() {
       </div>
     </div>
   );
+}
+
+function gearTransitLabel(gearDown: boolean, gearPosition: number): string {
+  const position = Number.isFinite(gearPosition) ? Math.max(0, Math.min(1, gearPosition)) : gearDown ? 1 : 0;
+  if (position > 0.001 && position < 0.999) return `TRN ${Math.round(position * 100)}%`;
+  return gearDown ? 'DN' : 'UP';
 }
 
 function n1Color(n1: number): string {

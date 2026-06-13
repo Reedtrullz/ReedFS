@@ -1,4 +1,6 @@
 import type { AircraftState, AircraftSpec, ControlInputs, FlightPhase } from '../types';
+import { normalizeAircraftConfig } from '../types';
+import { B737_800_FDM } from '../data/aircraft/b737-800-fdm.v1';
 import { computeAero } from './aero';
 import { updateEngines } from '../systems/engine';
 import { updateFuel } from '../systems/fuel';
@@ -155,9 +157,31 @@ function shouldAllowLiftoff(state: AircraftState, airspeedMps: number, normalFor
   );
 }
 
-function applyPilotConfiguration(state: AircraftState, controls: ControlInputs, weightOnWheels = state.ground.weightOnWheels): void {
-  state.config.flapSetting = controls.flapLever;
-  state.config.gearDown = weightOnWheels ? true : controls.gearLever === 'DOWN';
+function moveToward(current: number, target: number, maxStep: number): number {
+  if (!Number.isFinite(current)) return target;
+  if (Math.abs(target - current) <= maxStep) return target;
+  return current + Math.sign(target - current) * maxStep;
+}
+
+function applyPilotConfiguration(
+  state: AircraftState,
+  controls: ControlInputs,
+  dt: number,
+  weightOnWheels = state.ground.weightOnWheels,
+): void {
+  state.config = normalizeAircraftConfig(state.config);
+  const configModel = B737_800_FDM.configuration;
+  const commandedFlap = clamp(controls.flapLever, 0, 40);
+  state.config.flapSetting = moveToward(
+    state.config.flapSetting,
+    commandedFlap,
+    Math.max(0, configModel.flapRateDegPerSecond * dt),
+  );
+
+  const gearTarget = weightOnWheels || controls.gearLever === 'DOWN' ? 1 : 0;
+  const gearStep = configModel.gearTransitSeconds > 0 ? dt / configModel.gearTransitSeconds : 1;
+  state.config.gearPosition = moveToward(state.config.gearPosition, gearTarget, Math.max(0, gearStep));
+  state.config.gearDown = state.config.gearPosition >= 0.999;
   state.config.spoilersDeployed = controls.spoilers > 0.5;
   state.config.speedBrake = controls.spoilers;
 }
@@ -172,7 +196,7 @@ export function integrate(
   // ── Systems (must run before aero so engine/fuel state is current) ──
   // Pilot-facing configuration controls must be visible to the same tick's aero solve.
   // Ground contact re-applies the gear safety rule after liftoff/contact resolution.
-  applyPilotConfiguration(state, controls);
+  applyPilotConfiguration(state, controls, dt);
   updateEngines(state, controls, spec, dt, wind ?? null);
   updateFuel(state, spec, dt);
   updateElectrical(state, dt);
@@ -279,7 +303,8 @@ export function integrate(
   });
 
   // ── Config ──
-  applyPilotConfiguration(state, controls, groundContact.weightOnWheels);
+  // Reconcile gear-safety/contact state without advancing transit a second time in the same fixed step.
+  applyPilotConfiguration(state, controls, 0, groundContact.weightOnWheels);
   updateTakeoffPhase(state);
   updateLandingPhase(state, { wasPostLandingTaxiBeforeGroundContact });
 

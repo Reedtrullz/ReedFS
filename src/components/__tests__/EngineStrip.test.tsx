@@ -48,4 +48,27 @@ describe('EngineStrip', () => {
     expect(screen.getByText('GEAR CMD')).toBeTruthy();
     expect(screen.getByText('UP')).toBeTruthy();
   });
+
+  it('shows gear transit instead of pretending partial gear is fully up or down', () => {
+    useSimStore.setState((s) => ({
+      aircraft: {
+        ...s.aircraft,
+        config: {
+          ...s.aircraft.config,
+          gearDown: false,
+          gearPosition: 0.4,
+        },
+      },
+      pilotInputs: { ...s.pilotInputs, gearLever: 'UP' },
+      effectiveControls: { ...s.effectiveControls, gearLever: 'UP' },
+      inputs: { ...s.inputs, gearLever: 'UP' },
+    }));
+
+    render(<EngineStrip />);
+
+    expect(screen.getByText('GEAR ACT')).toBeTruthy();
+    expect(screen.getByText('TRN 40%')).toBeTruthy();
+    expect(screen.getByText('GEAR CMD')).toBeTruthy();
+    expect(screen.getByText('UP')).toBeTruthy();
+  });
 });

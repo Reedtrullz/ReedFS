@@ -431,6 +431,20 @@ describe('useSimStore', () => {
     expect(restored.inputManager.rightBrake).toBe(0);
   });
 
+  it('loadScenarioState fills missing gear transit state from legacy gearDown snapshots', () => {
+    const storage = memoryScenarioStorage();
+    const snapshot = createScenarioSnapshot(useSimStore.getState());
+    snapshot.aircraft.config.gearDown = true;
+    delete (snapshot.aircraft.config as unknown as Record<string, unknown>).gearPosition;
+    storage.setItem(SCENARIO_SAVE_KEY, JSON.stringify(snapshot));
+
+    useSimStore.getState().loadScenarioState(storage);
+
+    const restored = useSimStore.getState();
+    expect(restored.aircraft.config.gearDown).toBe(true);
+    expect(restored.aircraft.config.gearPosition).toBe(1);
+  });
+
   it('loadScenarioState clears stale AP pitch/roll while preserving backed A/T throttle when CMD_A is unbacked', () => {
     const storage = memoryScenarioStorage();
     useSimStore.getState().setInput({

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { AircraftState, AutopilotCommands, ControlInputs, AircraftSpec } from '../sim/types';
-import { B737_800_SPEC } from '../sim/types';
+import { B737_800_SPEC, normalizeAircraftConfig } from '../sim/types';
 import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
 import type { FlightPlan } from '@shared/types/fmc';
 import type { WindInfo } from '../sim/weather';
@@ -216,6 +216,7 @@ function defaultScenarioStorage(): ScenarioPersistenceStorage | null {
 
 function restoreSnapshotSlice(snapshot: ScenarioSnapshot): Partial<SimStore> {
   const aircraft = structuredClone(snapshot.aircraft);
+  aircraft.config = normalizeAircraftConfig(aircraft.config);
   const apState = structuredClone(snapshot.apState);
   const apCommands = structuredClone(snapshot.apCommands);
   const pilotInputs = normalizeControlInputs(structuredClone(snapshot.pilotInputs));

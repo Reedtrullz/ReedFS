@@ -1,6 +1,6 @@
 import type { AeroModel } from '../../systems/AeroModel';
 import { B737_800_AIRCRAFT_DATA } from './b737-800.v1';
-import type { FdmLineageMetadata, FdmSourceMetadata, GearStationDefinition, GroundModelData } from './fdmTypes';
+import type { ConfigurationTransitModelData, FdmLineageMetadata, FdmSourceMetadata, GearStationDefinition, GroundModelData } from './fdmTypes';
 
 export const B737_800_FDM_DATA_VERSION = '1.0.0';
 
@@ -12,6 +12,7 @@ export interface VersionedAircraftFdmData {
   name: string;
   lineage: FdmLineageMetadata;
   aero: AeroModel & FdmSourceMetadata;
+  configuration: ConfigurationTransitModelData;
   gearStations: GearStationDefinition[];
   ground: GroundModelData;
 }
@@ -104,6 +105,14 @@ export const B737_800_FDM: VersionedAircraftFdmData = {
     groundEffect: {
       liftReliefFactor: 0.03,
     },
+  },
+  configuration: {
+    ...sourceMetadataFor('Landing gear and flap transit rates'),
+    sourceReferenceIds: sourceRefsForSection(),
+    // Gameplay placeholders: enough lag to make command-vs-actual visible without
+    // blocking the current tutorial flow. Not AFM/Boeing timing data.
+    flapRateDegPerSecond: 5,
+    gearTransitSeconds: 6,
   },
   gearStations: [
     {

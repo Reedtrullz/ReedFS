@@ -1,4 +1,4 @@
-export type SourceRole = 'aircraft' | 'aero' | 'gear' | 'ground' | 'lineage';
+export type SourceRole = 'aircraft' | 'aero' | 'configuration' | 'gear' | 'ground' | 'lineage';
 
 export type SourceClassification =
   | 'gameplay-calibrated'
@@ -53,6 +53,12 @@ export interface GearStationDefinition extends FdmSourceMetadata {
   steerable: boolean;
   /** Legacy compatibility alias for runtime consumers that predate `sourceRefs`; keep consistent with `sourceRefs`. */
   sourceReferenceIds: string[];
+}
+
+export interface ConfigurationTransitModelData extends FdmSourceMetadata {
+  sourceReferenceIds: string[];
+  flapRateDegPerSecond: number;
+  gearTransitSeconds: number;
 }
 
 export interface GroundModelData extends FdmSourceMetadata {

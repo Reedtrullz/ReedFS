@@ -150,7 +150,11 @@ export function computeAero(
     : effectiveClWithoutSpoilers;
 
   // --- Drag ---
-  const cd0 = polar.cd0 + (state.config.gearDown ? aeroModel.gearCd : 0) + state.config.speedBrake * aeroModel.speedBrakeCd;
+  const rawGearPosition = typeof state.config.gearPosition === 'number' && Number.isFinite(state.config.gearPosition)
+    ? clamp(state.config.gearPosition, 0, 1)
+    : state.config.gearDown ? 1 : 0;
+  const gearExtension = !state.config.gearDown && rawGearPosition >= 0.999 ? 0 : rawGearPosition;
+  const cd0 = polar.cd0 + gearExtension * aeroModel.gearCd + state.config.speedBrake * aeroModel.speedBrakeCd;
   const inducedCd = polar.k * cl * cl * groundEffect.inducedDragMultiplier;
   const cd = cd0 + inducedCd + polar.stallDragRise * stallFraction * stallFraction;
 

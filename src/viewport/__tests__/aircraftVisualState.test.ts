@@ -40,20 +40,26 @@ describe('createAircraftVisualState', () => {
     const retracted = aircraft({ config: { ...aircraft().config, gearDown: false } });
     expect(createAircraftVisualState(retracted, controls({ gearLever: 'UP' })).gear.visible).toBe(false);
 
-    const transitioning = createAircraftVisualState(aircraft(), controls({ gearLever: 'UP' }));
-    expect(transitioning.gear.visible).toBe(true);
-    expect(transitioning.gear.extensionFraction).toBeCloseTo(0.5, 9);
-    expect(transitioning.gear.compressionScaleZ).toBe(1);
+    const transitioning = aircraft({ config: { ...aircraft().config, gearDown: false, gearPosition: 0.4 } });
+    const transitionVisual = createAircraftVisualState(transitioning, controls({ gearLever: 'UP' }));
+    expect(transitionVisual.gear.visible).toBe(true);
+    expect(transitionVisual.gear.extensionFraction).toBeCloseTo(0.4, 9);
+    expect(transitionVisual.gear.compressionScaleZ).toBe(1);
   });
 
-  it('maps flap detents to increasing downward flap deflection', () => {
-    const flaps5 = createAircraftVisualState(aircraft(), controls({ flapLever: 5 })).flaps.deflectionRad;
-    const flaps15 = createAircraftVisualState(aircraft(), controls({ flapLever: 15 })).flaps.deflectionRad;
-    const flaps30 = createAircraftVisualState(aircraft(), controls({ flapLever: 30 })).flaps.deflectionRad;
+  it('maps actual flap state to increasing downward flap deflection without snapping to command', () => {
+    const flaps5Aircraft = aircraft({ config: { ...aircraft().config, flapSetting: 5 } });
+    const flaps15Aircraft = aircraft({ config: { ...aircraft().config, flapSetting: 15 } });
+    const flaps30Aircraft = aircraft({ config: { ...aircraft().config, flapSetting: 30 } });
+    const flaps5 = createAircraftVisualState(flaps5Aircraft, controls({ flapLever: 30 })).flaps.deflectionRad;
+    const flaps15 = createAircraftVisualState(flaps15Aircraft, controls({ flapLever: 30 })).flaps.deflectionRad;
+    const flaps30 = createAircraftVisualState(flaps30Aircraft, controls({ flapLever: 30 })).flaps.deflectionRad;
+    const commanded30FromActual5 = createAircraftVisualState(flaps5Aircraft, controls({ flapLever: 30 })).flaps.deflectionRad;
 
     expect(flaps5).toBeGreaterThan(0);
     expect(flaps15).toBeGreaterThan(flaps5);
     expect(flaps30).toBeGreaterThan(flaps15);
+    expect(commanded30FromActual5).toBe(flaps5);
   });
 
   it('maps effective controls to differential surfaces with correct signs', () => {

@@ -46,7 +46,10 @@ export function applyIasFlightCondition(
     options.betaRad ?? 0,
   );
   if (options.flapSetting !== undefined) state.config.flapSetting = options.flapSetting;
-  if (options.gearDown !== undefined) state.config.gearDown = options.gearDown;
+  if (options.gearDown !== undefined) {
+    state.config.gearDown = options.gearDown;
+    state.config.gearPosition = options.gearDown ? 1 : 0;
+  }
   if (options.speedBrake !== undefined) state.config.speedBrake = options.speedBrake;
   return state;
 }

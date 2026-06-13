@@ -225,6 +225,7 @@ export function createAircraftStateForScenario(spec: AircraftSpec, scenario: Fli
   state.config = {
     flapSetting: scenario.flapSetting,
     gearDown: true,
+    gearPosition: 1,
     spoilersArmed: false,
     spoilersDeployed: false,
     speedBrake: 0,

@@ -65,10 +65,10 @@ describe('aircraft model animations', () => {
     });
   });
 
-  it('hides/retracts gear when the effective gear lever is up or gearDown is false', () => {
+  it('hides/retracts gear when actual gear is up', () => {
     const model = createBoeing737Model();
     const retracted = aircraftForAnimation({
-      config: { ...createInitialState(B737_800_SPEC).config, gearDown: false },
+      config: { ...createInitialState(B737_800_SPEC).config, gearDown: false, gearPosition: 0 },
     });
 
     applyAircraftModelAnimations(model, retracted, controls({ gearLever: 'UP' }));
@@ -80,16 +80,19 @@ describe('aircraft model animations', () => {
     });
   });
 
-  it('deflects flaps increasingly with effective flap detents', () => {
+  it('deflects flaps increasingly with actual flap state', () => {
     const model = createBoeing737Model();
     const aircraft = aircraftForAnimation();
 
-    applyAircraftModelAnimations(model, aircraft, controls({ flapLever: 5 }));
+    aircraft.config.flapSetting = 5;
+    applyAircraftModelAnimations(model, aircraft, controls({ flapLever: 30 }));
     const flaps5 = model.getObjectByName('leftFlap')?.rotation.x ?? 0;
 
-    applyAircraftModelAnimations(model, aircraft, controls({ flapLever: 15 }));
+    aircraft.config.flapSetting = 15;
+    applyAircraftModelAnimations(model, aircraft, controls({ flapLever: 30 }));
     const flaps15 = model.getObjectByName('leftFlap')?.rotation.x ?? 0;
 
+    aircraft.config.flapSetting = 30;
     applyAircraftModelAnimations(model, aircraft, controls({ flapLever: 30 }));
     const flaps30 = model.getObjectByName('leftFlap')?.rotation.x ?? 0;
 

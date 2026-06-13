@@ -58,6 +58,28 @@ describe('applyGroundContact', () => {
     expect(state.ground.normalForceN).toBeGreaterThan(0);
   });
 
+  it('treats commanded-down but actually retracted gear as gear-up runway contact', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.position = { lat: KSEA_RUNWAY_16L.start.lat, lon: KSEA_RUNWAY_16L.start.lon, alt: KSEA_RUNWAY_ALT_FT };
+    state.config.gearDown = false;
+    state.config.gearPosition = 0;
+    state.velocity.w = 1.5;
+    state.ground = {
+      ...state.ground,
+      weightOnWheels: false,
+      normalForceN: 0,
+      contact: 'none',
+      gearStations: createB737GearStations(0, false),
+    };
+
+    const contact = applyGroundContact(state, { ...idle, gearLever: 'DOWN' }, 1 / 60, KSEA_RUNWAY_ALT_FT);
+
+    expect(contact.contact).toBe('belly');
+    expect(contact.weightOnWheels).toBe(false);
+    expect(contact.gearStations.every((station) => !station.weightOnWheel && station.normalForceN === 0)).toBe(true);
+    expect(state.config.gearDown).toBe(false);
+  });
+
   it('initial state defines nose and left/right main gear stations in body axes', () => {
     const state = createInitialState(B737_800_SPEC);
 

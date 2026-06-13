@@ -27,6 +27,15 @@ const TAIL_CONTACT_POINT_BODY_M: BodyStationPosition = {
   z: -1.37,
 };
 
+const GEAR_CONTACT_EXTENSION_THRESHOLD = 0.95;
+
+function actualGearExtensionFraction(state: AircraftState): number {
+  const rawPosition = typeof state.config.gearPosition === 'number' && Number.isFinite(state.config.gearPosition)
+    ? Math.max(0, Math.min(1, state.config.gearPosition))
+    : state.config.gearDown ? 1 : 0;
+  return !state.config.gearDown && rawPosition >= 0.999 ? 0 : rawPosition;
+}
+
 export const B737_GROUND_MODEL: GroundModelData = B737_800_FDM.ground;
 
 export type GroundContactResult = GroundState;
@@ -689,7 +698,7 @@ export function applyGroundContact(
   options: GroundContactOptions = {},
 ): GroundContactResult {
   const groundModel = options.groundModel ?? B737_GROUND_MODEL;
-  const gearAvailableForContact = state.config.gearDown || inputs.gearLever === 'DOWN';
+  const gearAvailableForContact = actualGearExtensionFraction(state) >= GEAR_CONTACT_EXTENSION_THRESHOLD;
   const contactSurface = options.surface ?? fallbackGroundSurface(groundAltFt);
   const atOrBelowGround = state.position.alt <= groundAltFt + GROUND_CONTACT_EPSILON_FT;
   const wheelGeometry = computeWheelContactGeometry(state, B737_800_SPEC, contactSurface);
@@ -757,7 +766,6 @@ export function applyGroundContact(
   const gearNormalForceN = oleoLoads.totalNormalForceN;
   let loadedGearStations = oleoLoads.gearStations;
   state.position.alt = atOrBelowGround ? groundAltFt : state.position.alt + contactPenetrationM / FT_TO_M;
-  state.config.gearDown = true;
 
   const allowMainGearPivot = allowsMainGearPivot(state, inputs, options);
   const tailstrike = stabilizeGroundAttitude(state, allowMainGearPivot, loadedGearStations, groundModel);
