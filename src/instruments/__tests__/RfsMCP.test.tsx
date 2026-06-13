@@ -181,6 +181,8 @@ describe('RfsMCP', () => {
 
     render(<RfsMCP />);
 
+    expect(screen.getByText(`SPD ${expectedSpeed}`)).toBeTruthy();
+
     fireEvent.click(screen.getByRole('button', { name: 'SPD +5' }));
 
     const ap = useSimStore.getState().apState;
@@ -201,6 +203,9 @@ describe('RfsMCP', () => {
     const seededAltitude = Math.round(aircraft.position.alt / 100) * 100;
 
     render(<RfsMCP />);
+
+    expect(screen.getByText(`HDG ${String(seededHeading).padStart(3, '0')}`)).toBeTruthy();
+    expect(screen.getByText(`ALT ${seededAltitude}`)).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: 'HDG -5' }));
     fireEvent.click(screen.getByRole('button', { name: 'ALT +1000' }));

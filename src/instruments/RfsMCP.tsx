@@ -169,6 +169,7 @@ function applyMcpMode(apState: AutopilotState, mode: EnabledMcpMode): void {
 export function RfsMCP() {
   const apState = useSimStore((s) => s.apState);
   const aircraft = useSimStore((s) => s.aircraft);
+  const wind = useSimStore((s) => s.wind);
   const flightPlan = useSimStore((s) => s.flightPlan);
   const routeStatus = useSimStore((s) => s.routeStatus);
 
@@ -216,10 +217,11 @@ export function RfsMCP() {
     : lnavAvailable
       ? btnStyle
       : { ...btnStyle, color: '#777', border: '1px solid #444', cursor: 'not-allowed' };
-  const speedTarget = selectedSpeedKt(apState);
-  const headingTarget = selectedHeadingDeg(apState);
-  const altitudeTarget = selectedAltitudeFt(apState);
-  const verticalSpeedTarget = selectedVerticalSpeedFpm(apState);
+  const displayApState = apState ?? createDefaultAutopilotStateFromAircraft(aircraft, wind);
+  const speedTarget = selectedSpeedKt(displayApState);
+  const headingTarget = selectedHeadingDeg(displayApState);
+  const altitudeTarget = selectedAltitudeFt(displayApState);
+  const verticalSpeedTarget = selectedVerticalSpeedFpm(displayApState);
 
   return (
     <div
