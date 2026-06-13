@@ -1,6 +1,6 @@
 import { useSimStore } from '../store/simStore';
 import type { AutopilotState, LateralMode, ThrustMode, VerticalMode } from '@shared/autopilot/autopilotTypes';
-import { createDefaultAutopilotState } from './defaultAutopilotState';
+import { createDefaultAutopilotState, createDefaultAutopilotStateFromAircraft } from './defaultAutopilotState';
 import { deriveEffectiveAutoflightTruth } from '../sim/systems/effectiveAutoflightTruth';
 
 const btnStyle: React.CSSProperties = {
@@ -86,7 +86,10 @@ function deriveBackedVnavMode(
   apState: AutopilotState | null,
   context: Parameters<typeof deriveEffectiveAutoflightTruth>[1],
 ): VerticalMode {
-  const probe = structuredClone(apState ?? createDefaultAutopilotState());
+  const aircraft = context?.aircraft;
+  const probe = structuredClone(
+    apState ?? (aircraft ? createDefaultAutopilotStateFromAircraft(aircraft) : createDefaultAutopilotState()),
+  );
   probe.truth.autopilotStatus = 'CMD_A';
   probe.truth.verticalActive = 'VNAV';
   probe.boeing.cmdA = true;
@@ -174,23 +177,25 @@ export function RfsMCP() {
     if (mode === 'LNAV' && !state.routeStatus.lnavAvailable) return;
     if (mode === 'VNAV' && deriveBackedVnavMode(state.apState, state) === 'OFF') return;
     const current = state.apState;
-    const next = structuredClone(current ?? createDefaultAutopilotState());
+    const next = structuredClone(current ?? createDefaultAutopilotStateFromAircraft(state.aircraft, state.wind));
     applyMcpMode(next, mode);
     state.setApState(next);
   };
 
   const toggleFlightDirector = (side: FlightDirectorSide) => {
-    const current = useSimStore.getState().apState;
-    const next = structuredClone(current ?? createDefaultAutopilotState());
+    const state = useSimStore.getState();
+    const current = state.apState;
+    const next = structuredClone(current ?? createDefaultAutopilotStateFromAircraft(state.aircraft, state.wind));
     toggleFlightDirectorSwitch(next, side);
-    useSimStore.getState().setApState(next);
+    state.setApState(next);
   };
 
   const editTarget = (target: McpTarget, delta: number) => {
-    const current = useSimStore.getState().apState;
-    const next = structuredClone(current ?? createDefaultAutopilotState());
+    const state = useSimStore.getState();
+    const current = state.apState;
+    const next = structuredClone(current ?? createDefaultAutopilotStateFromAircraft(state.aircraft, state.wind));
     applyMcpTargetDelta(next, target, delta);
-    useSimStore.getState().setApState(next);
+    state.setApState(next);
   };
 
   const effectiveTruth = deriveEffectiveAutoflightTruth(apState, { aircraft, flightPlan, routeStatus });

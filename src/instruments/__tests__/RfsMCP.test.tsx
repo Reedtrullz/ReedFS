@@ -9,6 +9,8 @@ import { eulerToQuat } from '../../sim/physics/quaternion';
 import { createKseaKpdxFlight } from '../../sim/flightPlanLoader';
 import { computeRouteStatus } from '../../sim/systems/navigation';
 import { deriveEffectiveAutoflightTruth } from '../../sim/systems/effectiveAutoflightTruth';
+import { computeDerived } from '../../sim/physics/derived';
+import { ktToMs } from '../../sim/physics/units';
 
 function setVnavBackedKseaRoute(): void {
   const flightPlan = createKseaKpdxFlight();
@@ -91,9 +93,9 @@ describe('RfsMCP', () => {
     fireEvent.click(screen.getByRole('button', { name: 'ALT' }));
 
     expect(screen.getByLabelText('Flight director roll bar')).toBeTruthy();
-    expect(screen.getByText('FD ROLL -30.0°')).toBeTruthy();
+    expect(screen.getByText('FD ROLL +0.0°')).toBeTruthy();
     expect(screen.getByLabelText('Flight director pitch bar')).toBeTruthy();
-    expect(screen.getByText('FD PITCH +4.0°')).toBeTruthy();
+    expect(screen.getByText('FD PITCH +0.0°')).toBeTruthy();
   });
 
   it('first SPD click creates AP state and honestly engages SPEED', () => {
@@ -169,18 +171,35 @@ describe('RfsMCP', () => {
   });
 
   it('edits selected MCP speed target without engaging SPEED mode', () => {
+    const aircraft = structuredClone(useSimStore.getState().aircraft);
+    aircraft.position.alt = 432;
+    aircraft.attitude = { phi: 0, theta: 0, psi: 163 * Math.PI / 180 };
+    aircraft.quaternion = eulerToQuat(aircraft.attitude.phi, aircraft.attitude.theta, aircraft.attitude.psi);
+    aircraft.velocity = { u: ktToMs(149), v: 0, w: 0 };
+    useSimStore.setState({ aircraft, wind: null });
+    const expectedSpeed = Math.round(Math.max(0, computeDerived(aircraft).ias));
+
     render(<RfsMCP />);
 
     fireEvent.click(screen.getByRole('button', { name: 'SPD +5' }));
 
     const ap = useSimStore.getState().apState;
     expect(ap).not.toBeNull();
-    expect(ap?.boeing.speed).toBe(255);
+    expect(ap?.boeing.speed).toBe(expectedSpeed + 5);
     expect(ap?.truth.thrustActive).toBe('OFF');
-    expect(screen.getByText('SPD 255')).toBeTruthy();
+    expect(screen.getByText(`SPD ${expectedSpeed + 5}`)).toBeTruthy();
   });
 
-  it('edits selected MCP heading altitude and vertical-speed targets', () => {
+  it('edits selected MCP heading altitude and vertical-speed targets from current aircraft state', () => {
+    const aircraft = structuredClone(useSimStore.getState().aircraft);
+    aircraft.position.alt = 12_432;
+    aircraft.attitude = { phi: 0, theta: 0, psi: 163 * Math.PI / 180 };
+    aircraft.quaternion = eulerToQuat(aircraft.attitude.phi, aircraft.attitude.theta, aircraft.attitude.psi);
+    aircraft.velocity = { u: ktToMs(220), v: 0, w: 0 };
+    useSimStore.setState({ aircraft, wind: null });
+    const seededHeading = Math.round(aircraft.attitude.psi * 180 / Math.PI);
+    const seededAltitude = Math.round(aircraft.position.alt / 100) * 100;
+
     render(<RfsMCP />);
 
     fireEvent.click(screen.getByRole('button', { name: 'HDG -5' }));
@@ -188,11 +207,11 @@ describe('RfsMCP', () => {
     fireEvent.click(screen.getByRole('button', { name: 'VS +100' }));
 
     const ap = useSimStore.getState().apState;
-    expect(ap?.boeing.heading).toBe(355);
-    expect(ap?.boeing.altitude).toBe(11000);
+    expect(ap?.boeing.heading).toBe(seededHeading - 5);
+    expect(ap?.boeing.altitude).toBe(seededAltitude + 1000);
     expect(ap?.boeing.verticalSpeed).toBe(100);
-    expect(screen.getByText('HDG 355')).toBeTruthy();
-    expect(screen.getByText('ALT 11000')).toBeTruthy();
+    expect(screen.getByText(`HDG ${String(seededHeading - 5).padStart(3, '0')}`)).toBeTruthy();
+    expect(screen.getByText(`ALT ${seededAltitude + 1000}`)).toBeTruthy();
     expect(screen.getByText('VS +100')).toBeTruthy();
   });
 
