@@ -15,7 +15,7 @@
     "check:blackbox": "node scripts/check-blackbox-e2e.mjs",
     "check": "npm run check:deps && npm run check:release && npm run lint:ci && npm run typecheck && npm run test && npm run build",
     "preview": "vite preview",
-    "test:visual": "playwright test",
+    "test:visual": "playwright test --workers=1",
     "test:visual:update": "playwright test --update-snapshots"
   },
   "dependencies": {

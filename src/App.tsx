@@ -27,6 +27,7 @@ import { ScenarioPanel } from './components/ScenarioPanel';
 import { RouteStatus } from './components/RouteStatus';
 import { SceneStatus } from './components/SceneStatus';
 import { TakeoffSetupPanel } from './components/TakeoffSetupPanel';
+import { RfsLayout } from './components/layout/RfsLayout';
 
 const CesiumViewport = lazy(() => import('./viewport/CesiumViewport').then((m) => ({ default: m.CesiumViewport })));
 const ThreeLayer = lazy(() => import('./viewport/ThreeLayer').then((m) => ({ default: m.ThreeLayer })));
@@ -247,130 +248,125 @@ export function App() {
 
   return (
     <ErrorBoundary>
-    <div style={{ width: '100%', height: '100%' }}>
-      <Suspense fallback={<LoadingScreen />}>
-        <CesiumViewport onReady={handleViewerReady} scenePolicy={cesiumScenePolicy} />
-      </Suspense>
-      {viewerReady && (
-        <>
-          <Suspense key={`runway-${viewerGeneration}`} fallback={null}>
-            <RunwayLayer viewerRef={viewerRef} runwayOverrides={runwayOverrides} />
+      <RfsLayout
+        viewport={(
+          <Suspense fallback={<LoadingScreen />}>
+            <CesiumViewport onReady={handleViewerReady} scenePolicy={cesiumScenePolicy} />
           </Suspense>
-          {showDebugOverlays && (
-            <Suspense fallback={null}>
-              <RunwayEditor onOverridesChange={setRunwayOverrides} />
-            </Suspense>
-          )}
-          <Suspense key={`aircraft-${viewerGeneration}-${camMode}`} fallback={null}>
-            {camMode === 'cockpit' ? <CockpitLayer viewerRef={viewerRef} /> : <ThreeLayer viewerRef={viewerRef} />}
-          </Suspense>
-          <Suspense key={`weather-${viewerGeneration}`} fallback={null}>
-            <CloudLayer
-              viewerRef={viewerRef}
-              metar={metarData}
-              cloudSeed={activeScenario.weather.cloudSeed}
-              cloudAnchor={activeScenario.weather.cloudAnchor}
-            />
-            <ContrailLayer viewerRef={viewerRef} />
-          </Suspense>
-        </>
-      )}
-      {showDebugOverlays && (
-        <Suspense fallback={null}>
-          <Telemetry />
-          <ControlsHelp />
-          <ControlsSettings />
-          <AttitudeIndicator />
-        </Suspense>
-      )}
-      {showFlightInstruments && (
-        <Suspense fallback={null}>
-          <RfsPFD />
-          <RfsMCP />
-        </Suspense>
-      )}
-      <SceneStatus policy={cesiumScenePolicy} />
-      {showFlightInstruments && <ScenarioPanel />}
-      {showFlightInstruments && <RouteStatus />}
-      {showFlightInstruments && <TakeoffSetupPanel />}
-      <EngineStrip />
-      {showDebugOverlays && (
-        <div
-          style={{
-            position: 'fixed',
-            bottom: 80,
-            left: 14,
-            color: '#0f0',
-            fontFamily: 'monospace',
-            zIndex: 10,
-            fontSize: 10,
-            opacity: 0.5,
-            pointerEvents: 'none',
-          }}
-        >
-          RFS — Flight Test Build
-        </div>
-      )}
-      <div style={{ position: 'fixed', bottom: 20, left: 20, zIndex: 100, display: 'flex', gap: 8 }}>
-        {status === 'stopped' || status === 'paused' ? (
-          <>
-            <button onClick={handleStartRoll} style={btnStyle}>START ROLL</button>
-            {status === 'paused' && <button onClick={resume} style={btnStyle}>RESUME</button>}
-          </>
-        ) : (
-          <>
-            <button onClick={abortTakeoff} style={abortBtnStyle}>ABORT</button>
-            <button onClick={pause} style={btnStyle}>PAUSE</button>
-          </>
         )}
-        <button onClick={reset} style={btnStyle}>RESET</button>
-        <button
-          onClick={() => setCamMode(nextCameraMode)}
-          style={btnStyle}
-        >
-          CAM: {camMode.toUpperCase()}
-        </button>
-        <button
-          onClick={() => setOverlayMode(nextOverlayMode)}
-          style={btnStyle}
-        >
-          OVL: {overlayMode.toUpperCase()}
-        </button>
-        <button
-          onClick={handleToggleAudio}
-          style={btnStyle}
-        >
-          {audioButtonLabel}
-        </button>
-        <button
-          onClick={() => {
-            const store = useSimStore.getState();
-            const scenario = scenarioById(store.selectedScenarioId);
-            const fp = createDefaultFlightForScenario(scenario);
-            store.setFlightPlan(fp);
-            if (!fp) {
-              setRouteLoadMessage(`No default route is available for ${scenario.name}.`);
-              return;
-            }
-            setRouteLoadMessage(
-              `${fp.origin}→${fp.destination} route loaded. Takeoff setup reminder: confirm flaps for takeoff, set takeoff trim, keep throttle idle until ready, then press START ROLL.`,
-            );
-          }}
-          style={btnStyle}
-        >
-          LOAD PLAN
-        </button>
-        {routeLoadMessage && (
-          <div aria-label="Route load result" aria-live="polite" role="status" style={routeLoadMessageStyle}>
-            {routeLoadMessage}
+        sceneLayers={viewerReady ? (
+          <>
+            <Suspense key={`runway-${viewerGeneration}`} fallback={null}>
+              <RunwayLayer viewerRef={viewerRef} runwayOverrides={runwayOverrides} />
+            </Suspense>
+            {showDebugOverlays && (
+              <Suspense fallback={null}>
+                <RunwayEditor onOverridesChange={setRunwayOverrides} />
+              </Suspense>
+            )}
+            <Suspense key={`aircraft-${viewerGeneration}-${camMode}`} fallback={null}>
+              {camMode === 'cockpit' ? <CockpitLayer viewerRef={viewerRef} /> : <ThreeLayer viewerRef={viewerRef} />}
+            </Suspense>
+            <Suspense key={`weather-${viewerGeneration}`} fallback={null}>
+              <CloudLayer
+                viewerRef={viewerRef}
+                metar={metarData}
+                cloudSeed={activeScenario.weather.cloudSeed}
+                cloudAnchor={activeScenario.weather.cloudAnchor}
+              />
+              <ContrailLayer viewerRef={viewerRef} />
+            </Suspense>
+          </>
+        ) : null}
+        debugPanels={showDebugOverlays ? (
+          <Suspense fallback={null}>
+            <Telemetry />
+            <ControlsHelp />
+            <ControlsSettings />
+            <AttitudeIndicator />
+          </Suspense>
+        ) : null}
+        flightInstruments={showFlightInstruments ? (
+          <Suspense fallback={null}>
+            <div data-rfs-panel="pfd"><RfsPFD /></div>
+            <div data-rfs-panel="mcp"><RfsMCP /></div>
+          </Suspense>
+        ) : null}
+        sceneStatus={<SceneStatus policy={cesiumScenePolicy} />}
+        scenarioPanel={showFlightInstruments ? <ScenarioPanel /> : null}
+        routeStatus={showFlightInstruments ? <RouteStatus /> : null}
+        takeoffSetupPanel={showFlightInstruments ? <TakeoffSetupPanel /> : null}
+        engineStrip={<EngineStrip />}
+        buildWatermark={showDebugOverlays ? <>RFS — Flight Test Build</> : null}
+        fpsMonitor={showDebugOverlays ? <FPSMonitor /> : null}
+        controls={(
+          <div style={controlsBarStyle}>
+            {status === 'stopped' || status === 'paused' ? (
+              <>
+                <button onClick={handleStartRoll} style={btnStyle}>START ROLL</button>
+                {status === 'paused' && <button onClick={resume} style={btnStyle}>RESUME</button>}
+              </>
+            ) : (
+              <>
+                <button onClick={abortTakeoff} style={abortBtnStyle}>ABORT</button>
+                <button onClick={pause} style={btnStyle}>PAUSE</button>
+              </>
+            )}
+            <button onClick={reset} style={btnStyle}>RESET</button>
+            <button
+              onClick={() => setCamMode(nextCameraMode)}
+              style={btnStyle}
+            >
+              CAM: {camMode.toUpperCase()}
+            </button>
+            <button
+              onClick={() => setOverlayMode(nextOverlayMode)}
+              style={btnStyle}
+            >
+              OVL: {overlayMode.toUpperCase()}
+            </button>
+            <button
+              onClick={handleToggleAudio}
+              style={btnStyle}
+            >
+              {audioButtonLabel}
+            </button>
+            <button
+              onClick={() => {
+                const store = useSimStore.getState();
+                const scenario = scenarioById(store.selectedScenarioId);
+                const fp = createDefaultFlightForScenario(scenario);
+                store.setFlightPlan(fp);
+                if (!fp) {
+                  setRouteLoadMessage(`No default route is available for ${scenario.name}.`);
+                  return;
+                }
+                setRouteLoadMessage(
+                  `${fp.origin}→${fp.destination} route loaded. Takeoff setup reminder: confirm flaps for takeoff, set takeoff trim, keep throttle idle until ready, then press START ROLL.`,
+                );
+              }}
+              style={btnStyle}
+            >
+              LOAD PLAN
+            </button>
+            {routeLoadMessage && (
+              <div aria-label="Route load result" aria-live="polite" role="status" style={routeLoadMessageStyle}>
+                {routeLoadMessage}
+              </div>
+            )}
           </div>
         )}
-      </div>
-    </div>
-    {showDebugOverlays && <FPSMonitor />}
+      />
     </ErrorBoundary>
   );
 }
+
+const controlsBarStyle: React.CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  alignItems: 'center',
+  gap: 8,
+};
 
 const btnStyle: React.CSSProperties = {
   background: 'rgba(0,255,0,0.2)', color: '#0f0', border: '1px solid #0f0',

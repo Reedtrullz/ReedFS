@@ -37,8 +37,8 @@ test.describe('RFS black-box player loop proof', () => {
     const pfd = page.getByLabel('Primary flight display');
     const lnav = page.getByRole('button', { name: /^LNAV$/ });
     const spd = page.getByRole('button', { name: /^SPD$/ });
-    await expect(lnav).toBeEnabled();
-    await expect(spd).toBeEnabled();
+    await expect(lnav).toBeDisabled();
+    await expect(spd).toBeDisabled();
     await expect(lnav).toHaveAttribute('aria-pressed', 'false');
     await expect(spd).toHaveAttribute('aria-pressed', 'false');
     await expect(pfd.getByText('CMD_A', { exact: true })).toHaveCount(0);
@@ -46,6 +46,9 @@ test.describe('RFS black-box player loop proof', () => {
     await expect(pfd.getByText('SPEED', { exact: true })).toHaveCount(0);
 
     await rotateToPositiveRateThroughKeyboard(page);
+
+    await expect(lnav).toBeEnabled();
+    await expect(spd).toBeEnabled();
 
     await lnav.click();
     await spd.click();

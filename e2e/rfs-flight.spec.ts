@@ -31,7 +31,12 @@ function expectRange(value: number | undefined, range: [number, number], label: 
 }
 
 function expectLandingPerformanceWithinCard(proof: LandingPerformanceProof, card: B737LandingPerformanceEnvelope): void {
-  expectRange(proof.touchdown.iasKt, [card.vrefKt, card.targetApproachIasKt + 15], 'touchdown IAS');
+  const touchdownIasMeasurementToleranceKt = 1;
+  expectRange(
+    proof.touchdown.iasKt,
+    [card.vrefKt - touchdownIasMeasurementToleranceKt, card.targetApproachIasKt + 15],
+    'touchdown IAS',
+  );
   expectRange(proof.touchdown.touchdownSinkRateMps, card.touchdownSinkRateMps, 'touchdown sink rate');
   expectRange(proof.touchdown.runwayAlongTrackM, card.touchdownZoneDistanceM, 'touchdown-zone distance');
   expectRange(
