@@ -1,7 +1,7 @@
 import type { GeoPosition } from './types';
 import { KSEA_RUNWAYS, SUPPORTED_RUNWAYS, type RunwayReference, type SupportedAirport } from '../viewport/runwayData';
 
-export type GroundSurfaceKind = 'runway' | 'offRunway';
+export type GroundSurfaceKind = 'runway' | 'offRunway' | 'unsupportedTerrain';
 
 export interface GroundSurfaceFrictionScale {
   rolling: number;
@@ -33,7 +33,12 @@ export const OFF_RUNWAY_FRICTION_SCALE: GroundSurfaceFrictionScale = {
 };
 
 const RUNWAY_EDGE_MARGIN_M = 3;
-const ENVA_FALLBACK_ELEVATION_FT = 56;
+const UNSUPPORTED_TERRAIN_DISTANCE_M = 300_000;
+
+interface NearestRunwayFootprint {
+  runway: RunwayReference;
+  distanceM: number;
+}
 
 function localNorthEastMeters(position: GeoPosition, origin: RunwayReference['start']): { northM: number; eastM: number } {
   const metersPerDegreeLat = 111_320;
@@ -53,15 +58,33 @@ function runwayCoordinates(position: GeoPosition, runway: RunwayReference): { al
   };
 }
 
-function isWithinRunwayRectangle(runway: RunwayReference, alongTrackM: number, lateralOffsetM: number): boolean {
+function isWithinRunwayRectangle(
+  runway: RunwayReference,
+  alongTrackM: number,
+  lateralOffsetM: number,
+  longitudinalEdgeMarginM = RUNWAY_EDGE_MARGIN_M,
+  lateralEdgeMarginM = RUNWAY_EDGE_MARGIN_M,
+): boolean {
   return (
-    alongTrackM >= -RUNWAY_EDGE_MARGIN_M &&
-    alongTrackM <= runway.lengthM + RUNWAY_EDGE_MARGIN_M &&
-    Math.abs(lateralOffsetM) <= runway.widthM / 2 + RUNWAY_EDGE_MARGIN_M
+    alongTrackM >= -longitudinalEdgeMarginM &&
+    alongTrackM <= runway.lengthM + longitudinalEdgeMarginM &&
+    Math.abs(lateralOffsetM) <= runway.widthM / 2 + lateralEdgeMarginM
   );
 }
 
-function nearestRunwayByFootprintDistance(position: GeoPosition, runways: readonly RunwayReference[]): RunwayReference | undefined {
+export function isPositionOnPreparedRunwayFootprint(
+  position: GeoPosition,
+  lateralEdgeMarginM = 0,
+  longitudinalEdgeMarginM = RUNWAY_EDGE_MARGIN_M,
+  runways: readonly RunwayReference[] = SUPPORTED_RUNWAYS,
+): boolean {
+  return runways.some((runway) => {
+    const { alongTrackM, lateralOffsetM } = runwayCoordinates(position, runway);
+    return isWithinRunwayRectangle(runway, alongTrackM, lateralOffsetM, longitudinalEdgeMarginM, lateralEdgeMarginM);
+  });
+}
+
+function nearestRunwayByFootprintDistance(position: GeoPosition, runways: readonly RunwayReference[]): NearestRunwayFootprint | undefined {
   let nearestRunway: RunwayReference | undefined;
   let nearestDistanceSq = Number.POSITIVE_INFINITY;
 
@@ -76,7 +99,7 @@ function nearestRunwayByFootprintDistance(position: GeoPosition, runways: readon
     }
   }
 
-  return nearestRunway;
+  return nearestRunway ? { runway: nearestRunway, distanceM: Math.sqrt(nearestDistanceSq) } : undefined;
 }
 
 function sampleRunwaySurface(position: GeoPosition, runways: readonly RunwayReference[]): GroundSurfaceSample {
@@ -96,14 +119,23 @@ function sampleRunwaySurface(position: GeoPosition, runways: readonly RunwayRefe
     }
   }
 
-  const nearestRunway = nearestRunwayByFootprintDistance(position, runways);
+  const nearest = nearestRunwayByFootprintDistance(position, runways);
+
+  if (!nearest || nearest.distanceM > UNSUPPORTED_TERRAIN_DISTANCE_M) {
+    return {
+      kind: 'unsupportedTerrain',
+      onRunway: false,
+      groundAltFt: position.alt,
+      frictionScale: OFF_RUNWAY_FRICTION_SCALE,
+    };
+  }
 
   return {
     kind: 'offRunway',
     onRunway: false,
-    groundAltFt: nearestRunway?.elevationFt ?? ENVA_FALLBACK_ELEVATION_FT,
+    groundAltFt: nearest.runway.elevationFt,
     frictionScale: OFF_RUNWAY_FRICTION_SCALE,
-    airport: nearestRunway?.airport,
+    airport: nearest.runway.airport,
   };
 }
 

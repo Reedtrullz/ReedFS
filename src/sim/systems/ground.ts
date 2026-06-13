@@ -1,11 +1,12 @@
 import type { AircraftState, BodyStationPosition, ControlInputs, GearStationState, GroundContactType, GroundState } from '../types';
-import { createB737GearStations } from '../types';
+import { B737_800_SPEC, createB737GearStations } from '../types';
 import { bodyToNed, nedToBody } from '../physics/frames';
 import { eulerToQuat } from '../physics/quaternion';
 import type { GroundSurfaceSample } from '../runwaySurface';
-import { RUNWAY_FRICTION_SCALE } from '../runwaySurface';
+import { RUNWAY_FRICTION_SCALE, isPositionOnPreparedRunwayFootprint } from '../runwaySurface';
 import { B737_800_FDM } from '../data/aircraft/b737-800-fdm.v1';
 import type { GroundModelData } from '../data/aircraft/fdmTypes';
+import { computeWheelContactGeometry, type WheelContactGeometry, type WheelStationContactGeometry } from './wheelContact';
 
 export const ENVA_RUNWAY_ALT_FT = 56;
 export const KSEA_RUNWAY_ALT_FT = 432;
@@ -37,6 +38,7 @@ export interface GroundContactOptions {
   groundModel?: GroundModelData;
   airRelativeSpeedMps?: number;
   rotationReferenceSpeedMps?: number;
+  minimumSupportedNormalForceN?: number;
 }
 
 export interface GroundRollForceBreakdown {
@@ -145,6 +147,60 @@ export function brakeCommandFromInputs(inputs: ControlInputs): BrakeCommand {
 
 function frictionScaleForSurface(surface?: GroundSurfaceSample) {
   return surface?.frictionScale ?? RUNWAY_FRICTION_SCALE;
+}
+
+function fallbackGroundSurface(groundAltFt: number): GroundSurfaceSample {
+  return {
+    kind: 'runway',
+    onRunway: true,
+    groundAltFt,
+    frictionScale: RUNWAY_FRICTION_SCALE,
+  };
+}
+
+function wheelContactsAtOrBelowRunway(
+  geometry: WheelContactGeometry,
+  includeAllWhenFuselageReferenceContacts: boolean,
+): WheelStationContactGeometry[] {
+  if (includeAllWhenFuselageReferenceContacts) return geometry.stations;
+  return geometry.stations.filter((station) => station.runwayClearanceM <= GROUND_CONTACT_EPSILON_FT * FT_TO_M);
+}
+
+function gearStationsLoadedByWheelContacts(
+  gearStations: GearStationState[],
+  wheelContacts: WheelStationContactGeometry[],
+): GearStationState[] {
+  const contactIds = new Set(wheelContacts.map((contact) => contact.station.id));
+  return gearStations.map((station) => ({
+    ...station,
+    weightOnWheel: contactIds.has(station.id),
+  }));
+}
+
+function loadedWheelContactsOnPreparedRunway(
+  wheelContacts: WheelStationContactGeometry[],
+  surface: GroundSurfaceSample,
+  validateWheelFootprints: boolean,
+  loadedGearStations?: GearStationState[],
+): boolean {
+  if (!surface.onRunway) return false;
+  if (!validateWheelFootprints) return true;
+  const loadedStationIds = loadedGearStations
+    ? new Set(loadedGearStations.filter((station) => station.weightOnWheel && station.normalForceN > 1).map((station) => station.id))
+    : undefined;
+  const loadedWheelContacts = loadedStationIds
+    ? wheelContacts.filter((contact) => loadedStationIds.has(contact.station.id))
+    : wheelContacts;
+  if (loadedWheelContacts.length === 0) return false;
+  return loadedWheelContacts.every((contact) => isPositionOnPreparedRunwayFootprint(contact.wheelContactPosition));
+}
+
+function maxWheelPenetrationM(wheelContacts: WheelStationContactGeometry[]): number {
+  return wheelContacts.reduce((maxPenetration, contact) => Math.max(maxPenetration, contact.runwayPenetrationM), 0);
+}
+
+function maxWheelSinkRateMps(wheelContacts: WheelStationContactGeometry[]): number {
+  return wheelContacts.reduce((maxSinkRate, contact) => Math.max(maxSinkRate, contact.runwayNormalSinkRateMps), 0);
 }
 
 function grossWeightForceN(state: AircraftState): number {
@@ -634,12 +690,24 @@ export function applyGroundContact(
 ): GroundContactResult {
   const groundModel = options.groundModel ?? B737_GROUND_MODEL;
   const gearAvailableForContact = state.config.gearDown || inputs.gearLever === 'DOWN';
+  const contactSurface = options.surface ?? fallbackGroundSurface(groundAltFt);
   const atOrBelowGround = state.position.alt <= groundAltFt + GROUND_CONTACT_EPSILON_FT;
+  const wheelGeometry = computeWheelContactGeometry(state, B737_800_SPEC, contactSurface);
+  const establishedNearbyGearContact = state.ground.weightOnWheels
+    && state.ground.contact === 'gear'
+    && Math.abs(state.position.alt - groundAltFt) <= 30;
+  const wheelContacts = wheelContactsAtOrBelowRunway(wheelGeometry, atOrBelowGround || establishedNearbyGearContact);
+  const hasWheelContact = wheelContacts.length > 0;
   const runwayDownMps = bodyToNed(state.velocity, state.attitude).down;
+  const contactSinkRateMps = Math.max(runwayDownMps, maxWheelSinkRateMps(wheelContacts));
   const touchdownSinkRateMps = !state.ground.weightOnWheels && runwayDownMps > 0 ? runwayDownMps : undefined;
-  const surfaceOnRunway = options.surface?.onRunway ?? true;
+  const preliminarySurfaceOnRunway = contactSurface.onRunway;
 
-  if (!atOrBelowGround) {
+  if (contactSurface.kind === 'unsupportedTerrain' && !state.ground.weightOnWheels) {
+    return setGroundState(state, groundAltFt, 'none', false, 0, undefined, undefined, false);
+  }
+
+  if (!atOrBelowGround && !hasWheelContact) {
     return setGroundState(state, groundAltFt, 'none', false, 0);
   }
 
@@ -648,13 +716,13 @@ export function applyGroundContact(
   }
 
   if (options.allowLiftoff && gearAvailableForContact && state.ground.weightOnWheels) {
-    state.position.alt = Math.max(state.position.alt, groundAltFt);
+    state.position.alt = Math.max(state.position.alt, groundAltFt + 0.001);
     return setGroundState(state, groundAltFt, 'none', false, 0);
   }
 
   if (!gearAvailableForContact) {
     const contact: GroundContactType = state.ground.contact === 'crashed' || runwayDownMps > 5 ? 'crashed' : 'belly';
-    state.position.alt = groundAltFt;
+    state.position.alt = Math.max(state.position.alt, groundAltFt);
     applyGearUpContactDamping(state, contact, dt, groundModel);
     constrainRunwayNormalVelocity(state);
     return setGroundState(
@@ -665,21 +733,30 @@ export function applyGroundContact(
       options.normalForceN ?? grossWeightForceN(state),
       undefined,
       undefined,
-      surfaceOnRunway,
+      preliminarySurfaceOnRunway,
     );
   }
 
-  const staticGearNormalForceN = options.normalForceN ?? grossWeightForceN(state);
-  const groundPenetrationM = Math.max(0, (groundAltFt - state.position.alt) * FT_TO_M);
-  const oleoLoads = computeOleoStrutLoads(createB737GearStations(staticGearNormalForceN, true), {
+  const residualGearNormalForceN = options.normalForceN ?? grossWeightForceN(state);
+  const staticGearNormalForceN = hasWheelContact && !options.allowLiftoff
+    ? Math.max(residualGearNormalForceN, options.minimumSupportedNormalForceN ?? 0)
+    : residualGearNormalForceN;
+  const contactPenetrationM = atOrBelowGround
+    ? Math.max(0, (groundAltFt - state.position.alt) * FT_TO_M)
+    : maxWheelPenetrationM(wheelContacts);
+  const gearStationsForLoads = gearStationsLoadedByWheelContacts(
+    createB737GearStations(staticGearNormalForceN, true),
+    wheelContacts,
+  );
+  const oleoLoads = computeOleoStrutLoads(gearStationsForLoads, {
     totalStaticNormalForceN: staticGearNormalForceN,
     referenceWeightN: grossWeightForceN(state),
-    groundPenetrationM,
-    runwayDownMps,
+    groundPenetrationM: contactPenetrationM,
+    runwayDownMps: contactSinkRateMps,
   }, groundModel);
   const gearNormalForceN = oleoLoads.totalNormalForceN;
   let loadedGearStations = oleoLoads.gearStations;
-  state.position.alt = groundAltFt;
+  state.position.alt = atOrBelowGround ? groundAltFt : state.position.alt + contactPenetrationM / FT_TO_M;
   state.config.gearDown = true;
 
   const allowMainGearPivot = allowsMainGearPivot(state, inputs, options);
@@ -687,9 +764,16 @@ export function applyGroundContact(
   loadedGearStations = redistributeForMainGearPivot(loadedGearStations, allowMainGearPivot);
   applyTouchdownDamping(state, touchdownSinkRateMps ?? 0, groundModel);
   loadedGearStations = applyNosewheelSteering(state, inputs, loadedGearStations, groundModel);
-  applyTireSideForces(state, dt, loadedGearStations, options.surface, groundModel);
-  applyLongitudinalGroundDecel(state, inputs, dt, loadedGearStations, options.surface, groundModel);
+  applyTireSideForces(state, dt, loadedGearStations, contactSurface, groundModel);
+  applyLongitudinalGroundDecel(state, inputs, dt, loadedGearStations, contactSurface, groundModel);
   constrainRunwayNormalVelocity(state);
+
+  const finalSurfaceOnRunway = loadedWheelContactsOnPreparedRunway(
+    wheelContacts,
+    contactSurface,
+    options.surface !== undefined,
+    loadedGearStations,
+  );
 
   return setGroundState(
     state,
@@ -699,7 +783,7 @@ export function applyGroundContact(
     gearNormalForceN,
     loadedGearStations,
     touchdownSinkRateMps,
-    surfaceOnRunway,
+    finalSurfaceOnRunway,
     tailstrike,
   );
 }

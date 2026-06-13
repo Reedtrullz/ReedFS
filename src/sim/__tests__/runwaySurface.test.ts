@@ -147,6 +147,19 @@ describe('sampleSupportedAirportSurface', () => {
     expect(sample.frictionScale).toEqual(OFF_RUNWAY_FRICTION_SCALE);
   });
 
+  it('classifies terrain far from supported airports explicitly instead of borrowing a runway fallback', () => {
+    const unsupported = { lat: 0, lon: 0, alt: 1_234 };
+
+    const sample = sampleSupportedAirportSurface(unsupported);
+
+    expect(sample.kind).toBe('unsupportedTerrain');
+    expect(sample.onRunway).toBe(false);
+    expect(sample.airport).toBeUndefined();
+    expect(sample.runwayId).toBeUndefined();
+    expect(sample.groundAltFt).toBe(unsupported.alt);
+    expect(sample.frictionScale).toEqual(OFF_RUNWAY_FRICTION_SCALE);
+  });
+
   it('matches KSEA wrapper classification fields for a KSEA threshold position', () => {
     const kseaThresholdPosition = geoPositionForRunwayStart(KSEA_RUNWAY_16L);
 

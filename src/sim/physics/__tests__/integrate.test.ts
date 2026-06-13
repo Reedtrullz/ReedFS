@@ -359,6 +359,32 @@ describe('integrate', () => {
     expect(state.ground.groundAltFt).toBeCloseTo(KPDX_RUNWAY_10R.elevationFt, 6);
   });
 
+  it('keeps unsupported terrain explicit without synthesizing ground contact', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.position = { lat: 0, lon: 0, alt: 30_000 };
+    state.ground = {
+      ...state.ground,
+      aglFt: 30_000,
+      groundAltFt: state.position.alt,
+      weightOnWheels: false,
+      normalForceN: 0,
+      onRunway: false,
+      contact: 'none',
+      gearStations: createB737GearStations(0, false),
+    };
+    state.config.gearDown = true;
+    state.velocity.u = ktToMs(250);
+    state.velocity.v = 0;
+    state.velocity.w = 0;
+
+    integrate(state, idle, B737_800_SPEC, 1 / 60);
+
+    expect(state.ground.contact).toBe('none');
+    expect(state.ground.weightOnWheels).toBe(false);
+    expect(state.ground.onRunway).toBe(false);
+    expect(state.ground.groundAltFt).toBeCloseTo(state.position.alt, 1);
+  });
+
   it('transitions from KPDX takeoff to climb using current ground elevation', () => {
     const state = createInitialState(B737_800_SPEC);
     const groundAltFt = KPDX_RUNWAY_10R.elevationFt;
@@ -699,7 +725,8 @@ describe('integrate', () => {
     expect(touchdownSinkRateMps).toBeLessThan(4);
     expect(s.ground.weightOnWheels).toBe(true);
     expect(s.flightPhase).toBe('LANDED');
-    expect(s.position.alt).toBeCloseTo(KSEA_RUNWAY_ALT_FT, 1);
+    expect(s.position.alt).toBeGreaterThan(KSEA_RUNWAY_ALT_FT + 7);
+    expect(s.position.alt).toBeLessThan(KSEA_RUNWAY_ALT_FT + 13);
     expect(s.velocity.u).toBeLessThan(touchdownSpeedMps - 10);
     expect(Math.abs(derived.vs)).toBeLessThan(300);
   });

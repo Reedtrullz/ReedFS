@@ -208,6 +208,7 @@ export function integrate(
     surface: groundSurface,
     airRelativeSpeedMps: airspeedMps,
     rotationReferenceSpeedMps,
+    minimumSupportedNormalForceN: state.ground.weightOnWheels && !allowLiftoff ? aero.weight : 0,
   });
 
   // ── Config ──

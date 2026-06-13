@@ -15,7 +15,7 @@ import { B737_800_FDM } from '../../data/aircraft/b737-800-fdm.v1';
 import { bodyToNed, nedToBody } from '../../physics/frames';
 import { eulerToQuat } from '../../physics/quaternion';
 import { KSEA_RUNWAY_16L } from '../../../viewport/runwayData';
-import { sampleKseaSurface } from '../../runwaySurface';
+import { sampleKseaSurface, sampleSupportedAirportSurface } from '../../runwaySurface';
 import { ktToMs } from '../../physics/units';
 
 const DEG_TO_RAD = Math.PI / 180;
@@ -125,6 +125,41 @@ describe('applyGroundContact', () => {
     expect(nose?.normalForceN ?? 0).toBeLessThan(contact.normalForceN * 0.03);
     expect(mains.every((station) => station.weightOnWheel && station.normalForceN > 0)).toBe(true);
     expect(contact).toEqual(expect.objectContaining({ tailstrike: false }));
+  });
+
+  it('touches main gear before the nose during a flare with the fuselage reference still above the runway plane', () => {
+    const state = createInitialState(B737_800_SPEC);
+    const headingRad = KSEA_RUNWAY_16L.headingDeg * DEG_TO_RAD;
+    state.position = offsetPositionMeters(
+      KSEA_RUNWAY_16L.start,
+      Math.cos(headingRad) * 600,
+      Math.sin(headingRad) * 600,
+    );
+    state.position.alt = KSEA_RUNWAY_ALT_FT + 3.2;
+    state.attitude = { ...state.attitude, phi: 0, theta: 8 * DEG_TO_RAD, psi: headingRad };
+    state.quaternion = eulerToQuat(state.attitude.phi, state.attitude.theta, state.attitude.psi);
+    state.ground = {
+      ...state.ground,
+      weightOnWheels: false,
+      normalForceN: 0,
+      contact: 'none',
+      gearStations: createB737GearStations(0, false),
+    };
+    state.config.gearDown = true;
+    const surface = sampleSupportedAirportSurface(state.position);
+
+    const contact = applyGroundContact(state, { ...idle, elevator: -1 }, 1 / 60, KSEA_RUNWAY_ALT_FT, { surface });
+    const nose = contact.gearStations.find((station) => station.id === 'nose');
+    const mains = contact.gearStations.filter((station) => station.id === 'leftMain' || station.id === 'rightMain');
+
+    expect(surface.onRunway).toBe(true);
+    expect(contact.contact).toBe('gear');
+    expect(contact.weightOnWheels).toBe(true);
+    expect(state.position.alt).toBeGreaterThan(KSEA_RUNWAY_ALT_FT + 1);
+    expect(nose?.weightOnWheel).toBe(false);
+    expect(nose?.normalForceN ?? 0).toBe(0);
+    expect(mains).toHaveLength(2);
+    expect(mains.every((station) => station.weightOnWheel && station.normalForceN > 0)).toBe(true);
   });
 
   it('uses air-relative rotation reference speed instead of fixed ground speed for pivot gating', () => {
@@ -369,6 +404,31 @@ describe('applyGroundContact', () => {
     });
 
     expect(offRunwaySurface.kind).toBe('offRunway');
+    expect(contact.contact).toBe('gear');
+    expect(contact.weightOnWheels).toBe(true);
+    expect(contact.onRunway).toBe(false);
+  });
+
+  it('marks contact off-runway when a loaded wheel crosses the runway edge even if the aircraft reference is still inside', () => {
+    const state = createInitialState(B737_800_SPEC);
+    const headingRad = KSEA_RUNWAY_16L.headingDeg * DEG_TO_RAD;
+    const nearRightEdgeM = KSEA_RUNWAY_16L.widthM / 2 - 3;
+    state.position = offsetPositionMeters(
+      KSEA_RUNWAY_16L.start,
+      Math.cos(headingRad) * 600 - Math.sin(headingRad) * nearRightEdgeM,
+      Math.sin(headingRad) * 600 + Math.cos(headingRad) * nearRightEdgeM,
+    );
+    state.position.alt = KSEA_RUNWAY_ALT_FT;
+    state.attitude = { ...state.attitude, psi: headingRad };
+    state.quaternion = eulerToQuat(state.attitude.phi, state.attitude.theta, state.attitude.psi);
+    state.config.gearDown = true;
+    const centerSurface = sampleSupportedAirportSurface(state.position);
+
+    const contact = applyGroundContact(state, idle, 1 / 60, KSEA_RUNWAY_ALT_FT, {
+      surface: centerSurface,
+    });
+
+    expect(centerSurface.kind).toBe('runway');
     expect(contact.contact).toBe('gear');
     expect(contact.weightOnWheels).toBe(true);
     expect(contact.onRunway).toBe(false);
