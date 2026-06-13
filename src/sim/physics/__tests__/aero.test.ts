@@ -147,6 +147,40 @@ describe('computeAero', () => {
     expect(nearAero.drag).toBeLessThan(farAero.drag * 0.98);
   });
 
+  it('reduces lift in hot low-pressure scenario weather at the same aircraft state', () => {
+    const s = stateAtAoA(6, 85);
+    s.position.alt = 432;
+    s.ground = { ...s.ground, groundAltFt: 432, aglFt: 0 };
+    const computeAeroWithWeather = computeAero as typeof computeAero & ((
+      state: Parameters<typeof computeAero>[0],
+      inputs: Parameters<typeof computeAero>[1],
+      spec: Parameters<typeof computeAero>[2],
+      aeroModel: Parameters<typeof computeAero>[3],
+      wind: Parameters<typeof computeAero>[4],
+      weather: { qnhHpa: number; surfaceTemperatureC: number },
+    ) => ReturnType<typeof computeAero>);
+
+    const standardDay = computeAeroWithWeather(
+      s,
+      { ...cruise, throttle1: 0, throttle2: 0 },
+      B737_800_SPEC,
+      B737_AERO,
+      null,
+      { qnhHpa: 1013.25, surfaceTemperatureC: 15 },
+    );
+    const hotLowPressure = computeAeroWithWeather(
+      s,
+      { ...cruise, throttle1: 0, throttle2: 0 },
+      B737_800_SPEC,
+      B737_AERO,
+      null,
+      { qnhHpa: 990, surfaceTemperatureC: 35 },
+    );
+
+    expect(hotLowPressure.lift).toBeLessThan(standardDay.lift * 0.94);
+    expect(hotLowPressure.drag).toBeLessThan(standardDay.drag * 0.94);
+  });
+
   it('flaps increase lift and drag', () => {
     const s = createInitialState(B737_800_SPEC);
     s.velocity.u = 70; // ~136 kt

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ENVA_TUTORIAL_SCENARIO, KSEA_LIGHT_PATTERN_SCENARIO, KSEA_TUTORIAL_SCENARIO, SCENARIOS } from '../../scenarios';
+import { ENVA_TUTORIAL_SCENARIO, KPDX_TUTORIAL_SCENARIO, KSEA_LIGHT_PATTERN_SCENARIO, KSEA_TUTORIAL_SCENARIO, SCENARIOS } from '../../scenarios';
 import {
   assertPerformanceCardMatchesScenario,
   b737PerformanceCards,
@@ -54,19 +54,22 @@ describe('B737 performance-card scenario assertions', () => {
     expect(cardScenarioIds).toEqual(playableScenarioIds);
   });
 
-  it('keeps default tutorial and KSEA cards synchronized with scenario configuration', () => {
+  it('keeps default tutorial, KSEA, and KPDX cards synchronized with scenario configuration', () => {
     const envaCard = findPerformanceCardForScenario(ENVA_TUTORIAL_SCENARIO.id);
     const tutorialCard = findPerformanceCardForScenario(KSEA_TUTORIAL_SCENARIO.id);
     const lightCard = findPerformanceCardForScenario(KSEA_LIGHT_PATTERN_SCENARIO.id);
+    const kpdxCard = findPerformanceCardForScenario(KPDX_TUTORIAL_SCENARIO.id);
 
     expect(() => assertPerformanceCardMatchesScenario(envaCard, ENVA_TUTORIAL_SCENARIO)).not.toThrow();
     expect(() => assertPerformanceCardMatchesScenario(tutorialCard, KSEA_TUTORIAL_SCENARIO)).not.toThrow();
     expect(() => assertPerformanceCardMatchesScenario(lightCard, KSEA_LIGHT_PATTERN_SCENARIO)).not.toThrow();
+    expect(() => assertPerformanceCardMatchesScenario(kpdxCard, KPDX_TUTORIAL_SCENARIO)).not.toThrow();
     expect(envaCard.vSpeeds.v1Kt).toBeLessThanOrEqual(envaCard.vSpeeds.vrKt);
     expect(envaCard.vSpeeds.vrKt).toBeLessThan(envaCard.vSpeeds.v2Kt);
     expect(tutorialCard.vSpeeds.v1Kt).toBeLessThanOrEqual(tutorialCard.vSpeeds.vrKt);
     expect(tutorialCard.vSpeeds.vrKt).toBeLessThan(tutorialCard.vSpeeds.v2Kt);
     expect(lightCard.vSpeeds.vrKt).toBeLessThan(tutorialCard.vSpeeds.vrKt);
+    expect(kpdxCard.vSpeeds.vrKt).toBeLessThan(tutorialCard.vSpeeds.vrKt);
   });
 
   it.each(b737PerformanceCards)('labels $scenarioId performance-card ownership and runtime/test consumers', (card) => {

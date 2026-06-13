@@ -1,18 +1,34 @@
 import { useEffect, type RefObject } from 'react';
 import * as Cesium from 'cesium';
-import type { MetarData } from '../sim/weather';
+import type { CloudAnchor, MetarData } from '../sim/weather';
 
 export interface CloudLayerProps {
   viewerRef: RefObject<Cesium.Viewer | null>;
   metar: MetarData | null;
+  cloudSeed: number;
+  cloudAnchor: CloudAnchor;
 }
 
-export function CloudLayer({ viewerRef, metar }: CloudLayerProps) {
+function seededRandom(seed: number): () => number {
+  let state = (Math.trunc(seed) >>> 0) || 0x6d2b79f5;
+  return () => {
+    state += 0x6d2b79f5;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4_294_967_296;
+  };
+}
+
+export function CloudLayer({ viewerRef, metar, cloudSeed, cloudAnchor }: CloudLayerProps) {
+  const anchorLat = cloudAnchor.lat;
+  const anchorLon = cloudAnchor.lon;
   useEffect(() => {
     const viewer = viewerRef.current;
     if (!viewer || !metar || !metar.clouds.length) return;
 
     const billboards = viewer.scene.primitives.add(new Cesium.BillboardCollection());
+    const random = seededRandom(cloudSeed);
 
     for (const cloud of metar.clouds) {
       const baseAltM = cloud.base * 0.3048;
@@ -20,13 +36,13 @@ export function CloudLayer({ viewerRef, metar }: CloudLayerProps) {
       const spread = cloud.cover === 'OVC' ? 0.03 : 0.06;
 
       for (let i = 0; i < count; i++) {
-        const lat = 47.45 + ((i % 5) - 2) * spread;
-        const lon = -122.31 + (Math.floor(i / 5) - 1) * spread;
+        const lat = anchorLat + ((i % 5) - 2) * spread;
+        const lon = anchorLon + (Math.floor(i / 5) - 1) * spread;
 
         billboards.add({
           position: Cesium.Cartesian3.fromDegrees(lon, lat, baseAltM),
           image: createCloudCanvas(),
-          scale: 0.4 + Math.random() * 0.3,
+          scale: 0.4 + random() * 0.3,
           heightReference: Cesium.HeightReference.NONE,
         });
       }
@@ -35,7 +51,7 @@ export function CloudLayer({ viewerRef, metar }: CloudLayerProps) {
     return () => {
       viewer.scene.primitives.remove(billboards);
     };
-  }, [viewerRef, metar]);
+  }, [viewerRef, metar, cloudSeed, anchorLat, anchorLon]);
 
   return null;
 }

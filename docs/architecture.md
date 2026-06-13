@@ -97,7 +97,7 @@ RFS renders with Cesium plus a focused Three.js overlay:
 - `AircraftRenderer.ts` keeps the aircraft object persistent and updates transform/animation state each frame.
 - `CockpitLayer.tsx` and `CockpitModel.ts` provide the first-pass pilot-eye cockpit shell for cockpit camera mode.
 - `CameraManager.ts` owns chase/cockpit camera updates from Cesium `preRender` so follow cameras stay live while the sim runs.
-- `CloudLayer.tsx` and `ContrailLayer.tsx` add scene content and effects; they are part of the lazy viewport surface set.
+- `CloudLayer.tsx` uses scenario-authored METAR/cloud metadata: `App.tsx` supplies the selected scenario cloud seed and cloud anchor, so generated cloud billboard layouts are deterministic per scenario instead of tied to global randomness or a hard-coded KSEA origin. `ContrailLayer.tsx` adds aircraft effects; both are part of the lazy viewport surface set.
 - `App.tsx` lazy-loads Cesium/Three viewport surfaces, cockpit/debug overlays, and MCP/PFD instrument surfaces; `vite.config.ts` pins manual chunks for Cesium, Three, React/Zustand, and generic vendor code, with a documented 550 kB ceiling for the isolated Three.js vendor chunk while keeping the app/index chunk small.
 
 Known rendering follow-up:
@@ -130,11 +130,13 @@ Known guidance follow-up:
 
 ## Weather architecture
 
-- `weather.ts` parses optional METAR gust speed into `WindInfo.gustSpeed`.
+- `weather.ts` defines scenario-authored weather metadata (`stationIcao`, fallback QNH/temperature/visibility/clouds, deterministic gust/cloud seeds, and cloud anchor), converts it into fallback METAR data, and parses optional METAR gust speed plus scenario gust seed into `WindInfo`.
+- `App.tsx` fetches METAR from the selected scenario station (for example KPDX scenarios query KPDX instead of hard-coded KSEA), uses scenario fallback METAR while the external proxy is absent/unavailable, and passes scenario cloud seed/anchor to `CloudLayer.tsx`.
+- `aero.ts` derives density-altitude atmosphere from selected scenario QNH and surface temperature for the physics solve while preserving the existing ISA path when no scenario weather is supplied.
 - `environment.ts` converts METAR wind to NED then to body axes, and layers deterministic seeded gust perturbations onto air-relative velocity only.
 - `computeAirRelativeVelocity()` subtracts wind/gust from ground-relative body velocity and returns a new object.
 - Wind/gust never mutate `state.velocity`; position, GS, and VS remain ground-relative while TAS/IAS/AoA/beta use the perturbed air-relative vector.
-- Fixed-step scenario tests can inject deterministic wind to assert crosswind takeoff/weathercocking and crosswind approach/touchdown/rollout behavior without changing the wind contract.
+- Fixed-step scenario tests can inject deterministic wind/weather to assert crosswind takeoff/weathercocking, crosswind approach/touchdown/rollout, and density-altitude behavior without changing the wind contract.
 
 ## Ground model architecture
 

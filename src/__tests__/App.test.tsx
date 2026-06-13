@@ -31,7 +31,7 @@ class MockOscillatorNode {
 }
 vi.stubGlobal('OscillatorNode', MockOscillatorNode);
 
-const { mockSetInput, mockApplyInputActions, mockStart, mockStartTakeoffRoll, mockAbortTakeoff, mockPause, mockResume, mockReset, mockSetScenario, mockSetTutorialStep, mockSetFlightPlan, mockSetApState } = vi.hoisted(() => ({
+const { mockSetInput, mockApplyInputActions, mockStart, mockStartTakeoffRoll, mockAbortTakeoff, mockPause, mockResume, mockReset, mockSetScenario, mockSetTutorialStep, mockSetFlightPlan, mockSetApState, mockSetWind, mockFetchMetar, mockCloudLayer } = vi.hoisted(() => ({
   mockSetInput: vi.fn(),
   mockApplyInputActions: vi.fn(),
   mockStart: vi.fn(),
@@ -44,6 +44,9 @@ const { mockSetInput, mockApplyInputActions, mockStart, mockStartTakeoffRoll, mo
   mockSetTutorialStep: vi.fn(),
   mockSetFlightPlan: vi.fn(),
   mockSetApState: vi.fn(),
+  mockSetWind: vi.fn(),
+  mockFetchMetar: vi.fn(async () => null),
+  mockCloudLayer: vi.fn(() => null),
 }));
 
 vi.mock('../store/simStore', () => {
@@ -120,6 +123,7 @@ vi.mock('../store/simStore', () => {
     },
     status: 'stopped' as const,
     selectedScenarioId: 'ksea-tutorial',
+    wind: { dir: 180, speed: 0, gustSeed: 1601 },
     flightPlan: null,
     activeLegIndex: null,
     routeStatus: {
@@ -175,6 +179,7 @@ vi.mock('../store/simStore', () => {
     setTutorialStep: mockSetTutorialStep,
     setFlightPlan: mockSetFlightPlan,
     setApState: mockSetApState,
+    setWind: mockSetWind,
   };
   type MockSimStoreState = typeof state;
   const mock = Object.assign(
@@ -400,11 +405,24 @@ vi.mock('../components/AttitudeIndicator', () => ({
   AttitudeIndicator: () => <div aria-label="Attitude indicator" />,
 }));
 
+vi.mock('../sim/weather', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../sim/weather')>();
+  return {
+    ...actual,
+    fetchMetar: mockFetchMetar,
+  };
+});
+
+vi.mock('../viewport/CloudLayer', () => ({
+  CloudLayer: mockCloudLayer,
+}));
+
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import ThreeToCesium from 'three-to-cesium';
 import { App } from '../App';
 import { useSimStore } from '../store/simStore';
 import { CesiumViewport } from '../viewport/CesiumViewport';
+import { SCENARIOS } from '../sim/scenarios';
 
 const defaultAppTestApState = structuredClone(useSimStore.getState().apState);
 
@@ -442,6 +460,16 @@ describe('App', () => {
     expect(screen.queryByText('Controls')).toBeNull();
     expect(screen.queryByText(/SIM:/)).toBeNull();
     expect(screen.queryByText(/FPS/)).toBeNull();
+  });
+
+  it('fetches METAR weather from the selected scenario station instead of hard-coded KSEA', async () => {
+    const kpdxScenario = SCENARIOS.find((scenario) => scenario.runway.airport === 'KPDX');
+    expect(kpdxScenario).toBeDefined();
+    useSimStore.getState().selectedScenarioId = kpdxScenario!.id;
+
+    render(<App />);
+
+    await waitFor(() => expect(mockFetchMetar).toHaveBeenCalledWith('KPDX'));
   });
 
   it('mounts route status with the flight instruments overlay', () => {
@@ -683,14 +711,19 @@ describe('App', () => {
   });
 
   it('defers viewer-dependent layers until the Cesium viewer is ready', async () => {
-    vi.mocked(CesiumViewport).mockImplementationOnce(() => <div data-testid="pending-viewport" />);
+    const defaultViewportImplementation = vi.mocked(CesiumViewport).getMockImplementation();
+    vi.mocked(CesiumViewport).mockImplementation(() => <div data-testid="pending-viewport" />);
 
-    render(<App />);
-    await settleLazyImports();
+    try {
+      render(<App />);
+      await settleLazyImports();
 
-    expect(screen.getByTestId('pending-viewport')).toBeTruthy();
-    expect(ThreeToCesium).not.toHaveBeenCalled();
-    expect(mockEntityAdd).not.toHaveBeenCalled();
+      expect(screen.getByTestId('pending-viewport')).toBeTruthy();
+      expect(ThreeToCesium).not.toHaveBeenCalled();
+      expect(mockEntityAdd).not.toHaveBeenCalled();
+    } finally {
+      if (defaultViewportImplementation) vi.mocked(CesiumViewport).mockImplementation(defaultViewportImplementation);
+    }
   });
 
   it('uses a single Three/Cesium overlay canvas for the aircraft only', async () => {

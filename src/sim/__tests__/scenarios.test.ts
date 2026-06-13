@@ -13,7 +13,7 @@ function scenarioGrossWeight(scenario: typeof KSEA_TUTORIAL_SCENARIO): number {
 }
 
 describe('flight scenarios', () => {
-  it('defines unique scenario IDs with tutorial runway, trim, and wind context', () => {
+  it('defines unique scenario IDs with tutorial runway, trim, wind, and weather context', () => {
     expect(new Set(SCENARIOS.map((scenario) => scenario.id)).size).toBe(SCENARIOS.length);
     expect(KSEA_TUTORIAL_SCENARIO.id).toBe('ksea-tutorial');
     expect(KSEA_TUTORIAL_SCENARIO.runway.elevationFt).toBe(432);
@@ -21,6 +21,32 @@ describe('flight scenarios', () => {
     expect(KSEA_TUTORIAL_SCENARIO.grossWeightKg).toBe(KSEA_TUTORIAL_SCENARIO.zeroFuelWeightKg + KSEA_TUTORIAL_SCENARIO.fuel.totalFuel);
     expect(KSEA_TUTORIAL_SCENARIO.stabilizerTrimUnits).toBeGreaterThan(0);
     expect(KSEA_TUTORIAL_SCENARIO.wind).toEqual(expect.objectContaining({ speed: expect.any(Number) }));
+    expect(KSEA_TUTORIAL_SCENARIO.weather).toEqual(expect.objectContaining({
+      stationIcao: 'KSEA',
+      qnhHpa: expect.any(Number),
+      surfaceTemperatureC: expect.any(Number),
+      cloudSeed: expect.any(Number),
+    }));
+  });
+
+  it('includes a KPDX selectable scenario whose weather station and cloud seed are authored from scenario metadata', () => {
+    const kpdxScenario = SCENARIOS.find((scenario) => scenario.runway.airport === 'KPDX');
+
+    expect(kpdxScenario).toBeDefined();
+    expect(kpdxScenario?.weather.stationIcao).toBe('KPDX');
+    expect(kpdxScenario?.weather.cloudSeed).not.toBe(KSEA_TUTORIAL_SCENARIO.weather.cloudSeed);
+  });
+
+  it('keeps each scenario weather station, fallback pressure/temperature, and cloud anchor aligned with its runway', () => {
+    for (const scenario of SCENARIOS) {
+      expect(scenario.weather.stationIcao).toBe(scenario.runway.airport);
+      expect(scenario.weather.qnhHpa).toBeGreaterThan(850);
+      expect(scenario.weather.qnhHpa).toBeLessThan(1100);
+      expect(scenario.weather.surfaceTemperatureC).toBeGreaterThan(-60);
+      expect(scenario.weather.surfaceTemperatureC).toBeLessThan(60);
+      expect(scenario.weather.cloudAnchor.lat).toBeCloseTo(scenario.position.lat, 1);
+      expect(scenario.weather.cloudAnchor.lon).toBeCloseTo(scenario.position.lon, 1);
+    }
   });
 
   it('initializes every selectable scenario with explicit weight, CG, fuel, and runway state', () => {

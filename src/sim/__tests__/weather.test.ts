@@ -23,6 +23,15 @@ describe('parseMetarWind', () => {
     const w = parseMetarWind(m);
     expect(w.speed).toBe(0);
   });
+
+  it('adds scenario-authored gust seed to parsed wind for deterministic turbulence', () => {
+    const m: MetarData = { windDir: 250, windSpeed: 12, windGust: 21, temperature: 18, visibility: 9999, clouds: [], qnh: 1008 };
+    const parseWithScenarioSeed = parseMetarWind as (metar: MetarData, metadata?: { gustSeed: number }) => ReturnType<typeof parseMetarWind>;
+
+    const w = parseWithScenarioSeed(m, { gustSeed: 9403 });
+
+    expect(w).toEqual(expect.objectContaining({ dir: 250, speed: 12, gustSpeed: 21, gustSeed: 9403 }));
+  });
 });
 
 describe('fetchMetar', () => {

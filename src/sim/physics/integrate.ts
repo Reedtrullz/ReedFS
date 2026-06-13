@@ -1,7 +1,7 @@
 import type { AircraftState, AircraftSpec, ControlInputs, FlightPhase } from '../types';
 import { normalizeAircraftConfig } from '../types';
 import { B737_800_FDM } from '../data/aircraft/b737-800-fdm.v1';
-import { computeAero } from './aero';
+import { computeAero, type DensityAltitudeWeather } from './aero';
 import { updateEngines } from '../systems/engine';
 import { updateFuel } from '../systems/fuel';
 import { updateElectrical } from '../systems/electrical';
@@ -192,6 +192,7 @@ export function integrate(
   spec: AircraftSpec,
   dt: number,
   wind?: WindInfo | null,
+  weather?: DensityAltitudeWeather | null,
 ): void {
   // ── Systems (must run before aero so engine/fuel state is current) ──
   // Pilot-facing configuration controls must be visible to the same tick's aero solve.
@@ -202,7 +203,7 @@ export function integrate(
   updateElectrical(state, dt);
   updateHydraulic(state, dt);
 
-  const aero = computeAero(state, controls, spec, undefined, wind ?? null);
+  const aero = computeAero(state, controls, spec, undefined, wind ?? null, weather ?? null);
   const mass = state.grossWeight;
   const { p, q, r } = state.angularVel;
 

@@ -1,8 +1,8 @@
 import type { AircraftSpec, AircraftState, FuelState, GeoPosition } from './types';
 import { createB737GearStations, createInitialState } from './types';
 import { eulerToQuat } from './physics/quaternion';
-import type { WindInfo } from './weather';
-import { ENVA_RUNWAY_09, KSEA_RUNWAY_16L } from '../viewport/runwayData';
+import type { WindInfo, ScenarioWeatherMetadata } from './weather';
+import { ENVA_RUNWAY_09, KPDX_RUNWAY_10R, KSEA_RUNWAY_16L } from '../viewport/runwayData';
 
 export interface ScenarioFuelLoad {
   centerTank: number;
@@ -38,7 +38,16 @@ export interface FlightScenario {
   stabilizerTrimUnits: number;
   flapSetting: number;
   wind: WindInfo;
+  weather: ScenarioWeatherMetadata;
   tutorialSteps: ScenarioTutorialStep[];
+}
+
+function scenarioWeather(options: ScenarioWeatherMetadata): ScenarioWeatherMetadata {
+  return {
+    ...options,
+    clouds: options.clouds.map((cloud) => ({ ...cloud })),
+    cloudAnchor: { ...options.cloudAnchor },
+  };
 }
 
 // ── ENVA (default) ─────────────────────────────────────────────────────
@@ -55,7 +64,17 @@ export const ENVA_TUTORIAL_SCENARIO: FlightScenario = {
   cgPercent: 25,
   stabilizerTrimUnits: 5.0,
   flapSetting: 5,
-  wind: { dir: 90, speed: 0 },
+  wind: { dir: 90, speed: 0, gustSeed: 9009 },
+  weather: scenarioWeather({
+    stationIcao: 'ENVA',
+    surfaceTemperatureC: 7,
+    qnhHpa: 1016,
+    visibilityM: 9999,
+    clouds: [{ cover: 'SCT', base: 2_800 }],
+    cloudSeed: 9009,
+    gustSeed: 9009,
+    cloudAnchor: { lat: ENVA_RUNWAY_09.start.lat, lon: ENVA_RUNWAY_09.start.lon },
+  }),
   tutorialSteps: [
     {
       id: 'line-up',
@@ -89,7 +108,17 @@ export const KSEA_TUTORIAL_SCENARIO: FlightScenario = {
   cgPercent: 25,
   stabilizerTrimUnits: 5.0,
   flapSetting: 5,
-  wind: { dir: 180, speed: 0 },
+  wind: { dir: 180, speed: 0, gustSeed: 1601 },
+  weather: scenarioWeather({
+    stationIcao: 'KSEA',
+    surfaceTemperatureC: 15,
+    qnhHpa: 1013.25,
+    visibilityM: 9999,
+    clouds: [{ cover: 'BKN', base: 4_500 }],
+    cloudSeed: 1601,
+    gustSeed: 1601,
+    cloudAnchor: { lat: KSEA_RUNWAY_16L.start.lat, lon: KSEA_RUNWAY_16L.start.lon },
+  }),
   tutorialSteps: [
     {
       id: 'line-up',
@@ -122,7 +151,20 @@ export const KSEA_LIGHT_PATTERN_SCENARIO: FlightScenario = {
   cgPercent: 24,
   stabilizerTrimUnits: 4.5,
   flapSetting: 5,
-  wind: { dir: 200, speed: 6 },
+  wind: { dir: 200, speed: 6, gustSpeed: 11, gustSeed: 1602 },
+  weather: scenarioWeather({
+    stationIcao: 'KSEA',
+    surfaceTemperatureC: 18,
+    qnhHpa: 1009,
+    visibilityM: 9999,
+    clouds: [
+      { cover: 'FEW', base: 2_500 },
+      { cover: 'SCT', base: 5_500 },
+    ],
+    cloudSeed: 1602,
+    gustSeed: 1602,
+    cloudAnchor: { lat: KSEA_RUNWAY_16L.start.lat, lon: KSEA_RUNWAY_16L.start.lon },
+  }),
   tutorialSteps: [
     {
       id: 'pattern-setup',
@@ -142,7 +184,50 @@ export const KSEA_LIGHT_PATTERN_SCENARIO: FlightScenario = {
   ],
 };
 
-export const SCENARIOS: FlightScenario[] = [ENVA_TUTORIAL_SCENARIO, KSEA_TUTORIAL_SCENARIO, KSEA_LIGHT_PATTERN_SCENARIO];
+export const KPDX_TUTORIAL_SCENARIO: FlightScenario = {
+  id: 'kpdx-tutorial',
+  name: 'KPDX Tutorial Takeoff',
+  description: 'Medium-light 737-800 at Portland runway 10R with local KPDX weather metadata for scenario/weather binding checks.',
+  position: { lat: KPDX_RUNWAY_10R.start.lat, lon: KPDX_RUNWAY_10R.start.lon, alt: KPDX_RUNWAY_10R.elevationFt },
+  runway: { airport: KPDX_RUNWAY_10R.airport, runway: KPDX_RUNWAY_10R.id, elevationFt: KPDX_RUNWAY_10R.elevationFt, headingDeg: KPDX_RUNWAY_10R.headingDeg },
+  fuel: { centerTank: 6_000, leftTank: 2_000, rightTank: 2_000, totalFuel: 10_000 },
+  zeroFuelWeightKg: 48_413,
+  grossWeightKg: 58_413,
+  payloadWeightKg: 7_000,
+  cgPercent: 25,
+  stabilizerTrimUnits: 4.8,
+  flapSetting: 5,
+  wind: { dir: 120, speed: 5, gustSeed: 1010 },
+  weather: scenarioWeather({
+    stationIcao: 'KPDX',
+    surfaceTemperatureC: 21,
+    qnhHpa: 1011,
+    visibilityM: 9999,
+    clouds: [{ cover: 'SCT', base: 4_000 }],
+    cloudSeed: 1010,
+    gustSeed: 1010,
+    cloudAnchor: { lat: KPDX_RUNWAY_10R.start.lat, lon: KPDX_RUNWAY_10R.start.lon },
+  }),
+  tutorialSteps: [
+    {
+      id: 'line-up',
+      title: 'Line up at Portland',
+      body: 'Start on KPDX runway 10R with flaps 5 and medium-light fuel. Confirm local weather, trim, and runway heading before takeoff.',
+    },
+    {
+      id: 'advance-thrust',
+      title: 'Advance thrust and track runway 10R',
+      body: 'Bring thrust up smoothly and use small rudder inputs to hold the runway centerline.',
+    },
+    {
+      id: 'rotate-positive-rate',
+      title: 'Rotate and climb eastbound',
+      body: 'Rotate at VR, establish a positive rate, then retract gear and continue the climb.',
+    },
+  ],
+};
+
+export const SCENARIOS: FlightScenario[] = [ENVA_TUTORIAL_SCENARIO, KSEA_TUTORIAL_SCENARIO, KSEA_LIGHT_PATTERN_SCENARIO, KPDX_TUTORIAL_SCENARIO];
 
 const CENTER_TANK_ARM_PERCENT_MAC = 22;
 const WING_TANK_ARM_PERCENT_MAC = 30;
@@ -181,6 +266,19 @@ function validateScenario(spec: AircraftSpec, scenario: FlightScenario): void {
 
   if (!nearlyEqual(scenario.position.alt, scenario.runway.elevationFt)) {
     throw new Error(`${scenario.id} runway elevation must match scenario position altitude`);
+  }
+
+  if (scenario.weather.stationIcao !== scenario.runway.airport) {
+    throw new Error(`${scenario.id} weather station must match runway airport`);
+  }
+  if (!Number.isFinite(scenario.weather.qnhHpa) || scenario.weather.qnhHpa < 850 || scenario.weather.qnhHpa > 1100) {
+    throw new Error(`${scenario.id} weather QNH is outside a plausible range`);
+  }
+  if (!Number.isFinite(scenario.weather.surfaceTemperatureC) || scenario.weather.surfaceTemperatureC < -60 || scenario.weather.surfaceTemperatureC > 60) {
+    throw new Error(`${scenario.id} weather temperature is outside a plausible range`);
+  }
+  if (!Number.isFinite(scenario.weather.cloudSeed)) {
+    throw new Error(`${scenario.id} cloud seed must be deterministic`);
   }
 }
 

@@ -1,3 +1,19 @@
+export interface CloudAnchor {
+  lat: number;
+  lon: number;
+}
+
+export interface ScenarioWeatherMetadata {
+  stationIcao: string;
+  surfaceTemperatureC: number;
+  qnhHpa: number;
+  visibilityM: number;
+  clouds: { cover: string; base: number }[];
+  cloudSeed: number;
+  gustSeed?: number;
+  cloudAnchor: CloudAnchor;
+}
+
 export interface MetarData {
   windDir: number;
   windSpeed: number; // knots
@@ -44,11 +60,24 @@ function parseClouds(value: unknown): MetarData['clouds'] {
   }));
 }
 
-export function parseMetarWind(m: MetarData): WindInfo {
+export function parseMetarWind(m: MetarData, metadata: Pick<ScenarioWeatherMetadata, 'gustSeed'> = {}): WindInfo {
   return {
     dir: m.windDir,
     speed: m.windSpeed,
     ...(typeof m.windGust === 'number' && Number.isFinite(m.windGust) ? { gustSpeed: m.windGust } : {}),
+    ...(typeof metadata.gustSeed === 'number' && Number.isFinite(metadata.gustSeed) ? { gustSeed: metadata.gustSeed } : {}),
+  };
+}
+
+export function metarFromScenarioWeather(weather: ScenarioWeatherMetadata, wind: WindInfo): MetarData {
+  return {
+    windDir: wind.dir,
+    windSpeed: wind.speed,
+    ...(typeof wind.gustSpeed === 'number' && Number.isFinite(wind.gustSpeed) ? { windGust: wind.gustSpeed } : {}),
+    temperature: weather.surfaceTemperatureC,
+    visibility: weather.visibilityM,
+    clouds: weather.clouds.map((cloud) => ({ ...cloud })),
+    qnh: weather.qnhHpa,
   };
 }
 

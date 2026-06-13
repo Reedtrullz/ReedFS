@@ -3,10 +3,43 @@ import { isaAtAltitude } from './atmosphere';
 import { computeAirRelativeVelocity } from '../systems/environment';
 import type { AeroModel, FlapPolar } from '../systems/AeroModel';
 import { B737_AERO } from '../systems/AeroModel';
-import type { WindInfo } from '../weather';
+import type { WindInfo, ScenarioWeatherMetadata } from '../weather';
 
 const G = 9.80665;
 const FT_TO_M = 0.3048;
+const SEA_LEVEL_PRESSURE_PA = 101_325;
+const GAS_CONSTANT_DRY_AIR = 287.058;
+const HEAT_CAPACITY_RATIO_AIR = 1.4;
+const SUTHERLAND_CONSTANT_K = 110.4;
+const SUTHERLAND_COEFFICIENT = 1.458e-6;
+
+export type DensityAltitudeWeather = Pick<ScenarioWeatherMetadata, 'qnhHpa' | 'surfaceTemperatureC'>;
+
+function viscosityForTemperature(tempK: number): number {
+  return SUTHERLAND_COEFFICIENT * Math.pow(tempK, 1.5) / (tempK + SUTHERLAND_CONSTANT_K);
+}
+
+export function atmosphereForDensityAltitude(altFt: number, weather: DensityAltitudeWeather | null = null): ReturnType<typeof isaAtAltitude> {
+  const standard = isaAtAltitude(altFt);
+  if (!weather) return standard;
+
+  const qnhHpa = Number.isFinite(weather.qnhHpa) ? weather.qnhHpa : 1013.25;
+  const surfaceTemperatureC = Number.isFinite(weather.surfaceTemperatureC) ? weather.surfaceTemperatureC : 15;
+  const pressurePa = qnhHpa * 100 * (standard.pressurePa / SEA_LEVEL_PRESSURE_PA);
+  const isaSeaLevelDeltaK = (surfaceTemperatureC + 273.15) - 288.15;
+  const tempK = Math.max(150, standard.tempK + isaSeaLevelDeltaK);
+  const density = pressurePa / (GAS_CONSTANT_DRY_AIR * tempK);
+
+  return {
+    tempK,
+    tempC: tempK - 273.15,
+    pressurePa,
+    pressureHpa: pressurePa / 100,
+    density,
+    speedOfSound: Math.sqrt(HEAT_CAPACITY_RATIO_AIR * GAS_CONSTANT_DRY_AIR * tempK),
+    viscosity: viscosityForTemperature(tempK),
+  };
+}
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
@@ -127,10 +160,11 @@ export function computeAero(
   spec: AircraftSpec,
   aeroModel: AeroModel = B737_AERO,
   wind: WindInfo | null = null,
+  weather: DensityAltitudeWeather | null = null,
 ): AeroResult {
   const { u, v, w } = computeAirRelativeVelocity(state, wind);
   const tasMs = Math.sqrt(u * u + v * v + w * w);
-  const atmo = isaAtAltitude(state.position.alt);
+  const atmo = atmosphereForDensityAltitude(state.position.alt, weather);
   const rho = atmo.density;
   const q = 0.5 * rho * tasMs * tasMs;
   const S = spec.wingArea, b = spec.wingSpan, c = spec.meanChord;

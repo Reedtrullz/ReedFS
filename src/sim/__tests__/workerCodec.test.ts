@@ -119,7 +119,7 @@ describe('workerCodec', () => {
     expect(decoded.input).not.toBe(input);
     expect(decoded.input.aircraft).not.toBe(input.aircraft);
     expect(decoded.input.flightPlan).not.toBe(input.flightPlan);
-    expect(decoded.input.wind).toEqual({ dir: 200, speed: 6 });
+    expect(decoded.input.wind).toEqual(KSEA_LIGHT_PATTERN_SCENARIO.wind);
     expect(decoded.input.wind).not.toBe(input.wind);
     expect(input.wind).toEqual(originalWind);
   });

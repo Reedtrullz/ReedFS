@@ -116,6 +116,7 @@ export function syncGuidanceState(
 
 export function advanceSimulationStep(input: SimulationStepInput): SimulationStepResult {
   const state = input.cloneAircraft === false ? input.aircraft : structuredClone(input.aircraft);
+  const scenario = scenarioById(input.selectedScenarioId);
   const routeBeforeTick = input.flightPlan
     ? computeRouteStatus(state, input.flightPlan, input.activeLegIndex)
     : createNoRouteStatus();
@@ -140,7 +141,7 @@ export function advanceSimulationStep(input: SimulationStepInput): SimulationSte
     : {};
   const controlsForIntegration = composeControlsSlice(input.pilotInputs, apCommands, input.apState, truthContext);
 
-  integrate(state, controlsForIntegration.effectiveControls, input.spec, input.dt, input.wind);
+  integrate(state, controlsForIntegration.effectiveControls, input.spec, input.dt, input.wind, scenario.weather);
 
   const routeStatus = input.flightPlan
     ? computeRouteStatus(state, input.flightPlan, routeBeforeTick.activeLegIndex)
@@ -151,7 +152,6 @@ export function advanceSimulationStep(input: SimulationStepInput): SimulationSte
     routeStatus,
   };
   const controls = composeControlsSlice(input.pilotInputs, apCommands, input.apState, committedTruthContext);
-  const scenario = scenarioById(input.selectedScenarioId);
 
   return {
     aircraft: state,

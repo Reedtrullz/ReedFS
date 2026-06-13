@@ -455,6 +455,47 @@ export const b737PerformanceCards: B737TakeoffPerformanceCard[] = [
       'RFS gameplay card for light hand-flying/pattern practice; lower VR than the tutorial scenario by design.',
     ],
   },
+  {
+    scenarioId: 'kpdx-tutorial',
+    runway: '10R',
+    grossWeightKg: 58_413,
+    flapSetting: 5,
+    stabilizerTrimUnits: 4.8,
+    assumedTemperatureC: null,
+    vSpeeds: { v1Kt: 137, vrKt: 145, v2Kt: 152 },
+    cleanClimb: {
+      altitudeFt: 10_000,
+      iasKt: 250,
+      n1Percent: 72,
+      expectedClimbFpm: [1_400, 3_800],
+    },
+    approach: {
+      heightAglFt: 1_500,
+      iasKt: 138,
+      vrefKt: 133,
+      flapSetting: 30,
+      expectedAoADeg: [0, 9],
+    },
+    landing: landingPerformanceEnvelope({
+      vrefKt: 133,
+      targetApproachIasKt: 138,
+      sinkRateFpm: [490, 840],
+      touchdownSinkRateMps: [0.5, 14.5],
+    }),
+    initialClimbPitchDeg: 10,
+    ownership: {
+      label: 'runtime-takeoff-cue-and-physics-test-card',
+      runtimeConsumers: ['src/sim/takeoffCue.ts', 'src/instruments/RfsPFD.tsx'],
+      testConsumers: [
+        'src/sim/data/__tests__/performanceCards.test.ts',
+        'src/sim/physics/__tests__/performanceCards.test.ts',
+      ],
+      sourceNote: 'RFS gameplay baseline card for the KPDX tutorial scenario; broad envelope guard, not a certified Boeing AFM table.',
+    },
+    notes: [
+      'RFS gameplay card for medium-light KPDX weather/scenario binding practice; values are placeholder envelope guards, not AFM data.',
+    ],
+  },
 ];
 
 export function findPerformanceCardForScenario(scenarioId: string): B737TakeoffPerformanceCard {

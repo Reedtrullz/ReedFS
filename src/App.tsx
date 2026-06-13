@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Viewer as CesiumViewer } from 'cesium';
 import { getCesiumScenePolicy } from './config/cesium';
 import type { RunwayLayerProps } from './viewport/RunwayLayer';
@@ -14,7 +14,7 @@ import {
   shouldIgnoreKeyboardEvent,
 } from './input/keyboardControls';
 import { mergeInputActions } from './input/InputManager';
-import { fetchMetar, parseMetarWind } from './sim/weather';
+import { fetchMetar, metarFromScenarioWeather, parseMetarWind } from './sim/weather';
 import type { MetarData } from './sim/weather';
 import { nextCameraMode, type CameraMode } from './viewport/cameraMode';
 import { nextOverlayMode, shouldShowDebugOverlays, shouldShowFlightInstruments, type OverlayMode } from './viewport/overlayMode';
@@ -58,12 +58,23 @@ export function App() {
   const resume = useSimStore((s) => s.resume);
   const reset = useSimStore((s) => s.reset);
   const status = useSimStore((s) => s.status);
+  const selectedScenarioId = useSimStore((s) => s.selectedScenarioId);
   const setInput = useSimStore((s) => s.setInput);
+  const activeScenario = scenarioById(selectedScenarioId);
+  const fallbackMetarData = useMemo(
+    () => metarFromScenarioWeather(activeScenario.weather, activeScenario.wind),
+    [activeScenario],
+  );
+  const weatherWindSeed = useMemo(
+    () => ({ gustSeed: activeScenario.weather.gustSeed ?? activeScenario.weather.cloudSeed }),
+    [activeScenario],
+  );
 
   const keysRef = useRef(new Set<string>());
   const [camMode, setCamMode] = useState<CameraMode>('chase');
   const [overlayMode, setOverlayMode] = useState<OverlayMode>('flight');
-  const [metarData, setMetarData] = useState<MetarData | null>(null);
+  const [fetchedMetarData, setFetchedMetarData] = useState<{ scenarioId: string; metar: MetarData } | null>(null);
+  const metarData = fetchedMetarData?.scenarioId === selectedScenarioId ? fetchedMetarData.metar : fallbackMetarData;
   const [viewerGeneration, setViewerGeneration] = useState(0);
   const [runwayOverrides, setRunwayOverrides] = useState<RunwayLayerProps['runwayOverrides']>(undefined);
   const [routeLoadMessage, setRouteLoadMessage] = useState<string | null>(null);
@@ -139,15 +150,25 @@ export function App() {
     return () => cancelAnimationFrame(raf);
   }, []);
 
-  // Fetch METAR weather on mount
+  // Fetch METAR weather for the selected scenario station, with deterministic scenario-authored fallback.
   useEffect(() => {
-    fetchMetar('KSEA').then((metar) => {
+    const scenario = activeScenario;
+    let cancelled = false;
+
+    useSimStore.getState().setWind(parseMetarWind(fallbackMetarData, weatherWindSeed));
+
+    fetchMetar(scenario.weather.stationIcao).then((metar) => {
+      if (cancelled || useSimStore.getState().selectedScenarioId !== scenario.id) return;
       if (metar) {
-        useSimStore.getState().setWind(parseMetarWind(metar));
-        setMetarData(metar);
+        useSimStore.getState().setWind(parseMetarWind(metar, weatherWindSeed));
+        setFetchedMetarData({ scenarioId: scenario.id, metar });
       }
     });
-  }, []);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeScenario, fallbackMetarData, weatherWindSeed]);
 
   useEffect(() => {
     const viewer = viewerRef.current;
@@ -244,7 +265,12 @@ export function App() {
             {camMode === 'cockpit' ? <CockpitLayer viewerRef={viewerRef} /> : <ThreeLayer viewerRef={viewerRef} />}
           </Suspense>
           <Suspense key={`weather-${viewerGeneration}`} fallback={null}>
-            <CloudLayer viewerRef={viewerRef} metar={metarData} />
+            <CloudLayer
+              viewerRef={viewerRef}
+              metar={metarData}
+              cloudSeed={activeScenario.weather.cloudSeed}
+              cloudAnchor={activeScenario.weather.cloudAnchor}
+            />
             <ContrailLayer viewerRef={viewerRef} />
           </Suspense>
         </>
