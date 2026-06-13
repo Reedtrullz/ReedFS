@@ -12,6 +12,7 @@
     "lint:ci": "eslint . --max-warnings=0",
     "check:deps": "node scripts/check-single-three.mjs",
     "check:release": "node scripts/release-hardening-check.mjs",
+    "check:blackbox": "node scripts/check-blackbox-e2e.mjs",
     "check": "npm run check:deps && npm run check:release && npm run lint:ci && npm run typecheck && npm run test && npm run build",
     "preview": "vite preview",
     "test:visual": "playwright test",
