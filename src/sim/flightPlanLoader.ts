@@ -1,4 +1,5 @@
 import type { FlightPlan, FlightPlanWaypoint } from '@shared/types/fmc';
+import { createRouteSourceFromFlightPlan, type RouteSource } from './fms/routeAdapter';
 import type { FlightScenario } from './scenarios';
 
 const AIRPORT_COORDS: Record<string, Pick<FlightPlanWaypoint, 'lat' | 'lon' | 'coordinateSource'>> = {
@@ -57,6 +58,18 @@ export function createKseaKpdxFlight(): FlightPlan {
       },
     ],
   };
+}
+
+export function createKseaKpdxRouteSource(): RouteSource {
+  return createRouteSourceFromFlightPlan(createKseaKpdxFlight(), {
+    id: 'canned:ksea-kpdx',
+    type: 'canned',
+    label: 'KSEA to KPDX canned route',
+    limitations: [
+      'Adapter wraps the current RFMS shared FlightPlan shape; CDU route editing UI is not implemented yet.',
+      'RFMS shared dependency remains a sibling checkout via @shared path mapping.',
+    ],
+  });
 }
 
 export function createDefaultFlightForScenario(scenario: FlightScenario): FlightPlan | null {
