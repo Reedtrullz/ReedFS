@@ -6,6 +6,26 @@ import { RfsPFD } from '../RfsPFD';
 import { createDefaultAutopilotState } from '../defaultAutopilotState';
 import { useSimStore } from '../../store/simStore';
 import { eulerToQuat } from '../../sim/physics/quaternion';
+import { createKseaKpdxFlight } from '../../sim/flightPlanLoader';
+import { computeRouteStatus } from '../../sim/systems/navigation';
+import { deriveEffectiveAutoflightTruth } from '../../sim/systems/effectiveAutoflightTruth';
+
+function setVnavBackedKseaRoute(): void {
+  const flightPlan = createKseaKpdxFlight();
+  const aircraft = structuredClone(useSimStore.getState().aircraft);
+  aircraft.position.lat = 46.97;
+  aircraft.position.lon = -122.90;
+  aircraft.position.alt = 18_000;
+  aircraft.velocity.u = 128.6;
+  const routeStatus = computeRouteStatus(aircraft, flightPlan, 1);
+
+  useSimStore.setState({
+    aircraft,
+    flightPlan,
+    activeLegIndex: routeStatus.activeLegIndex,
+    routeStatus,
+  });
+}
 
 describe('RfsMCP', () => {
   beforeEach(() => {
@@ -176,10 +196,32 @@ describe('RfsMCP', () => {
     expect(screen.getByText('VS +100')).toBeTruthy();
   });
 
-  it('does not render a clickable VNAV button when VNAV availability is not gated', () => {
+  it('does not render a VNAV button when no VNAV backing is available', () => {
     render(<RfsMCP />);
 
     expect(screen.queryByRole('button', { name: 'VNAV' })).toBeNull();
+  });
+
+  it('renders a backed VNAV button for an available constrained route and engages Boeing VNAV truth', () => {
+    setVnavBackedKseaRoute();
+    render(<RfsMCP />);
+
+    const vnav = screen.getByRole('button', { name: 'VNAV' });
+    fireEvent.click(vnav);
+
+    const state = useSimStore.getState();
+    const ap = state.apState;
+    expect(ap).not.toBeNull();
+    expect(ap?.truth.autopilotStatus).toBe('CMD_A');
+    expect(ap?.truth.verticalActive).toBe('VNAV');
+    expect(ap?.boeing.cmdA).toBe(true);
+    expect(ap?.boeing.vnav).toBe(true);
+    expect(ap?.boeing.altHold).toBe(false);
+    expect(ap?.boeing.vs).toBe(false);
+
+    const effective = deriveEffectiveAutoflightTruth(ap, state);
+    expect(effective.verticalActive).toBe('VNAV_PTH');
+    expect(vnav).toHaveStyle({ background: '#0a0' });
   });
 
   it('disables LNAV with a visible reason when no compatible route is available', () => {

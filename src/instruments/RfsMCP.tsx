@@ -40,7 +40,9 @@ const targetDisplayStyle: React.CSSProperties = {
 type McpTarget = 'speed' | 'heading' | 'altitude' | 'verticalSpeed';
 type FlightDirectorSide = 'left' | 'right';
 
-type EnabledMcpMode = 'HDG_SEL' | 'LNAV' | 'ALT_HOLD' | 'VS' | 'SPEED' | 'N1' | 'OFF';
+type EnabledMcpMode = 'HDG_SEL' | 'LNAV' | 'VNAV' | 'ALT_HOLD' | 'VS' | 'SPEED' | 'N1' | 'OFF';
+
+const VNAV_DISPLAY_MODES = new Set<VerticalMode>(['VNAV', 'VNAV_PTH', 'ALT*', 'ALT_HOLD']);
 
 function clearBoeingModeFlags(apState: AutopilotState): void {
   apState.boeing.hdgSel = false;
@@ -78,6 +80,21 @@ function selectedAltitudeFt(apState: AutopilotState | null): number {
 
 function selectedVerticalSpeedFpm(apState: AutopilotState | null): number {
   return clamp(Math.round(finiteTarget(apState?.boeing.verticalSpeed, 0) / 100) * 100, -6000, 6000);
+}
+
+function deriveBackedVnavMode(
+  apState: AutopilotState | null,
+  context: Parameters<typeof deriveEffectiveAutoflightTruth>[1],
+): VerticalMode {
+  const probe = structuredClone(apState ?? createDefaultAutopilotState());
+  probe.truth.autopilotStatus = 'CMD_A';
+  probe.truth.verticalActive = 'VNAV';
+  probe.boeing.cmdA = true;
+  probe.boeing.vnav = true;
+  probe.boeing.altHold = false;
+  probe.boeing.vs = false;
+
+  return deriveEffectiveAutoflightTruth(probe, context).verticalActive;
 }
 
 function formatVerticalSpeed(value: number): string {
@@ -133,6 +150,11 @@ function applyMcpMode(apState: AutopilotState, mode: EnabledMcpMode): void {
     if (mode === 'VS' && !Number.isFinite(apState.boeing.verticalSpeed)) {
       apState.boeing.verticalSpeed = 0;
     }
+  } else if (mode === 'VNAV') {
+    apState.truth.verticalActive = 'VNAV';
+    apState.boeing.vnav = true;
+    apState.boeing.altHold = false;
+    apState.boeing.vs = false;
   } else if (mode === 'SPEED' || mode === 'N1') {
     apState.truth.thrustActive = mode as ThrustMode;
     apState.boeing.speedMode = mode === 'SPEED';
@@ -148,11 +170,13 @@ export function RfsMCP() {
   const routeStatus = useSimStore((s) => s.routeStatus);
 
   const toggleMode = (mode: EnabledMcpMode) => {
-    if (mode === 'LNAV' && !useSimStore.getState().routeStatus.lnavAvailable) return;
-    const current = useSimStore.getState().apState;
+    const state = useSimStore.getState();
+    if (mode === 'LNAV' && !state.routeStatus.lnavAvailable) return;
+    if (mode === 'VNAV' && deriveBackedVnavMode(state.apState, state) === 'OFF') return;
+    const current = state.apState;
     const next = structuredClone(current ?? createDefaultAutopilotState());
     applyMcpMode(next, mode);
-    useSimStore.getState().setApState(next);
+    state.setApState(next);
   };
 
   const toggleFlightDirector = (side: FlightDirectorSide) => {
@@ -173,6 +197,9 @@ export function RfsMCP() {
   const latActive = effectiveTruth.lateralActive;
   const vertActive = effectiveTruth.verticalActive;
   const thrActive = effectiveTruth.thrustActive;
+  const backedVnavMode = deriveBackedVnavMode(apState, { aircraft, flightPlan, routeStatus });
+  const vnavAvailable = backedVnavMode !== 'OFF';
+  const vnavActive = Boolean(apState?.boeing.vnav) && VNAV_DISPLAY_MODES.has(vertActive);
   const fdLeft = apState?.boeing.fdLeft ?? false;
   const fdRight = apState?.boeing.fdRight ?? false;
   const lnavAvailable = routeStatus.lnavAvailable;
@@ -264,10 +291,18 @@ export function RfsMCP() {
       <div>
         <button
           onClick={() => toggleMode('ALT_HOLD')}
-          style={vertActive === 'ALT_HOLD' ? activeStyle : btnStyle}
+          style={vertActive === 'ALT_HOLD' && !vnavActive ? activeStyle : btnStyle}
         >
           ALT
         </button>
+        {vnavAvailable && (
+          <button
+            onClick={() => toggleMode('VNAV')}
+            style={vnavActive ? activeStyle : btnStyle}
+          >
+            VNAV
+          </button>
+        )}
         <button
           onClick={() => toggleMode('VS')}
           style={vertActive === 'VS' ? activeStyle : btnStyle}
