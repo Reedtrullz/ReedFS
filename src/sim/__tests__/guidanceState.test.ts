@@ -236,6 +236,27 @@ describe('guidanceState', () => {
       controls: takeoffControls,
     }).phase).toBe('takeoff-roll');
 
+    const pitchOnlyBelowVrAircraft = structuredClone(rollingAircraft);
+    setIasKt(pitchOnlyBelowVrAircraft, 89);
+    pitchOnlyBelowVrAircraft.attitude.theta = 6.7 * Math.PI / 180;
+    pitchOnlyBelowVrAircraft.ground.weightOnWheels = true;
+    pitchOnlyBelowVrAircraft.ground.contact = 'gear';
+    expect(buildGuidanceState({
+      scenario: KSEA_TUTORIAL_SCENARIO,
+      status: 'running',
+      aircraft: pitchOnlyBelowVrAircraft,
+      controls: { ...takeoffControls, elevator: 0 },
+    }).phase).toBe('takeoff-roll');
+
+    const explicitRotationIntentAircraft = structuredClone(rollingAircraft);
+    setIasKt(explicitRotationIntentAircraft, 89);
+    expect(buildGuidanceState({
+      scenario: KSEA_TUTORIAL_SCENARIO,
+      status: 'running',
+      aircraft: explicitRotationIntentAircraft,
+      controls: { ...takeoffControls, elevator: -0.35 },
+    }).phase).toBe('rotation');
+
     const atScenarioVrAircraft = structuredClone(rollingAircraft);
     setIasKt(atScenarioVrAircraft, 149);
     expect(buildGuidanceState({

@@ -47,8 +47,12 @@ export interface GuidanceStateInput {
 }
 
 const MS_TO_KT = 1.94384449;
-const ROTATION_PITCH_RAD = 5 * Math.PI / 180;
+const ROTATION_INTENT_ELEVATOR = -0.2;
 const ROLLOUT_SPEED_THRESHOLD_KT = 15;
+
+function hasExplicitRotationIntent(controls: ControlInputs): boolean {
+  return controls.elevator <= ROTATION_INTENT_ELEVATOR;
+}
 
 export function deriveGuidancePhase(
   status: SimStatus,
@@ -80,7 +84,7 @@ export function deriveGuidancePhase(
     return aircraft.config.gearDown || controls.gearLever === 'DOWN' ? 'positive-rate' : 'climb';
   }
 
-  if (speedKt >= rotationSpeedKt || aircraft.attitude.theta >= ROTATION_PITCH_RAD) return 'rotation';
+  if (speedKt >= rotationSpeedKt || hasExplicitRotationIntent(controls)) return 'rotation';
 
   const takeoffThrust = Math.max(controls.throttle1, controls.throttle2) >= 0.9;
   if (status === 'running' || aircraft.flightPhase === 'TAKEOFF' || takeoffThrust) return 'takeoff-roll';
