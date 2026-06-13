@@ -54,7 +54,7 @@ export function deriveGuidancePhase(
   status: SimStatus,
   aircraft: AircraftState,
   controls: ControlInputs,
-  scenarioId?: string | null,
+  scenarioId: string,
 ): GuidancePhase {
   if (status === 'stopped') return 'preflight';
 

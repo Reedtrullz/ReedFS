@@ -271,7 +271,12 @@ describe('guidanceState', () => {
     descendingAirborneGearDown.ground.aglFt = 80;
     descendingAirborneGearDown.velocity.w = 2;
     descendingAirborneGearDown.position.alt += 80;
-    expect(deriveGuidancePhase('running', descendingAirborneGearDown, takeoffControls)).toBe('rotation');
+    expect(deriveGuidancePhase(
+      'running',
+      descendingAirborneGearDown,
+      takeoffControls,
+      KSEA_TUTORIAL_SCENARIO.id,
+    )).toBe('rotation');
   });
 
   it('keeps rejected takeoff prioritized when TAKEOFF briefly reports airborne', () => {
@@ -290,7 +295,7 @@ describe('guidanceState', () => {
         throttle2: 0,
         brake: 1,
         spoilers: 1,
-      })).toBe('rejected-takeoff');
+      }, KSEA_TUTORIAL_SCENARIO.id)).toBe('rejected-takeoff');
     }
   });
 
