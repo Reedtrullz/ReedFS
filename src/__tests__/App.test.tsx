@@ -636,6 +636,7 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: 'LOAD PLAN' }));
 
     expect(mockSetFlightPlan).toHaveBeenCalledTimes(1);
+    expect(mockSetFlightPlan).toHaveBeenCalledWith(expect.objectContaining({ origin: 'KSEA', destination: 'KPDX' }));
     expect(mockSetApState).not.toHaveBeenCalled();
   });
 
