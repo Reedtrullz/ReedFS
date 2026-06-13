@@ -10,7 +10,6 @@ import { useSimStore } from './store/simStore';
 import { readGamepadActions } from './input/GamepadManager';
 import {
   applyDiscreteKeyAction,
-  applyDiscreteKeyInput,
   computeHeldKeyActions,
   shouldIgnoreKeyboardEvent,
 } from './input/keyboardControls';
@@ -27,6 +26,7 @@ import { EngineStrip } from './components/EngineStrip';
 import { ScenarioPanel } from './components/ScenarioPanel';
 import { RouteStatus } from './components/RouteStatus';
 import { SceneStatus } from './components/SceneStatus';
+import { TakeoffSetupPanel } from './components/TakeoffSetupPanel';
 
 const CesiumViewport = lazy(() => import('./viewport/CesiumViewport').then((m) => ({ default: m.CesiumViewport })));
 const ThreeLayer = lazy(() => import('./viewport/ThreeLayer').then((m) => ({ default: m.ThreeLayer })));
@@ -91,17 +91,9 @@ export function App() {
 
       const action = applyDiscreteKeyAction(key);
       if (action) {
+        if ((key === 'g' || key === 'f') && e.repeat) return;
         e.preventDefault();
         useSimStore.getState().applyInputActions(action, 0);
-        return;
-      }
-
-      const partial = applyDiscreteKeyInput(key, useSimStore.getState().inputs);
-      if (partial) {
-        const repeatSensitive = key === 'g' || key === 'f';
-        if (repeatSensitive && e.repeat) return;
-        e.preventDefault();
-        setInput(partial);
       }
     };
 
@@ -274,6 +266,7 @@ export function App() {
       <SceneStatus policy={cesiumScenePolicy} />
       {showFlightInstruments && <ScenarioPanel />}
       {showFlightInstruments && <RouteStatus />}
+      {showFlightInstruments && <TakeoffSetupPanel />}
       <EngineStrip />
       {showDebugOverlays && (
         <div

@@ -1,3 +1,5 @@
+import { B737_FLAP_DETENTS } from './flapDetents';
+
 export type ControlBindingId =
   | 'pitch'
   | 'roll'
@@ -78,7 +80,7 @@ export const DEFAULT_CONTROL_BINDINGS: ControlBinding[] = [
     label: 'Flaps',
     keyboard: ['F'],
     gamepad: ['Gamepad LB/L1'],
-    description: 'Cycle flap detents for takeoff/approach setup.',
+    description: `Cycle B737 flap detents ${B737_FLAP_DETENTS.join('/')} for takeoff/approach setup.`,
   },
   {
     id: 'trim',

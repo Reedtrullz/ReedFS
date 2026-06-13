@@ -4,6 +4,7 @@ import {
   controlBindingLabels,
   validateControlBindings,
 } from '../controlBindings';
+import { B737_FLAP_DETENTS } from '../flapDetents';
 
 describe('controlBindings', () => {
   it('default bindings include the core keyboard/gamepad actions needed for repeated play', () => {
@@ -45,6 +46,14 @@ describe('controlBindings', () => {
       label: 'Differential brake',
       keyboard: ['Z/X'],
       description: expect.stringMatching(/left\/right|side/i),
+    }));
+  });
+
+  it('describes flaps with the shared B737 detent model', () => {
+    const flaps = DEFAULT_CONTROL_BINDINGS.find((binding) => binding.id === 'flaps');
+
+    expect(flaps).toEqual(expect.objectContaining({
+      description: expect.stringContaining(B737_FLAP_DETENTS.join('/')),
     }));
   });
 

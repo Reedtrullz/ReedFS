@@ -1,5 +1,6 @@
 import type { ControlInputs } from '../sim/types';
 import type { InputActions } from './InputManager';
+import { nextB737FlapDetent } from './flapDetents';
 
 export const THROTTLE_STEP = 0.05;
 export const TRIM_STEP_UNITS = 0.1;
@@ -7,10 +8,6 @@ const ELEVATOR_KEY_DEFLECTION = 1;
 
 function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value));
-}
-
-function nextFlapDetent(flaps: number): number {
-  return flaps >= 40 ? 0 : flaps < 5 ? 5 : flaps + 5;
 }
 
 function isEditableKeyboardTarget(target: EventTarget | null): boolean {
@@ -75,6 +72,10 @@ export function applyDiscreteKeyAction(key: string): InputActions | null {
       return { trimDelta: TRIM_STEP_UNITS };
     case '8':
       return { trimDelta: -TRIM_STEP_UNITS };
+    case 'g':
+      return { gearToggle: true };
+    case 'f':
+      return { flapNext: true };
     default:
       return null;
   }
@@ -93,7 +94,7 @@ export function applyDiscreteKeyInput(key: string, inputs: ControlInputs): Parti
     case 'g':
       return { gearLever: inputs.gearLever === 'UP' ? 'DOWN' : 'UP' };
     case 'f':
-      return { flapLever: nextFlapDetent(inputs.flapLever) };
+      return { flapLever: nextB737FlapDetent(inputs.flapLever) };
     default:
       return null;
   }

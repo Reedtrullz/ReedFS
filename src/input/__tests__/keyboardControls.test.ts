@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { ControlInputs } from '../../sim/types';
 import {
+  applyDiscreteKeyAction,
   applyDiscreteKeyInput,
   computeHeldKeyActions,
   computeHeldKeyInputs,
   shouldIgnoreKeyboardEvent,
 } from '../keyboardControls';
+import { B737_FLAP_DETENTS, nextB737FlapDetent } from '../flapDetents';
 
 const inputs: ControlInputs = {
   elevator: 0,
@@ -72,10 +74,20 @@ describe('keyboardControls', () => {
     });
   });
 
-  it('toggles gear and cycles flaps', () => {
+  it('dispatches flap and gear keys as shared input actions', () => {
+    expect(applyDiscreteKeyAction('f')).toEqual({ flapNext: true });
+    expect(applyDiscreteKeyAction('g')).toEqual({ gearToggle: true });
+  });
+
+  it('uses the shared B737 flap detent sequence for keyboard flap cycling', () => {
+    expect(B737_FLAP_DETENTS).toEqual([0, 1, 2, 5, 10, 15, 25, 30, 40]);
+    expect(B737_FLAP_DETENTS.map(nextB737FlapDetent)).toEqual([1, 2, 5, 10, 15, 25, 30, 40, 0]);
+
     expect(applyDiscreteKeyInput('g', inputs)).toEqual({ gearLever: 'UP' });
-    expect(applyDiscreteKeyInput('f', { ...inputs, flapLever: 0 })).toEqual({ flapLever: 5 });
-    expect(applyDiscreteKeyInput('f', { ...inputs, flapLever: 5 })).toEqual({ flapLever: 10 });
+    expect(applyDiscreteKeyInput('f', { ...inputs, flapLever: 0 })).toEqual({ flapLever: 1 });
+    expect(applyDiscreteKeyInput('f', { ...inputs, flapLever: 1 })).toEqual({ flapLever: 2 });
+    expect(applyDiscreteKeyInput('f', { ...inputs, flapLever: 2 })).toEqual({ flapLever: 5 });
+    expect(applyDiscreteKeyInput('f', { ...inputs, flapLever: 15 })).toEqual({ flapLever: 25 });
     expect(applyDiscreteKeyInput('f', { ...inputs, flapLever: 40 })).toEqual({ flapLever: 0 });
   });
 
