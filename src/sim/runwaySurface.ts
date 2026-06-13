@@ -18,6 +18,7 @@ export interface GroundSurfaceSample {
   runwayId?: string;
   alongTrackM?: number;
   lateralOffsetM?: number;
+  runwayHalfWidthM?: number;
 }
 
 export const RUNWAY_FRICTION_SCALE: GroundSurfaceFrictionScale = {
@@ -38,6 +39,8 @@ const UNSUPPORTED_TERRAIN_DISTANCE_M = 300_000;
 interface NearestRunwayFootprint {
   runway: RunwayReference;
   distanceM: number;
+  alongTrackM: number;
+  lateralOffsetM: number;
 }
 
 function localNorthEastMeters(position: GeoPosition, origin: RunwayReference['start']): { northM: number; eastM: number } {
@@ -86,6 +89,8 @@ export function isPositionOnPreparedRunwayFootprint(
 
 function nearestRunwayByFootprintDistance(position: GeoPosition, runways: readonly RunwayReference[]): NearestRunwayFootprint | undefined {
   let nearestRunway: RunwayReference | undefined;
+  let nearestAlongTrackM = 0;
+  let nearestLateralOffsetM = 0;
   let nearestDistanceSq = Number.POSITIVE_INFINITY;
 
   for (const runway of runways) {
@@ -96,10 +101,17 @@ function nearestRunwayByFootprintDistance(position: GeoPosition, runways: readon
     if (distanceSq < nearestDistanceSq) {
       nearestDistanceSq = distanceSq;
       nearestRunway = runway;
+      nearestAlongTrackM = alongTrackM;
+      nearestLateralOffsetM = lateralOffsetM;
     }
   }
 
-  return nearestRunway ? { runway: nearestRunway, distanceM: Math.sqrt(nearestDistanceSq) } : undefined;
+  return nearestRunway ? {
+    runway: nearestRunway,
+    distanceM: Math.sqrt(nearestDistanceSq),
+    alongTrackM: nearestAlongTrackM,
+    lateralOffsetM: nearestLateralOffsetM,
+  } : undefined;
 }
 
 function sampleRunwaySurface(position: GeoPosition, runways: readonly RunwayReference[]): GroundSurfaceSample {
@@ -115,6 +127,7 @@ function sampleRunwaySurface(position: GeoPosition, runways: readonly RunwayRefe
         runwayId: runway.id,
         alongTrackM,
         lateralOffsetM,
+        runwayHalfWidthM: runway.widthM / 2,
       };
     }
   }
@@ -136,6 +149,9 @@ function sampleRunwaySurface(position: GeoPosition, runways: readonly RunwayRefe
     groundAltFt: nearest.runway.elevationFt,
     frictionScale: OFF_RUNWAY_FRICTION_SCALE,
     airport: nearest.runway.airport,
+    alongTrackM: nearest.alongTrackM,
+    lateralOffsetM: nearest.lateralOffsetM,
+    runwayHalfWidthM: nearest.runway.widthM / 2,
   };
 }
 

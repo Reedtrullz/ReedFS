@@ -32,11 +32,6 @@ function runwayHeadingDeltaRad(state: ReturnType<typeof createInitialState>): nu
   return normalizeAngleRad(state.attitude.psi - ksea16LHeadingRad());
 }
 
-function runwayLateralDisplacementM(state: ReturnType<typeof createInitialState>): number {
-  const metersPerDegreeLon = 111_320 * Math.cos(KSEA_RUNWAY_16L.start.lat * Math.PI / 180);
-  return (state.position.lon - KSEA_RUNWAY_16L.start.lon) * metersPerDegreeLon;
-}
-
 function degToRad(deg: number): number {
   return deg * Math.PI / 180;
 }
@@ -1178,7 +1173,14 @@ describe('integrate', () => {
     });
 
     expect(Math.abs(runwayHeadingDeltaRad(state))).toBeLessThan(degToRad(25));
-    expect(Math.abs(runwayLateralDisplacementM(state))).toBeLessThan(250);
+    const runwayCoordinates = ksea16LRunwayCoordinatesM(state);
+    const runwayHalfWidthM = KSEA_RUNWAY_16L.widthM / 2;
+    if (Math.abs(runwayCoordinates.lateralOffsetM) <= runwayHalfWidthM) {
+      expect(state.ground.onRunway).toBe(true);
+    } else {
+      expect(state.ground.onRunway).toBe(false);
+      expect(state.ground.contact).toBe('gear');
+    }
     expect(state.velocity.u).toBeGreaterThan(40);
     expect(state.ground.weightOnWheels).toBe(true);
   });

@@ -34,6 +34,7 @@ describe('sampleKseaSurface', () => {
     expect(sample.onRunway).toBe(true);
     expect(sample.runwayId).toBe('16L');
     expect(sample.groundAltFt).toBe(KSEA_RUNWAY_16L.elevationFt);
+    expect(sample.runwayHalfWidthM).toBe(KSEA_RUNWAY_16L.widthM / 2);
     expect(Math.abs(sample.lateralOffsetM ?? 0)).toBeLessThan(1e-6);
     expect(sample.alongTrackM ?? 0).toBeGreaterThanOrEqual(-1);
     expect(sample.frictionScale.rolling).toBe(1);
@@ -49,6 +50,8 @@ describe('sampleKseaSurface', () => {
     expect(sample.kind).toBe('offRunway');
     expect(sample.onRunway).toBe(false);
     expect(sample.runwayId).toBeUndefined();
+    expect(sample.runwayHalfWidthM).toBe(KSEA_RUNWAY_16L.widthM / 2);
+    expect(Math.abs(sample.lateralOffsetM ?? 0)).toBeGreaterThan(KSEA_RUNWAY_16L.widthM / 2);
     expect(sample.groundAltFt).toBe(KSEA_RUNWAY_16L.elevationFt);
     expect(sample.frictionScale.rolling).toBeGreaterThan(1);
     expect(sample.frictionScale.brake).toBeLessThan(1);
