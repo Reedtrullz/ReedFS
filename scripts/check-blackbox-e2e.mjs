@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const realRepoRoot = fs.realpathSync(repoRoot);
 const entrypoint = path.join(repoRoot, 'e2e/rfs-blackbox-player-loop.spec.ts');
 const allowedExternalImports = new Set(['@playwright/test']);
 const importLikePattern = /(?:import|export)\s+(?:type\s+)?(?:[^'";]*?\s+from\s+)?['"]([^'"]+)['"]|import\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
@@ -20,6 +21,7 @@ const forbiddenPatterns = [
 ];
 
 const extensions = ['', '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'];
+const invalidResolvedImport = Symbol('invalid resolved import');
 const visited = new Set();
 const failures = [];
 
@@ -27,16 +29,45 @@ function toRepoPath(filePath) {
   return path.relative(repoRoot, filePath).split(path.sep).join('/');
 }
 
+function isWithinDirectory(childPath, parentPath) {
+  const relative = path.relative(parentPath, childPath);
+  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+}
+
+function assertNotSymlink(filePath, fromFile, specifier) {
+  const stats = fs.lstatSync(filePath);
+  if (stats.isSymbolicLink()) {
+    failures.push(`${toRepoPath(fromFile)} imports ${specifier}, which resolves to symlink ${toRepoPath(filePath)}`);
+    return false;
+  }
+  return true;
+}
+
+function assertRepoLocalRealPath(filePath, fromFile, specifier) {
+  const realPath = fs.realpathSync(filePath);
+  if (!isWithinDirectory(realPath, realRepoRoot)) {
+    failures.push(`${toRepoPath(fromFile)} imports ${specifier}, whose real path resolves outside the repository`);
+    return false;
+  }
+  return true;
+}
+
 function resolveRelativeImport(fromFile, specifier) {
   const base = path.resolve(path.dirname(fromFile), specifier);
   for (const extension of extensions) {
     const candidate = base + extension;
-    if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) return candidate;
+    if (!fs.existsSync(candidate)) continue;
+    if (!assertNotSymlink(candidate, fromFile, specifier)) return invalidResolvedImport;
+    if (!assertRepoLocalRealPath(candidate, fromFile, specifier)) return invalidResolvedImport;
+    if (fs.statSync(candidate).isFile()) return candidate;
   }
 
   for (const extension of extensions.slice(1)) {
     const candidate = path.join(base, `index${extension}`);
-    if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) return candidate;
+    if (!fs.existsSync(candidate)) continue;
+    if (!assertNotSymlink(candidate, fromFile, specifier)) return invalidResolvedImport;
+    if (!assertRepoLocalRealPath(candidate, fromFile, specifier)) return invalidResolvedImport;
+    if (fs.statSync(candidate).isFile()) return candidate;
   }
 
   return null;
@@ -48,6 +79,7 @@ function assertRepoLocal(filePath, fromFile, specifier) {
     failures.push(`${toRepoPath(fromFile)} imports ${specifier}, which resolves outside the repository`);
     return false;
   }
+  if (!assertRepoLocalRealPath(filePath, fromFile, specifier)) return false;
   return true;
 }
 
@@ -69,6 +101,7 @@ function scanFile(filePath) {
     return;
   }
 
+  if (!assertNotSymlink(filePath, entrypoint, toRepoPath(filePath))) return;
   if (!assertRepoLocal(filePath, entrypoint, toRepoPath(filePath))) return;
 
   const source = fs.readFileSync(filePath, 'utf8');
@@ -90,6 +123,7 @@ function scanFile(filePath) {
 
     if (specifier.startsWith('.') || specifier.startsWith('/')) {
       const resolved = resolveRelativeImport(filePath, specifier);
+      if (resolved === invalidResolvedImport) continue;
       if (!resolved) {
         failures.push(`${repoPath} imports ${specifier}, but the target could not be resolved deterministically`);
         continue;
