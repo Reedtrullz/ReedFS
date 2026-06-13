@@ -183,6 +183,8 @@ jobs:
             EXPECTED_COMMIT=${{ github.sha }}
             PREVIOUS_IMAGE_ID="$(docker inspect -f '{{.Image}}' rfs 2>/dev/null || true)"
             PREVIOUS_IMAGE_REF="$(docker inspect -f '{{.Config.Image}}' rfs 2>/dev/null || true)"
+            PREVIOUS_PUBLIC_VERSION_JSON="$(curl -fsS https://fly.reidar.tech/rfs-version.json 2>/dev/null || true)"
+            PREVIOUS_PUBLIC_COMMIT="$(printf '%s\n' "$PREVIOUS_PUBLIC_VERSION_JSON" | sed -n 's/.*"commit"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1)"
             PREVIOUS_IMAGE="$PREVIOUS_IMAGE_ID"
             if [ -z "$PREVIOUS_IMAGE" ] || [ "$PREVIOUS_IMAGE" = "<no value>" ]; then
               PREVIOUS_IMAGE="$PREVIOUS_IMAGE_REF"
@@ -192,14 +194,43 @@ jobs:
             fi
 
             rollback() {
-              if [ -n "$PREVIOUS_IMAGE" ]; then
-                echo "Rolling back to previous image: $PREVIOUS_IMAGE (previous ref: $PREVIOUS_IMAGE_REF)"
-                docker rm -f rfs 2>/dev/null || true
-                docker run -d --name rfs --restart unless-stopped \
-                  -p 127.0.0.1:3005:80 \
-                  --memory 256m --cpus 1.0 \
-                  --log-driver json-file --log-opt max-size=10m --log-opt max-file=3 \
-                  "$PREVIOUS_IMAGE" || true
+              if [ -z "$PREVIOUS_IMAGE" ]; then
+                echo "Rollback unavailable: no previous image was captured."
+                return 1
+              fi
+
+              echo "Rolling back to previous image: $PREVIOUS_IMAGE (previous ref: $PREVIOUS_IMAGE_REF, previous public commit: ${PREVIOUS_PUBLIC_COMMIT:-unknown})"
+              docker rm -f rfs 2>/dev/null || true
+              if ! docker run -d --name rfs --restart unless-stopped \
+                -p 127.0.0.1:3005:80 \
+                --memory 256m --cpus 1.0 \
+                --log-driver json-file --log-opt max-size=10m --log-opt max-file=3 \
+                "$PREVIOUS_IMAGE"; then
+                echo "Rollback container start failed!"
+                return 1
+              fi
+
+              for attempt in $(seq 1 10); do
+                if curl -fsS https://fly.reidar.tech/ > /dev/null; then
+                  break
+                fi
+                if [ "$attempt" = "10" ]; then
+                  echo "Rollback public health check failed!"
+                  return 1
+                fi
+                sleep 3
+              done
+
+              if [ -n "$PREVIOUS_PUBLIC_COMMIT" ]; then
+                if ! curl -fsS https://fly.reidar.tech/rfs-version.json | grep -F "$PREVIOUS_PUBLIC_COMMIT" > /dev/null; then
+                  echo "Rollback public version check failed; expected previous commit $PREVIOUS_PUBLIC_COMMIT"
+                  return 1
+                fi
+              else
+                if ! curl -fsS https://fly.reidar.tech/rfs-version.json > /dev/null; then
+                  echo "Rollback public version check failed; previous commit unknown"
+                  return 1
+                fi
               fi
             }
 
@@ -238,7 +269,10 @@ jobs:
               --memory 256m --cpus 1.0 \
               --log-driver json-file --log-opt max-size=10m --log-opt max-file=3 \
               "$IMAGE_REF"; then
-              rollback
+              if ! rollback; then
+                docker rm -f rfs_canary
+                exit 1
+              fi
               docker rm -f rfs_canary
               exit 1
             fi
@@ -246,12 +280,16 @@ jobs:
 
             if ! curl -fsS https://fly.reidar.tech/ > /dev/null; then
               echo "Public post-promotion health check failed; rolling back."
-              rollback
+              if ! rollback; then
+                exit 1
+              fi
               exit 1
             fi
             if ! curl -fsS https://fly.reidar.tech/rfs-version.json | grep -F "$EXPECTED_COMMIT" > /dev/null; then
               echo "Public post-promotion version check failed; rolling back."
-              rollback
+              if ! rollback; then
+                exit 1
+              fi
               exit 1
             fi
             echo "Deployed $IMAGE_REF (${{ needs.publish.outputs.image_digest }}) successfully to https://fly.reidar.tech"

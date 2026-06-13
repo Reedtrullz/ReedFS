@@ -60,6 +60,9 @@ check(ci.includes("curl -fsS https://fly.reidar.tech/"), "workflow must verify t
 check(ci.includes("https://fly.reidar.tech/rfs-version.json"), "workflow must verify public version metadata");
 check(ci.includes("org.opencontainers.image.revision"), "workflow Docker build must include OCI labels");
 check(ci.includes("PREVIOUS_IMAGE_ID=\"$(docker inspect -f '{{.Image}}' rfs") && ci.includes("PREVIOUS_IMAGE_REF=\"$(docker inspect -f '{{.Config.Image}}' rfs"), "deploy rollback must capture previous image ID and Config.Image fallback");
+check(!ci.includes('"$PREVIOUS_IMAGE" || true'), "deploy rollback container start failure must be fatal");
+check(ci.includes("PREVIOUS_PUBLIC_COMMIT"), "deploy rollback must capture the previous public version commit before promotion");
+check(ci.includes("Rollback public version check failed") && ci.includes("$PREVIOUS_PUBLIC_COMMIT"), "deploy rollback must verify the previous public /rfs-version.json commit after rollback");
 check(ci.includes('docker logs --tail=50 rfs_canary') && ci.includes('docker rm -f rfs_canary'), "deploy canary failures must print logs and clean up the canary container");
 
 check(dockerfile.includes("node:22-alpine@sha256:968df39aedcea65eeb078fb336ed7191baf48f972b4479711397108be0966920"), "Dockerfile must pin node:22-alpine by digest");

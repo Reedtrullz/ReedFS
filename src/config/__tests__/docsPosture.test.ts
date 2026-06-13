@@ -24,4 +24,11 @@ describe('canonical docs posture', () => {
     expect(ciWorkflow).toContain('curl -fsS http://localhost:3005/');
     expect(ciWorkflow).toContain('curl -fsS http://localhost:3005/rfs-version.json');
   });
+
+  it('makes deployment rollback failures fatal and publicly verifiable', () => {
+    expect(ciWorkflow).not.toContain('"$PREVIOUS_IMAGE" || true');
+    expect(ciWorkflow).toContain('PREVIOUS_PUBLIC_COMMIT');
+    expect(ciWorkflow).toContain('Rollback public version check failed');
+    expect(ciWorkflow).toContain('$PREVIOUS_PUBLIC_COMMIT');
+  });
 });
