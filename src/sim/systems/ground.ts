@@ -766,7 +766,13 @@ export function applyGroundContact(
   loadedGearStations = applyNosewheelSteering(state, inputs, loadedGearStations, groundModel);
   applyTireSideForces(state, dt, loadedGearStations, contactSurface, groundModel);
   applyLongitudinalGroundDecel(state, inputs, dt, loadedGearStations, contactSurface, groundModel);
+  if (Math.abs(state.velocity.u) <= groundModel.friction.stopEpsilonMps && !hasBreakawayThrustCommand(inputs, groundModel)) {
+    state.velocity.u = 0;
+  }
   constrainRunwayNormalVelocity(state);
+  if (Math.abs(state.velocity.u) <= groundModel.friction.stopEpsilonMps && !hasBreakawayThrustCommand(inputs, groundModel)) {
+    state.velocity.u = 0;
+  }
 
   const finalSurfaceOnRunway = loadedWheelContactsOnPreparedRunway(
     wheelContacts,

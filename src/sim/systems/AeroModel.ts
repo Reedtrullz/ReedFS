@@ -36,6 +36,7 @@ export interface AeroModel {
   flapPolars: FlapPolar[];
   gearCd: number;
   speedBrakeCd: number;
+  speedBrakeLiftDumpFraction: number;
   cm0: number;
   cmAlpha: number;
   cmElevator: number;

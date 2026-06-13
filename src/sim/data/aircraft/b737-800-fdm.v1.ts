@@ -70,6 +70,10 @@ export const B737_800_FDM: VersionedAircraftFdmData = {
     // below the documented P0 envelope until source-backed drag data replaces it.
     gearCd: 0.08,
     speedBrakeCd: 0.04,
+    // Gameplay-calibrated placeholder: landing spoilers dump a substantial
+    // fraction of positive wing lift so rollout/RTO braking receives realistic
+    // wheel loading. Not AFM/Boeing data.
+    speedBrakeLiftDumpFraction: 0.35,
     cm0: 0.08,
     cmAlpha: -1.2,
     cmElevator: -1.2,

@@ -143,7 +143,11 @@ export function computeAero(
   const polar = flapPolarForSetting(aeroModel, state.config.flapSetting);
   const { cl, stallFraction } = liftCoefficientAtAoA(aoa, mach, polar);
   const groundEffect = computeGroundEffectFactors(heightAboveGroundM(state), b, aeroModel.groundEffect);
-  const effectiveCl = cl * groundEffect.liftMultiplier;
+  const speedBrakeLiftDump = clamp(state.config.speedBrake, 0, 1) * clamp(aeroModel.speedBrakeLiftDumpFraction, 0, 1);
+  const effectiveClWithoutSpoilers = cl * groundEffect.liftMultiplier;
+  const effectiveCl = effectiveClWithoutSpoilers > 0
+    ? effectiveClWithoutSpoilers * (1 - speedBrakeLiftDump)
+    : effectiveClWithoutSpoilers;
 
   // --- Drag ---
   const cd0 = polar.cd0 + (state.config.gearDown ? aeroModel.gearCd : 0) + state.config.speedBrake * aeroModel.speedBrakeCd;

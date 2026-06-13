@@ -157,6 +157,28 @@ describe('computeAero', () => {
     expect(flap.drag).toBeGreaterThan(clean.drag);
   });
 
+  it('landing spoilers dump lift while adding drag from FDM coefficients', () => {
+    const stowedState = stateAtAoA(7, 72);
+    stowedState.config.flapSetting = 30;
+    stowedState.config.gearDown = true;
+    const deployedState = structuredClone(stowedState);
+    deployedState.config.speedBrake = 1;
+
+    const stowed = computeAero(
+      stowedState,
+      { ...cruise, flapLever: 30, gearLever: 'DOWN', spoilers: 0, throttle1: 0, throttle2: 0 },
+      B737_800_SPEC,
+    );
+    const deployed = computeAero(
+      deployedState,
+      { ...cruise, flapLever: 30, gearLever: 'DOWN', spoilers: 1, throttle1: 0, throttle2: 0 },
+      B737_800_SPEC,
+    );
+
+    expect(deployed.lift).toBeLessThan(stowed.lift * 0.75);
+    expect(deployed.drag).toBeGreaterThan(stowed.drag);
+  });
+
   it('clean lift rises in the linear range but saturates near stall', () => {
     const low = computeAero(stateAtAoA(2), { ...cruise, throttle1: 0, throttle2: 0 }, B737_800_SPEC);
     const mid = computeAero(stateAtAoA(8), { ...cruise, throttle1: 0, throttle2: 0 }, B737_800_SPEC);

@@ -304,6 +304,50 @@ describe('integrate', () => {
     expect(s.velocity.w).toBeLessThan(0.1);
   });
 
+  it('spoilers increase first-touchdown gear normal load by dumping lift', () => {
+    const makeTouchdownState = () => {
+      const state = createInitialState(B737_800_SPEC);
+      state.position = ksea16LPositionMeters(400, 0, KSEA_RUNWAY_ALT_FT);
+      setRunwayHeading(state);
+      state.flightPhase = 'APPROACH';
+      state.config.flapSetting = 30;
+      state.config.gearDown = true;
+      state.config.speedBrake = 0;
+      state.velocity.u = ktToMs(140);
+      state.velocity.v = 0;
+      state.velocity.w = 0;
+      state.ground = {
+        ...state.ground,
+        aglFt: 0,
+        groundAltFt: KSEA_RUNWAY_ALT_FT,
+        weightOnWheels: false,
+        normalForceN: 0,
+        onRunway: false,
+        contact: 'none',
+        gearStations: createB737GearStations(0, false),
+      };
+      return state;
+    };
+    const stowed = makeTouchdownState();
+    const deployed = makeTouchdownState();
+
+    integrate(stowed, { ...idle, flapLever: 30, gearLever: 'DOWN', spoilers: 0 }, B737_800_SPEC, 1 / 120);
+    integrate(deployed, { ...idle, flapLever: 30, gearLever: 'DOWN', spoilers: 1 }, B737_800_SPEC, 1 / 120);
+
+    expect(stowed.ground.contact).toBe('gear');
+    expect(deployed.ground.contact).toBe('gear');
+    expect(deployed.ground.normalForceN).toBeGreaterThan(stowed.ground.normalForceN * 1.15);
+    expect(
+      deployed.ground.gearStations
+        .filter((station) => station.id === 'leftMain' || station.id === 'rightMain')
+        .reduce((sum, station) => sum + station.normalForceN, 0),
+    ).toBeGreaterThan(
+      stowed.ground.gearStations
+        .filter((station) => station.id === 'leftMain' || station.id === 'rightMain')
+        .reduce((sum, station) => sum + station.normalForceN, 0) * 1.15,
+    );
+  });
+
   it('marks ground contact off-runway when the aircraft is outside the prepared runway rectangle', () => {
     const state = createInitialState(B737_800_SPEC);
     state.position = offsetPositionMeters(KSEA_RUNWAY_16L.start, 0, 80);
