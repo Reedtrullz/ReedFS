@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import ciWorkflow from '../../../.github/workflows/ci.yml?raw';
+import dockerfile from '../../../Dockerfile?raw';
+import nginxConf from '../../../nginx.conf?raw';
 import readme from '../../../README.md?raw';
 import architecture from '../../../docs/architecture.md?raw';
 import physicsInvariants from '../../../docs/physics-invariants.md?raw';
@@ -30,5 +32,28 @@ describe('canonical docs posture', () => {
     expect(ciWorkflow).toContain('PREVIOUS_PUBLIC_COMMIT');
     expect(ciWorkflow).toContain('Rollback public version check failed');
     expect(ciWorkflow).toContain('$PREVIOUS_PUBLIC_COMMIT');
+  });
+
+  it('runs nginx as a non-root read-only container with tmpfs runtime state', () => {
+    expect(dockerfile).toContain('USER 101:101');
+    expect(dockerfile).toContain('COPY --from=builder --chown=101:101 /app/dist');
+    expect(dockerfile).toContain('EXPOSE 8080');
+    expect(dockerfile).toContain('http://127.0.0.1:8080/');
+    expect(nginxConf).toContain('listen 8080;');
+    expect(nginxConf).toContain('client_body_temp_path /tmp/client_temp;');
+    for (const requiredFlag of [
+      '--read-only',
+      '--cap-drop ALL',
+      '--security-opt no-new-privileges',
+      '--tmpfs /var/cache/nginx:rw,noexec,nosuid,size=16m,uid=101,gid=101,mode=755',
+      '--tmpfs /var/run:rw,noexec,nosuid,size=4m,uid=101,gid=101,mode=755',
+      '--tmpfs /tmp:rw,noexec,nosuid,size=16m,uid=101,gid=101,mode=1777',
+      '--pids-limit 128',
+      '--user 101:101',
+    ]) {
+      expect(ciWorkflow).toContain(requiredFlag);
+    }
+    expect(ciWorkflow).toContain('127.0.0.1:3005:8080');
+    expect(ciWorkflow).toContain('127.0.0.1:3004:8080');
   });
 });

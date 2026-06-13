@@ -86,7 +86,16 @@ jobs:
           set -eu
           docker rm -f rfs_pr_smoke 2>/dev/null || true
           docker run -d --name rfs_pr_smoke \
-            -p 127.0.0.1:3005:80 \
+            --read-only \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --tmpfs /var/cache/nginx:rw,noexec,nosuid,size=16m,uid=101,gid=101,mode=755 \
+            --tmpfs /var/run:rw,noexec,nosuid,size=4m,uid=101,gid=101,mode=755 \
+            --tmpfs /tmp:rw,noexec,nosuid,size=16m,uid=101,gid=101,mode=1777 \
+            --pids-limit 128 \
+            --user 101:101 \
+            --memory 256m --cpus 1.0 \
+            -p 127.0.0.1:3005:8080 \
             rfs:pr-smoke-${{ github.sha }}
           cleanup() {
             docker logs --tail=50 rfs_pr_smoke 2>/dev/null || true
@@ -202,7 +211,15 @@ jobs:
               echo "Rolling back to previous image: $PREVIOUS_IMAGE (previous ref: $PREVIOUS_IMAGE_REF, previous public commit: ${PREVIOUS_PUBLIC_COMMIT:-unknown})"
               docker rm -f rfs 2>/dev/null || true
               if ! docker run -d --name rfs --restart unless-stopped \
-                -p 127.0.0.1:3005:80 \
+                --read-only \
+                --cap-drop ALL \
+                --security-opt no-new-privileges \
+                --tmpfs /var/cache/nginx:rw,noexec,nosuid,size=16m,uid=101,gid=101,mode=755 \
+                --tmpfs /var/run:rw,noexec,nosuid,size=4m,uid=101,gid=101,mode=755 \
+                --tmpfs /tmp:rw,noexec,nosuid,size=16m,uid=101,gid=101,mode=1777 \
+                --pids-limit 128 \
+                --user 101:101 \
+                -p 127.0.0.1:3005:8080 \
                 --memory 256m --cpus 1.0 \
                 --log-driver json-file --log-opt max-size=10m --log-opt max-file=3 \
                 "$PREVIOUS_IMAGE"; then
@@ -239,7 +256,16 @@ jobs:
 
             # Start canary on port 3004. Existing production stays up until canary passes.
             docker run -d --name rfs_canary \
-              -p 127.0.0.1:3004:80 \
+              --read-only \
+              --cap-drop ALL \
+              --security-opt no-new-privileges \
+              --tmpfs /var/cache/nginx:rw,noexec,nosuid,size=16m,uid=101,gid=101,mode=755 \
+              --tmpfs /var/run:rw,noexec,nosuid,size=4m,uid=101,gid=101,mode=755 \
+              --tmpfs /tmp:rw,noexec,nosuid,size=16m,uid=101,gid=101,mode=1777 \
+              --pids-limit 128 \
+              --user 101:101 \
+              --memory 256m --cpus 1.0 \
+              -p 127.0.0.1:3004:8080 \
               "$IMAGE_REF"
 
             # Canary health and version checks.
@@ -265,7 +291,15 @@ jobs:
             echo "Canary healthy, promoting immutable image $IMAGE_REF..."
             docker rm -f rfs 2>/dev/null || true
             if ! docker run -d --name rfs --restart unless-stopped \
-              -p 127.0.0.1:3005:80 \
+              --read-only \
+              --cap-drop ALL \
+              --security-opt no-new-privileges \
+              --tmpfs /var/cache/nginx:rw,noexec,nosuid,size=16m,uid=101,gid=101,mode=755 \
+              --tmpfs /var/run:rw,noexec,nosuid,size=4m,uid=101,gid=101,mode=755 \
+              --tmpfs /tmp:rw,noexec,nosuid,size=16m,uid=101,gid=101,mode=1777 \
+              --pids-limit 128 \
+              --user 101:101 \
+              -p 127.0.0.1:3005:8080 \
               --memory 256m --cpus 1.0 \
               --log-driver json-file --log-opt max-size=10m --log-opt max-file=3 \
               "$IMAGE_REF"; then

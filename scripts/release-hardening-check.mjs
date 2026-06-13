@@ -70,7 +70,30 @@ check(dockerfile.includes("nginx:alpine@sha256:8b1e78743a03dbb2c95171cc58639fef2
 check(dockerfile.includes("810fc9652da431eaf8978b85bf4af131605559b5"), "Dockerfile must checkout the audited RFMS/RFMC commit");
 check(dockerfile.includes("npm ci --legacy-peer-deps"), "Dockerfile must use npm ci --legacy-peer-deps");
 check(dockerfile.includes("RFS_COMMIT_SHA") && dockerfile.includes("RFS_IMAGE_REF"), "Dockerfile must pass release metadata into the build");
+check(dockerfile.includes("USER 101:101"), "Dockerfile runtime stage must run nginx as fixed non-root UID/GID 101:101");
+check(dockerfile.includes("COPY --from=builder --chown=101:101 /app/dist"), "Dockerfile must chown static assets for the non-root nginx user");
+check(dockerfile.includes("EXPOSE 8080") && dockerfile.includes("http://127.0.0.1:8080/"), "Dockerfile runtime must expose and healthcheck non-privileged port 8080");
 check(dockerfile.includes("ARG VITE_CESIUM_ION_TOKEN") && dockerfile.includes("VITE_CESIUM_ION_TOKEN=${VITE_CESIUM_ION_TOKEN}"), "Dockerfile must expose VITE_CESIUM_ION_TOKEN to the Vite build");
+
+check(nginx.includes("listen 8080;"), "nginx.conf must listen on non-privileged port 8080");
+check(nginx.includes("client_body_temp_path /tmp/client_temp;") && nginx.includes("proxy_temp_path /tmp/proxy_temp;"), "nginx.conf must put temp paths on tmpfs-compatible /tmp locations");
+
+const hardenedRunFlags = [
+  "--read-only",
+  "--cap-drop ALL",
+  "--security-opt no-new-privileges",
+  "--tmpfs /var/cache/nginx:rw,noexec,nosuid,size=16m,uid=101,gid=101,mode=755",
+  "--tmpfs /var/run:rw,noexec,nosuid,size=4m,uid=101,gid=101,mode=755",
+  "--tmpfs /tmp:rw,noexec,nosuid,size=16m,uid=101,gid=101,mode=1777",
+  "--pids-limit 128",
+  "--user 101:101",
+  "--memory 256m",
+  "--cpus 1.0",
+];
+for (const flag of hardenedRunFlags) {
+  check(ci.includes(flag), `workflow docker runs must include ${flag}`);
+}
+check((ci.match(/127\.0\.0\.1:3005:8080/g) ?? []).length >= 2 && ci.includes("127.0.0.1:3004:8080"), "workflow smoke/deploy runs must map host ports to container port 8080");
 
 check(!/host_key_checking\s*=\s*false/i.test(ansibleCfg), "ansible.cfg must not disable host key checking");
 check(/host_key_checking\s*=\s*true/i.test(ansibleCfg), "ansible.cfg should explicitly enable host key checking");

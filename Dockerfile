@@ -38,9 +38,10 @@ LABEL org.opencontainers.image.title="RFS" \
   org.opencontainers.image.version="${RFS_VERSION}" \
   org.opencontainers.image.source="https://github.com/Reedtrullz/ReedFS" \
   org.opencontainers.image.ref.name="${RFS_IMAGE_REF}"
-COPY --from=builder /app/dist /usr/share/nginx/html
+COPY --from=builder --chown=101:101 /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-  CMD wget -q --spider http://127.0.0.1:80/ || exit 1
-EXPOSE 80
+  CMD wget -q --spider http://127.0.0.1:8080/ || exit 1
+EXPOSE 8080
+USER 101:101
 CMD ["nginx", "-g", "daemon off;"]
