@@ -529,7 +529,7 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
       apState.boeing.altitude = initialAltitudeFt;
 
       useSimStore.getState().setScenario('ksea-tutorial');
-      useSimStore.getState().setInput({
+      const initialControls: BrowserControlInputs = {
         elevator: 0,
         aileron: 0,
         rudder: 0,
@@ -542,7 +542,14 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
         leftBrake: 0,
         rightBrake: 0,
         ...proofSetup.initialControls,
-      });
+      };
+      const seedControls = (controls: BrowserControlInputs): void => {
+        useSimStore.setState({
+          inputs: { ...controls },
+          pilotInputs: { ...controls },
+          effectiveControls: { ...controls },
+        });
+      };
 
       const configureAircraft = (position: { lat: number; lon: number }, headingDeg: number): void => {
         const routeHeadingRad = toRad(headingDeg);
@@ -594,22 +601,14 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
       };
 
       configureAircraft(proofSetup.initialPosition, proofSetup.initialHeadingDeg);
+      seedControls(initialControls);
 
       useSimStore.getState().setFlightPlan(flightPlan);
       if (proofSetup.seedActiveLegIndex !== undefined) {
         useSimStore.setState({ activeLegIndex: proofSetup.seedActiveLegIndex });
       }
       useSimStore.getState().setApState(apState);
-      if (proofSetup.seedActiveLegIndex !== undefined) {
-        useSimStore.getState().setInput({
-          flapLever: proofSetup.initialControls?.flapLever ?? initialFlapSetting,
-          gearLever: proofSetup.initialControls?.gearLever ?? (initialGearDown ? 'DOWN' : 'UP'),
-          brake: proofSetup.initialControls?.brake ?? 0,
-          leftBrake: proofSetup.initialControls?.leftBrake ?? 0,
-          rightBrake: proofSetup.initialControls?.rightBrake ?? 0,
-          spoilers: proofSetup.initialControls?.spoilers ?? 0,
-        });
-      }
+      seedControls(initialControls);
 
       const controlSnapshot = (controls: BrowserControlInputs): RouteProofControlSnapshot => ({
         elevator: controls.elevator,
@@ -890,7 +889,9 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
 
       const runLandingBridge = (): Pick<RouteLandingBridgeProofResult, 'landingApproach' | 'touchdown' | 'rollout' | 'reset'> => {
         const runway = KPDX_RUNWAY_10L;
-        const approachPosition = offsetRunwayPosition(runway, 220, 0);
+        // Stay on the KPDX 10L footprint while remaining just outside the synthetic KPDX
+        // waypoint capture radius so route-complete truth is not hidden by the seed.
+        const approachPosition = offsetRunwayPosition(runway, 1050, 0);
         const headingRad = runway.headingDeg * Math.PI / 180;
         const pitchRad = 2 * Math.PI / 180;
         const approachControls: BrowserControlInputs = {
