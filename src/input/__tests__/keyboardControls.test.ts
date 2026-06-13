@@ -91,6 +91,14 @@ describe('keyboardControls', () => {
     expect(applyDiscreteKeyInput('f', { ...inputs, flapLever: 40 })).toEqual({ flapLever: 0 });
   });
 
+  it('normalizes out-of-detent flap values to the next B737 detent', () => {
+    expect(nextB737FlapDetent(-1)).toBe(0);
+    expect(nextB737FlapDetent(3)).toBe(5);
+    expect(nextB737FlapDetent(5.1)).toBe(10);
+    expect(nextB737FlapDetent(40.1)).toBe(0);
+    expect(nextB737FlapDetent(Number.NaN)).toBe(0);
+  });
+
   it('ignores editable targets and browser shortcut modifiers', () => {
     expect(shouldIgnoreKeyboardEvent(keyboardEventForTarget('w', document.createElement('input')))).toBe(true);
     expect(shouldIgnoreKeyboardEvent(keyboardEventForTarget('f', document.body, { ctrlKey: true }))).toBe(true);

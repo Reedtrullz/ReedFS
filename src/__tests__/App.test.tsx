@@ -110,7 +110,7 @@ vi.mock('../store/simStore', () => {
       quaternion: { q0: 1, q1: 0, q2: 0, q3: 0 },
       velocity: { u: 0, v: 0, w: 0 },
       angularVel: { p: 0, q: 0, r: 0 },
-      config: { flapSetting: 0, gearDown: true, spoilersDeployed: false, speedBrake: 0 },
+      config: { flapSetting: 0, gearDown: true, spoilersDeployed: false, speedBrake: 0, stabilizerTrimUnits: 5 },
       engines: [
         { n1: 0, n2: 0, egt: 0, fuelFlow: 0, thrust: 0, running: false },
         { n1: 0, n2: 0, egt: 0, fuelFlow: 0, thrust: 0, running: false },

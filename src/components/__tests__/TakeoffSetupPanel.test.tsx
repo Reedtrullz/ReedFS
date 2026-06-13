@@ -28,7 +28,7 @@ describe('TakeoffSetupPanel', () => {
     expect(screen.getByText('Throttle 0%')).toBeTruthy();
     expect(screen.getByText('Gear UP')).toBeTruthy();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Flaps Up' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Flaps Next' }));
     fireEvent.click(screen.getByRole('button', { name: 'Trim Nose Up' }));
     fireEvent.click(screen.getByRole('button', { name: 'Throttle Up' }));
     fireEvent.click(screen.getByRole('button', { name: 'Gear' }));

@@ -5,7 +5,7 @@ import { THROTTLE_STEP, TRIM_STEP_UNITS } from '../input/keyboardControls';
 const panelStyle: CSSProperties = {
   position: 'fixed',
   top: 14,
-  left: 360,
+  left: 384,
   zIndex: 110,
   width: 300,
   background: 'rgba(2, 8, 12, 0.82)',
@@ -86,7 +86,7 @@ export function TakeoffSetupPanel() {
 
       <div aria-label="Takeoff setup controls" style={buttonsStyle}>
         <button style={buttonStyle} type="button" onClick={() => applyInputActions({ flapNext: true }, 0)}>
-          Flaps Up
+          Flaps Next
         </button>
         <button style={buttonStyle} type="button" onClick={() => applyInputActions({ trimDelta: TRIM_STEP_UNITS }, 0)}>
           Trim Nose Up
