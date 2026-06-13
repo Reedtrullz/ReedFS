@@ -12,7 +12,22 @@ import { deriveEffectiveAutoflightTruth } from '../../sim/systems/effectiveAutof
 import { computeDerived } from '../../sim/physics/derived';
 import { ktToMs } from '../../sim/physics/units';
 
+function setAirborneRuntime(): void {
+  const aircraft = structuredClone(useSimStore.getState().aircraft);
+  aircraft.position.alt = Math.max(aircraft.position.alt, 5_000);
+  aircraft.ground = {
+    ...aircraft.ground,
+    weightOnWheels: false,
+    aglFt: Math.max(aircraft.ground.aglFt, 1_000),
+    contact: 'none',
+    onRunway: false,
+  };
+  aircraft.flightPhase = 'CRUISE';
+  useSimStore.setState({ aircraft, status: 'running' });
+}
+
 function setVnavBackedKseaRoute(): void {
+  setAirborneRuntime();
   const flightPlan = createKseaKpdxFlight();
   const aircraft = structuredClone(useSimStore.getState().aircraft);
   aircraft.position.lat = 46.97;
@@ -57,6 +72,7 @@ describe('RfsMCP', () => {
   });
 
   it('toggles FD switches independently without clearing active MCP modes', () => {
+    setAirborneRuntime();
     render(<RfsMCP />);
 
     fireEvent.click(screen.getByRole('button', { name: 'HDG' }));
@@ -75,6 +91,7 @@ describe('RfsMCP', () => {
   });
 
   it('lets the player enable PFD Flight Director bars from the MCP controls', () => {
+    setAirborneRuntime();
     const aircraft = structuredClone(useSimStore.getState().aircraft);
     aircraft.position.alt = 9_000;
     aircraft.attitude = { phi: 0, theta: 0, psi: 180 * Math.PI / 180 };
@@ -99,6 +116,7 @@ describe('RfsMCP', () => {
   });
 
   it('first SPD click creates AP state and honestly engages SPEED', () => {
+    setAirborneRuntime();
     render(<RfsMCP />);
 
     fireEvent.click(screen.getByRole('button', { name: 'SPD' }));
@@ -125,6 +143,7 @@ describe('RfsMCP', () => {
   });
 
   it('first N1 click creates AP state and honestly engages N1', () => {
+    setAirborneRuntime();
     render(<RfsMCP />);
 
     fireEvent.click(screen.getByRole('button', { name: 'N1' }));
@@ -139,6 +158,7 @@ describe('RfsMCP', () => {
   });
 
   it('switches between SPD and N1 without leaving conflicting Boeing thrust flags', () => {
+    setAirborneRuntime();
     render(<RfsMCP />);
 
     fireEvent.click(screen.getByRole('button', { name: 'SPD' }));
@@ -158,6 +178,7 @@ describe('RfsMCP', () => {
   });
 
   it('first VS click creates AP state and engages VS with a safe zero-fpm default', () => {
+    setAirborneRuntime();
     render(<RfsMCP />);
 
     fireEvent.click(screen.getByRole('button', { name: 'VS' }));
@@ -260,7 +281,8 @@ describe('RfsMCP', () => {
     expect(useSimStore.getState().apState).toBeNull();
   });
 
-  it('first LNAV click creates AP state when route guidance is available', () => {
+  it('first LNAV click creates AP state when route guidance is available and the aircraft is airborne', () => {
+    setAirborneRuntime();
     useSimStore.setState((s) => ({
       routeStatus: {
         ...s.routeStatus,

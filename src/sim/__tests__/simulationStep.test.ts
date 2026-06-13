@@ -5,8 +5,9 @@ import type { AutopilotCommands, ControlInputs } from '../types';
 import { B737_800_SPEC, createInitialState } from '../types';
 import { buildGuidanceState } from '../guidanceState';
 import { KSEA_TUTORIAL_SCENARIO } from '../scenarios';
-import { createNoRouteStatus } from '../systems/navigation';
+import { computeRouteStatus, createNoRouteStatus } from '../systems/navigation';
 import { resetAutopilotPID } from '../systems/autopilot';
+import { eulerToQuat } from '../physics/quaternion';
 import { advanceSimulationStep, composeControlsSlice } from '../simulationStep';
 
 function tutorialControls(): ControlInputs {
@@ -33,6 +34,19 @@ function turnAnticipationPlan(): FlightPlan {
       { ident: 'ORIG', lat: 47.0, lon: -122.0, discontinuity: false },
       { ident: 'MID', lat: 47.2, lon: -122.0, discontinuity: false },
       { ident: 'DEST', lat: 47.2, lon: -121.8, discontinuity: false },
+    ],
+  };
+}
+
+function finalLegCompletionPlan(): FlightPlan {
+  return {
+    origin: 'ORIG',
+    destination: 'DEST',
+    flightNumber: 'TST125',
+    route: 'ORIG DEST',
+    waypoints: [
+      { ident: 'ORIG', lat: 47.0, lon: -122.0, discontinuity: false },
+      { ident: 'DEST', lat: 47.02, lon: -122.0, discontinuity: false },
     ],
   };
 }
@@ -261,6 +275,59 @@ describe('advanceSimulationStep', () => {
 
     expect(result.apCommands.aileron).toBeGreaterThan(0);
     expect(result.activeLegIndex).toBe(1);
+  });
+
+  it('clears LNAV lateral command ownership in the same tick that completes the final route leg', () => {
+    const aircraft = createInitialState(B737_800_SPEC);
+    aircraft.position = { lat: 47.010, lon: -122.0, alt: 5_000 };
+    aircraft.velocity = { u: 300, v: 0, w: 0 };
+    aircraft.attitude = { phi: 0, theta: 0, psi: 0.1 };
+    aircraft.quaternion = eulerToQuat(aircraft.attitude.phi, aircraft.attitude.theta, aircraft.attitude.psi);
+    aircraft.config.gearDown = false;
+    aircraft.ground = {
+      ...aircraft.ground,
+      weightOnWheels: false,
+      aglFt: 4_500,
+      contact: 'none',
+      onRunway: false,
+    };
+    aircraft.flightPhase = 'CRUISE';
+    const pilotInputs = { ...tutorialControls(), aileron: 0.25, flapLever: 0, gearLever: 'UP' as const };
+    const flightPlan = finalLegCompletionPlan();
+    const apState = lnavAutopilotState();
+    apState.truth.verticalActive = 'OFF';
+    apState.boeing.altHold = false;
+    const routeBeforeTick = computeRouteStatus(aircraft, flightPlan, 0);
+    const guidance = buildGuidanceState({
+      scenario: KSEA_TUTORIAL_SCENARIO,
+      status: 'running',
+      aircraft,
+      controls: pilotInputs,
+    });
+
+    expect(routeBeforeTick.lnavAvailable).toBe(true);
+    expect(routeBeforeTick.routeComplete).toBe(false);
+
+    const result = advanceSimulationStep({
+      aircraft,
+      spec: B737_800_SPEC,
+      pilotInputs,
+      apState,
+      flightPlan,
+      activeLegIndex: 0,
+      routeStatus: routeBeforeTick,
+      wind: null,
+      dt: 1,
+      status: 'running',
+      selectedScenarioId: KSEA_TUTORIAL_SCENARIO.id,
+      guidance,
+    });
+
+    expect(result.routeStatus.routeComplete).toBe(true);
+    expect(result.routeStatus.lnavAvailable).toBe(false);
+    expect(result.apCommands.aileron).toBeUndefined();
+    expect(result.controls.apCommands.aileron).toBeUndefined();
+    expect(result.controls.effectiveControls.aileron).toBe(pilotInputs.aileron);
   });
 
   it('feeds N1 autothrottle commands into effective controls before engine integration', () => {

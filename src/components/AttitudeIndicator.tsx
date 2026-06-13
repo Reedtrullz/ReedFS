@@ -9,6 +9,8 @@ export function AttitudeIndicator() {
   const center = size / 2;
   const pitchDeg = (theta * 180) / Math.PI;
   const pitchOffset = -pitchDeg * 3; // 3px per degree, negative so nose-up = horizon lower
+  const horizonY = center + pitchOffset;
+  const horizonFillY = Math.max(0, Math.min(size, horizonY));
   const rollDeg = (-phi * 180) / Math.PI; // negative phi = right wing down → positive visual roll
 
   return (
@@ -32,15 +34,15 @@ export function AttitudeIndicator() {
         </defs>
         <g clipPath="url(#attClip)" transform={`rotate(${rollDeg}, ${center}, ${center})`}>
           {/* Sky */}
-          <rect x={0} y={0} width={size} height={center + pitchOffset} fill="#3388cc" />
+          <rect x={0} y={0} width={size} height={horizonFillY} fill="#3388cc" />
           {/* Ground */}
-          <rect x={0} y={center + pitchOffset} width={size} height={size} fill="#6b4423" />
+          <rect x={0} y={horizonFillY} width={size} height={size - horizonFillY} fill="#6b4423" />
           {/* Horizon line */}
-          <line x1={10} y1={center + pitchOffset} x2={size - 10} y2={center + pitchOffset}
+          <line x1={10} y1={horizonY} x2={size - 10} y2={horizonY}
             stroke="#fff" strokeWidth={2} />
           {/* Pitch marks: every 10 degrees */}
           {[-20, -10, 10, 20].map((deg) => {
-            const y = center + pitchOffset - deg * 3;
+            const y = horizonY - deg * 3;
             const w = deg % 20 === 0 ? 30 : 15;
             return (
               <g key={deg}>

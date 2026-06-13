@@ -115,6 +115,15 @@ test.describe('RFS truth-flow browser proof', () => {
     expect(kseaSnapshot.lnavAvailable).toBe(true);
     expectFmaOff(kseaSnapshot);
 
+    await page.getByRole('button', { name: /^LNAV$/ }).click();
+    await expect(page.getByLabel('Primary flight display').getByText('LNAV')).toHaveCount(0);
+
+    const stoppedLnavSnapshot = await readTruthSnapshot(page);
+    expect(stoppedLnavSnapshot.status).toBe('stopped');
+    expect(stoppedLnavSnapshot.weightOnWheels).toBe(true);
+    expect(stoppedLnavSnapshot.guidancePhase).toBe('preflight');
+    expectFmaOff(stoppedLnavSnapshot);
+
     await page.getByRole('button', { name: 'START ROLL' }).click();
     await page.keyboard.press('G');
 

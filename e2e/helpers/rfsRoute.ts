@@ -198,7 +198,7 @@ const SECOND_SEQUENCE_FRAMES = 60 * 8;
 const ROUTE_SAMPLE_INTERVAL_FRAMES = 300;
 const SEQUENCE_SAMPLE_INTERVAL_FRAMES = 30;
 
-export async function loadKseaRouteAndSelectAutomationThroughUi(page: Page): Promise<void> {
+export async function loadKseaRouteAndVerifyStoppedAutomationGatingThroughUi(page: Page): Promise<void> {
   await page.getByLabel('Scenario', { exact: true }).selectOption('ksea-tutorial');
   await page.getByRole('button', { name: /^LOAD PLAN$/ }).click();
 
@@ -213,8 +213,8 @@ export async function loadKseaRouteAndSelectAutomationThroughUi(page: Page): Pro
   await page.getByRole('button', { name: /^SPD$/ }).click();
 
   const primaryFlightDisplay = page.getByLabel('Primary flight display');
-  await expect(primaryFlightDisplay.getByText('LNAV')).toBeVisible();
-  await expect(primaryFlightDisplay.getByText('SPEED')).toBeVisible();
+  await expect(primaryFlightDisplay.getByText('LNAV')).toHaveCount(0);
+  await expect(primaryFlightDisplay.getByText('SPEED')).toHaveCount(0);
 }
 
 const KSEA_ROUTE_PROOF: RouteProofSetup = {

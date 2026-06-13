@@ -10,24 +10,14 @@ import {
   flyKseaRouteThroughMultiGateProgression,
   flyKseaRouteThroughSecondSequence,
   flyKseaRouteWithLnav,
-  loadKseaRouteAndSelectAutomationThroughUi,
+  loadKseaRouteAndVerifyStoppedAutomationGatingThroughUi,
 } from './helpers/rfsRoute';
 
 test.describe('RFS route and LNAV browser proof', () => {
-  test('KSEA route is loaded and AP modes are selected through visible controls', async ({ page }) => {
+  test('KSEA route is loaded and stopped AP mode clicks remain gated through visible controls', async ({ page }) => {
     await openRfs(page);
 
-    await loadKseaRouteAndSelectAutomationThroughUi(page);
-
-    const routeStatus = page.getByLabel('Route status');
-    await expect(routeStatus.getByText('KSEA→KPDX')).toBeVisible();
-    await expect(routeStatus.getByText(/LEG\s+1\/3/)).toBeVisible();
-    await expect(routeStatus.getByText('KSEA → OLM')).toBeVisible();
-    await expect(routeStatus.getByText('DTG')).toBeVisible();
-
-    const primaryFlightDisplay = page.getByLabel('Primary flight display');
-    await expect(primaryFlightDisplay.getByText('LNAV')).toBeVisible();
-    await expect(primaryFlightDisplay.getByText('SPEED')).toBeVisible();
+    await loadKseaRouteAndVerifyStoppedAutomationGatingThroughUi(page);
   });
 
   test('KSEA sample route loads, enables LNAV, and decreases DTG while flying', async ({ page }) => {

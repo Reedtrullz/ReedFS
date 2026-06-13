@@ -116,6 +116,10 @@ function applyMcpTargetDelta(apState: AutopilotState, target: McpTarget, delta: 
   }
 }
 
+function canEngageMcpCommand(state: ReturnType<typeof useSimStore.getState>): boolean {
+  return state.status === 'running' && !state.aircraft.ground.weightOnWheels;
+}
+
 function toggleFlightDirectorSwitch(apState: AutopilotState, side: FlightDirectorSide): void {
   if (side === 'left') {
     apState.boeing.fdLeft = !apState.boeing.fdLeft;
@@ -175,6 +179,7 @@ export function RfsMCP() {
 
   const toggleMode = (mode: EnabledMcpMode) => {
     const state = useSimStore.getState();
+    if (mode !== 'OFF' && !canEngageMcpCommand(state)) return;
     if (mode === 'LNAV' && !state.routeStatus.lnavAvailable) return;
     if (mode === 'VNAV' && deriveBackedVnavMode(state.apState, state) === 'OFF') return;
     const current = state.apState;

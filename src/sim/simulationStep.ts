@@ -138,13 +138,19 @@ export function advanceSimulationStep(input: SimulationStepInput): SimulationSte
       input.wind,
     )
     : {};
-  const controls = composeControlsSlice(input.pilotInputs, apCommands, input.apState, truthContext);
+  const controlsForIntegration = composeControlsSlice(input.pilotInputs, apCommands, input.apState, truthContext);
 
-  integrate(state, controls.effectiveControls, input.spec, input.dt, input.wind);
+  integrate(state, controlsForIntegration.effectiveControls, input.spec, input.dt, input.wind);
 
   const routeStatus = input.flightPlan
     ? computeRouteStatus(state, input.flightPlan, routeBeforeTick.activeLegIndex)
     : createNoRouteStatus();
+  const committedTruthContext: EffectiveAutoflightTruthContext = {
+    aircraft: state,
+    flightPlan: input.flightPlan,
+    routeStatus,
+  };
+  const controls = composeControlsSlice(input.pilotInputs, apCommands, input.apState, committedTruthContext);
   const scenario = scenarioById(input.selectedScenarioId);
 
   return {
