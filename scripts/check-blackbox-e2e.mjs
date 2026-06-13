@@ -5,7 +5,9 @@ import { fileURLToPath } from 'node:url';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const realRepoRoot = fs.realpathSync(repoRoot);
-const entrypoint = path.join(repoRoot, 'e2e/rfs-blackbox-player-loop.spec.ts');
+const e2eRoot = path.join(repoRoot, 'e2e');
+const realE2eRoot = fs.realpathSync(e2eRoot);
+const entrypoint = path.join(e2eRoot, 'rfs-blackbox-player-loop.spec.ts');
 const allowedExternalImports = new Set(['@playwright/test']);
 const importLikePattern = /(?:import|export)\s+(?:type\s+)?(?:[^'";]*?\s+from\s+)?['"]([^'"]+)['"]|import\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
 
@@ -89,6 +91,13 @@ function assertE2eLocal(filePath, fromFile, specifier) {
     failures.push(`${toRepoPath(fromFile)} imports ${specifier}, which resolves outside e2e/ black-box helpers`);
     return false;
   }
+
+  const realPath = fs.realpathSync(filePath);
+  if (!isWithinDirectory(realPath, realE2eRoot)) {
+    failures.push(`${toRepoPath(fromFile)} imports ${specifier}, whose real path resolves outside e2e/ black-box helpers`);
+    return false;
+  }
+
   return true;
 }
 
