@@ -157,6 +157,48 @@ describe('integrate', () => {
     expect(state.config.stabilizerTrimUnits).toBeLessThanOrEqual(6);
   });
 
+  it('below VR neutral elevator keeps ground-roll pitch bounded with nose gear loaded', () => {
+    const state = createAircraftStateForScenario(B737_800_SPEC, KSEA_TUTORIAL_SCENARIO);
+    state.flightPhase = 'TAKEOFF';
+    state.position.alt = KSEA_RUNWAY_ALT_FT;
+    state.velocity.u = ktToMs(89);
+    state.velocity.w = 0;
+    setAttitude(state, { ...state.attitude, theta: degToRad(6.7) });
+
+    integrate(state, { ...idle, throttle1: 1, throttle2: 1, flapLever: 5 }, B737_800_SPEC, 1 / 60);
+
+    const nose = state.ground.gearStations.find((station) => station.id === 'nose');
+    expect(state.ground.weightOnWheels).toBe(true);
+    expect(state.attitude.theta).toBeLessThanOrEqual(degToRad(3));
+    expect(nose?.weightOnWheel).toBe(true);
+    expect(nose?.normalForceN ?? 0).toBeGreaterThan(0);
+    expect(state.ground).toEqual(expect.objectContaining({ tailstrike: false }));
+  });
+
+  it('at and after VR elevator input permits main-gear pivot and liftoff without immediate tailstrike', () => {
+    const state = runFixedStepScenario({ hz: 120, seconds: 30 });
+    state.flightPhase = 'TAKEOFF';
+    const rotateInputs: ControlInputs = {
+      ...takeoffRollInputs(),
+      ...computeHeldKeyInputs(new Set(['w'])),
+    };
+
+    let minNoseLoadFraction = Number.POSITIVE_INFINITY;
+
+    for (let i = 0; i < 3 * 120 && state.ground.weightOnWheels; i += 1) {
+      integrate(state, rotateInputs, B737_800_SPEC, 1 / 120);
+      if (state.ground.contact !== 'gear' || state.ground.normalForceN <= 0) continue;
+      const nose = state.ground.gearStations.find((station) => station.id === 'nose');
+      minNoseLoadFraction = Math.min(minNoseLoadFraction, (nose?.normalForceN ?? 0) / state.ground.normalForceN);
+      expect(state.ground).toEqual(expect.objectContaining({ tailstrike: false }));
+    }
+
+    expect(minNoseLoadFraction).toBeLessThan(0.05);
+    expect(state.ground.weightOnWheels).toBe(false);
+    expect(state.position.alt).toBeGreaterThan(KSEA_RUNWAY_ALT_FT);
+    expect(state.ground).toEqual(expect.objectContaining({ tailstrike: false }));
+  });
+
   it('takeoff trim creates a stronger hands-off nose-up pitch tendency than zero trim', () => {
     const untrimmed = airborneTakeoffConfigState(0);
     const trimmed = airborneTakeoffConfigState(KSEA_TUTORIAL_SCENARIO.stabilizerTrimUnits);

@@ -1,4 +1,4 @@
-import type { AircraftState, ControlInputs, GearStationState, GroundContactType, GroundState } from '../types';
+import type { AircraftState, BodyStationPosition, ControlInputs, GearStationState, GroundContactType, GroundState } from '../types';
 import { createB737GearStations } from '../types';
 import { bodyToNed, nedToBody } from '../physics/frames';
 import { eulerToQuat } from '../physics/quaternion';
@@ -12,6 +12,19 @@ export const KSEA_RUNWAY_ALT_FT = 432;
 export const GROUND_CONTACT_EPSILON_FT = 0.5;
 const G = 9.80665;
 const FT_TO_M = 0.3048;
+const KT_TO_MPS = 0.514444444;
+const PRE_ROTATION_MAX_PITCH_RAD = 3 * Math.PI / 180;
+const MAIN_GEAR_PIVOT_MAX_PITCH_RAD = 10.5 * Math.PI / 180;
+const MAIN_GEAR_PIVOT_MIN_SPEED_MPS = 125 * KT_TO_MPS;
+const MAIN_GEAR_PIVOT_ELEVATOR = -0.2;
+const TAIL_CONTACT_POINT_BODY_M: BodyStationPosition = {
+  // Gameplay placeholder tail-skid point: aft/lower tail cone in body axes.
+  // Combined with the current main-gear stations this yields a ~12.5° tailstrike
+  // clearance envelope without hard-coding the strike check itself.
+  x: -20.0,
+  y: 0,
+  z: -1.37,
+};
 
 export const B737_GROUND_MODEL: GroundModelData = B737_800_FDM.ground;
 
@@ -22,6 +35,8 @@ export interface GroundContactOptions {
   allowLiftoff?: boolean;
   surface?: GroundSurfaceSample;
   groundModel?: GroundModelData;
+  airRelativeSpeedMps?: number;
+  rotationReferenceSpeedMps?: number;
 }
 
 export interface GroundRollForceBreakdown {
@@ -145,6 +160,7 @@ function setGroundState(
   gearStationsOverride?: GearStationState[],
   touchdownSinkRateMps?: number,
   onRunway = contact !== 'none',
+  tailstrike = false,
 ): GroundState {
   const aglFt = Math.max(0, state.position.alt - groundAltFt);
   const gearStations = gearStationsOverride ?? createB737GearStations(
@@ -164,6 +180,7 @@ function setGroundState(
     lastTouchdownSinkRateMps,
     onRunway: contact !== 'none' && onRunway,
     contact,
+    tailstrike,
     gearStations,
   };
   state.ground = ground;
@@ -506,19 +523,106 @@ function applyLongitudinalGroundDecel(
   }
 }
 
-function stabilizeGroundAttitude(state: AircraftState, groundModel: GroundModelData = B737_GROUND_MODEL): void {
-  const clampedPhi = Math.max(-groundModel.attitude.maxGroundRollRad, Math.min(groundModel.attitude.maxGroundRollRad, state.attitude.phi));
-  const clampedTheta = Math.max(groundModel.attitude.minGroundPitchRad, Math.min(groundModel.attitude.maxGroundPitchRad, state.attitude.theta));
+function stationCompressionM(station: GearStationState, normalForceN: number): number {
+  if (normalForceN <= 0) return 0;
+  return clamp(normalForceN / station.springStiffnessNPerM, 0, station.maxCompressionM);
+}
 
-  if (clampedPhi === state.attitude.phi && clampedTheta === state.attitude.theta) {
-    return;
+function groundSpeedMps(state: AircraftState): number {
+  return Math.hypot(state.velocity.u, state.velocity.v);
+}
+
+function mainGearPivotReference(gearStations: GearStationState[]): BodyStationPosition | undefined {
+  const mains = gearStations.filter((station) => station.id === 'leftMain' || station.id === 'rightMain');
+  if (mains.length === 0) return undefined;
+
+  return {
+    x: mains.reduce((sum, station) => sum + station.positionBodyM.x, 0) / mains.length,
+    y: mains.reduce((sum, station) => sum + station.positionBodyM.y, 0) / mains.length,
+    z: mains.reduce((sum, station) => sum + station.positionBodyM.z, 0) / mains.length,
+  };
+}
+
+function pitchPlaneDownM(position: BodyStationPosition, pitchRad: number): number {
+  return -Math.sin(pitchRad) * position.x + Math.cos(pitchRad) * position.z;
+}
+
+function tailClearanceAboveMainGearPlaneM(gearStations: GearStationState[], pitchRad: number): number {
+  const mainReference = mainGearPivotReference(gearStations);
+  if (!mainReference) return Number.POSITIVE_INFINITY;
+  return pitchPlaneDownM(mainReference, pitchRad) - pitchPlaneDownM(TAIL_CONTACT_POINT_BODY_M, pitchRad);
+}
+
+function tailstrikePitchLimitRad(gearStations: GearStationState[]): number {
+  const mainReference = mainGearPivotReference(gearStations);
+  if (!mainReference) return MAIN_GEAR_PIVOT_MAX_PITCH_RAD;
+  const longitudinalArmM = Math.max(1, mainReference.x - TAIL_CONTACT_POINT_BODY_M.x);
+  const verticalArmM = Math.max(0, mainReference.z - TAIL_CONTACT_POINT_BODY_M.z);
+  return Math.atan2(verticalArmM, longitudinalArmM);
+}
+
+function noseGearPitchMomentAboutMainGearNm(gearStations: GearStationState[]): number {
+  const mainReference = mainGearPivotReference(gearStations);
+  const nose = gearStations.find((station) => station.id === 'nose');
+  if (!mainReference || !nose || nose.normalForceN <= 0) return 0;
+  return Math.max(0, (nose.positionBodyM.x - mainReference.x) * nose.normalForceN);
+}
+
+function allowsMainGearPivot(state: AircraftState, inputs: ControlInputs, options: GroundContactOptions): boolean {
+  const rotationSpeedMps = options.rotationReferenceSpeedMps ?? MAIN_GEAR_PIVOT_MIN_SPEED_MPS;
+  const airspeedMps = options.airRelativeSpeedMps ?? groundSpeedMps(state);
+  return airspeedMps >= rotationSpeedMps && inputs.elevator <= MAIN_GEAR_PIVOT_ELEVATOR;
+}
+
+function redistributeForMainGearPivot(gearStations: GearStationState[], allowMainGearPivot: boolean): GearStationState[] {
+  if (!allowMainGearPivot) return gearStations;
+  const nose = gearStations.find((station) => station.id === 'nose');
+  const mains = gearStations.filter((station) => station.id === 'leftMain' || station.id === 'rightMain');
+  const mainReference = mainGearPivotReference(gearStations);
+  if (!nose || mains.length === 0 || !mainReference || nose.normalForceN <= 0) return gearStations;
+
+  const noseMomentNm = noseGearPitchMomentAboutMainGearNm(gearStations);
+  const noseMomentArmM = Math.max(1, nose.positionBodyM.x - mainReference.x);
+  const noseUnloadN = Math.min(nose.normalForceN, noseMomentNm / noseMomentArmM);
+  const mainLoadGainN = noseUnloadN / mains.length;
+  return gearStations.map((station) => {
+    const normalForceN = station.id === 'nose'
+      ? Math.max(0, station.normalForceN - noseUnloadN)
+      : station.id === 'leftMain' || station.id === 'rightMain'
+        ? station.normalForceN + mainLoadGainN
+        : station.normalForceN;
+    return {
+      ...station,
+      normalForceN,
+      compressionM: stationCompressionM(station, normalForceN),
+      weightOnWheel: normalForceN > 1,
+    };
+  });
+}
+
+function stabilizeGroundAttitude(
+  state: AircraftState,
+  allowMainGearPivot: boolean,
+  gearStations: GearStationState[],
+  groundModel: GroundModelData = B737_GROUND_MODEL,
+): boolean {
+  const clampedPhi = Math.max(-groundModel.attitude.maxGroundRollRad, Math.min(groundModel.attitude.maxGroundRollRad, state.attitude.phi));
+  const tailstrike = tailClearanceAboveMainGearPlaneM(gearStations, state.attitude.theta) <= 0;
+  const pivotPitchLimitRad = Math.min(MAIN_GEAR_PIVOT_MAX_PITCH_RAD, tailstrikePitchLimitRad(gearStations));
+  const maxPitch = allowMainGearPivot
+    ? Math.min(groundModel.attitude.maxGroundPitchRad, pivotPitchLimitRad)
+    : Math.min(groundModel.attitude.maxGroundPitchRad, PRE_ROTATION_MAX_PITCH_RAD);
+  const clampedTheta = Math.max(groundModel.attitude.minGroundPitchRad, Math.min(maxPitch, state.attitude.theta));
+
+  if (clampedPhi !== state.attitude.phi || clampedTheta !== state.attitude.theta) {
+    state.attitude.phi = clampedPhi;
+    state.attitude.theta = clampedTheta;
+    state.angularVel.p = 0;
+    state.angularVel.q = 0;
+    state.quaternion = eulerToQuat(clampedPhi, clampedTheta, state.attitude.psi);
   }
 
-  state.attitude.phi = clampedPhi;
-  state.attitude.theta = clampedTheta;
-  state.angularVel.p = 0;
-  state.angularVel.q = 0;
-  state.quaternion = eulerToQuat(clampedPhi, clampedTheta, state.attitude.psi);
+  return tailstrike;
 }
 
 export function applyGroundContact(
@@ -578,7 +682,9 @@ export function applyGroundContact(
   state.position.alt = groundAltFt;
   state.config.gearDown = true;
 
-  stabilizeGroundAttitude(state, groundModel);
+  const allowMainGearPivot = allowsMainGearPivot(state, inputs, options);
+  const tailstrike = stabilizeGroundAttitude(state, allowMainGearPivot, loadedGearStations, groundModel);
+  loadedGearStations = redistributeForMainGearPivot(loadedGearStations, allowMainGearPivot);
   applyTouchdownDamping(state, touchdownSinkRateMps ?? 0, groundModel);
   loadedGearStations = applyNosewheelSteering(state, inputs, loadedGearStations, groundModel);
   applyTireSideForces(state, dt, loadedGearStations, options.surface, groundModel);
@@ -594,5 +700,6 @@ export function applyGroundContact(
     loadedGearStations,
     touchdownSinkRateMps,
     surfaceOnRunway,
+    tailstrike,
   );
 }

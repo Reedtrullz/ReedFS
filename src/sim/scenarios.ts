@@ -244,6 +244,7 @@ export function createAircraftStateForScenario(spec: AircraftSpec, scenario: Fli
     lastTouchdownSinkRateMps: 0,
     onRunway: true,
     contact: 'gear',
+    tailstrike: false,
     gearStations: createB737GearStations(grossWeight * 9.80665, true),
   };
   state.flightPhase = 'PARKED';

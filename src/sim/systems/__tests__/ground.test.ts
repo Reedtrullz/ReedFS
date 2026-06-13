@@ -16,6 +16,9 @@ import { bodyToNed, nedToBody } from '../../physics/frames';
 import { eulerToQuat } from '../../physics/quaternion';
 import { KSEA_RUNWAY_16L } from '../../../viewport/runwayData';
 import { sampleKseaSurface } from '../../runwaySurface';
+import { ktToMs } from '../../physics/units';
+
+const DEG_TO_RAD = Math.PI / 180;
 
 const idle: ControlInputs = {
   elevator: 0,
@@ -87,6 +90,96 @@ describe('applyGroundContact', () => {
     expect(contact.gearStations.every((station) => station.weightOnWheel)).toBe(true);
     expect(contact.gearStations.map((station) => station.normalForceN)).toEqual([12_000, 54_000, 54_000]);
     expect(contact.gearStations.reduce((sum, station) => sum + station.normalForceN, 0)).toBeCloseTo(120_000, 6);
+  });
+
+  it('keeps nose gear loaded and clamps pitch below VR with neutral elevator', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.position.alt = KSEA_RUNWAY_ALT_FT;
+    state.velocity.u = ktToMs(89);
+    state.attitude.theta = 6.7 * DEG_TO_RAD;
+    state.quaternion = eulerToQuat(state.attitude.phi, state.attitude.theta, state.attitude.psi);
+    state.config.gearDown = true;
+
+    const contact = applyGroundContact(state, idle, 1 / 60, KSEA_RUNWAY_ALT_FT);
+    const nose = contact.gearStations.find((station) => station.id === 'nose');
+
+    expect(state.attitude.theta).toBeLessThanOrEqual(3 * DEG_TO_RAD);
+    expect(nose?.weightOnWheel).toBe(true);
+    expect(nose?.normalForceN ?? 0).toBeGreaterThan(0);
+    expect(contact).toEqual(expect.objectContaining({ tailstrike: false }));
+  });
+
+  it('permits main-gear pivot after VR with elevator intent and unloads the nose gear', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.position.alt = KSEA_RUNWAY_ALT_FT;
+    state.velocity.u = ktToMs(150);
+    state.attitude.theta = 8 * DEG_TO_RAD;
+    state.quaternion = eulerToQuat(state.attitude.phi, state.attitude.theta, state.attitude.psi);
+    state.config.gearDown = true;
+
+    const contact = applyGroundContact(state, { ...idle, elevator: -1 }, 1 / 60, KSEA_RUNWAY_ALT_FT);
+    const nose = contact.gearStations.find((station) => station.id === 'nose');
+    const mains = contact.gearStations.filter((station) => station.id === 'leftMain' || station.id === 'rightMain');
+
+    expect(state.attitude.theta).toBeGreaterThanOrEqual(7.5 * DEG_TO_RAD);
+    expect(nose?.normalForceN ?? 0).toBeLessThan(contact.normalForceN * 0.03);
+    expect(mains.every((station) => station.weightOnWheel && station.normalForceN > 0)).toBe(true);
+    expect(contact).toEqual(expect.objectContaining({ tailstrike: false }));
+  });
+
+  it('uses air-relative rotation reference speed instead of fixed ground speed for pivot gating', () => {
+    const heavyLike = createInitialState(B737_800_SPEC);
+    heavyLike.position.alt = KSEA_RUNWAY_ALT_FT;
+    heavyLike.velocity.u = ktToMs(150);
+    heavyLike.attitude.theta = 8 * DEG_TO_RAD;
+    heavyLike.quaternion = eulerToQuat(heavyLike.attitude.phi, heavyLike.attitude.theta, heavyLike.attitude.psi);
+    heavyLike.config.gearDown = true;
+
+    const blocked = applyGroundContact(
+      heavyLike,
+      { ...idle, elevator: -1 },
+      1 / 60,
+      KSEA_RUNWAY_ALT_FT,
+      { airRelativeSpeedMps: ktToMs(150), rotationReferenceSpeedMps: ktToMs(170) },
+    );
+    const blockedNose = blocked.gearStations.find((station) => station.id === 'nose');
+
+    expect(heavyLike.attitude.theta).toBeLessThanOrEqual(3 * DEG_TO_RAD);
+    expect(blockedNose?.normalForceN ?? 0).toBeGreaterThan(0);
+
+    const headwindLike = createInitialState(B737_800_SPEC);
+    headwindLike.position.alt = KSEA_RUNWAY_ALT_FT;
+    headwindLike.velocity.u = ktToMs(110);
+    headwindLike.attitude.theta = 8 * DEG_TO_RAD;
+    headwindLike.quaternion = eulerToQuat(headwindLike.attitude.phi, headwindLike.attitude.theta, headwindLike.attitude.psi);
+    headwindLike.config.gearDown = true;
+
+    const pivot = applyGroundContact(
+      headwindLike,
+      { ...idle, elevator: -1 },
+      1 / 60,
+      KSEA_RUNWAY_ALT_FT,
+      { airRelativeSpeedMps: ktToMs(150), rotationReferenceSpeedMps: ktToMs(149) },
+    );
+    const pivotNose = pivot.gearStations.find((station) => station.id === 'nose');
+
+    expect(headwindLike.attitude.theta).toBeGreaterThanOrEqual(7.5 * DEG_TO_RAD);
+    expect(pivotNose?.normalForceN ?? 0).toBeLessThan(pivot.normalForceN * 0.03);
+  });
+
+  it('flags tailstrike explicitly instead of treating high-pitch ground contact as normal VR rotation', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.position.alt = KSEA_RUNWAY_ALT_FT;
+    state.velocity.u = ktToMs(150);
+    state.attitude.theta = 15 * DEG_TO_RAD;
+    state.quaternion = eulerToQuat(state.attitude.phi, state.attitude.theta, state.attitude.psi);
+    state.config.gearDown = true;
+
+    const contact = applyGroundContact(state, { ...idle, elevator: -1 }, 1 / 60, KSEA_RUNWAY_ALT_FT);
+
+    expect(contact.contact).toBe('gear');
+    expect(contact).toEqual(expect.objectContaining({ tailstrike: true }));
+    expect(state.attitude.theta).toBeLessThanOrEqual(12.5 * DEG_TO_RAD);
   });
 
   it('computes oleo spring load from runway penetration', () => {

@@ -79,7 +79,10 @@ export const B737_800_FDM: VersionedAircraftFdmData = {
     stabilizerTrim: {
       minUnits: 0,
       maxUnits: 15,
-      cmPerUnit: 0.012,
+      // Slightly below the migrated placeholder value to keep the VR-gated ENVA
+      // tutorial climb inside the bounded manual initial-climb envelope after
+      // ground-contact liftoff no longer releases early below VR.
+      cmPerUnit: 0.01135,
     },
     sideForce: {
       cyBeta: -0.9,

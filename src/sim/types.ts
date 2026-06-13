@@ -76,6 +76,7 @@ export interface GroundState {
   lastTouchdownSinkRateMps: number;
   onRunway: boolean;
   contact: GroundContactType;
+  tailstrike: boolean;
   gearStations: GearStationState[];
 }
 
@@ -265,6 +266,7 @@ export function createInitialState(spec: AircraftSpec): AircraftState {
       lastTouchdownSinkRateMps: 0,
       onRunway: true,
       contact: 'gear',
+      tailstrike: false,
       gearStations: createB737GearStations(grossWeight * 9.80665, true),
     },
     simTime: 0,

@@ -11,15 +11,21 @@ import { ftToM, ktToMs, mToFt } from './units';
 import { quatDerivative, quatNormalize, quatToEuler } from './quaternion';
 import type { WindInfo } from '../weather';
 import { sampleSupportedAirportSurface } from '../runwaySurface';
+import { computeAirRelativeVelocity } from '../systems/environment';
 
 const G = 9.80665;
 const TAKEOFF_ASSIST_MIN_HEIGHT_FT = 50;
 // Release only when the gear is almost unloaded and the aircraft has both
 // plausible 737 takeoff energy and a positive rotation attitude. This prevents
 // fake liftoff from pitch projection or low-speed over-rotation.
-const LIFTOFF_NORMAL_FORCE_FRACTION = 0.08;
-const MIN_LIFTOFF_SPEED_MPS = ktToMs(125);
+const LIFTOFF_NORMAL_FORCE_FRACTION = 0.14;
 const MIN_LIFTOFF_PITCH_RAD = 3 * Math.PI / 180;
+const LIGHT_LIFTOFF_REFERENCE_WEIGHT_KG = 50_000;
+const MEDIUM_LIFTOFF_REFERENCE_WEIGHT_KG = 62_000;
+const HEAVY_LIFTOFF_REFERENCE_WEIGHT_KG = 78_000;
+const LIGHT_LIFTOFF_REFERENCE_SPEED_KT = 137;
+const MEDIUM_LIFTOFF_REFERENCE_SPEED_KT = 149;
+const HEAVY_LIFTOFF_REFERENCE_SPEED_KT = 170;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
@@ -49,11 +55,36 @@ function estimateNormalForceN(state: AircraftState, aero: { lift: number; thrust
   return clamp(aero.weight - aero.lift - verticalThrustN, 0, aero.weight);
 }
 
-function shouldAllowLiftoff(state: AircraftState, normalForceN: number, weightN: number): boolean {
-  const speedMps = Math.hypot(state.velocity.u, state.velocity.v, state.velocity.w);
+function estimateMinimumLiftoffSpeedMps(state: AircraftState): number {
+  const grossWeightKg = Math.max(0, state.grossWeight);
+  if (grossWeightKg <= MEDIUM_LIFTOFF_REFERENCE_WEIGHT_KG) {
+    const fraction = clamp(
+      (grossWeightKg - LIGHT_LIFTOFF_REFERENCE_WEIGHT_KG)
+        / (MEDIUM_LIFTOFF_REFERENCE_WEIGHT_KG - LIGHT_LIFTOFF_REFERENCE_WEIGHT_KG),
+      0,
+      1,
+    );
+    return ktToMs(LIGHT_LIFTOFF_REFERENCE_SPEED_KT + fraction * (MEDIUM_LIFTOFF_REFERENCE_SPEED_KT - LIGHT_LIFTOFF_REFERENCE_SPEED_KT));
+  }
+
+  const fraction = clamp(
+    (grossWeightKg - MEDIUM_LIFTOFF_REFERENCE_WEIGHT_KG)
+      / (HEAVY_LIFTOFF_REFERENCE_WEIGHT_KG - MEDIUM_LIFTOFF_REFERENCE_WEIGHT_KG),
+    0,
+    1,
+  );
+  return ktToMs(MEDIUM_LIFTOFF_REFERENCE_SPEED_KT + fraction * (HEAVY_LIFTOFF_REFERENCE_SPEED_KT - MEDIUM_LIFTOFF_REFERENCE_SPEED_KT));
+}
+
+function airRelativeSpeedMps(state: AircraftState, wind: WindInfo | null): number {
+  const airRelativeVelocity = computeAirRelativeVelocity(state, wind);
+  return Math.hypot(airRelativeVelocity.u, airRelativeVelocity.v, airRelativeVelocity.w);
+}
+
+function shouldAllowLiftoff(state: AircraftState, airspeedMps: number, normalForceN: number, weightN: number): boolean {
   return (
     normalForceN <= weightN * LIFTOFF_NORMAL_FORCE_FRACTION &&
-    speedMps >= MIN_LIFTOFF_SPEED_MPS &&
+    airspeedMps >= estimateMinimumLiftoffSpeedMps(state) &&
     state.attitude.theta >= MIN_LIFTOFF_PITCH_RAD
   );
 }
@@ -131,7 +162,11 @@ export function integrate(
   const preIntegrationSurface = sampleSupportedAirportSurface(state.position);
   const nearRunwaySurface = state.position.alt <= preIntegrationSurface.groundAltFt + GROUND_CONTACT_EPSILON_FT;
   const normalForceN = nearRunwaySurface ? estimateNormalForceN(state, aero) : 0;
-  const allowLiftoff = state.ground.weightOnWheels && nearRunwaySurface && shouldAllowLiftoff(state, normalForceN, aero.weight);
+  const airspeedMps = airRelativeSpeedMps(state, wind ?? null);
+  const rotationReferenceSpeedMps = estimateMinimumLiftoffSpeedMps(state);
+  const allowLiftoff = state.ground.weightOnWheels
+    && nearRunwaySurface
+    && shouldAllowLiftoff(state, airspeedMps, normalForceN, aero.weight);
 
   if (state.ground.weightOnWheels && nearRunwaySurface && !allowLiftoff) {
     constrainRunwayNormalVelocity(state);
@@ -171,6 +206,8 @@ export function integrate(
     allowLiftoff,
     normalForceN,
     surface: groundSurface,
+    airRelativeSpeedMps: airspeedMps,
+    rotationReferenceSpeedMps,
   });
 
   // ── Config ──
