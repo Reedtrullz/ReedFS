@@ -105,6 +105,7 @@ jobs:
             RFS_COMMIT_SHA=${{ github.sha }}
             RFS_IMAGE_REF=ghcr.io/reedtrullz/rfs:sha-${{ github.sha }}
             RFS_VERSION=${{ github.sha }}
+            VITE_CESIUM_ION_TOKEN=${{ secrets.VITE_CESIUM_ION_TOKEN }}
           labels: |
             org.opencontainers.image.title=RFS
             org.opencontainers.image.description=Reidar Flight Simulator web app

@@ -4,6 +4,7 @@ ARG RFS_COMMIT_SHA=unknown
 ARG RFS_IMAGE_REF=unknown
 ARG RFS_IMAGE_DIGEST=unknown
 ARG RFS_VERSION=0.0.0
+ARG VITE_CESIUM_ION_TOKEN=
 
 # Clone RFMS for shared/ types (needed by RFS @shared imports) at the audited RFMC/RFMS commit.
 RUN apk add --no-cache git
@@ -23,7 +24,8 @@ COPY . .
 ENV RFS_COMMIT_SHA=${RFS_COMMIT_SHA} \
   RFS_IMAGE_REF=${RFS_IMAGE_REF} \
   RFS_IMAGE_DIGEST=${RFS_IMAGE_DIGEST} \
-  RFS_VERSION=${RFS_VERSION}
+  RFS_VERSION=${RFS_VERSION} \
+  VITE_CESIUM_ION_TOKEN=${VITE_CESIUM_ION_TOKEN}
 RUN npm run build
 
 FROM nginx:alpine@sha256:8b1e78743a03dbb2c95171cc58639fef29abc8816598e27fb910ed2e621e589a

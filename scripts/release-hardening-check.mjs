@@ -48,6 +48,7 @@ check(ci.includes("pull-requests: read"), "gitleaks job must have pull-requests 
 check(ci.includes("810fc9652da431eaf8978b85bf4af131605559b5"), "workflow must pin RFMS/RFMC checkout to the audited commit");
 check((ci.match(/npm ci --legacy-peer-deps/g) ?? []).length >= 2, "workflow must use npm ci --legacy-peer-deps");
 check(ci.includes("ghcr.io/reedtrullz/rfs:latest") && ci.includes("ghcr.io/reedtrullz/rfs:sha-${{ github.sha }}"), "workflow must push latest and sha-${{ github.sha }} tags");
+check(ci.includes("VITE_CESIUM_ION_TOKEN=${{ secrets.VITE_CESIUM_ION_TOKEN }}"), "workflow Docker build must pass the VITE_CESIUM_ION_TOKEN repo secret as a build arg");
 check(ci.includes("IMAGE_REF=ghcr.io/reedtrullz/rfs:sha-${{ github.sha }}"), "deploy must use the immutable sha image ref");
 check(!/docker run[\s\S]*ghcr\.io\/reedtrullz\/rfs:latest/.test(ci), "deploy must not run mutable latest");
 check(ci.includes("curl -fsS https://fly.reidar.tech/"), "workflow must verify the public domain after promotion");
@@ -61,6 +62,7 @@ check(dockerfile.includes("nginx:alpine@sha256:8b1e78743a03dbb2c95171cc58639fef2
 check(dockerfile.includes("810fc9652da431eaf8978b85bf4af131605559b5"), "Dockerfile must checkout the audited RFMS/RFMC commit");
 check(dockerfile.includes("npm ci --legacy-peer-deps"), "Dockerfile must use npm ci --legacy-peer-deps");
 check(dockerfile.includes("RFS_COMMIT_SHA") && dockerfile.includes("RFS_IMAGE_REF"), "Dockerfile must pass release metadata into the build");
+check(dockerfile.includes("ARG VITE_CESIUM_ION_TOKEN") && dockerfile.includes("VITE_CESIUM_ION_TOKEN=${VITE_CESIUM_ION_TOKEN}"), "Dockerfile must expose VITE_CESIUM_ION_TOKEN to the Vite build");
 
 check(!/host_key_checking\s*=\s*false/i.test(ansibleCfg), "ansible.cfg must not disable host key checking");
 check(/host_key_checking\s*=\s*true/i.test(ansibleCfg), "ansible.cfg should explicitly enable host key checking");

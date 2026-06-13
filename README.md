@@ -113,6 +113,10 @@ cp .env.example .env.local
 
 Never commit a real Cesium token.
 
+Production Docker images are built by GitHub Actions, so `VITE_CESIUM_ION_TOKEN`
+must also exist as a repository secret named `VITE_CESIUM_ION_TOKEN`; local
+`.env` files are not copied into CI or Docker builds.
+
 ## Quality gate
 
 Run the same gate CI uses:

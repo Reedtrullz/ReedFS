@@ -376,6 +376,30 @@ vi.mock('../config/cesium', async (importOriginal) => {
   };
 });
 
+vi.mock('../instruments/RfsPFD', () => ({
+  RfsPFD: () => <div aria-label="Primary flight display" />,
+}));
+
+vi.mock('../instruments/RfsMCP', () => ({
+  RfsMCP: () => <button type="button">HDG</button>,
+}));
+
+vi.mock('../components/Telemetry', () => ({
+  Telemetry: () => <div>SIM: TEST</div>,
+}));
+
+vi.mock('../components/ControlsHelp', () => ({
+  ControlsHelp: () => <div>Controls</div>,
+}));
+
+vi.mock('../components/ControlsSettings', () => ({
+  ControlsSettings: () => <div aria-label="Controls settings" />,
+}));
+
+vi.mock('../components/AttitudeIndicator', () => ({
+  AttitudeIndicator: () => <div aria-label="Attitude indicator" />,
+}));
+
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import ThreeToCesium from 'three-to-cesium';
 import { App } from '../App';
