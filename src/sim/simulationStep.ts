@@ -17,7 +17,6 @@ import {
 } from './systems/autopilot';
 import {
   deriveEffectiveAutoflightTruth,
-  effectiveAutopilotIsEngaged,
   type EffectiveAutoflightTruthContext,
 } from './systems/effectiveAutoflightTruth';
 
@@ -71,13 +70,12 @@ function filterApCommandsByEffectiveModes(
   apCommands: AutopilotCommands,
   truth: AutoflightTruthState,
 ): AutopilotCommands {
-  if (truth.autopilotStatus === 'OFF') return {};
-
+  const autopilotEngaged = truth.autopilotStatus !== 'OFF';
   const filtered: AutopilotCommands = {};
-  if (AP_LATERAL_SERVO_MODES.has(truth.lateralActive) && apCommands.aileron !== undefined) {
+  if (autopilotEngaged && AP_LATERAL_SERVO_MODES.has(truth.lateralActive) && apCommands.aileron !== undefined) {
     filtered.aileron = apCommands.aileron;
   }
-  if (AP_VERTICAL_SERVO_MODES.has(truth.verticalActive) && apCommands.elevator !== undefined) {
+  if (autopilotEngaged && AP_VERTICAL_SERVO_MODES.has(truth.verticalActive) && apCommands.elevator !== undefined) {
     filtered.elevator = apCommands.elevator;
   }
   if (AP_THRUST_SERVO_MODES.has(truth.thrustActive)) {
@@ -94,9 +92,9 @@ export function composeControlsSlice(
   truthContext: EffectiveAutoflightTruthContext = {},
 ): ControlsSlice {
   const effectiveTruth = deriveEffectiveAutoflightTruth(apState, truthContext);
-  const active = effectiveTruth.autopilotStatus !== 'OFF';
   const activeApCommands = filterApCommandsByEffectiveModes(apCommands, effectiveTruth);
-  const effectiveControls = composeEffectiveControls(pilotInputs, activeApCommands, active);
+  const autoflightOwnsAnyAxis = effectiveTruth.autopilotStatus !== 'OFF' || Object.keys(activeApCommands).length > 0;
+  const effectiveControls = composeEffectiveControls(pilotInputs, activeApCommands, autoflightOwnsAnyAxis);
   return {
     pilotInputs,
     apCommands: activeApCommands,
@@ -126,8 +124,10 @@ export function advanceSimulationStep(input: SimulationStepInput): SimulationSte
     flightPlan: input.flightPlan,
     routeStatus: routeBeforeTick,
   };
-  const apActive = effectiveAutopilotIsEngaged(input.apState, truthContext);
-  const apCommands = apActive
+  const effectiveTruth = deriveEffectiveAutoflightTruth(input.apState, truthContext);
+  const autoflightCommandsActive = effectiveTruth.autopilotStatus !== 'OFF'
+    || AP_THRUST_SERVO_MODES.has(effectiveTruth.thrustActive);
+  const apCommands = autoflightCommandsActive
     ? computeAutopilotCommandsForState(
       state,
       input.apState,

@@ -119,6 +119,31 @@ function lnavAutopilotState(): AutopilotState {
   };
 }
 
+function speedAutothrottleOnlyState(): AutopilotState {
+  const state = lnavAutopilotState();
+  return {
+    ...state,
+    boeing: {
+      ...state.boeing,
+      speed: 240,
+      autothrottleArm: true,
+      speedMode: true,
+      n1: false,
+      lnav: false,
+      hdgSel: false,
+      altHold: false,
+      cmdA: false,
+    },
+    truth: {
+      ...state.truth,
+      lateralActive: 'OFF',
+      verticalActive: 'OFF',
+      thrustActive: 'SPEED',
+      autopilotStatus: 'OFF',
+    },
+  };
+}
+
 function n1AutopilotState(): AutopilotState {
   const state = lnavAutopilotState();
   return {
@@ -178,6 +203,31 @@ describe('advanceSimulationStep', () => {
     expect(controls.effectiveControls.aileron).toBe(controls.pilotInputs.aileron);
     expect(controls.effectiveControls.throttle1).toBe(controls.pilotInputs.throttle1);
     expect(controls.effectiveControls.throttle2).toBe(controls.pilotInputs.throttle2);
+    expect(controls.inputs).toBe(controls.effectiveControls);
+  });
+
+  it('lets A/T-only SPEED own throttles while pilot pitch and roll remain effective', () => {
+    const pilotInputs = { ...tutorialControls(), elevator: 0.18, aileron: -0.12, throttle1: 0.2, throttle2: 0.2 };
+    const apState = speedAutothrottleOnlyState();
+    const apCommands: AutopilotCommands = {
+      elevator: -0.7,
+      aileron: 0.6,
+      throttle1: 0.64,
+      throttle2: 0.64,
+    };
+
+    const controls = composeControlsSlice(pilotInputs, apCommands, apState, {
+      routeStatus: createNoRouteStatus(),
+    });
+
+    expect(controls.apCommands.elevator).toBeUndefined();
+    expect(controls.apCommands.aileron).toBeUndefined();
+    expect(controls.apCommands.throttle1).toBe(0.64);
+    expect(controls.apCommands.throttle2).toBe(0.64);
+    expect(controls.effectiveControls.elevator).toBe(pilotInputs.elevator);
+    expect(controls.effectiveControls.aileron).toBe(pilotInputs.aileron);
+    expect(controls.effectiveControls.throttle1).toBe(0.64);
+    expect(controls.effectiveControls.throttle2).toBe(0.64);
     expect(controls.inputs).toBe(controls.effectiveControls);
   });
 
@@ -328,6 +378,47 @@ describe('advanceSimulationStep', () => {
     expect(result.apCommands.aileron).toBeUndefined();
     expect(result.controls.apCommands.aileron).toBeUndefined();
     expect(result.controls.effectiveControls.aileron).toBe(pilotInputs.aileron);
+  });
+
+  it('feeds SPEED autothrottle-only commands into integration without overriding pilot pitch or roll', () => {
+    const aircraft = createInitialState(B737_800_SPEC);
+    aircraft.flightPhase = 'CRUISE';
+    aircraft.ground = { ...aircraft.ground, weightOnWheels: false, contact: 'none', onRunway: false, aglFt: 5000 };
+    aircraft.velocity.u = 80;
+    aircraft.engines[0].n1 = 0;
+    aircraft.engines[1].n1 = 0;
+    const pilotInputs = { ...tutorialControls(), elevator: 0.16, aileron: -0.09, throttle1: 0, throttle2: 0, flapLever: 0, gearLever: 'UP' as const };
+    const apState = speedAutothrottleOnlyState();
+    const guidance = buildGuidanceState({
+      scenario: KSEA_TUTORIAL_SCENARIO,
+      status: 'running',
+      aircraft,
+      controls: pilotInputs,
+    });
+
+    const result = advanceSimulationStep({
+      aircraft,
+      spec: B737_800_SPEC,
+      pilotInputs,
+      apState,
+      flightPlan: null,
+      activeLegIndex: null,
+      routeStatus: createNoRouteStatus(),
+      wind: null,
+      dt: 1 / 60,
+      status: 'running',
+      selectedScenarioId: KSEA_TUTORIAL_SCENARIO.id,
+      guidance,
+    });
+
+    expect(result.apCommands.elevator).toBeUndefined();
+    expect(result.apCommands.aileron).toBeUndefined();
+    expect(result.apCommands.throttle1).toBeGreaterThan(pilotInputs.throttle1);
+    expect(result.apCommands.throttle2).toBe(result.apCommands.throttle1);
+    expect(result.controls.effectiveControls.elevator).toBe(pilotInputs.elevator);
+    expect(result.controls.effectiveControls.aileron).toBe(pilotInputs.aileron);
+    expect(result.controls.effectiveControls.throttle1).toBe(result.apCommands.throttle1);
+    expect(result.aircraft.engines[0].n1).toBeGreaterThan(0);
   });
 
   it('feeds N1 autothrottle commands into effective controls before engine integration', () => {

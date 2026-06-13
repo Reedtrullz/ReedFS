@@ -73,6 +73,21 @@ function minimalApState(): AutopilotState {
   };
 }
 
+function speedAutothrottleOnlyState(): AutopilotState {
+  const ap = minimalApState();
+  ap.truth.autopilotStatus = 'OFF';
+  ap.truth.lateralActive = 'OFF';
+  ap.truth.verticalActive = 'OFF';
+  ap.truth.thrustActive = 'SPEED';
+  ap.boeing.cmdA = false;
+  ap.boeing.hdgSel = false;
+  ap.boeing.altHold = false;
+  ap.boeing.autothrottleArm = true;
+  ap.boeing.speedMode = true;
+  ap.boeing.speed = 240;
+  return ap;
+}
+
 function startTakeoffRollFromStore(): void {
   useSimStore.getState().setInput({
     throttle1: 1,
@@ -313,6 +328,44 @@ describe('useSimStore', () => {
     expect(useSimStore.getState().pilotInputs.elevator).not.toBe(0.42);
     expect(useSimStore.getState().inputs.elevator).toBe(0.42);
   });
+  it('A/T-only SPEED owns throttles while manual pitch and roll remain pilot-owned', () => {
+    const ap = speedAutothrottleOnlyState();
+    useSimStore.getState().setApState(ap);
+    const apCommands: AutopilotCommands = {
+      elevator: -0.4,
+      aileron: 0.3,
+      throttle1: 0.72,
+      throttle2: 0.72,
+    };
+    useSimStore.setState((s) => {
+      const effectiveControls = {
+        ...s.pilotInputs,
+        elevator: apCommands.elevator ?? s.pilotInputs.elevator,
+        aileron: apCommands.aileron ?? s.pilotInputs.aileron,
+        throttle1: apCommands.throttle1 ?? s.pilotInputs.throttle1,
+        throttle2: apCommands.throttle2 ?? s.pilotInputs.throttle2,
+      };
+      return { apCommands, effectiveControls, inputs: effectiveControls };
+    });
+
+    useSimStore.getState().setInput({ elevator: 0.22, aileron: -0.11, throttle1: 0.95, throttle2: 0.95 });
+
+    const state = useSimStore.getState();
+    expect(state.apState?.truth.autopilotStatus).toBe('OFF');
+    expect(state.apState?.truth.thrustActive).toBe('SPEED');
+    expect(state.apCommands.elevator).toBeUndefined();
+    expect(state.apCommands.aileron).toBeUndefined();
+    expect(state.apCommands.throttle1).toBe(0.72);
+    expect(state.apCommands.throttle2).toBe(0.72);
+    expect(state.pilotInputs.elevator).toBe(0.22);
+    expect(state.pilotInputs.aileron).toBe(-0.11);
+    expect(state.pilotInputs.throttle1).not.toBe(0.95);
+    expect(state.effectiveControls.elevator).toBe(0.22);
+    expect(state.effectiveControls.aileron).toBe(-0.11);
+    expect(state.effectiveControls.throttle1).toBe(0.72);
+    expect(state.inputs).toBe(state.effectiveControls);
+  });
+
   it('throttle input-manager actions start from the live throttle lever after split-throttle input', () => {
     useSimStore.getState().setInput({ throttle1: 0.8 });
 
@@ -378,7 +431,7 @@ describe('useSimStore', () => {
     expect(restored.inputManager.rightBrake).toBe(0);
   });
 
-  it('loadScenarioState does not restore stale AP axis commands when CMD_A truth is unbacked', () => {
+  it('loadScenarioState clears stale AP pitch/roll while preserving backed A/T throttle when CMD_A is unbacked', () => {
     const storage = memoryScenarioStorage();
     useSimStore.getState().setInput({
       elevator: 0.12,
@@ -410,17 +463,19 @@ describe('useSimStore', () => {
     useSimStore.getState().loadScenarioState(storage);
 
     const restored = useSimStore.getState();
-    expect(restored.apCommands).toEqual({});
+    expect(restored.apCommands).toEqual({ throttle1: 0.9, throttle2: 0.85 });
     expect(restored.effectiveControls).toEqual(expect.objectContaining({
       elevator: 0.12,
       aileron: -0.08,
-      throttle1: 0.21,
-      throttle2: 0.23,
+      throttle1: 0.9,
+      throttle2: 0.85,
     }));
     expect(restored.effectiveControls.elevator).toBe(restored.pilotInputs.elevator);
     expect(restored.effectiveControls.aileron).toBe(restored.pilotInputs.aileron);
-    expect(restored.effectiveControls.throttle1).toBe(restored.pilotInputs.throttle1);
-    expect(restored.effectiveControls.throttle2).toBe(restored.pilotInputs.throttle2);
+    expect(restored.pilotInputs.throttle1).toBe(0.21);
+    expect(restored.pilotInputs.throttle2).toBe(0.23);
+    expect(restored.effectiveControls.throttle1).toBe(restored.apCommands.throttle1);
+    expect(restored.effectiveControls.throttle2).toBe(restored.apCommands.throttle2);
     expect(restored.inputs).toBe(restored.effectiveControls);
   });
 

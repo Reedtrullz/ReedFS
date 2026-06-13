@@ -50,7 +50,7 @@ function makeInputs(partial: Partial<ControlInputs> = {}): ControlInputs {
 }
 
 describe('computeAutopilotCommandsForState effective truth gating', () => {
-  it('does not command controls when CMD_A truth is not backed by cmdA', () => {
+  it('does not command AP pitch or roll when CMD_A is unbacked but preserves backed A/T SPEED', () => {
     const s = createInitialState(B737_800_SPEC);
     s.velocity.u = 128.6;
     const ap = makeAp('HDG_SEL', 'ALT_HOLD', 'SPEED');
@@ -59,6 +59,22 @@ describe('computeAutopilotCommandsForState effective truth gating', () => {
     ap.boeing.altHold = true;
     ap.boeing.speedMode = true;
     ap.boeing.autothrottleArm = true;
+    const commands = computeAutopilotCommandsForState(s, ap, null, 1 / 60, null, createNoRouteStatus());
+    expect(commands.elevator).toBeUndefined();
+    expect(commands.aileron).toBeUndefined();
+    expect(commands.throttle1).toBeGreaterThan(0);
+    expect(commands.throttle2).toBe(commands.throttle1);
+  });
+
+  it('does not command controls when CMD_A and A/T truth are both unbacked', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.velocity.u = 128.6;
+    const ap = makeAp('HDG_SEL', 'ALT_HOLD', 'SPEED');
+    ap.boeing.cmdA = false;
+    ap.boeing.hdgSel = true;
+    ap.boeing.altHold = true;
+    ap.boeing.speedMode = false;
+    ap.boeing.autothrottleArm = false;
     const commands = computeAutopilotCommandsForState(s, ap, null, 1 / 60, null, createNoRouteStatus());
     expect(commands).toEqual({});
   });

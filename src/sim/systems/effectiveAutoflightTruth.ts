@@ -139,7 +139,10 @@ export function deriveEffectiveAutoflightTruth(
   const backedAp = autopilotStatusIsBacked(apState);
   const thrustActive = deriveThrustMode(apState);
   if (!backedAp) {
-    return offAutoflightTruth(apState);
+    return {
+      ...offAutoflightTruth(apState),
+      thrustActive,
+    };
   }
 
   const vnav = VNAV_FAMILY.has(apState.truth.verticalActive) ? resolveVnavOutput(apState, context) : null;

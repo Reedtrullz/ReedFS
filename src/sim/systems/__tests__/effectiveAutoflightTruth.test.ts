@@ -95,6 +95,8 @@ describe('effective autoflight truth', () => {
   it('rejects CMD_A truth unbacked by the actual command channel', () => {
     const ap = makeAp();
     ap.boeing.cmdA = false;
+    ap.boeing.autothrottleArm = false;
+    ap.boeing.speedMode = false;
 
     const effective = deriveEffectiveAutoflightTruth(ap);
 
@@ -104,6 +106,27 @@ describe('effective autoflight truth', () => {
     expect(effective.verticalActive).toBe('OFF');
     expect(effective.lastModeChangeTimestamps).toEqual({ thrust: 1, lateral: 2, vertical: 3 });
     expect(effective.vsEntry).toBe(700);
+    expect(effectiveAutopilotIsEngaged(ap, { routeStatus: createNoRouteStatus() })).toBe(false);
+  });
+
+  it('keeps A/T SPEED effective when the autopilot channels are OFF', () => {
+    const ap = makeAp();
+    ap.truth.autopilotStatus = 'OFF';
+    ap.truth.lateralActive = 'OFF';
+    ap.truth.verticalActive = 'OFF';
+    ap.truth.thrustActive = 'SPEED';
+    ap.boeing.cmdA = false;
+    ap.boeing.lnav = false;
+    ap.boeing.vnav = false;
+    ap.boeing.autothrottleArm = true;
+    ap.boeing.speedMode = true;
+
+    const effective = deriveEffectiveAutoflightTruth(ap, { routeStatus: createNoRouteStatus() });
+
+    expect(effective.autopilotStatus).toBe('OFF');
+    expect(effective.lateralActive).toBe('OFF');
+    expect(effective.verticalActive).toBe('OFF');
+    expect(effective.thrustActive).toBe('SPEED');
     expect(effectiveAutopilotIsEngaged(ap, { routeStatus: createNoRouteStatus() })).toBe(false);
   });
 

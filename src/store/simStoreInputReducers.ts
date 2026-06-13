@@ -152,7 +152,7 @@ export function sanitizeSetInputPartial(
   apActive: boolean,
   apOwnsThrust: boolean,
 ): { pilotPatch: Partial<ControlInputs>; shouldDisconnect: boolean } {
-  if (!apActive) return { pilotPatch: partial, shouldDisconnect: false };
+  if (!apActive && !apOwnsThrust) return { pilotPatch: partial, shouldDisconnect: false };
 
   const pilotPatch: Partial<ControlInputs> = { ...partial };
   let shouldDisconnect = false;
@@ -167,6 +167,8 @@ export function sanitizeSetInputPartial(
       }
       continue;
     }
+
+    if (!apActive) continue;
 
     if (value === effectiveControls[key] && value !== pilotInputs[key]) {
       delete pilotPatch[key];

@@ -106,6 +106,10 @@ function hasLateralGuidance(truth: AutoflightTruthState): boolean {
   return truth.lateralActive === 'HDG_SEL' || truth.lateralActive === 'LNAV';
 }
 
+function hasThrustGuidance(truth: AutoflightTruthState): boolean {
+  return truth.thrustActive === 'SPEED' || truth.thrustActive === 'N1';
+}
+
 export function computeN1TargetPercent(state: AircraftState): number {
   if (state.flightPhase === 'TAKEOFF') return 92;
   if (state.flightPhase === 'CLIMB') return 88;
@@ -257,15 +261,16 @@ export function computeAutopilotCommands(
   targetN1Percent?: number,
   wind: WindInfo | null = null,
 ): AutopilotCommands {
-  if (!isAutopilotEngaged(ap)) return {};
-
   const t = ap.truth;
+  const autopilotEngaged = isAutopilotEngaged(ap);
+  if (!autopilotEngaged && !hasThrustGuidance(t)) return {};
+
   const cmd: AutopilotCommands = {};
 
   // ── Pitch target ──
   let pitchTargetDeg: number | undefined;
 
-  if (hasVerticalGuidance(t)) {
+  if (autopilotEngaged && hasVerticalGuidance(t)) {
     if (t.verticalActive === 'ALT_HOLD') {
       pitchTargetDeg = altitudeToPitch(targetAltFt, state, dt);
     } else if (t.verticalActive === 'VS') {
@@ -283,7 +288,7 @@ export function computeAutopilotCommands(
   }
 
   // ── Bank target ──
-  if (hasLateralGuidance(t)) {
+  if (autopilotEngaged && hasLateralGuidance(t)) {
     let bankTargetDeg = 0; // default: wings level
     if (t.lateralActive === 'HDG_SEL' || t.lateralActive === 'LNAV') {
       bankTargetDeg = headingToBank(targetHeadingRad, state);
@@ -361,7 +366,7 @@ export function computeAutopilotCommandsForState(
     flightPlan: flightPlan ?? null,
     routeStatus: routeStatusForTruth,
   });
-  if (truth.autopilotStatus === 'OFF') return {};
+  if (truth.autopilotStatus === 'OFF' && !hasThrustGuidance(truth)) return {};
 
   const effectiveAp = apWithEffectiveTruth(ap, truth);
   const tgts = resolveAutopilotTargets(state, effectiveAp, flightPlan, activeLegIndex, routeStatusForTruth);

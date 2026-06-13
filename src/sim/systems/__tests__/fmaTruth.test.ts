@@ -196,9 +196,24 @@ describe('deriveDisplayFmaTruth', () => {
     expect(fma.verticalActive).toBe('OFF');
   });
 
-  it('falls back to OFF when raw CMD status is not backed by an engaged AP channel', () => {
+  it('shows backed A/T SPEED while raw CMD status falls back to OFF when no AP channel is engaged', () => {
     const raw = apState();
     raw.boeing.cmdA = false;
+    const routeStatus: RouteStatusSnapshot = createNoRouteStatus();
+
+    const fma = deriveDisplayFmaTruth(raw, { routeStatus });
+
+    expect(fma.autopilotStatus).toBe('OFF');
+    expect(fma.thrustActive).toBe('SPEED');
+    expect(fma.lateralActive).toBe('OFF');
+    expect(fma.verticalActive).toBe('OFF');
+  });
+
+  it('falls fully back to OFF when raw CMD and A/T statuses are both unbacked', () => {
+    const raw = apState();
+    raw.boeing.cmdA = false;
+    raw.boeing.autothrottleArm = false;
+    raw.boeing.speedMode = false;
     const routeStatus: RouteStatusSnapshot = createNoRouteStatus();
 
     const fma = deriveDisplayFmaTruth(raw, { routeStatus });
