@@ -454,6 +454,7 @@ describe('App', () => {
     expect(mockSetFlightPlan).toHaveBeenCalledTimes(1);
     expect(mockSetFlightPlan).toHaveBeenCalledWith(expect.objectContaining({ origin: 'KSEA', destination: 'KPDX' }));
     expect(mockSetApState).not.toHaveBeenCalled();
+    expect(screen.queryByText(/no default route/i)).toBeNull();
   });
 
   it('LOAD PLAN keeps NO ROUTE and does not arm route AP modes for the default ENVA scenario', () => {
@@ -468,6 +469,23 @@ describe('App', () => {
     expect(mockSetFlightPlan).toHaveBeenCalledTimes(1);
     expect(mockSetFlightPlan).toHaveBeenCalledWith(null);
     expect(mockSetApState).not.toHaveBeenCalled();
+    expect(screen.getByText(/no default route/i)).toBeTruthy();
+  });
+
+  it('LOAD PLAN clears stale no-route feedback after loading a compatible KSEA route', () => {
+    const store = useSimStore.getState();
+    store.selectedScenarioId = 'enva-tutorial';
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'LOAD PLAN' }));
+    expect(screen.getByText(/no default route/i)).toBeTruthy();
+
+    store.selectedScenarioId = 'ksea-tutorial';
+    fireEvent.click(screen.getByRole('button', { name: 'LOAD PLAN' }));
+
+    expect(mockSetFlightPlan).toHaveBeenLastCalledWith(expect.objectContaining({ origin: 'KSEA', destination: 'KPDX' }));
+    expect(screen.queryByText(/no default route/i)).toBeNull();
   });
 
   it('tracks Z/X differential brake keys in the live input path and clears them on blur and cleanup', () => {

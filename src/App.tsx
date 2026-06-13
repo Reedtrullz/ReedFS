@@ -66,6 +66,7 @@ export function App() {
   const [metarData, setMetarData] = useState<MetarData | null>(null);
   const [viewerGeneration, setViewerGeneration] = useState(0);
   const [runwayOverrides, setRunwayOverrides] = useState<RunwayLayerProps['runwayOverrides']>(undefined);
+  const [routeLoadMessage, setRouteLoadMessage] = useState<string | null>(null);
 
   // Keyboard controls — tracks pressed keys for simultaneous input
   useEffect(() => {
@@ -328,11 +329,21 @@ export function App() {
             const scenario = scenarioById(store.selectedScenarioId);
             const fp = createDefaultFlightForScenario(scenario);
             store.setFlightPlan(fp);
+            if (!fp) {
+              setRouteLoadMessage(`No default route is available for ${scenario.name}.`);
+              return;
+            }
+            setRouteLoadMessage(null);
           }}
           style={btnStyle}
         >
           LOAD PLAN
         </button>
+        {routeLoadMessage && (
+          <div aria-live="polite" style={routeLoadMessageStyle}>
+            {routeLoadMessage}
+          </div>
+        )}
       </div>
     </div>
     {showDebugOverlays && <FPSMonitor />}
@@ -351,4 +362,16 @@ const abortBtnStyle: React.CSSProperties = {
   color: '#ff7777',
   border: '1px solid #ff7777',
   fontWeight: 800,
+};
+
+const routeLoadMessageStyle: React.CSSProperties = {
+  alignSelf: 'center',
+  background: 'rgba(255,183,77,0.16)',
+  border: '1px solid rgba(255,183,77,0.75)',
+  borderRadius: 4,
+  color: '#ffcf88',
+  fontFamily: 'monospace',
+  fontSize: 12,
+  fontWeight: 800,
+  padding: '6px 10px',
 };
