@@ -3,6 +3,8 @@ import { KSEA_TUTORIAL_SCENARIO, createAircraftStateForScenario } from '../scena
 import { B737_800_SPEC, type ControlInputs } from '../types';
 import { buildGuidanceState, deriveGuidancePhase, rebuildGuidanceState } from '../guidanceState';
 
+const KT_TO_MS = 1 / 1.94384449;
+
 const configuredInputs: ControlInputs = {
   elevator: 0,
   aileron: 0,
@@ -17,6 +19,10 @@ const configuredInputs: ControlInputs = {
 
 function scenarioAircraft() {
   return createAircraftStateForScenario(B737_800_SPEC, KSEA_TUTORIAL_SCENARIO);
+}
+
+function setIasKt(aircraft: ReturnType<typeof scenarioAircraft>, iasKt: number) {
+  aircraft.velocity.u = iasKt * KT_TO_MS;
 }
 
 describe('guidanceState', () => {
@@ -85,7 +91,7 @@ describe('guidanceState', () => {
     }).activeTutorialStep?.id).toBe('advance-thrust');
 
     const rotatingAircraft = structuredClone(rollingAircraft);
-    rotatingAircraft.velocity.u = 75;
+    setIasKt(rotatingAircraft, 149);
 
     expect(buildGuidanceState({
       scenario: KSEA_TUTORIAL_SCENARIO,
@@ -213,11 +219,29 @@ describe('guidanceState', () => {
     }).phase).toBe('rejected-takeoff');
 
     const rotatingAircraft = structuredClone(rollingAircraft);
-    rotatingAircraft.velocity.u = 75;
+    setIasKt(rotatingAircraft, 149);
     expect(buildGuidanceState({
       scenario: KSEA_TUTORIAL_SCENARIO,
       status: 'running',
       aircraft: rotatingAircraft,
+      controls: takeoffControls,
+    }).phase).toBe('rotation');
+
+    const belowScenarioVrAircraft = structuredClone(rollingAircraft);
+    setIasKt(belowScenarioVrAircraft, 140);
+    expect(buildGuidanceState({
+      scenario: KSEA_TUTORIAL_SCENARIO,
+      status: 'running',
+      aircraft: belowScenarioVrAircraft,
+      controls: takeoffControls,
+    }).phase).toBe('takeoff-roll');
+
+    const atScenarioVrAircraft = structuredClone(rollingAircraft);
+    setIasKt(atScenarioVrAircraft, 149);
+    expect(buildGuidanceState({
+      scenario: KSEA_TUTORIAL_SCENARIO,
+      status: 'running',
+      aircraft: atScenarioVrAircraft,
       controls: takeoffControls,
     }).phase).toBe('rotation');
 

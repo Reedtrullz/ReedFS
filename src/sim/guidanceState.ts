@@ -3,6 +3,7 @@ import { buildGuidanceChecklist, coachMessageForState, type ChecklistItem } from
 import type { FlightScenario, ScenarioTutorialStep } from './scenarios';
 import type { AircraftState, ControlInputs } from './types';
 import { isPositiveRateEstablished } from './flightPhasePredicates';
+import { rotateSpeedKtForScenario } from './takeoffCue';
 import {
   clampTutorialStepIndex,
   createTutorialState,
@@ -46,7 +47,6 @@ export interface GuidanceStateInput {
 }
 
 const MS_TO_KT = 1.94384449;
-const ROTATION_SPEED_KT = 135;
 const ROTATION_PITCH_RAD = 5 * Math.PI / 180;
 const ROLLOUT_SPEED_THRESHOLD_KT = 15;
 
@@ -54,10 +54,12 @@ export function deriveGuidancePhase(
   status: SimStatus,
   aircraft: AircraftState,
   controls: ControlInputs,
+  scenarioId?: string | null,
 ): GuidancePhase {
   if (status === 'stopped') return 'preflight';
 
   const speedKt = Math.max(0, aircraft.velocity.u) * MS_TO_KT;
+  const rotationSpeedKt = rotateSpeedKtForScenario(scenarioId);
   const onGear = aircraft.ground.contact === 'gear' || aircraft.ground.weightOnWheels;
   if (aircraft.flightPhase === 'LANDED' && onGear) {
     return speedKt > ROLLOUT_SPEED_THRESHOLD_KT ? 'landing-rollout' : 'landed';
@@ -78,7 +80,7 @@ export function deriveGuidancePhase(
     return aircraft.config.gearDown || controls.gearLever === 'DOWN' ? 'positive-rate' : 'climb';
   }
 
-  if (speedKt >= ROTATION_SPEED_KT || aircraft.attitude.theta >= ROTATION_PITCH_RAD) return 'rotation';
+  if (speedKt >= rotationSpeedKt || aircraft.attitude.theta >= ROTATION_PITCH_RAD) return 'rotation';
 
   const takeoffThrust = Math.max(controls.throttle1, controls.throttle2) >= 0.9;
   if (status === 'running' || aircraft.flightPhase === 'TAKEOFF' || takeoffThrust) return 'takeoff-roll';
@@ -117,7 +119,7 @@ export function buildGuidanceState({
   controls,
   tutorialStepIndex,
 }: GuidanceStateInput): GuidanceState {
-  const phase = deriveGuidancePhase(status, aircraft, controls);
+  const phase = deriveGuidancePhase(status, aircraft, controls, scenario.id);
   const baseTutorial = createTutorialState(scenario);
   const requestedTutorialStepIndex = tutorialStepIndex ?? tutorialStepIndexForPhase(scenario, phase);
   const tutorial: TutorialState = {
