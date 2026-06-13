@@ -3,8 +3,12 @@ import { useSimStore } from '../store/simStore';
 import { computeDerived } from '../sim/physics/derived';
 import { quatToEuler } from '../sim/physics/quaternion';
 import { deriveDisplayFmaTruth } from '../sim/systems/fmaTruth';
+import { routeStatusToNavOutput, type RouteStatusSnapshot } from '../sim/systems/navigation';
+import { computeVNAV } from '../sim/systems/vnav';
 import { maybeFindPerformanceCardForScenario, type B737VSpeeds } from '../sim/data/performance/b737PerformanceCards';
 import { takeoffCueText } from '../sim/takeoffCue';
+import type { AircraftState } from '../sim/types';
+import type { FlightPlan } from '@shared/types/fmc';
 
 const glass: CSSProperties = {
   background: 'linear-gradient(180deg, rgba(9,14,18,0.95), rgba(2,5,7,0.92))',
@@ -114,57 +118,148 @@ function finiteNumber(value: number | null | undefined): number | null {
   return Number.isFinite(value) ? (value as number) : null;
 }
 
-function flightDirectorRollCommandDeg({
-  enabled,
-  lateralMode,
-  currentHeadingDeg,
-  currentRollDeg,
-  selectedHeadingDeg,
-}: {
+type FlightDirectorMode = 'HDG_SEL' | 'LNAV' | 'ALT_HOLD' | 'VS' | 'VNAV' | 'VNAV_PTH' | 'ALT*';
+type VnavFlightDirectorMode = Extract<FlightDirectorMode, 'VNAV' | 'VNAV_PTH' | 'ALT*'>;
+
+interface FlightDirectorAxisCue {
+  commandDeg: number;
+  mode: FlightDirectorMode;
+}
+
+export interface FlightDirectorCue {
+  roll: FlightDirectorAxisCue | null;
+  pitch: FlightDirectorAxisCue | null;
+}
+
+export interface FlightDirectorCueInput {
   enabled: boolean;
   lateralMode: string;
+  verticalMode: string;
   currentHeadingDeg: number;
   currentRollDeg: number;
+  currentPitchDeg: number;
+  currentVerticalSpeedFpm: number;
+  altitudeFt: number;
   selectedHeadingDeg: number | null | undefined;
-}): number | null {
-  if (!enabled || lateralMode !== 'HDG_SEL') return null;
-  const selectedHeading = finiteNumber(selectedHeadingDeg);
-  if (selectedHeading === null) return null;
-  const targetBankDeg = clampValue(headingErrorDeg(selectedHeading, currentHeadingDeg) * 0.28, -30, 30);
+  selectedAltitudeFt: number | null | undefined;
+  selectedVerticalSpeedFpm: number | null | undefined;
+  aircraft: AircraftState;
+  flightPlan: FlightPlan | null;
+  routeStatus: RouteStatusSnapshot | null;
+}
+
+const VNAV_FD_MODES: ReadonlySet<VnavFlightDirectorMode> = new Set(['VNAV', 'VNAV_PTH', 'ALT*']);
+
+function isVnavFlightDirectorMode(mode: string): mode is VnavFlightDirectorMode {
+  return VNAV_FD_MODES.has(mode as VnavFlightDirectorMode);
+}
+
+function verticalSpeedTargetWithAltitudeCapture(
+  targetVerticalSpeedFpm: number,
+  selectedAltitudeFt: number | null | undefined,
+  altitudeFt: number,
+): number {
+  const selectedAltitude = finiteNumber(selectedAltitudeFt);
+  if (selectedAltitude === null || selectedAltitude <= 0) return targetVerticalSpeedFpm;
+
+  const altitudeDeltaFt = selectedAltitude - altitudeFt;
+  const captureWindowFt = 500;
+  const enteringCaptureWindow = Math.abs(altitudeDeltaFt) < captureWindowFt * 2
+    && ((targetVerticalSpeedFpm > 0 && altitudeDeltaFt <= captureWindowFt)
+      || (targetVerticalSpeedFpm < 0 && altitudeDeltaFt >= -captureWindowFt));
+  if (!enteringCaptureWindow) return targetVerticalSpeedFpm;
+
+  return targetVerticalSpeedFpm * Math.max(0, Math.abs(altitudeDeltaFt) / captureWindowFt);
+}
+
+function rollCommandForHeadingTarget(targetHeadingDeg: number, currentHeadingDeg: number, currentRollDeg: number): number {
+  const targetBankDeg = clampValue(headingErrorDeg(targetHeadingDeg, currentHeadingDeg) * 0.28, -30, 30);
   return clampValue(targetBankDeg - currentRollDeg, -30, 30);
 }
 
-function flightDirectorPitchCommandDeg({
-  enabled,
-  verticalMode,
-  currentPitchDeg,
-  altitudeFt,
-  selectedAltitudeFt,
-}: {
-  enabled: boolean;
-  verticalMode: string;
-  currentPitchDeg: number;
-  altitudeFt: number;
-  selectedAltitudeFt: number | null | undefined;
-}): number | null {
-  if (!enabled || verticalMode !== 'ALT_HOLD') return null;
-  const selectedAltitude = finiteNumber(selectedAltitudeFt);
-  if (selectedAltitude === null || selectedAltitude <= 0) return null;
-  const targetPitchDeg = clampValue((selectedAltitude - altitudeFt) * 0.004, -10, 15);
+function pitchCommandForAltitudeTarget(targetAltitudeFt: number, altitudeFt: number, currentPitchDeg: number): number {
+  const targetPitchDeg = clampValue((targetAltitudeFt - altitudeFt) * 0.004, -10, 15);
   return clampValue(targetPitchDeg - currentPitchDeg, -10, 10);
 }
 
-function FlightDirectorBars({ pitchCommandDeg, rollCommandDeg }: { pitchCommandDeg: number | null; rollCommandDeg: number | null }) {
-  if (pitchCommandDeg === null && rollCommandDeg === null) return null;
+function pitchCommandForVerticalSpeedTarget(targetVerticalSpeedFpm: number, currentVerticalSpeedFpm: number, currentPitchDeg: number): number {
+  const targetPitchDeg = clampValue((targetVerticalSpeedFpm - currentVerticalSpeedFpm) * 0.00015, -8, 15);
+  return clampValue(targetPitchDeg - currentPitchDeg, -10, 10);
+}
+
+export function deriveFlightDirectorCue(input: FlightDirectorCueInput): FlightDirectorCue {
+  if (!input.enabled) return { roll: null, pitch: null };
+
+  let roll: FlightDirectorAxisCue | null = null;
+  if (input.lateralMode === 'HDG_SEL') {
+    const selectedHeading = finiteNumber(input.selectedHeadingDeg);
+    if (selectedHeading !== null) {
+      roll = {
+        commandDeg: rollCommandForHeadingTarget(selectedHeading, input.currentHeadingDeg, input.currentRollDeg),
+        mode: 'HDG_SEL',
+      };
+    }
+  } else if (input.lateralMode === 'LNAV' && input.routeStatus) {
+    const nav = routeStatusToNavOutput(input.routeStatus, { maxInterceptDeg: 25 });
+    if (nav) {
+      roll = {
+        commandDeg: rollCommandForHeadingTarget((nav.desiredTrack * 180) / Math.PI, input.currentHeadingDeg, input.currentRollDeg),
+        mode: 'LNAV',
+      };
+    }
+  }
+
+  let pitch: FlightDirectorAxisCue | null = null;
+  if (input.verticalMode === 'ALT_HOLD') {
+    const selectedAltitude = finiteNumber(input.selectedAltitudeFt);
+    if (selectedAltitude !== null && selectedAltitude > 0) {
+      pitch = {
+        commandDeg: pitchCommandForAltitudeTarget(selectedAltitude, input.altitudeFt, input.currentPitchDeg),
+        mode: 'ALT_HOLD',
+      };
+    }
+  } else if (input.verticalMode === 'VS') {
+    const selectedVerticalSpeed = finiteNumber(input.selectedVerticalSpeedFpm);
+    if (selectedVerticalSpeed !== null) {
+      const targetVerticalSpeed = verticalSpeedTargetWithAltitudeCapture(
+        selectedVerticalSpeed,
+        input.selectedAltitudeFt,
+        input.altitudeFt,
+      );
+      pitch = {
+        commandDeg: pitchCommandForVerticalSpeedTarget(targetVerticalSpeed, input.currentVerticalSpeedFpm, input.currentPitchDeg),
+        mode: 'VS',
+      };
+    }
+  } else if (isVnavFlightDirectorMode(input.verticalMode) && input.flightPlan && input.routeStatus) {
+    const nav = routeStatusToNavOutput(input.routeStatus, { maxInterceptDeg: 25 });
+    if (nav) {
+      const vnav = computeVNAV(input.aircraft, input.flightPlan, nav);
+      if (vnav.available && vnav.altitudeConstraint) {
+        pitch = {
+          commandDeg: pitchCommandForVerticalSpeedTarget(vnav.targetVs, input.currentVerticalSpeedFpm, input.currentPitchDeg),
+          mode: input.verticalMode,
+        };
+      }
+    }
+  }
+
+  return { roll, pitch };
+}
+
+function FlightDirectorBars({ cue }: { cue: FlightDirectorCue }) {
+  if (cue.pitch === null && cue.roll === null) return null;
 
   return (
     <div aria-label="Flight director command bars" style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
-      {pitchCommandDeg !== null && (
+      {cue.pitch !== null && (
         <div
           aria-label="Flight director pitch bar"
+          data-testid="fd-pitch-command"
+          data-mode={cue.pitch.mode}
           style={{
             position: 'absolute',
-            top: `calc(50% - ${pitchCommandDeg * 4}px)`,
+            top: `calc(50% - ${cue.pitch.commandDeg * 4}px)`,
             left: '24%',
             right: '24%',
             height: 4,
@@ -174,13 +269,15 @@ function FlightDirectorBars({ pitchCommandDeg, rollCommandDeg }: { pitchCommandD
           }}
         >
           <span style={{ position: 'absolute', right: 0, top: -15, color: '#ffb8fb', fontSize: 10, fontWeight: 900 }}>
-            FD PITCH {signedDegreesText(pitchCommandDeg)}
+            FD PITCH {signedDegreesText(cue.pitch.commandDeg)}
           </span>
         </div>
       )}
-      {rollCommandDeg !== null && (
+      {cue.roll !== null && (
         <div
           aria-label="Flight director roll bar"
+          data-testid="fd-roll-command"
+          data-mode={cue.roll.mode}
           style={{
             position: 'absolute',
             top: '50%',
@@ -190,12 +287,12 @@ function FlightDirectorBars({ pitchCommandDeg, rollCommandDeg }: { pitchCommandD
             background: '#ff4df3',
             boxShadow: '0 0 9px rgba(255,77,243,0.95)',
             borderRadius: 3,
-            transform: `translate(-50%, -50%) rotate(${rollCommandDeg}deg)`,
+            transform: `translate(-50%, -50%) rotate(${cue.roll.commandDeg}deg)`,
             transformOrigin: 'center',
           }}
         >
           <span style={{ position: 'absolute', left: 9, top: -14, color: '#ffb8fb', fontSize: 10, fontWeight: 900, whiteSpace: 'nowrap' }}>
-            FD ROLL {signedDegreesText(rollCommandDeg)}
+            FD ROLL {signedDegreesText(cue.roll.commandDeg)}
           </span>
         </div>
       )}
@@ -380,8 +477,15 @@ function useFmaText(kind: 'thrustActive' | 'lateralActive' | 'verticalActive' | 
 }
 
 export function RfsPFD() {
+  const flightPlan = useSimStore((s) => s.flightPlan);
+  const routeStatus = useSimStore((s) => s.routeStatus);
   const ias = useSimStore((s) => Math.max(0, computeDerived(s.aircraft, s.wind).ias));
   const altitude = useSimStore((s) => Math.max(0, s.aircraft.position.alt));
+  const latitude = useSimStore((s) => s.aircraft.position.lat);
+  const longitude = useSimStore((s) => s.aircraft.position.lon);
+  const velocityU = useSimStore((s) => s.aircraft.velocity.u);
+  const velocityV = useSimStore((s) => s.aircraft.velocity.v);
+  const velocityW = useSimStore((s) => s.aircraft.velocity.w);
   const vs = useSimStore((s) => computeDerived(s.aircraft, s.wind).vs);
   const pitch = useSimStore((s) => {
     const euler = quatToEuler(s.aircraft.quaternion);
@@ -423,19 +527,25 @@ export function RfsPFD() {
   });
   const vSpeeds = maybeFindPerformanceCardForScenario(selectedScenarioId)?.vSpeeds;
   const showTakeoffReference = takeoffCue != null || flightPhase === 'PARKED' || flightPhase === 'TAKEOFF';
-  const fdRollCommandDeg = flightDirectorRollCommandDeg({
+  const aircraftForVnav = {
+    position: { lat: latitude, lon: longitude, alt: altitude },
+    velocity: { u: velocityU, v: velocityV, w: velocityW },
+  } as AircraftState;
+  const fdCue = deriveFlightDirectorCue({
     enabled: flightDirectorEnabled,
     lateralMode,
+    verticalMode,
     currentHeadingDeg: hdg,
     currentRollDeg: roll,
-    selectedHeadingDeg: selectedHeading,
-  });
-  const fdPitchCommandDeg = flightDirectorPitchCommandDeg({
-    enabled: flightDirectorEnabled,
-    verticalMode,
     currentPitchDeg: pitch,
+    currentVerticalSpeedFpm: vs,
     altitudeFt: altitude,
+    selectedHeadingDeg: selectedHeading,
     selectedAltitudeFt: selectedAltitude,
+    selectedVerticalSpeedFpm: selectedVerticalSpeed,
+    aircraft: aircraftForVnav,
+    flightPlan,
+    routeStatus,
   });
 
   return (
@@ -532,7 +642,7 @@ export function RfsPFD() {
             </div>
             <div style={{ position: 'absolute', top: '50%', left: '18%', right: '18%', height: 3, background: '#ffd84a' }} />
             <div style={{ position: 'absolute', top: 'calc(50% - 10px)', left: '50%', width: 3, height: 20, background: '#ffd84a' }} />
-            <FlightDirectorBars pitchCommandDeg={fdPitchCommandDeg} rollCommandDeg={fdRollCommandDeg} />
+            <FlightDirectorBars cue={fdCue} />
             <div style={{ position: 'absolute', left: 12, bottom: 10, color: '#ffffff', fontSize: 13, fontWeight: 800 }}>
               P {pitch.toFixed(1)}°
             </div>

@@ -240,7 +240,7 @@ describe('RfsPFD', () => {
     expect(screen.getByText('FD PITCH +4.0°')).toBeTruthy();
   });
 
-  it('keeps Flight Director bars hidden for LNAV and VS modes until cues mirror the AP resolver', () => {
+  it('draws Flight Director command bars for backed LNAV and VS modes', () => {
     setAircraftOnKseaRoute();
     const ap = apStateWithModes();
     ap.truth.lateralActive = 'LNAV';
@@ -254,8 +254,53 @@ describe('RfsPFD', () => {
 
     render(<RfsPFD />);
 
-    expect(screen.queryByLabelText('Flight director roll bar')).toBeNull();
-    expect(screen.queryByLabelText('Flight director pitch bar')).toBeNull();
+    expect(screen.getByLabelText('Flight director roll bar')).toBeTruthy();
+    expect(screen.getByTestId('fd-roll-command').getAttribute('data-mode')).toBe('LNAV');
+    expect(screen.getByLabelText('Flight director pitch bar')).toBeTruthy();
+    expect(screen.getByTestId('fd-pitch-command').getAttribute('data-mode')).toBe('VS');
+  });
+
+  it('attenuates the VS Flight Director pitch cue near MCP altitude capture', () => {
+    const aircraft = structuredClone(useSimStore.getState().aircraft);
+    aircraft.position.alt = 9_990;
+    aircraft.velocity.u = 128.6;
+    aircraft.velocity.w = 0;
+    aircraft.attitude = { phi: 0, theta: 0, psi: 0 };
+    aircraft.quaternion = eulerToQuat(aircraft.attitude.phi, aircraft.attitude.theta, aircraft.attitude.psi);
+    const ap = apStateWithModes();
+    ap.truth.lateralActive = 'OFF';
+    ap.truth.verticalActive = 'VS';
+    ap.boeing.lnav = false;
+    ap.boeing.vs = true;
+    ap.boeing.vnav = false;
+    ap.boeing.altHold = false;
+    ap.boeing.verticalSpeed = 1000;
+    ap.boeing.altitude = 10_000;
+    useSimStore.setState({ aircraft });
+    useSimStore.getState().setApState(ap);
+
+    render(<RfsPFD />);
+
+    expect(screen.getByTestId('fd-pitch-command').getAttribute('data-mode')).toBe('VS');
+    expect(screen.getByText('FD PITCH +0.0°')).toBeTruthy();
+  });
+
+  it('draws a Flight Director pitch command for backed VNAV path guidance', () => {
+    setAircraftOnKseaRoute();
+    const ap = apStateWithModes();
+    ap.truth.lateralActive = 'LNAV';
+    ap.truth.verticalActive = 'VNAV';
+    ap.boeing.lnav = true;
+    ap.boeing.hdgSel = false;
+    ap.boeing.vnav = true;
+    ap.boeing.vs = false;
+    ap.boeing.altHold = false;
+    useSimStore.getState().setApState(ap);
+
+    render(<RfsPFD />);
+
+    expect(screen.getByLabelText('Flight director pitch bar')).toBeTruthy();
+    expect(screen.getByTestId('fd-pitch-command').getAttribute('data-mode')).toBe('VNAV_PTH');
   });
 
   it('does not invent Flight Director bars before MCP/autopilot state exists', () => {
