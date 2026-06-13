@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 
 export interface RouteProofSnapshot {
   routeName: string;
@@ -197,6 +197,25 @@ const FIRST_SEQUENCE_FRAMES = 60 * 12;
 const SECOND_SEQUENCE_FRAMES = 60 * 8;
 const ROUTE_SAMPLE_INTERVAL_FRAMES = 300;
 const SEQUENCE_SAMPLE_INTERVAL_FRAMES = 30;
+
+export async function loadKseaRouteAndSelectAutomationThroughUi(page: Page): Promise<void> {
+  await page.getByLabel('Scenario', { exact: true }).selectOption('ksea-tutorial');
+  await page.getByRole('button', { name: /^LOAD PLAN$/ }).click();
+
+  const routeStatus = page.getByLabel('Route status');
+  await expect(routeStatus.getByText('KSEA→KPDX')).toBeVisible();
+  await expect(routeStatus.getByText(/LEG\s+1\/3/)).toBeVisible();
+  await expect(routeStatus.getByText('KSEA → OLM')).toBeVisible();
+  await expect(routeStatus.getByText('DTG')).toBeVisible();
+
+  await expect(page.getByRole('button', { name: /^LNAV$/ })).toBeEnabled();
+  await page.getByRole('button', { name: /^LNAV$/ }).click();
+  await page.getByRole('button', { name: /^SPD$/ }).click();
+
+  const primaryFlightDisplay = page.getByLabel('Primary flight display');
+  await expect(primaryFlightDisplay.getByText('LNAV')).toBeVisible();
+  await expect(primaryFlightDisplay.getByText('SPEED')).toBeVisible();
+}
 
 const KSEA_ROUTE_PROOF: RouteProofSetup = {
   initialPosition: { lat: 47.445, lon: -122.315 },
