@@ -17,21 +17,16 @@ import {
 import { mergeInputActions } from './input/InputManager';
 import { fetchMetar, parseMetarWind } from './sim/weather';
 import type { MetarData } from './sim/weather';
-import { createDefaultAutopilotState } from './instruments/defaultAutopilotState';
 import { nextCameraMode, type CameraMode } from './viewport/cameraMode';
 import { nextOverlayMode, shouldShowDebugOverlays, shouldShowFlightInstruments, type OverlayMode } from './viewport/overlayMode';
 import { createDefaultFlightForScenario } from './sim/flightPlanLoader';
 import { scenarioById } from './sim/scenarios';
-import { computeRouteStatus, getInitialActiveLegIndex } from './sim/systems/navigation';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { FPSMonitor } from './components/FPSMonitor';
 import { EngineStrip } from './components/EngineStrip';
 import { ScenarioPanel } from './components/ScenarioPanel';
 import { RouteStatus } from './components/RouteStatus';
 import { SceneStatus } from './components/SceneStatus';
-import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
-import type { AircraftState } from './sim/types';
-import type { SimulationStatus } from './sim/simulationStatus';
 
 const CesiumViewport = lazy(() => import('./viewport/CesiumViewport').then((m) => ({ default: m.CesiumViewport })));
 const ThreeLayer = lazy(() => import('./viewport/ThreeLayer').then((m) => ({ default: m.ThreeLayer })));
@@ -49,31 +44,6 @@ const ControlsSettings = lazy(() => import('./components/ControlsSettings').then
 
 const cesiumScenePolicy = getCesiumScenePolicy();
 type AudioUiStatus = 'off' | 'starting' | 'on' | 'blocked';
-
-function applyLoadedRouteAutopilotDefaults(apState: AutopilotState): AutopilotState {
-  const next = structuredClone(apState);
-  next.truth.lateralActive = 'LNAV';
-  next.truth.verticalActive = 'ALT_HOLD';
-  next.truth.thrustActive = 'SPEED';
-  next.truth.autopilotStatus = 'CMD_A';
-  next.boeing.cmdA = true;
-  next.boeing.cmdB = false;
-  next.boeing.cwsA = false;
-  next.boeing.cwsB = false;
-  next.boeing.lnav = true;
-  next.boeing.hdgSel = false;
-  next.boeing.vnav = false;
-  next.boeing.altHold = true;
-  next.boeing.vs = false;
-  next.boeing.speedMode = true;
-  next.boeing.n1 = false;
-  next.boeing.autothrottleArm = true;
-  return next;
-}
-
-function shouldApplyLoadedRouteAutopilotDefaults(status: SimulationStatus, aircraft: AircraftState, routeCompatible: boolean): boolean {
-  return routeCompatible && status === 'stopped' && aircraft.flightPhase === 'PARKED';
-}
 
 export function App() {
   const viewerRef = useRef<CesiumViewer | null>(null);
@@ -358,11 +328,6 @@ export function App() {
             const scenario = scenarioById(store.selectedScenarioId);
             const fp = createDefaultFlightForScenario(scenario);
             store.setFlightPlan(fp);
-            if (!fp) return;
-            const routeStatus = computeRouteStatus(store.aircraft, fp, getInitialActiveLegIndex(fp));
-            if (!shouldApplyLoadedRouteAutopilotDefaults(store.status, store.aircraft, routeStatus.lnavAvailable)) return;
-            const ap = store.apState ?? createDefaultAutopilotState();
-            store.setApState(applyLoadedRouteAutopilotDefaults(ap));
           }}
           style={btnStyle}
         >

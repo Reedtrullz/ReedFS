@@ -453,6 +453,7 @@ describe('App', () => {
 
     expect(mockSetFlightPlan).toHaveBeenCalledTimes(1);
     expect(mockSetFlightPlan).toHaveBeenCalledWith(expect.objectContaining({ origin: 'KSEA', destination: 'KPDX' }));
+    expect(mockSetApState).not.toHaveBeenCalled();
   });
 
   it('LOAD PLAN keeps NO ROUTE and does not arm route AP modes for the default ENVA scenario', () => {
@@ -594,47 +595,24 @@ describe('App', () => {
     }
   });
 
-  it('LOAD PLAN does not engage VNAV on the default route when no VNAV constraint exists', () => {
+  it('LOAD PLAN does not engage AP modes on the default route while stopped', () => {
     render(<App />);
 
     fireEvent.click(screen.getByRole('button', { name: 'LOAD PLAN' }));
 
-    expect(mockSetApState).toHaveBeenCalledTimes(1);
-    const nextApState = mockSetApState.mock.calls[0][0];
-    expect(nextApState.truth.lateralActive).toBe('LNAV');
-    expect(nextApState.truth.thrustActive).toBe('SPEED');
-    expect(nextApState.truth.verticalActive).toBe('ALT_HOLD');
-    expect(nextApState.boeing.lnav).toBe(true);
-    expect(nextApState.boeing.speedMode).toBe(true);
-    expect(nextApState.boeing.vnav).toBe(false);
-    expect(nextApState.boeing.altHold).toBe(true);
+    expect(mockSetFlightPlan).toHaveBeenCalledWith(expect.objectContaining({ origin: 'KSEA', destination: 'KPDX' }));
+    expect(mockSetApState).not.toHaveBeenCalled();
   });
 
-  it('LOAD PLAN creates and annunciates safe AP defaults when AP state is null', () => {
+  it('LOAD PLAN stores the route without creating AP state when AP state is null', () => {
     useSimStore.getState().apState = null;
     render(<App />);
 
     fireEvent.click(screen.getByRole('button', { name: 'LOAD PLAN' }));
 
     expect(mockSetFlightPlan).toHaveBeenCalledTimes(1);
-    expect(mockSetApState).toHaveBeenCalledTimes(1);
-    const nextApState = mockSetApState.mock.calls[0][0];
-    expect(nextApState.truth.lateralActive).toBe('LNAV');
-    expect(nextApState.truth.thrustActive).toBe('SPEED');
-    expect(nextApState.truth.verticalActive).toBe('ALT_HOLD');
-    expect(nextApState.truth.autopilotStatus).toBe('CMD_A');
-    expect(nextApState.boeing.lnav).toBe(true);
-    expect(nextApState.boeing.speedMode).toBe(true);
-    expect(nextApState.boeing.altHold).toBe(true);
-    expect(nextApState.boeing.cmdA).toBe(true);
-    expect(nextApState.boeing.cmdB).toBe(false);
-    expect(nextApState.boeing.cwsA).toBe(false);
-    expect(nextApState.boeing.cwsB).toBe(false);
-    expect(nextApState.boeing.vnav).toBe(false);
-    expect(nextApState.boeing.vs).toBe(false);
-    expect(nextApState.boeing.hdgSel).toBe(false);
-    expect(nextApState.boeing.n1).toBe(false);
-    expect(nextApState.boeing.autothrottleArm).toBe(true);
+    expect(mockSetFlightPlan).toHaveBeenCalledWith(expect.objectContaining({ origin: 'KSEA', destination: 'KPDX' }));
+    expect(mockSetApState).not.toHaveBeenCalled();
   });
 
   it('LOAD PLAN only stores the route during a running takeoff instead of auto-commanding AP modes', () => {
