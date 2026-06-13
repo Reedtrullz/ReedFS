@@ -1,6 +1,7 @@
 import type { AircraftState, AutopilotCommands, ControlInputs } from '../types';
 import type { AutoflightTruthState, AutopilotState } from '@shared/autopilot/autopilotTypes';
 import type { FlightPlan } from '@shared/types/fmc';
+import type { WindInfo } from '../weather';
 import {
   computeRouteStatus,
   routeStatusToNavOutput,
@@ -9,6 +10,7 @@ import {
 } from './navigation';
 import { computeVNAV } from './vnav';
 import { bodyToNed } from '../physics/frames';
+import { computeDerived } from '../physics/derived';
 import { deriveEffectiveAutoflightTruth } from './effectiveAutoflightTruth';
 
 // ── Module-level PID state ──────────────────────────────────────────────
@@ -45,8 +47,8 @@ function currentVsFpm(state: AircraftState): number {
   const ned = bodyToNed(state.velocity, state.attitude);
   return -ned.down * 196.850394;
 }
-function currentTasKt(state: AircraftState): number {
-  return Math.sqrt(state.velocity.u ** 2 + state.velocity.v ** 2 + state.velocity.w ** 2) * 1.944;
+function currentIasKt(state: AircraftState, wind: WindInfo | null = null): number {
+  return computeDerived(state, wind).ias;
 }
 function pid(
   s: { value: number; prevError: number },
@@ -245,6 +247,7 @@ export function computeAutopilotCommands(
   dt: number,
   targetVerticalSpeedFpm?: number,
   targetN1Percent?: number,
+  wind: WindInfo | null = null,
 ): AutopilotCommands {
   if (!isAutopilotEngaged(ap)) return {};
 
@@ -282,10 +285,10 @@ export function computeAutopilotCommands(
 
   // ── Thrust ──
   if (t.thrustActive === 'SPEED') {
-    const tasKt = currentTasKt(state);
-    const spdErr = targetSpeedKt - tasKt;
+    const iasKt = currentIasKt(state, wind);
+    const spdErr = targetSpeedKt - iasKt;
     const altFt = state.position.alt;
-    const deficit = targetSpeedKt - tasKt;
+    const deficit = targetSpeedKt - iasKt;
     const vsFpm = currentVsFpm(state);
     const aboveTarget = t.verticalActive === 'ALT_HOLD' && state.position.alt > targetAltFt + 200;
 
@@ -339,6 +342,7 @@ export function computeAutopilotCommandsForState(
   dt: number,
   activeLegIndex?: number | null,
   routeStatus?: RouteStatusSnapshot | null,
+  wind: WindInfo | null = null,
 ): AutopilotCommands {
   if (!ap) return {};
 
@@ -353,7 +357,17 @@ export function computeAutopilotCommandsForState(
 
   const effectiveAp = apWithEffectiveTruth(ap, truth);
   const tgts = resolveAutopilotTargets(state, effectiveAp, flightPlan, activeLegIndex, routeStatusForTruth);
-  return computeAutopilotCommands(state, effectiveAp, tgts.targetHeadingRad, tgts.targetAltFt, tgts.targetSpeedKt, dt, tgts.targetVerticalSpeedFpm, tgts.targetN1Percent);
+  return computeAutopilotCommands(
+    state,
+    effectiveAp,
+    tgts.targetHeadingRad,
+    tgts.targetAltFt,
+    tgts.targetSpeedKt,
+    dt,
+    tgts.targetVerticalSpeedFpm,
+    tgts.targetN1Percent,
+    wind,
+  );
 }
 
 // ── Controls composition ────────────────────────────────────────────────

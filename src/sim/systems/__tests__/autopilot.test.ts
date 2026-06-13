@@ -10,6 +10,8 @@ import { createInitialState, B737_800_SPEC } from '../../types';
 import type { AutopilotCommands, ControlInputs } from '../../types';
 import type { AutopilotState, LateralMode, ThrustMode, VerticalMode } from '@shared/autopilot/autopilotTypes';
 import type { FlightPlan } from '@shared/types/fmc';
+import type { WindInfo } from '../../weather';
+import { computeDerived } from '../../physics/derived';
 import { createNoRouteStatus, type RouteStatusSnapshot } from '../navigation';
 
 beforeEach(() => resetAutopilotPID());
@@ -158,6 +160,30 @@ describe('computeAutopilotCommands ALT_HOLD', () => {
 });
 
 describe('computeAutopilotCommands SPEED', () => {
+  it('SPEED mode uses IAS with tailwind instead of raw body speed', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.attitude.psi = 0;
+    s.position.alt = 0;
+    s.velocity.u = 250 / 1.944;
+    s.velocity.v = 0;
+    s.velocity.w = 0;
+    s.ground.weightOnWheels = false;
+    const ap = makeAp('HDG_SEL', 'ALT_HOLD', 'SPEED');
+    ap.boeing.speed = 250;
+    ap.boeing.hdgSel = true;
+    ap.boeing.altHold = true;
+    ap.boeing.speedMode = true;
+    ap.boeing.autothrottleArm = true;
+    const tailwind: WindInfo = { dir: 180, speed: 20 };
+
+    const displayedIas = computeDerived(s, tailwind).ias;
+    const commands = computeAutopilotCommandsForState(s, ap, null, 1, null, createNoRouteStatus(), tailwind);
+
+    expect(displayedIas).toBeLessThan(240);
+    expect(commands.throttle1).toBeGreaterThan(0.5);
+    expect(commands.throttle2).toBe(commands.throttle1);
+  });
+
   it('advances throttle below target speed', () => {
     const s = createInitialState(B737_800_SPEC);
     s.velocity.u = 100; // 194 kts, target 250

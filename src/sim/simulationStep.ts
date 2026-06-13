@@ -135,6 +135,7 @@ export function advanceSimulationStep(input: SimulationStepInput): SimulationSte
       input.dt,
       routeBeforeTick.activeLegIndex,
       routeBeforeTick,
+      input.wind,
     )
     : {};
   const controls = composeControlsSlice(input.pilotInputs, apCommands, input.apState, truthContext);
