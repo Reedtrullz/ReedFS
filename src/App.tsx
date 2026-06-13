@@ -334,7 +334,7 @@ export function App() {
               return;
             }
             setRouteLoadMessage(
-              `${fp.origin}→${fp.destination} route loaded. Takeoff setup: flaps set for takeoff; trim set for takeoff; throttle idle. Press START ROLL when ready.`,
+              `${fp.origin}→${fp.destination} route loaded. Takeoff setup reminder: confirm flaps for takeoff, set takeoff trim, keep throttle idle until ready, then press START ROLL.`,
             );
           }}
           style={btnStyle}
