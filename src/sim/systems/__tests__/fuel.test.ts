@@ -35,6 +35,35 @@ describe('updateFuel', () => {
     expect(s.fuel.totalFuel).toBeLessThan(before);
   });
 
+  it('stops reported fuel flow when all tanks are dry', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.fuel = { centerTank: 0, leftTank: 0, rightTank: 0, totalFuel: 0, fuelFlowTotal: 8_000 };
+    s.engines[0] = { ...s.engines[0], fuelFlow: 4_000, thrust: 20_000, running: true };
+    s.engines[1] = { ...s.engines[1], fuelFlow: 4_000, thrust: 20_000, running: true };
+
+    updateFuel(s, B737_800_SPEC, 1);
+
+    expect(s.fuel.totalFuel).toBe(0);
+    expect(s.fuel.fuelFlowTotal).toBe(0);
+    expect(s.engines[0].fuelFlow).toBe(0);
+    expect(s.engines[0].thrust).toBe(0);
+    expect(s.engines[0].running).toBe(false);
+  });
+
+  it('clamps reported fuel flow to fuel actually available during a starvation tick', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.fuel = { centerTank: 0, leftTank: 0.25, rightTank: 0.25, totalFuel: 0.5, fuelFlowTotal: 7_200 };
+    s.engines[0] = { ...s.engines[0], fuelFlow: 3_600, thrust: 20_000, running: true };
+    s.engines[1] = { ...s.engines[1], fuelFlow: 3_600, thrust: 20_000, running: true };
+
+    updateFuel(s, B737_800_SPEC, 1);
+
+    expect(s.fuel.totalFuel).toBe(0);
+    expect(s.fuel.fuelFlowTotal).toBeCloseTo(1_800, 6);
+    expect(s.engines[0].fuelFlow).toBeCloseTo(900, 6);
+    expect(s.engines[1].fuelFlow).toBeCloseTo(900, 6);
+  });
+
   it('preserves payload mass in grossWeight when fuel burns', () => {
     const s = createInitialState(B737_800_SPEC);
     s.payloadWeight = 12000;

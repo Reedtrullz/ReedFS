@@ -1,4 +1,4 @@
-export type SourceRole = 'aircraft' | 'aero' | 'configuration' | 'gear' | 'ground' | 'lineage';
+export type SourceRole = 'aircraft' | 'aero' | 'configuration' | 'engine' | 'gear' | 'ground' | 'lineage';
 
 export type SourceClassification =
   | 'gameplay-calibrated'
@@ -59,6 +59,32 @@ export interface ConfigurationTransitModelData extends FdmSourceMetadata {
   sourceReferenceIds: string[];
   flapRateDegPerSecond: number;
   gearTransitSeconds: number;
+}
+
+export interface EngineThrustLapsePointData {
+  altitudeFt: number;
+  mach: number;
+  lapseFactor: number;
+  /** Documented placeholder table temperature. Current model does not interpolate OAT. */
+  oatC?: number;
+}
+
+export interface EngineModelData extends FdmSourceMetadata {
+  sourceReferenceIds: string[];
+  idleN1Percent: number;
+  togaN1Percent: number;
+  idleN2Percent: number;
+  n2PerN1Percent: number;
+  spoolUpTimeConstantSeconds: number;
+  spoolDownTimeConstantSeconds: number;
+  n2TimeConstantSeconds: number;
+  idleEgtC: number;
+  egtPerN2PercentC: number;
+  highN2EgtReliefStartPercent: number;
+  highN2EgtReliefPerPercentC: number;
+  /** kg fuel / N thrust / hour. Placeholder conversion of legacy 0.55 lb/lbf/hr SFC. */
+  fuelSfcKgPerNewtonHour: number;
+  thrustLapseTable: EngineThrustLapsePointData[];
 }
 
 export interface GroundModelData extends FdmSourceMetadata {

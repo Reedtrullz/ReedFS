@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { computeEngineThrustN, updateEngines } from '../engine';
 import { createInitialState, B737_800_SPEC } from '../../types';
-import type { ControlInputs } from '../../types';
+import type { AircraftSpec, ControlInputs } from '../../types';
+import { B737_800_FDM } from '../../data/aircraft/b737-800-fdm.v1';
 import { eulerToQuat } from '../../physics/quaternion';
 import * as b737PerformanceFixtures from '../../data/performance/b737PerformanceCards';
 
@@ -18,6 +19,32 @@ interface EngineLapseFixture {
   expectedSeaLevelStaticRatio: [number, number];
   ownership: { sourceNote: string };
 }
+
+interface TestEngineModel {
+  sourceReferenceIds?: string[];
+  claimBoundary?: string;
+  idleN1Percent: number;
+  togaN1Percent: number;
+  idleN2Percent: number;
+  n2PerN1Percent: number;
+  spoolUpTimeConstantSeconds: number;
+  spoolDownTimeConstantSeconds: number;
+  n2TimeConstantSeconds: number;
+  idleEgtC: number;
+  egtPerN2PercentC: number;
+  highN2EgtReliefStartPercent: number;
+  highN2EgtReliefPerPercentC: number;
+  fuelSfcKgPerNewtonHour: number;
+  thrustLapseTable: Array<{ altitudeFt: number; mach: number; lapseFactor: number; oatC?: number }>;
+}
+
+type ComputeEngineThrustWithModel = (
+  n1Percent: number,
+  spec: AircraftSpec,
+  altitudeFt: number,
+  mach: number,
+  engineModel?: TestEngineModel,
+) => number;
 
 const b737EngineLapseFixtures = (
   b737PerformanceFixtures as { b737EngineLapseFixtures?: EngineLapseFixture[] }
@@ -47,6 +74,62 @@ describe('updateEngines', () => {
     s.engines[0].n1 = 90; s.engines[0].running = true;
     updateEngines(s, { ...idle, throttle1: 0.9, throttle2: 0.9 }, B737_800_SPEC, 0);
     expect(s.engines[0].fuelFlow).toBeGreaterThan(100);
+  });
+
+  it('keeps engine spool, fuel-flow, and thrust-lapse parameters in the FDM shell', () => {
+    const engine = (B737_800_FDM as unknown as { engine?: TestEngineModel }).engine;
+
+    expect(engine).toBeDefined();
+    expect(engine?.sourceReferenceIds?.length).toBeGreaterThan(0);
+    expect(engine?.claimBoundary).toMatch(/not certified/i);
+    expect(engine?.claimBoundary).toMatch(/not an? AFM/i);
+    expect(engine?.fuelSfcKgPerNewtonHour).toBeGreaterThan(0);
+    expect(engine?.spoolUpTimeConstantSeconds).toBeGreaterThan(0);
+    expect(engine?.spoolDownTimeConstantSeconds).toBeGreaterThan(engine?.spoolUpTimeConstantSeconds ?? 0);
+    expect(engine?.thrustLapseTable.length).toBeGreaterThanOrEqual(6);
+  });
+
+  it('uses the active FDM thrust-lapse table instead of hard-coded altitude/Mach math', () => {
+    const customEngine: TestEngineModel = {
+      idleN1Percent: 20,
+      togaN1Percent: 100,
+      idleN2Percent: 22,
+      n2PerN1Percent: 1.05,
+      spoolUpTimeConstantSeconds: 1.5,
+      spoolDownTimeConstantSeconds: 3,
+      n2TimeConstantSeconds: 0.6,
+      idleEgtC: 350,
+      egtPerN2PercentC: 5.5,
+      highN2EgtReliefStartPercent: 80,
+      highN2EgtReliefPerPercentC: 2,
+      fuelSfcKgPerNewtonHour: 0.55 * 0.4536 / 4.4482216152605,
+      thrustLapseTable: [
+        { altitudeFt: 0, mach: 0.2, lapseFactor: 1 },
+        { altitudeFt: 10_000, mach: 0.45, lapseFactor: 0.25 },
+      ],
+    };
+    const computeWithModel = computeEngineThrustN as unknown as ComputeEngineThrustWithModel;
+
+    const seaLevel = computeWithModel(90, B737_800_SPEC, 0, 0.2, customEngine);
+    const climb = computeWithModel(90, B737_800_SPEC, 10_000, 0.45, customEngine);
+
+    expect(climb / seaLevel).toBeCloseTo(0.25, 3);
+  });
+
+  it('flames out on dry tanks: no fuel flow or thrust, and spools down despite throttle command', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.fuel = { centerTank: 0, leftTank: 0, rightTank: 0, totalFuel: 0, fuelFlowTotal: 0 };
+    s.engines[0] = { ...s.engines[0], n1: 70, n2: 82, egt: 800, thrust: 40_000, fuelFlow: 2_000, running: true };
+    s.engines[1] = { ...s.engines[1], n1: 70, n2: 82, egt: 800, thrust: 40_000, fuelFlow: 2_000, running: true };
+
+    updateEngines(s, { ...idle, throttle1: 1, throttle2: 1 }, B737_800_SPEC, 1);
+
+    expect(s.engines[0].n1).toBeLessThan(70);
+    expect(s.engines[0].n2).toBeLessThan(82);
+    expect(s.engines[0].thrust).toBe(0);
+    expect(s.engines[0].fuelFlow).toBe(0);
+    expect(s.engines[0].running).toBe(false);
+    expect(s.fuel.fuelFlowTotal).toBe(0);
   });
 
   it('defines table-driven engine lapse placeholders with non-AFM metadata', () => {

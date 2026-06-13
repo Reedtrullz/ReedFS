@@ -1,6 +1,6 @@
 import type { AeroModel } from '../../systems/AeroModel';
 import { B737_800_AIRCRAFT_DATA } from './b737-800.v1';
-import type { ConfigurationTransitModelData, FdmLineageMetadata, FdmSourceMetadata, GearStationDefinition, GroundModelData } from './fdmTypes';
+import type { ConfigurationTransitModelData, EngineModelData, FdmLineageMetadata, FdmSourceMetadata, GearStationDefinition, GroundModelData } from './fdmTypes';
 
 export const B737_800_FDM_DATA_VERSION = '1.0.0';
 
@@ -13,6 +13,7 @@ export interface VersionedAircraftFdmData {
   lineage: FdmLineageMetadata;
   aero: AeroModel & FdmSourceMetadata;
   configuration: ConfigurationTransitModelData;
+  engine: EngineModelData;
   gearStations: GearStationDefinition[];
   ground: GroundModelData;
 }
@@ -43,7 +44,7 @@ const sourceRefsForSection = (): string[] => [...sourceReferenceIds];
 const sourceMetadataFor = (sectionName: string): FdmSourceMetadata => ({
   sourceQuality: 'gameplay-calibrated',
   sourceRefs: sourceRefsForSection(),
-  claimBoundary: `${sectionName} values are gameplay placeholders preserved for RFS simulator behavior only; they are not certified, not AFM data, not Boeing-published operating data, and must not be used to claim real 737-800 performance fidelity.`,
+  claimBoundary: `${sectionName} values are gameplay placeholders preserved for RFS simulator behavior only; they are not certified, not AFM data, not an AFM table, not Boeing-published operating data, and must not be used to claim real 737-800 performance fidelity.`,
   lastReviewed: '2026-06-13',
 });
 
@@ -113,6 +114,42 @@ export const B737_800_FDM: VersionedAircraftFdmData = {
     // blocking the current tutorial flow. Not AFM/Boeing timing data.
     flapRateDegPerSecond: 5,
     gearTransitSeconds: 6,
+  },
+  engine: {
+    ...sourceMetadataFor('Engine spool, fuel-flow, and thrust-lapse model'),
+    sourceReferenceIds: sourceRefsForSection(),
+    // Legacy behavior moved into data: idle ~20% N1, TOGA ~100% N1, with slower
+    // spool-down than spool-up. Placeholder values only; not certified engine data.
+    idleN1Percent: 20,
+    togaN1Percent: 100,
+    idleN2Percent: 22,
+    n2PerN1Percent: 1.05,
+    spoolUpTimeConstantSeconds: 1.5,
+    spoolDownTimeConstantSeconds: 3,
+    n2TimeConstantSeconds: 0.6,
+    idleEgtC: 350,
+    egtPerN2PercentC: 5.5,
+    highN2EgtReliefStartPercent: 80,
+    highN2EgtReliefPerPercentC: 2,
+    fuelSfcKgPerNewtonHour: 0.55 * 0.4536 / 4.4482216152605,
+    // Lapse grid generated from the legacy placeholder density/Mach formula to
+    // preserve current simulator behavior while making ownership data-driven.
+    // OAT is documented per point, but current Task 19 intentionally does not
+    // claim temperature interpolation; Task 25 binds weather/scenario metadata.
+    thrustLapseTable: [
+      { altitudeFt: 0, mach: 0.2, oatC: 15, lapseFactor: 1.000007 },
+      { altitudeFt: 0, mach: 0.45, oatC: 15, lapseFactor: 0.912506 },
+      { altitudeFt: 0, mach: 0.78, oatC: 15, lapseFactor: 0.796196 },
+      { altitudeFt: 0, mach: 0.82, oatC: 15, lapseFactor: 0.778595 },
+      { altitudeFt: 10_000, mach: 0.2, oatC: -5, lapseFactor: 0.808795 },
+      { altitudeFt: 10_000, mach: 0.45, oatC: -5, lapseFactor: 0.738026 },
+      { altitudeFt: 10_000, mach: 0.78, oatC: -5, lapseFactor: 0.643955 },
+      { altitudeFt: 10_000, mach: 0.82, oatC: -5, lapseFactor: 0.629720 },
+      { altitudeFt: 35_000, mach: 0.2, oatC: -54, lapseFactor: 0.440382 },
+      { altitudeFt: 35_000, mach: 0.45, oatC: -54, lapseFactor: 0.401848 },
+      { altitudeFt: 35_000, mach: 0.78, oatC: -54, lapseFactor: 0.350627 },
+      { altitudeFt: 35_000, mach: 0.82, oatC: -54, lapseFactor: 0.342877 },
+    ],
   },
   gearStations: [
     {
