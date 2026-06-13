@@ -48,10 +48,14 @@ check(ci.includes("security-events: write"), "gitleaks job must have security-ev
 check(ci.includes("pull-requests: read"), "gitleaks job must have pull-requests read permission for pull_request runs");
 check(ci.includes("810fc9652da431eaf8978b85bf4af131605559b5"), "workflow must pin RFMS/RFMC checkout to the audited commit");
 check((ci.match(/npm ci --legacy-peer-deps/g) ?? []).length >= 2, "workflow must use npm ci --legacy-peer-deps");
+check(ci.includes("npm run check:deps"), "workflow test job must run npm run check:deps before build/test");
+check(ci.includes("push: false"), "workflow must include a PR-safe Docker smoke build with push: false");
+check(ci.includes("load: true"), "workflow must load the PR Docker smoke image into the local daemon");
+check(ci.includes("curl -fsS http://localhost:3005/") && ci.includes("curl -fsS http://localhost:3005/rfs-version.json"), "workflow PR Docker smoke must curl / and /rfs-version.json");
 check(ci.includes("ghcr.io/reedtrullz/rfs:latest") && ci.includes("ghcr.io/reedtrullz/rfs:sha-${{ github.sha }}"), "workflow must push latest and sha-${{ github.sha }} tags");
 check(ci.includes("VITE_CESIUM_ION_TOKEN=${{ secrets.VITE_CESIUM_ION_TOKEN }}"), "workflow Docker build must pass the VITE_CESIUM_ION_TOKEN repo secret as a build arg");
 check(ci.includes("IMAGE_REF=ghcr.io/reedtrullz/rfs:sha-${{ github.sha }}"), "deploy must use the immutable sha image ref");
-check(!/docker run[\s\S]*ghcr\.io\/reedtrullz\/rfs:latest/.test(ci), "deploy must not run mutable latest");
+check(!/docker run[^\n]*ghcr\.io\/reedtrullz\/rfs:latest/.test(ci), "deploy must not run mutable latest");
 check(ci.includes("curl -fsS https://fly.reidar.tech/"), "workflow must verify the public domain after promotion");
 check(ci.includes("https://fly.reidar.tech/rfs-version.json"), "workflow must verify public version metadata");
 check(ci.includes("org.opencontainers.image.revision"), "workflow Docker build must include OCI labels");

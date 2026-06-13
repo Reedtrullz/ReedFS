@@ -48,6 +48,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci --legacy-peer-deps
+      - run: npm run check:deps
       - run: npm run check:release
       - run: npm run lint:ci
       - run: npm run typecheck
@@ -60,8 +61,53 @@ jobs:
         run: npx playwright install --with-deps chromium
       - run: npm run test:visual
 
-  publish:
+  docker-smoke:
     needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      # actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      # docker/build-push-action@v7
+      - name: Build PR-safe Docker smoke image
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf
+        with:
+          context: .
+          push: false
+          load: true
+          tags: rfs:pr-smoke-${{ github.sha }}
+          build-args: |
+            RFS_COMMIT_SHA=${{ github.sha }}
+            RFS_IMAGE_REF=rfs:pr-smoke-${{ github.sha }}
+            RFS_VERSION=${{ github.sha }}
+      - name: Smoke nginx container and release metadata
+        run: |
+          set -eu
+          docker rm -f rfs_pr_smoke 2>/dev/null || true
+          docker run -d --name rfs_pr_smoke \
+            -p 127.0.0.1:3005:80 \
+            rfs:pr-smoke-${{ github.sha }}
+          cleanup() {
+            docker logs --tail=50 rfs_pr_smoke 2>/dev/null || true
+            docker rm -f rfs_pr_smoke 2>/dev/null || true
+          }
+          trap cleanup EXIT
+          for attempt in $(seq 1 20); do
+            if curl -fsS http://localhost:3005/ > /dev/null; then
+              break
+            fi
+            if [ "$attempt" = "20" ]; then
+              echo "Docker smoke health check failed"
+              exit 1
+            fi
+            sleep 1
+          done
+          curl -fsS http://localhost:3005/ > /dev/null
+          curl -fsS http://localhost:3005/rfs-version.json | grep -F "${{ github.sha }}" > /dev/null
+
+  publish:
+    needs: [test, docker-smoke]
     if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     permissions:
