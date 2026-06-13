@@ -333,14 +333,16 @@ export function App() {
               setRouteLoadMessage(`No default route is available for ${scenario.name}.`);
               return;
             }
-            setRouteLoadMessage(null);
+            setRouteLoadMessage(
+              `${fp.origin}→${fp.destination} route loaded. Takeoff setup: flaps set for takeoff; trim set for takeoff; throttle idle. Press START ROLL when ready.`,
+            );
           }}
           style={btnStyle}
         >
           LOAD PLAN
         </button>
         {routeLoadMessage && (
-          <div aria-live="polite" style={routeLoadMessageStyle}>
+          <div aria-label="Route load result" aria-live="polite" role="status" style={routeLoadMessageStyle}>
             {routeLoadMessage}
           </div>
         )}
