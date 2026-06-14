@@ -18,6 +18,7 @@ The AP/FMA truth contract also now covers effective-control ownership: active ti
 The completed baseline now includes:
 
 - Quality scripts and CI release gate are in place.
+- Branch-protection and exact-SHA release closeout runbooks/checkers are in place; remote branch-protection changes and live release claims still require explicit authorization plus read-only checker evidence.
 - React hook/lint blockers are cleaned up.
 - Quaternion attitude is authoritative and initialized consistently.
 - Body/NED transforms are centralized.

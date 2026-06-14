@@ -29,6 +29,10 @@ const packageJson = JSON.parse(read("package.json"));
 const ansibleCfg = read("ansible.cfg");
 const inventory = read("inventory/hosts.yml");
 const playbook = read("ansible-playbook.yml");
+const branchProtectionRunbook = read("docs/runbooks/branch-protection.md");
+const releaseCloseoutRunbook = read("docs/runbooks/release-closeout.md");
+const branchProtectionChecker = read("scripts/check-branch-protection.mjs");
+const exactShaReleaseChecker = read("scripts/check-exact-sha-release.mjs");
 
 check(!/Cross-Origin-Opener-Policy|Cross-Origin-Embedder-Policy/.test(nginx), "nginx.conf must not set COOP/COEP headers");
 
@@ -187,6 +191,14 @@ check(packageJson.scripts?.build === "tsc -b && vite build && node scripts/write
 check(read("scripts/write-version-metadata.mjs").includes('argv[2] ?? "dist/rfs-version.json"'), "release metadata generator must default to dist/rfs-version.json and accept an output path argument");
 check(read("scripts/write-version-metadata.mjs").includes("RFS_REQUIRE_IMAGE_DIGEST"), "release metadata generator must support a release-mode guard that rejects unknown image digests");
 check(!existsSync(resolve(root, "public/rfs-version.json")), "public/rfs-version.json must not be tracked or generated in the source tree");
+
+check(branchProtectionRunbook.includes("Do not run mutation commands unless the user gives explicit current authorization"), "branch-protection runbook must require explicit authorization before remote mutations");
+check(branchProtectionRunbook.includes("secret-scan") && branchProtectionRunbook.includes("deploy"), "branch-protection runbook must document required release-governance checks");
+check(branchProtectionChecker.includes("allow_force_pushes") && branchProtectionChecker.includes("allow_deletions") && branchProtectionChecker.includes("enforce_admins"), "branch-protection checker must verify admins, force-push, and deletion policy");
+check(releaseCloseoutRunbook.includes("Pushed is not deployed") && releaseCloseoutRunbook.includes("CI green is not live"), "release-closeout runbook must preserve pushed/CI/live non-claim boundaries");
+check(releaseCloseoutRunbook.includes("check-exact-sha-release.mjs") && releaseCloseoutRunbook.includes("rfs-version.json"), "release-closeout runbook must document exact-SHA live metadata verification");
+check(exactShaReleaseChecker.includes("status === 'completed'") && exactShaReleaseChecker.includes("conclusion === 'success'"), "exact-SHA release checker must require completed/success GitHub Actions status");
+check(exactShaReleaseChecker.includes("live.commit") && exactShaReleaseChecker.includes("live.version") && exactShaReleaseChecker.includes("imageDigest"), "exact-SHA release checker must verify live commit/version/image digest metadata");
 
 if (failures.length > 0) {
   stderr.write("release hardening checks failed:\n");

@@ -7,6 +7,7 @@ Current source-of-truth documents:
 - `../architecture.md` — current implementation architecture.
 - `../physics-invariants.md` — active physics contracts and regression checklist.
 - `../roadmap.md` — prioritized necessary enhancements.
+- `../runbooks/branch-protection.md` and `../runbooks/release-closeout.md` — current release-governance verification runbooks; remote branch-protection changes and live/deployed claims require explicit authorization plus checker evidence.
 - `../reviews/2026-06-12-comprehensive-project-review-remaining-work.md` — latest comprehensive project review, browser dogfood evidence, and remaining-work roadmap.
 - `2026-06-12-rfs-comprehensive-remediation-program.md` — current umbrella implementation program for the 55-finding 2026-06-12 dogfood/deep-review remediation set; links and sequences the child plans below.
 - `2026-06-12-rfs-p0-truth-playability-remediation.md` — current P0 player-truth plan for positive-rate/gear-up, scenario-card VR, LOAD PLAN route-vs-AP semantics, ENVA no-route feedback, and initial-climb envelope proof.
