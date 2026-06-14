@@ -1,5 +1,27 @@
+# Dependency and build outputs
 node_modules/
 dist/
-*.local
+coverage/
+test-results/
+playwright-report/
+
+# VCS and local review/dogfood artifacts
+.git
+.gitignore
+dogfood-output/
+docs/reviews/
+
+# Environment files and local overrides
 .env
+.env*
+*.local
+
+# Logs and editor/OS artifacts
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 .DS_Store
+.vscode/
+.idea/

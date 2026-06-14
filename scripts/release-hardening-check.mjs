@@ -14,8 +14,13 @@ function check(condition, message) {
   if (!condition) failures.push(message);
 }
 
+function dockerignoreHasLine(pattern) {
+  return dockerignore.split(/\r?\n/).some((line) => line.trim() === pattern);
+}
+
 const ci = read(".github/workflows/ci.yml");
 const dockerfile = read("Dockerfile");
+const dockerignore = read(".dockerignore");
 const nginx = read("nginx.conf");
 const packageJson = JSON.parse(read("package.json"));
 const ansibleCfg = read("ansible.cfg");
@@ -80,6 +85,34 @@ check(dockerfile.includes("USER 101:101"), "Dockerfile runtime stage must run ng
 check(dockerfile.includes("COPY --from=builder --chown=101:101 /app/dist"), "Dockerfile must chown static assets for the non-root nginx user");
 check(dockerfile.includes("EXPOSE 8080") && dockerfile.includes("http://127.0.0.1:8080/"), "Dockerfile runtime must expose and healthcheck non-privileged port 8080");
 check(dockerfile.includes("ARG VITE_CESIUM_ION_TOKEN") && dockerfile.includes("VITE_CESIUM_ION_TOKEN=${VITE_CESIUM_ION_TOKEN}"), "Dockerfile must expose VITE_CESIUM_ION_TOKEN to the Vite build");
+
+const requiredDockerignoreExclusions = [
+  ".git",
+  "dogfood-output/",
+  "coverage/",
+  "test-results/",
+  "playwright-report/",
+  "docs/reviews/",
+  ".env",
+  ".env*",
+  "*.local",
+  "*.log",
+  ".DS_Store",
+];
+for (const pattern of requiredDockerignoreExclusions) {
+  check(dockerignoreHasLine(pattern), `.dockerignore must exclude ${pattern}`);
+}
+const requiredDockerBuildInputs = [
+  "package.json",
+  "package-lock.json",
+  "src/",
+  "public/",
+  "nginx.conf",
+  "Dockerfile",
+];
+for (const pattern of requiredDockerBuildInputs) {
+  check(!dockerignoreHasLine(pattern), `.dockerignore must not exclude build input ${pattern}`);
+}
 
 check(nginx.includes("listen 8080;"), "nginx.conf must listen on non-privileged port 8080");
 check(nginx.includes("client_body_temp_path /tmp/client_temp;") && nginx.includes("proxy_temp_path /tmp/proxy_temp;"), "nginx.conf must put temp paths on tmpfs-compatible /tmp locations");

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import dockerignore from '../../../.dockerignore?raw';
 import ciWorkflow from '../../../.github/workflows/ci.yml?raw';
 import dockerfile from '../../../Dockerfile?raw';
 import nginxConf from '../../../nginx.conf?raw';
@@ -58,6 +59,35 @@ describe('canonical docs posture', () => {
     }
     expect(ciWorkflow).toContain('127.0.0.1:3005:8080');
     expect(ciWorkflow).toContain('127.0.0.1:3004:8080');
+  });
+
+  it('keeps local artifacts and secrets out of Docker build contexts without excluding build inputs', () => {
+    for (const requiredExclusion of [
+      '.git',
+      'dogfood-output/',
+      'coverage/',
+      'test-results/',
+      'playwright-report/',
+      'docs/reviews/',
+      '.env',
+      '.env*',
+      '*.local',
+      '*.log',
+      '.DS_Store',
+    ]) {
+      expect(dockerignore).toContain(requiredExclusion);
+    }
+
+    for (const requiredInput of [
+      'package.json',
+      'package-lock.json',
+      'src/',
+      'public/',
+      'nginx.conf',
+      'Dockerfile',
+    ]) {
+      expect(dockerignore).not.toContain(requiredInput);
+    }
   });
 
   it('serves browser security headers without enabling COOP or COEP', () => {
