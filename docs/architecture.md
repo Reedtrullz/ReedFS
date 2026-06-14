@@ -21,27 +21,28 @@ RFMS avionics logic is not duplicated in this repo. RFS imports shared autopilot
 
 ```text
 src/App.tsx
-  -> src/hooks/useSimLoop.ts
-    -> src/runtime/frameScheduler.ts
-      -> input phase: held keyboard + gamepad actions -> applyInputActions(dt)
-      -> fixedSimulation phase: src/store/simStore.ts tick(timestamp)
-        -> structuredClone(aircraft)
-        -> computeRouteStatus(state, flightPlan, activeLegIndex)
-        -> computeAutopilotCommandsForStateWithControllerState(state, apState, flightPlan, dt, routeStatus.activeLegIndex, routeStatus, apControllerState)
-        -> compose pilot inputs + AP-owned axis/throttle commands into effectiveControls
-        -> src/sim/physics/integrate.ts
-          1. updateEngines(state, effectiveControls, spec, dt)
-          2. updateFuel(state, spec, dt)
-          3. updateElectrical(state, dt)
-          4. updateHydraulic(state, dt)
-          5. computeAero(state, effectiveControls, spec, B737_AERO, wind)
-          6. integrate angular rates, quaternion, velocity, and position
-          7. sample supported-airport runway/off-runway surface, then update ground/contact state and flight phase
-        -> recompute routeStatus / activeLegIndex
-        -> rebuild phase-aware GuidanceState/checklist/tutorial state from aircraft, scenario, status, and effective controls
-        -> commit next Zustand aircraft/control/guidance snapshot
-      -> render/effects phase: central extension point; Cesium camera follow remains on scene.preRender
-      -> audio phase: if AUDIO enabled, update EngineSound and GPWS from the committed sim state
+  -> src/app/RfsShell.tsx
+    -> src/hooks/useSimLoop.ts
+      -> src/runtime/frameScheduler.ts
+        -> input phase: held keyboard + gamepad actions -> applyInputActions(dt)
+        -> fixedSimulation phase: src/store/simStore.ts tick(timestamp)
+          -> structuredClone(aircraft)
+          -> computeRouteStatus(state, flightPlan, activeLegIndex)
+          -> computeAutopilotCommandsForStateWithControllerState(state, apState, flightPlan, dt, routeStatus.activeLegIndex, routeStatus, apControllerState)
+          -> compose pilot inputs + AP-owned axis/throttle commands into effectiveControls
+          -> src/sim/physics/integrate.ts
+            1. updateEngines(state, effectiveControls, spec, dt)
+            2. updateFuel(state, spec, dt)
+            3. updateElectrical(state, dt)
+            4. updateHydraulic(state, dt)
+            5. computeAero(state, effectiveControls, spec, B737_AERO, wind)
+            6. integrate angular rates, quaternion, velocity, and position
+            7. sample supported-airport runway/off-runway surface, then update ground/contact state and flight phase
+          -> recompute routeStatus / activeLegIndex
+          -> rebuild phase-aware GuidanceState/checklist/tutorial state from aircraft, scenario, status, and effective controls
+          -> commit next Zustand aircraft/control/guidance snapshot
+        -> render/effects phase: central extension point; Cesium camera follow remains on scene.preRender
+        -> audio phase: if AUDIO enabled, update EngineSound and GPWS from the committed sim state
 ```
 
 The system order is intentional:
@@ -101,8 +102,8 @@ RFS renders with Cesium plus a focused Three.js overlay:
 - `AircraftRenderer.ts` keeps the aircraft object persistent and updates transform/animation state each frame.
 - `CockpitLayer.tsx` and `CockpitModel.ts` provide the first-pass pilot-eye cockpit shell for cockpit camera mode. Cockpit raycast metadata now separates real click actions from explicit unavailable placeholders: throttle/flap/gear/speedbrake controls patch pilot inputs, the MCP panel toggles FD L through the same AP state path as the 2D MCP, and the yoke reports an unavailable reason instead of silently no-oping.
 - `CameraManager.ts` owns chase/cockpit camera updates from Cesium `preRender` so follow cameras stay live while the sim runs.
-- `CloudLayer.tsx` uses scenario-authored METAR/cloud metadata: `App.tsx` supplies the selected scenario cloud seed and cloud anchor, so generated cloud billboard layouts are deterministic per scenario instead of tied to global randomness or a hard-coded KSEA origin. `ContrailLayer.tsx` adds aircraft effects; both are part of the lazy viewport surface set.
-- `App.tsx` lazy-loads Cesium/Three viewport surfaces, cockpit/debug overlays, and MCP/PFD instrument surfaces; `RfsLayout.tsx` owns the fixed overlay layout slots, the named `<main>` landmark, visually hidden simulator `<h1>`, `data-rfs-panel` hooks, responsive breakpoints, debug scroll lane, and Cesium-credit-safe bottom reservation so product panels do not fight direct fixed positioning. The managed controls slot exposes a named `Simulator controls` region and truthful `aria-pressed` state for current overlay/audio controls. `vite.config.ts` pins manual chunks for Cesium, Three, React/Zustand, and generic vendor code, with a documented 550 kB ceiling for the isolated Three.js vendor chunk while the historical Cesium bundle remains the large exception.
+- `CloudLayer.tsx` uses scenario-authored METAR/cloud metadata: `useScenarioWeather.ts` supplies the selected scenario fallback/fetched METAR, while `RfsShell.tsx` passes scenario cloud seed and cloud anchor so generated cloud billboard layouts are deterministic per scenario instead of tied to global randomness or a hard-coded KSEA origin. `ContrailLayer.tsx` adds aircraft effects; both are part of the lazy viewport surface set.
+- `App.tsx` is now only the ErrorBoundary wrapper. `RfsShell.tsx` lazy-loads Cesium/Three viewport surfaces, cockpit/debug overlays, and MCP/PFD instrument surfaces; `RfsLayout.tsx` owns the fixed overlay layout slots, the named `<main>` landmark, visually hidden simulator `<h1>`, `data-rfs-panel` hooks, responsive breakpoints, debug scroll lane, and Cesium-credit-safe bottom reservation so product panels do not fight direct fixed positioning. `BottomControlBar.tsx` owns the managed controls slot content and exposes truthful `aria-pressed` state for overlay/audio buttons. `vite.config.ts` pins manual chunks for Cesium, Three, React/Zustand, and generic vendor code, with a documented 550 kB ceiling for the isolated Three.js vendor chunk while the historical Cesium bundle remains the large exception.
 
 Known rendering follow-up:
 
@@ -116,7 +117,7 @@ RFS bridges RFMS-compatible avionics state into native physics and player-facing
 
 - `RfsMCP.tsx` edits RFMS-compatible selected speed/heading/altitude/vertical-speed targets, creates an unbacked default AP state for target/FD switch clicks, backs CMD A only when a real AP mode is engaged, exposes clickable FD L/R, SPD, and N1 buttons because those backed controls now exist, keeps the Boeing `speedMode` and `n1` flags mutually exclusive, and keeps unsupported modes hidden.
 - `RfsPFD.tsx` renders readable speed/altitude tapes, attitude/heading, low-altitude radio-altitude awareness, selected/managed MCP target strip/tape/footer bugs, honest FD command bars for supported direct HDG SEL/ALT HOLD modes, and an FMA row from the same truth modes the servo laws use. Route-mode FMA truth uses the same route-status-to-`NavOutput` conversion as AP LNAV/VNAV; FD bars consume the shared guidance target bank from `guidanceTargets.ts` instead of recomputing independent AP targets; `N1` is shown from `apState.truth.thrustActive`, not from a cosmetic flag. PFD/debug telemetry selectors subscribe to primitive values to avoid overlay churn.
-- `App.tsx` can load the KSEA -> OLM -> BTG -> KPDX sample route. LOAD PLAN applies the safe LNAV + SPEED + ALT_HOLD defaults only in the stopped/PARKED preflight state; during a running takeoff it stores the route without auto-commanding AP modes.
+- `BottomControlBar.tsx` exposes LOAD PLAN through `RfsShell.tsx`. LOAD PLAN applies the safe LNAV + SPEED + ALT_HOLD defaults only in the stopped/PARKED preflight state; during a running takeoff it stores the route without auto-commanding AP modes.
 - `flightPlanLoader.ts` keeps the KSEA sample route as a canned source, and `fms/routeAdapter.ts` defines the RFMS-compatible route-edit seam around the shared `FlightPlan` shape: route sources, staged draft operations, DIRECT_TO, explicit DISCONTINUITY insertion, undo, and EXEC are pure data operations. This is not a CDU implementation yet; it prevents canned routes from being the whole FMS boundary while preserving route-status/LNAV ownership in the store.
 - `navigation.ts` validates route geometry, computes cross-track/along-track/desired-track/turn metrics, and sequences legs on capture radius, passed-waypoint geometry, or a bounded turn-anticipation gate.
 - `RouteStatus.tsx` exposes active leg, next waypoint, DTG, track, ETA, and LNAV unavailable reasons in a named live `Route status` region so route changes and unavailable reasons are screen-reader reachable.
@@ -135,7 +136,7 @@ Known guidance follow-up:
 ## Weather architecture
 
 - `weather.ts` defines scenario-authored weather metadata (`stationIcao`, fallback QNH/temperature/visibility/clouds, deterministic gust/cloud seeds, and cloud anchor), converts it into fallback METAR data, and parses optional METAR gust speed plus scenario gust seed into `WindInfo`.
-- `App.tsx` fetches METAR from the selected scenario station (for example KPDX scenarios query KPDX instead of hard-coded KSEA), uses scenario fallback METAR while the external proxy is absent/unavailable, and passes scenario cloud seed/anchor to `CloudLayer.tsx`.
+- `useScenarioWeather.ts` fetches METAR from the selected scenario station (for example KPDX scenarios query KPDX instead of hard-coded KSEA), uses scenario fallback METAR while the external proxy is absent/unavailable, seeds store wind, and returns the cloud-layer METAR data to `RfsShell.tsx`.
 - `aero.ts` derives density-altitude atmosphere from selected scenario QNH and surface temperature for the physics solve while preserving the existing ISA path when no scenario weather is supplied.
 - `environment.ts` converts METAR wind to NED then to body axes, and layers deterministic seeded gust perturbations onto air-relative velocity only.
 - `computeAirRelativeVelocity()` subtracts wind/gust from ground-relative body velocity and returns a new object.
@@ -156,7 +157,7 @@ Known guidance follow-up:
 
 - `audioMapping.ts` contains pure mappings for gain clamping, engine N1 -> oscillator parameters, and GPWS speech parameters.
 - `AudioEngine.ts` owns the `AudioContext`, master/engine/cockpit buses, explicit `start()`, idempotent `dispose()`, and lifecycle status reporting.
-- `App.tsx` exposes the `AUDIO: OFF/ON` control. Mounting the app does not start or resume Web Audio; the player must click the audio control to satisfy browser autoplay policy.
+- `BottomControlBar.tsx` exposes the `AUDIO: OFF/ON` control through `RfsShell.tsx`. Mounting the app does not start or resume Web Audio; the player must click the audio control to satisfy browser autoplay policy.
 - `useAudioLoop(true)` creates engine oscillators and contributes an audio phase to the central `FrameScheduler`; engine sound updates and GPWS callout checks run after the committed sim tick in the same app RAF. When disabled, no audio phase work or engine oscillators are active.
 
 ## Quality and release architecture

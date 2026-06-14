@@ -35,7 +35,10 @@ The next major enhancements are the prioritized realism/product phases documente
 
 ```text
 src/
-  App.tsx                         Browser UI shell and controls
+  App.tsx                         ErrorBoundary wrapper around the simulator shell
+  app/RfsShell.tsx                 Browser UI shell: lazy viewport, input/camera/audio wiring, layout composition
+  app/useScenarioWeather.ts        Scenario weather fallback, METAR fetch, and store wind bootstrap
+  components/BottomControlBar.tsx  Bottom simulator controls and route-load status
   runtime/frameScheduler.ts          Single app RAF scheduler: input -> fixed sim -> render/effects -> audio
   hooks/useSimLoop.ts              Central scheduler hook into store tick and frame phases
   store/simStore.ts                Zustand sim state, inputs, AP state, wind, flight plan

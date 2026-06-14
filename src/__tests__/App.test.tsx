@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
+import appSource from '../App.tsx?raw';
 
 // Mock Web Audio API (not available in jsdom)
 const mockAudioContexts: MockAudioContext[] = [];
@@ -435,6 +436,11 @@ async function settleLazyImports(): Promise<void> {
 }
 
 describe('App', () => {
+  it('delegates simulator shell composition to RfsShell instead of owning feature surfaces inline', () => {
+    expect(appSource).toMatch(/<RfsShell\b/);
+    expect(appSource).not.toMatch(/<RfsLayout\b|<CesiumViewport\b|<ScenarioPanel\b|<BottomControlBar\b/);
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     mockAudioContexts.length = 0;
