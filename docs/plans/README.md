@@ -8,6 +8,7 @@ Current source-of-truth documents:
 - `../physics-invariants.md` — active physics contracts and regression checklist.
 - `../roadmap.md` — prioritized necessary enhancements.
 - `../runbooks/branch-protection.md` and `../runbooks/release-closeout.md` — current release-governance verification runbooks; `master` branch protection is enabled/verified and live/deployed claims require exact-SHA checker evidence.
+- `2026-06-14-rfs-strict-meaningful-use-round3-remediation.md` — reviewed implementation plan covering RFS-R3-001 through RFS-R3-044 with Task 7 as final continuous black-box acceptance after prerequisite fixes.
 - `../reviews/2026-06-14-rfs-strict-meaningful-use-round3.md` — current strict round-3 meaningful-use review; Task 7 remains blocked by visible takeoff setup truth, black-box proof scope, AP vertical truth, and route-to-approach/landing continuity gaps.
 - `../reviews/2026-06-13-rfs-meaningful-use-remediation-closeout.md` — final 46-finding closeout ledger and proof-boundary record for the June 13 meaningful-use remediation pass.
 - `../reviews/2026-06-12-comprehensive-project-review-remaining-work.md` — latest comprehensive project review, browser dogfood evidence, and remaining-work roadmap.
