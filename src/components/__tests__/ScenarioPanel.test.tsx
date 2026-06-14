@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import '@testing-library/jest-dom/vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ScenarioPanel } from '../ScenarioPanel';
 import { useSimStore } from '../../store/simStore';
@@ -28,6 +29,14 @@ describe('ScenarioPanel', () => {
     expect(screen.getByText('Checklist')).toBeTruthy();
     expect(screen.getByText('Coach')).toBeTruthy();
     expect(screen.getByText('Flaps set for takeoff')).toBeTruthy();
+  });
+
+  it('shows tutorial takeoff guidance that preserves configured setup on START ROLL', () => {
+    render(<ScenarioPanel />);
+
+    const panel = screen.getByRole('region', { name: 'Scenario and tutorial' });
+    expect(panel).toHaveTextContent(/START ROLL preserves/i);
+    expect(screen.queryByText(/START ROLL resets the takeoff levers/i)).not.toBeInTheDocument();
   });
 
   it('changes scenario and resets tutorial guidance', () => {

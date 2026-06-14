@@ -79,7 +79,7 @@ export const ENVA_TUTORIAL_SCENARIO: FlightScenario = {
     {
       id: 'line-up',
       title: 'Line up and configure',
-      body: 'Start on ENVA runway 09 with gear down and both throttles idle. START ROLL resets the takeoff levers, so set flaps 5, trim 5.0, then advance thrust manually.',
+      body: 'Start on ENVA runway 09 with gear down and both throttles idle. START ROLL preserves the configured setup, so set flaps 5, trim 5.0, then advance thrust manually.',
     },
     {
       id: 'advance-thrust',
@@ -123,7 +123,7 @@ export const KSEA_TUTORIAL_SCENARIO: FlightScenario = {
     {
       id: 'line-up',
       title: 'Line up and configure',
-      body: 'Start on KSEA 16L with gear down and both throttles idle. START ROLL resets the takeoff levers, so set flaps 5, trim 5.0, then advance thrust manually.',
+      body: 'Start on KSEA 16L with gear down and both throttles idle. START ROLL preserves the configured setup, so set flaps 5, trim 5.0, then advance thrust manually.',
     },
     {
       id: 'advance-thrust',

@@ -12,7 +12,7 @@ test.describe('RFS black-box player loop proof', () => {
 
     await expect(page.getByLabel('Route status').getByText('KSEA→KPDX')).toBeVisible();
     await expect(page.getByRole('status', { name: 'Route load result' })).toHaveText(
-      'KSEA→KPDX route loaded. Takeoff setup reminder: confirm flaps for takeoff, set takeoff trim, keep throttle idle until ready, then press START ROLL.',
+      'KSEA→KPDX route loaded. Confirm flaps 5, trim 5.0, idle throttle, then START ROLL.',
     );
     const takeoffSetup = page.getByRole('region', { name: 'Takeoff setup' });
     await expect(takeoffSetup).toBeVisible();

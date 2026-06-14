@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { TakeoffSetupPanel } from '../TakeoffSetupPanel';
 import { useSimStore } from '../../store/simStore';
@@ -22,7 +23,8 @@ describe('TakeoffSetupPanel', () => {
   it('shows takeoff configuration values and dispatches existing input actions', () => {
     render(<TakeoffSetupPanel />);
 
-    expect(screen.getByRole('region', { name: 'Takeoff setup' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Takeoff setup' })).toHaveTextContent(/START ROLL preserves/i);
+    expect(screen.queryByText(/resets the takeoff levers/i)).not.toBeInTheDocument();
     expect(screen.getByText('Flaps 5')).toBeTruthy();
     expect(screen.getByText('Trim 5.0')).toBeTruthy();
     expect(screen.getByText('Throttle 0%')).toBeTruthy();

@@ -244,7 +244,7 @@ export function RfsShell() {
       return;
     }
     setRouteLoadMessage(
-      `${fp.origin}→${fp.destination} route loaded. Takeoff setup reminder: confirm flaps for takeoff, set takeoff trim, keep throttle idle until ready, then press START ROLL.`,
+      `${fp.origin}→${fp.destination} route loaded. Confirm flaps ${scenario.flapSetting}, trim ${scenario.stabilizerTrimUnits.toFixed(1)}, idle throttle, then START ROLL.`,
     );
   };
 

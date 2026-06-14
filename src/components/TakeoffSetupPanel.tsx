@@ -74,7 +74,7 @@ export function TakeoffSetupPanel() {
     <section aria-label="Takeoff setup" style={panelStyle}>
       <div style={titleStyle}>Takeoff setup</div>
       <div style={{ color: '#ffdfad', fontSize: 11, lineHeight: 1.4, marginTop: 5 }}>
-        Configure the B737 before pressing START ROLL.
+        Set flaps, trim, and throttle before or after START ROLL. START ROLL preserves the configured takeoff setup and clears brakes/AP.
       </div>
 
       <div aria-label="Current takeoff configuration" style={valuesStyle}>

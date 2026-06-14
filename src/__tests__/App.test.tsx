@@ -795,13 +795,29 @@ describe('App', () => {
     }
   });
 
-  it('LOAD PLAN does not engage AP modes on the default route while stopped', () => {
+  it('LOAD PLAN shows route loaded takeoff setup guidance without engaging AP modes while stopped', () => {
     render(<App />);
 
     fireEvent.click(screen.getByRole('button', { name: 'LOAD PLAN' }));
 
     expect(mockSetFlightPlan).toHaveBeenCalledWith(expect.objectContaining({ origin: 'KSEA', destination: 'KPDX' }));
     expect(mockSetApState).not.toHaveBeenCalled();
+    expect(screen.getByRole('status', { name: 'Route load result' }).textContent).toBe(
+      'KSEA→KPDX route loaded. Confirm flaps 5, trim 5.0, idle throttle, then START ROLL.',
+    );
+    expect(screen.getByRole('status', { name: 'Route load result' }).textContent).not.toMatch(/resets the takeoff levers|Takeoff setup reminder/i);
+  });
+
+  it('LOAD PLAN derives takeoff setup guidance from the selected KSEA scenario', () => {
+    useSimStore.getState().selectedScenarioId = 'ksea-light-pattern';
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'LOAD PLAN' }));
+
+    expect(mockSetFlightPlan).toHaveBeenCalledWith(expect.objectContaining({ origin: 'KSEA', destination: 'KPDX' }));
+    expect(screen.getByRole('status', { name: 'Route load result' }).textContent).toBe(
+      'KSEA→KPDX route loaded. Confirm flaps 5, trim 4.5, idle throttle, then START ROLL.',
+    );
   });
 
   it('LOAD PLAN stores the route without creating AP state when AP state is null', () => {
