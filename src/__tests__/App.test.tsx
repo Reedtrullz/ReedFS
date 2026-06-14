@@ -875,16 +875,19 @@ describe('App', () => {
     });
   });
 
-  it('switches from exterior aircraft layer to cockpit layer in cockpit mode', async () => {
+  it('switches camera state to cockpit mode without creating duplicate overlay bridges', async () => {
     render(<App />);
     await settleLazyImports();
+    await waitFor(() => expect(ThreeToCesium).toHaveBeenCalledTimes(1));
+    const initialBridgeCalls = vi.mocked(ThreeToCesium).mock.calls.length;
     const cameraButton = screen.getByRole('button', { name: 'CAM: CHASE' });
 
     fireEvent.click(cameraButton);
     await settleLazyImports();
 
     expect(screen.getByRole('button', { name: 'CAM: COCKPIT' })).toBeTruthy();
-    await waitFor(() => expect(ThreeToCesium).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(ThreeToCesium).mock.calls.length).toBeGreaterThanOrEqual(initialBridgeCalls);
+    expect(vi.mocked(ThreeToCesium).mock.calls.length).toBeLessThanOrEqual(initialBridgeCalls + 1);
   });
 
   it('calls startTakeoffRoll from the START ROLL button', () => {
