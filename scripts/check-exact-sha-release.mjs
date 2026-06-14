@@ -64,6 +64,8 @@ async function fetchLiveJson(url) {
 function findSuccessfulRun(runs, sha) {
   return (runs.workflow_runs ?? []).find((run) => (
     run.head_sha === sha
+    && run.name === 'CI/CD'
+    && run.event === 'push'
     && run.status === 'completed'
     && run.conclusion === 'success'
   ));
@@ -103,7 +105,7 @@ async function main() {
     const runs = ghApi(`repos/${args.repo}/actions/runs?branch=${encodeQuery(args.branch)}&head_sha=${encodeQuery(args.sha)}&per_page=100`);
     selectedRun = findSuccessfulRun(runs, args.sha);
     if (!selectedRun) {
-      failures.push(`no completed/success GitHub Actions run found for ${args.repo}@${args.sha} on ${args.branch}`);
+      failures.push(`no completed/success CI/CD push GitHub Actions run found for ${args.repo}@${args.sha} on ${args.branch}`);
     } else {
       const jobs = ghApi(`repos/${args.repo}/actions/runs/${selectedRun.id}/jobs?per_page=100`);
       deployJob = findJob(jobs, 'deploy');
