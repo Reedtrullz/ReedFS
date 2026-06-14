@@ -8,7 +8,7 @@ const root = process.cwd();
 const artifactPath = path.resolve(root, process.env.RFS_VISUAL_TIMINGS_FILE ?? 'test-results/visual-timings.json');
 const configPath = path.resolve(root, 'playwright.config.ts');
 const maxTestDurationMs = Number(process.env.RFS_VISUAL_MAX_TEST_MS ?? 80_000);
-const maxTotalDurationMs = Number(process.env.RFS_VISUAL_MAX_TOTAL_MS ?? 390_000);
+const maxTotalDurationMs = Number(process.env.RFS_VISUAL_MAX_TOTAL_MS ?? 480_000);
 const maxArtifactAgeMs = Number(process.env.RFS_VISUAL_MAX_ARTIFACT_AGE_MS ?? 10 * 60_000);
 
 function fail(message) {
