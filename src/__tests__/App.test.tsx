@@ -450,6 +450,19 @@ describe('App', () => {
     cleanup();
   });
 
+  it('starts one centralized app frame loop for input, simulation, render/effects, and audio scheduling', async () => {
+    const requestFrame = vi.spyOn(window, 'requestAnimationFrame').mockImplementation(() => 101);
+    const cancelFrame = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => undefined);
+
+    render(<App />);
+    await settleLazyImports();
+
+    expect(requestFrame).toHaveBeenCalledTimes(1);
+
+    cleanup();
+    expect(cancelFrame).toHaveBeenCalledTimes(1);
+  });
+
   it('hides debug overlays by default while keeping the flight instrument overlay available', async () => {
     render(<App />);
     await settleLazyImports();

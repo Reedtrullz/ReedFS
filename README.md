@@ -36,7 +36,8 @@ The next major enhancements are the prioritized realism/product phases documente
 ```text
 src/
   App.tsx                         Browser UI shell and controls
-  hooks/useSimLoop.ts              RAF heartbeat into the store tick
+  runtime/frameScheduler.ts          Single app RAF scheduler: input -> fixed sim -> render/effects -> audio
+  hooks/useSimLoop.ts              Central scheduler hook into store tick and frame phases
   store/simStore.ts                Zustand sim state, inputs, AP state, wind, flight plan
   sim/
     types.ts                       Aircraft state/spec/control types and initial state
@@ -178,8 +179,9 @@ Current implementation is still main-thread physics:
 
 ```text
 React App
-  -> useSimLoop RAF
-    -> simStore.tick(dt)
+  -> useSimLoop single RAF via runtime/FrameScheduler
+    -> input phase: held keyboard + gamepad actions -> applyInputActions(dt)
+    -> fixedSimulation phase: simStore.tick(timestamp)
       -> computeRouteStatus before physics for active-leg AP targets
       -> computeAutopilotCommandsForState (HDG/LNAV/VNAV/VS plus SPEED/N1 thrust)
       -> compose pilotInputs + apCommands into effectiveControls
@@ -197,6 +199,8 @@ React App
       -> recompute routeStatus / activeLegIndex
       -> rebuild GuidanceState
       -> Zustand state update
+    -> render/effects phase: reserved central hook for browser-frame effects; Cesium camera remains on scene.preRender
+    -> audio phase: when AUDIO is enabled, update EngineSound and GPWS from the committed sim state
 ```
 
 Moving physics to a default-on browser `Worker` remains a recommended follow-up after the state/control/route contracts stabilize. The current bridge slice provides runtime adapters, main-thread/worker-handler parity tests, and an experimental browser module Worker selected only by `VITE_RFS_WORKER_PHYSICS=1`; production still defaults to the main-thread adapter.
@@ -211,7 +215,7 @@ With `VITE_RFS_WORKER_PHYSICS=1`, `src/sim/simulationRuntime.ts` instantiates a 
 
 ### Audio startup
 
-Audio is explicit and browser-autoplay-safe. The `AUDIO: OFF` cockpit control is the only path that starts the `AudioContext`; mounting the app no longer resumes Web Audio or creates engine oscillators. Once enabled, `useAudioLoop(true)` drives engine sound parameters and GPWS callouts from the current sim state. Turning audio off stops the loop and mutes the master bus.
+Audio is explicit and browser-autoplay-safe. The `AUDIO: OFF` cockpit control is the only path that starts the `AudioContext`; mounting the app no longer resumes Web Audio or creates engine oscillators. Once enabled, `useAudioLoop(true)` contributes an audio phase to the central `FrameScheduler` so engine sound parameters and GPWS callouts run after the committed sim tick in the same app RAF. Turning audio off stops the audio phase work, disposes engine sounds, and mutes the master bus.
 
 ## Deployment
 

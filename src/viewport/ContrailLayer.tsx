@@ -1,9 +1,15 @@
 import { useEffect, type RefObject } from 'react';
 import * as Cesium from 'cesium';
 import { useSimStore } from '../store/simStore';
+import type { FramePhase } from '../runtime/frameScheduler';
 import { isCesiumResourceDestroyed } from './cesiumLifecycle';
 
-export function ContrailLayer({ viewerRef }: { viewerRef: RefObject<Cesium.Viewer | null> }) {
+export interface ContrailLayerProps {
+  viewerRef: RefObject<Cesium.Viewer | null>;
+  registerFrameEffect: (effect: FramePhase) => () => void;
+}
+
+export function ContrailLayer({ viewerRef, registerFrameEffect }: ContrailLayerProps) {
   useEffect(() => {
     const viewer = viewerRef.current;
     if (!viewer) return;
@@ -25,8 +31,7 @@ export function ContrailLayer({ viewerRef }: { viewerRef: RefObject<Cesium.Viewe
       }),
     );
 
-    let raf: number;
-    const update = () => {
+    const updateContrails: FramePhase = () => {
       const a = useSimStore.getState().aircraft;
       if (a.position.alt > 25000 && a.engines[0].running) {
         system.emissionRate = 80;
@@ -39,17 +44,17 @@ export function ContrailLayer({ viewerRef }: { viewerRef: RefObject<Cesium.Viewe
       } else {
         system.emissionRate = 0;
       }
-      raf = requestAnimationFrame(update);
     };
-    raf = requestAnimationFrame(update);
+    updateContrails({ timestamp: performance.now(), dt: 0 });
+    const unregister = registerFrameEffect(updateContrails);
 
     return () => {
-      cancelAnimationFrame(raf);
+      unregister();
       if (!isCesiumResourceDestroyed(viewer)) {
         primitives.remove(system);
       }
     };
-  }, [viewerRef]);
+  }, [registerFrameEffect, viewerRef]);
 
   return null;
 }

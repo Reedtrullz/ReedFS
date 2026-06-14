@@ -12,7 +12,7 @@ Browser
   CesiumJS globe and terrain
   Three.js aircraft/effects layer via three-to-cesium
   Zustand store for aircraft/input/AP/weather/flight-plan state
-  TypeScript 6-DOF integration loop on requestAnimationFrame
+  TypeScript 6-DOF integration loop on a central FrameScheduler RAF
 ```
 
 RFMS avionics logic is not duplicated in this repo. RFS imports shared autopilot and flight-plan types from the sibling RFMS checkout through the `@shared` Vite alias.
@@ -22,22 +22,26 @@ RFMS avionics logic is not duplicated in this repo. RFS imports shared autopilot
 ```text
 src/App.tsx
   -> src/hooks/useSimLoop.ts
-    -> src/store/simStore.ts tick()
-      -> structuredClone(aircraft)
-      -> computeRouteStatus(state, flightPlan, activeLegIndex)
-      -> computeAutopilotCommandsForState(state, apState, flightPlan, dt, routeStatus.activeLegIndex, routeStatus)
-      -> compose pilot inputs + AP-owned axis/throttle commands into effectiveControls
-      -> src/sim/physics/integrate.ts
-        1. updateEngines(state, effectiveControls, spec, dt)
-        2. updateFuel(state, spec, dt)
-        3. updateElectrical(state, dt)
-        4. updateHydraulic(state, dt)
-        5. computeAero(state, effectiveControls, spec, B737_AERO, wind)
-        6. integrate angular rates, quaternion, velocity, and position
-        7. sample supported-airport runway/off-runway surface, then update ground/contact state and flight phase
-      -> recompute routeStatus / activeLegIndex
-      -> rebuild phase-aware GuidanceState/checklist/tutorial state from aircraft, scenario, status, and effective controls
-      -> commit next Zustand aircraft/control/guidance snapshot
+    -> src/runtime/frameScheduler.ts
+      -> input phase: held keyboard + gamepad actions -> applyInputActions(dt)
+      -> fixedSimulation phase: src/store/simStore.ts tick(timestamp)
+        -> structuredClone(aircraft)
+        -> computeRouteStatus(state, flightPlan, activeLegIndex)
+        -> computeAutopilotCommandsForState(state, apState, flightPlan, dt, routeStatus.activeLegIndex, routeStatus)
+        -> compose pilot inputs + AP-owned axis/throttle commands into effectiveControls
+        -> src/sim/physics/integrate.ts
+          1. updateEngines(state, effectiveControls, spec, dt)
+          2. updateFuel(state, spec, dt)
+          3. updateElectrical(state, dt)
+          4. updateHydraulic(state, dt)
+          5. computeAero(state, effectiveControls, spec, B737_AERO, wind)
+          6. integrate angular rates, quaternion, velocity, and position
+          7. sample supported-airport runway/off-runway surface, then update ground/contact state and flight phase
+        -> recompute routeStatus / activeLegIndex
+        -> rebuild phase-aware GuidanceState/checklist/tutorial state from aircraft, scenario, status, and effective controls
+        -> commit next Zustand aircraft/control/guidance snapshot
+      -> render/effects phase: central extension point; Cesium camera follow remains on scene.preRender
+      -> audio phase: if AUDIO enabled, update EngineSound and GPWS from the committed sim state
 ```
 
 The system order is intentional:
@@ -153,7 +157,7 @@ Known guidance follow-up:
 - `audioMapping.ts` contains pure mappings for gain clamping, engine N1 -> oscillator parameters, and GPWS speech parameters.
 - `AudioEngine.ts` owns the `AudioContext`, master/engine/cockpit buses, explicit `start()`, idempotent `dispose()`, and lifecycle status reporting.
 - `App.tsx` exposes the `AUDIO: OFF/ON` control. Mounting the app does not start or resume Web Audio; the player must click the audio control to satisfy browser autoplay policy.
-- `useAudioLoop(true)` creates engine oscillators, updates them from sim state each RAF, and runs GPWS callout checks. When disabled, no audio loop or engine oscillators are created.
+- `useAudioLoop(true)` creates engine oscillators and contributes an audio phase to the central `FrameScheduler`; engine sound updates and GPWS callout checks run after the committed sim tick in the same app RAF. When disabled, no audio phase work or engine oscillators are active.
 
 ## Quality and release architecture
 

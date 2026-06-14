@@ -28,6 +28,7 @@ import { RouteStatus } from './components/RouteStatus';
 import { SceneStatus } from './components/SceneStatus';
 import { TakeoffSetupPanel } from './components/TakeoffSetupPanel';
 import { RfsLayout } from './components/layout/RfsLayout';
+import type { FramePhase, FramePhaseContext } from './runtime/frameScheduler';
 
 const CesiumViewport = lazy(() => import('./viewport/CesiumViewport').then((m) => ({ default: m.CesiumViewport })));
 const ThreeLayer = lazy(() => import('./viewport/ThreeLayer').then((m) => ({ default: m.ThreeLayer })));
@@ -48,10 +49,25 @@ type AudioUiStatus = 'off' | 'starting' | 'on' | 'blocked';
 
 export function App() {
   const viewerRef = useRef<CesiumViewer | null>(null);
+  const keysRef = useRef(new Set<string>());
+  const renderEffectsRef = useRef(new Set<FramePhase>());
   const [audioEnabled, setAudioEnabled] = useState(false);
   const [audioStatus, setAudioStatus] = useState<AudioUiStatus>('off');
-  useSimLoop();
-  useAudioLoop(audioEnabled);
+  const audioFrame = useAudioLoop(audioEnabled);
+  const inputFrame = useCallback(({ dt }: FramePhaseContext) => {
+    const actions = mergeInputActions(computeHeldKeyActions(keysRef.current), readGamepadActions());
+    useSimStore.getState().applyInputActions(actions, dt);
+  }, []);
+  const renderEffectsFrame = useCallback((context: FramePhaseContext) => {
+    for (const effect of renderEffectsRef.current) effect(context);
+  }, []);
+  const registerFrameEffect = useCallback((effect: FramePhase) => {
+    renderEffectsRef.current.add(effect);
+    return () => {
+      renderEffectsRef.current.delete(effect);
+    };
+  }, []);
+  useSimLoop({ onInputFrame: inputFrame, onRenderEffectsFrame: renderEffectsFrame, onAudioFrame: audioFrame });
 
   const startTakeoffRoll = useSimStore((s) => s.startTakeoffRoll);
   const abortTakeoff = useSimStore((s) => s.abortTakeoff);
@@ -71,7 +87,6 @@ export function App() {
     [activeScenario],
   );
 
-  const keysRef = useRef(new Set<string>());
   const [camMode, setCamMode] = useState<CameraMode>('chase');
   const [overlayMode, setOverlayMode] = useState<OverlayMode>('flight');
   const [fetchedMetarData, setFetchedMetarData] = useState<{ scenarioId: string; metar: MetarData } | null>(null);
@@ -135,21 +150,6 @@ export function App() {
       clearHeldKeys();
     };
   }, [setInput]);
-
-  // Input dynamics and gamepad polling
-  useEffect(() => {
-    let raf: number;
-    let lastTimestamp = 0;
-    const poll = (timestamp: number) => {
-      const dt = lastTimestamp > 0 ? Math.min((timestamp - lastTimestamp) / 1000, 0.05) : 1 / 60;
-      lastTimestamp = timestamp;
-      const actions = mergeInputActions(computeHeldKeyActions(keysRef.current), readGamepadActions());
-      useSimStore.getState().applyInputActions(actions, dt);
-      raf = requestAnimationFrame(poll);
-    };
-    raf = requestAnimationFrame(poll);
-    return () => cancelAnimationFrame(raf);
-  }, []);
 
   // Fetch METAR weather for the selected scenario station, with deterministic scenario-authored fallback.
   useEffect(() => {
@@ -274,7 +274,7 @@ export function App() {
                 cloudSeed={activeScenario.weather.cloudSeed}
                 cloudAnchor={activeScenario.weather.cloudAnchor}
               />
-              <ContrailLayer viewerRef={viewerRef} />
+              <ContrailLayer viewerRef={viewerRef} registerFrameEffect={registerFrameEffect} />
             </Suspense>
           </>
         ) : null}
@@ -298,7 +298,7 @@ export function App() {
         takeoffSetupPanel={showFlightInstruments ? <TakeoffSetupPanel /> : null}
         engineStrip={<EngineStrip />}
         buildWatermark={showDebugOverlays ? <>RFS — Flight Test Build</> : null}
-        fpsMonitor={showDebugOverlays ? <FPSMonitor /> : null}
+        fpsMonitor={showDebugOverlays ? <FPSMonitor registerFrameEffect={registerFrameEffect} /> : null}
         controls={(
           <div style={controlsBarStyle}>
             {status === 'stopped' || status === 'paused' ? (

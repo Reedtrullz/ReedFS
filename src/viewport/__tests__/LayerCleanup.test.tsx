@@ -156,13 +156,22 @@ describe('viewport layer cleanup', () => {
     expect(mockTtc.canvas.removeEventListener).toHaveBeenCalledWith('pointerdown', expect.any(Function));
   });
 
+  const registerFrameEffect = () => () => undefined;
+  const renderCleanupLayer = (name: 'ThreeLayer' | 'ContrailLayer' | 'CockpitLayer', viewerRef: never) => {
+    if (name === 'ThreeLayer') return render(<ThreeLayer viewerRef={viewerRef} />);
+    if (name === 'ContrailLayer') {
+      return render(<ContrailLayer viewerRef={viewerRef} registerFrameEffect={registerFrameEffect} />);
+    }
+    return render(<CockpitLayer viewerRef={viewerRef} />);
+  };
+
   it.each([
-    ['ThreeLayer', ThreeLayer],
-    ['ContrailLayer', ContrailLayer],
-    ['CockpitLayer', CockpitLayer],
-  ])('%s does not read viewer.scene during cleanup after Cesium has destroyed it', (_name, Layer) => {
+    ['ThreeLayer'],
+    ['ContrailLayer'],
+    ['CockpitLayer'],
+  ] as const)('%s does not read viewer.scene during cleanup after Cesium has destroyed it', (name) => {
     const { viewer, viewerRef } = createViewerRef();
-    const { unmount } = render(<Layer viewerRef={viewerRef as never} />);
+    const { unmount } = renderCleanupLayer(name, viewerRef as never);
 
     viewer.scene = undefined;
 
@@ -170,12 +179,12 @@ describe('viewport layer cleanup', () => {
   });
 
   it.each([
-    ['ThreeLayer', ThreeLayer],
-    ['ContrailLayer', ContrailLayer],
-    ['CockpitLayer', CockpitLayer],
-  ])('%s does not touch destroyed Cesium scene resources during cleanup', (_name, Layer) => {
+    ['ThreeLayer'],
+    ['ContrailLayer'],
+    ['CockpitLayer'],
+  ] as const)('%s does not touch destroyed Cesium scene resources during cleanup', (name) => {
     const { viewer, viewerRef } = createViewerRef();
-    const { unmount } = render(<Layer viewerRef={viewerRef as never} />);
+    const { unmount } = renderCleanupLayer(name, viewerRef as never);
 
     viewer.isDestroyed = () => true;
     if (viewer.scene) {

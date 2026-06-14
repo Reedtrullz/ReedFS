@@ -1,26 +1,27 @@
 import { useEffect, useRef, useState } from 'react';
+import type { FramePhase } from '../runtime/frameScheduler';
 
-export function FPSMonitor() {
+export interface FPSMonitorProps {
+  registerFrameEffect: (effect: FramePhase) => () => void;
+}
+
+export function FPSMonitor({ registerFrameEffect }: FPSMonitorProps) {
   const [fps, setFps] = useState(0);
   const frames = useRef(0);
   const lastTime = useRef(0);
 
   useEffect(() => {
-    let raf: number;
     lastTime.current = performance.now();
-    const update = () => {
+    const updateFps: FramePhase = ({ timestamp }) => {
       frames.current++;
-      const now = performance.now();
-      if (now - lastTime.current >= 1000) {
+      if (timestamp - lastTime.current >= 1000) {
         setFps(frames.current);
         frames.current = 0;
-        lastTime.current = now;
+        lastTime.current = timestamp;
       }
-      raf = requestAnimationFrame(update);
     };
-    raf = requestAnimationFrame(update);
-    return () => cancelAnimationFrame(raf);
-  }, []);
+    return registerFrameEffect(updateFps);
+  }, [registerFrameEffect]);
 
   return (
     <div

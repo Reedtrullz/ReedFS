@@ -1,9 +1,10 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useSimStore } from '../store/simStore';
 import { EngineSound } from '../audio/EngineSound';
 import { updateGPWS } from '../audio/GPWS';
+import type { FramePhase } from '../runtime/frameScheduler';
 
-export function useAudioLoop(enabled = false) {
+export function useAudioLoop(enabled = false): FramePhase {
   const enginesRef = useRef<EngineSound[] | null>(null);
 
   useEffect(() => {
@@ -14,23 +15,19 @@ export function useAudioLoop(enabled = false) {
       enginesRef.current = [new EngineSound(0), new EngineSound(1)];
     }
 
-    // Drive from sim state
-    let raf: number;
-    const update = () => {
-      const a = useSimStore.getState().aircraft;
-      if (enginesRef.current) {
-        enginesRef.current[0].update(a.engines[0].n1);
-        enginesRef.current[1].update(a.engines[1].n1);
-      }
-      updateGPWS(a);
-      raf = requestAnimationFrame(update);
-    };
-    raf = requestAnimationFrame(update);
-
     return () => {
-      cancelAnimationFrame(raf);
       enginesRef.current?.forEach((e) => e.dispose());
       enginesRef.current = null;
     };
+  }, [enabled]);
+
+  return useCallback(() => {
+    if (!enabled) return;
+    const a = useSimStore.getState().aircraft;
+    if (enginesRef.current) {
+      enginesRef.current[0].update(a.engines[0].n1);
+      enginesRef.current[1].update(a.engines[1].n1);
+    }
+    updateGPWS(a);
   }, [enabled]);
 }
