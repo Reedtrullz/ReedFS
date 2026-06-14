@@ -54,6 +54,20 @@ describe('canonical docs posture', () => {
     expect(ciWorkflow).toContain('curl -fsS http://localhost:3005/rfs-version.json');
   });
 
+  it('keeps black-box guard in local, CI, and README gates', () => {
+    const expectedCheckChain =
+      'npm run check:deps && npm run check:release && npm run check:blackbox && npm run lint:ci && npm run typecheck && npm run test && npm run build && npm run check:bundle';
+    expect(packageJson.scripts.check).toBe(expectedCheckChain);
+    expect(readme).toContain(expectedCheckChain);
+
+    const testJobStart = ciWorkflow.indexOf('  test:\n');
+    const dockerSmokeStart = ciWorkflow.indexOf('\n  docker-smoke:', testJobStart);
+    const testJob = ciWorkflow.slice(testJobStart, dockerSmokeStart);
+    expect(testJob).toMatch(
+      /- run: npm run check:release\s+- run: npm run check:blackbox\s+- run: npm run lint:ci/,
+    );
+  });
+
   it('makes deployment rollback failures fatal and publicly verifiable', () => {
     expect(ciWorkflow).not.toContain('"$PREVIOUS_IMAGE" || true');
     expect(ciWorkflow).toContain('PREVIOUS_PUBLIC_COMMIT');

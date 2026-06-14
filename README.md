@@ -144,7 +144,7 @@ npm run check
 `npm run check` expands to:
 
 ```text
-npm run check:deps && npm run check:release && npm run lint:ci && npm run typecheck && npm run test && npm run build && npm run check:bundle
+npm run check:deps && npm run check:release && npm run check:blackbox && npm run lint:ci && npm run typecheck && npm run test && npm run build && npm run check:bundle
 ```
 
 Useful targeted commands:
