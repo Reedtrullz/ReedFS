@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { checkGPWS } from '../GPWS';
+import { describe, expect, it, vi } from 'vitest';
+import { checkGPWS, updateGPWS } from '../GPWS';
 import {
   B737_800_SPEC,
   createInitialState,
@@ -76,5 +76,55 @@ describe('GPWS', () => {
     });
 
     expect(checkGPWS(state)).toBeNull();
+  });
+
+  it('emits caption events for GPWS callouts even when speech audio is unavailable', () => {
+    const state = gpwsState({
+      position: { lat: 0, lon: 0, alt: 600 },
+      ground: { aglFt: 600, groundAltFt: 0, weightOnWheels: false },
+      velocity: { u: 90, v: 0, w: 16 },
+      flightPhase: 'DESCENT',
+    });
+    const onCaption = vi.fn();
+
+    updateGPWS(state, {
+      nowMs: 4_000,
+      captionsEnabled: true,
+      speechEnabled: false,
+      onCaption,
+    });
+
+    expect(onCaption).toHaveBeenCalledWith(expect.objectContaining({
+      kind: 'gpws',
+      text: 'PULL UP',
+      timestampMs: 4_000,
+    }));
+  });
+
+  it('does not consume a callout while both speech and captions are disabled', () => {
+    const state = gpwsState({
+      position: { lat: 0, lon: 0, alt: 180 },
+      ground: { aglFt: 180, groundAltFt: 0, weightOnWheels: false },
+      velocity: { u: 80, v: 0, w: 0 },
+      config: { gearDown: false, flapSetting: 30 },
+      flightPhase: 'APPROACH',
+    });
+    const onCaption = vi.fn();
+
+    updateGPWS(state, {
+      nowMs: 8_000,
+      captionsEnabled: false,
+      speechEnabled: false,
+      onCaption,
+    });
+    updateGPWS(state, {
+      nowMs: 12_000,
+      captionsEnabled: true,
+      speechEnabled: false,
+      onCaption,
+    });
+
+    expect(onCaption).toHaveBeenCalledTimes(1);
+    expect(onCaption).toHaveBeenCalledWith(expect.objectContaining({ text: 'TOO LOW GEAR' }));
   });
 });

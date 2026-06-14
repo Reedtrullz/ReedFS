@@ -429,6 +429,7 @@ import { App } from '../App';
 import { useSimStore } from '../store/simStore';
 import { CesiumViewport } from '../viewport/CesiumViewport';
 import { SCENARIOS } from '../sim/scenarios';
+import { AUDIO_SETTINGS_STORAGE_KEY } from '../audio/audioSettings';
 
 const defaultAppTestApState = structuredClone(useSimStore.getState().apState);
 
@@ -449,6 +450,7 @@ describe('App', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockReadGamepadActions.mockReturnValue(null);
+    window.localStorage.clear();
     mockAudioContexts.length = 0;
     useSimStore.getState().apState = structuredClone(defaultAppTestApState);
     useSimStore.getState().status = 'stopped';
@@ -904,6 +906,25 @@ describe('App', () => {
 
     expect(mockAbortTakeoff).toHaveBeenCalledTimes(1);
     expect(mockPause).not.toHaveBeenCalled();
+  });
+
+  it('persists audio settings from the shell without creating an AudioContext', () => {
+    render(<App />);
+
+    expect(mockAudioContexts).toHaveLength(0);
+    fireEvent.click(screen.getByRole('button', { name: /audio settings/i }));
+    fireEvent.change(screen.getByRole('slider', { name: /master volume/i }), { target: { value: '0.25' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: /mute audio/i }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /show audio captions/i }));
+
+    expect(mockAudioContexts).toHaveLength(0);
+    const saved = JSON.parse(window.localStorage.getItem(AUDIO_SETTINGS_STORAGE_KEY) ?? '{}') as Record<string, unknown>;
+    expect(saved).toMatchObject({
+      version: 1,
+      muted: true,
+      captionsEnabled: false,
+    });
+    expect(saved.masterVolume).toBe(0.25);
   });
 
   it('starts audio only from the explicit AUDIO control', async () => {

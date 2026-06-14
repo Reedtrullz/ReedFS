@@ -1,10 +1,21 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useSimStore } from '../store/simStore';
 import { EngineSound } from '../audio/EngineSound';
-import { updateGPWS } from '../audio/GPWS';
+import { updateGPWS, type AudioCaptionEvent } from '../audio/GPWS';
 import type { FramePhase } from '../runtime/frameScheduler';
 
-export function useAudioLoop(enabled = false): FramePhase {
+export interface UseAudioLoopOptions {
+  enabled?: boolean;
+  captionsEnabled?: boolean;
+  speechEnabled?: boolean;
+  onCaption?: (event: AudioCaptionEvent) => void;
+}
+
+export function useAudioLoop(options: boolean | UseAudioLoopOptions = false): FramePhase {
+  const enabled = typeof options === 'boolean' ? options : options.enabled ?? false;
+  const captionsEnabled = typeof options === 'boolean' ? true : options.captionsEnabled ?? true;
+  const speechEnabled = typeof options === 'boolean' ? enabled : options.speechEnabled ?? enabled;
+  const onCaption = typeof options === 'boolean' ? undefined : options.onCaption;
   const enginesRef = useRef<EngineSound[] | null>(null);
 
   useEffect(() => {
@@ -22,12 +33,11 @@ export function useAudioLoop(enabled = false): FramePhase {
   }, [enabled]);
 
   return useCallback(() => {
-    if (!enabled) return;
     const a = useSimStore.getState().aircraft;
-    if (enginesRef.current) {
+    if (enabled && enginesRef.current) {
       enginesRef.current[0].update(a.engines[0].n1);
       enginesRef.current[1].update(a.engines[1].n1);
     }
-    updateGPWS(a);
-  }, [enabled]);
+    updateGPWS(a, { captionsEnabled, speechEnabled, onCaption });
+  }, [captionsEnabled, enabled, onCaption, speechEnabled]);
 }

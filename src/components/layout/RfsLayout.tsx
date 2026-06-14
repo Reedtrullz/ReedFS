@@ -139,7 +139,7 @@ const layoutCss = `
 .rfs-layout__top-left [data-rfs-panel="scenario"] {
   flex: 0 1 min(330px, 25vw);
   width: min(330px, 25vw);
-  max-height: min(560px, calc(100vh - 340px));
+  max-height: min(560px, calc(100vh - 380px));
   overflow: auto;
 }
 

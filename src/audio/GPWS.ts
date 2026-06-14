@@ -72,21 +72,42 @@ export function checkGPWS(state: AircraftState): string | null {
   return checkMode1(state) ?? checkMode2(state) ?? checkMode3(state) ?? checkMode4(state) ?? checkMode5(state) ?? checkMode6(state);
 }
 
+export interface AudioCaptionEvent {
+  kind: 'gpws';
+  text: string;
+  timestampMs: number;
+}
+
+export interface GpwsUpdateOptions {
+  nowMs?: number;
+  captionsEnabled?: boolean;
+  speechEnabled?: boolean;
+  onCaption?: (event: AudioCaptionEvent) => void;
+}
+
 let lastAlert = '';
 let lastAlertTime = 0;
 
-export function updateGPWS(state: AircraftState): void {
-  const now = performance.now();
+export function updateGPWS(state: AircraftState, options: GpwsUpdateOptions = {}): void {
+  const now = options.nowMs ?? performance.now();
   const alert = checkGPWS(state);
+  const shouldCaption = options.captionsEnabled ?? true;
+  const shouldSpeak = options.speechEnabled ?? true;
+  if (!shouldCaption && !shouldSpeak) return;
   if (alert && alert !== lastAlert && now - lastAlertTime > 3000) {
     lastAlert = alert;
     lastAlertTime = now;
-    speakCallout(alert);
+    if (shouldCaption) {
+      options.onCaption?.({ kind: 'gpws', text: alert, timestampMs: now });
+    }
+    if (shouldSpeak) {
+      speakCallout(alert);
+    }
   }
 }
 
 function speakCallout(text: string): void {
-  if (typeof speechSynthesis === 'undefined') return;
+  if (typeof speechSynthesis === 'undefined' || typeof SpeechSynthesisUtterance === 'undefined') return;
   const speech = mapGpwsCalloutToSpeechParams(text);
   const utterance = new SpeechSynthesisUtterance(speech.text);
   utterance.rate = speech.rate;

@@ -6,6 +6,8 @@ import { LoadingScreen } from '../components/LoadingScreen';
 import { useSimLoop } from '../hooks/useSimLoop';
 import { useAudioLoop } from '../hooks/useAudioLoop';
 import { getAudioEngine } from '../audio/AudioEngine';
+import { effectiveMasterVolume, loadAudioSettings, saveAudioSettings, type AudioSettingsState } from '../audio/audioSettings';
+import type { AudioCaptionEvent } from '../audio/GPWS';
 import { useSimStore } from '../store/simStore';
 import { readGamepadActions, type GamepadCommand } from '../input/GamepadManager';
 import {
@@ -25,6 +27,7 @@ import { RouteStatus } from '../components/RouteStatus';
 import { SceneStatus } from '../components/SceneStatus';
 import { TakeoffSetupPanel } from '../components/TakeoffSetupPanel';
 import { BottomControlBar, type AudioUiStatus } from '../components/BottomControlBar';
+import { AudioSettings } from '../components/AudioSettings';
 import { RfsLayout } from '../components/layout/RfsLayout';
 import type { FramePhase, FramePhaseContext } from '../runtime/frameScheduler';
 import { useScenarioWeather } from './useScenarioWeather';
@@ -62,7 +65,17 @@ export function RfsShell() {
   const gamepadCommandHandlerRef = useRef<(commands: readonly GamepadCommand[]) => void>(() => undefined);
   const [audioEnabled, setAudioEnabled] = useState(false);
   const [audioStatus, setAudioStatus] = useState<AudioUiStatus>('off');
-  const audioFrame = useAudioLoop(audioEnabled);
+  const [audioSettings, setAudioSettings] = useState<AudioSettingsState>(() => loadAudioSettings());
+  const [audioCaption, setAudioCaption] = useState<AudioCaptionEvent | null>(null);
+  const handleAudioCaption = useCallback((event: AudioCaptionEvent) => {
+    setAudioCaption(event);
+  }, []);
+  const audioFrame = useAudioLoop({
+    enabled: audioEnabled,
+    captionsEnabled: audioSettings.captionsEnabled,
+    speechEnabled: audioEnabled && !audioSettings.muted,
+    onCaption: handleAudioCaption,
+  });
   const inputFrame = useCallback(({ dt }: FramePhaseContext) => {
     const gamepadActions = readGamepadActions();
     const actions = mergeInputActions(computeHeldKeyActions(keysRef.current), gamepadActions);
@@ -192,6 +205,14 @@ export function RfsShell() {
     });
   }, []);
 
+  const handleAudioSettingsChange = useCallback((nextSettings: AudioSettingsState) => {
+    setAudioSettings(nextSettings);
+    saveAudioSettings(nextSettings);
+    if (audioEnabled) {
+      getAudioEngine().setMasterVolume(effectiveMasterVolume(nextSettings));
+    }
+  }, [audioEnabled]);
+
   const handleToggleAudio = useCallback(async () => {
     if (audioEnabled) {
       getAudioEngine().setMasterVolume(0);
@@ -204,14 +225,14 @@ export function RfsShell() {
     try {
       const engine = getAudioEngine();
       await engine.start();
-      engine.setMasterVolume(0.5);
+      engine.setMasterVolume(effectiveMasterVolume(audioSettings));
       setAudioEnabled(true);
       setAudioStatus('on');
     } catch {
       setAudioEnabled(false);
       setAudioStatus('blocked');
     }
-  }, [audioEnabled]);
+  }, [audioEnabled, audioSettings]);
 
   const handleLoadPlan = () => {
     const store = useSimStore.getState();
@@ -271,6 +292,11 @@ export function RfsShell() {
   const showDebugOverlays = shouldShowDebugOverlays(overlayMode);
   const showFlightInstruments = shouldShowFlightInstruments(overlayMode);
   const viewerReady = viewerGeneration > 0;
+  const audioCaptionNode = audioSettings.captionsEnabled && audioCaption ? (
+    <div aria-label="Audio caption" aria-live="polite" role="status" style={audioCaptionStyle}>
+      {audioCaption.text}
+    </div>
+  ) : null;
 
   return (
     <RfsLayout
@@ -325,24 +351,43 @@ export function RfsShell() {
       buildWatermark={showDebugOverlays ? <>RFS — Flight Test Build</> : null}
       fpsMonitor={showDebugOverlays ? <FPSMonitor registerFrameEffect={registerFrameEffect} /> : null}
       controls={(
-        <BottomControlBar
-          status={status}
-          camMode={camMode}
-          overlayMode={overlayMode}
-          audioEnabled={audioEnabled}
-          audioStatus={audioStatus}
-          routeLoadMessage={routeLoadMessage}
-          onStartRoll={startTakeoffRoll}
-          onAbortTakeoff={abortTakeoff}
-          onPause={pause}
-          onResume={resume}
-          onReset={reset}
-          onNextCameraMode={() => setCamMode(nextCameraMode)}
-          onNextOverlayMode={() => setOverlayMode(nextOverlayMode)}
-          onToggleAudio={handleToggleAudio}
-          onLoadPlan={handleLoadPlan}
-        />
+        <>
+          {audioCaptionNode}
+          <AudioSettings
+            settings={audioSettings}
+            audioStatus={audioStatus}
+            onSettingsChange={handleAudioSettingsChange}
+          />
+          <BottomControlBar
+            status={status}
+            camMode={camMode}
+            overlayMode={overlayMode}
+            audioEnabled={audioEnabled}
+            audioStatus={audioStatus}
+            routeLoadMessage={routeLoadMessage}
+            onStartRoll={startTakeoffRoll}
+            onAbortTakeoff={abortTakeoff}
+            onPause={pause}
+            onResume={resume}
+            onReset={reset}
+            onNextCameraMode={() => setCamMode(nextCameraMode)}
+            onNextOverlayMode={() => setOverlayMode(nextOverlayMode)}
+            onToggleAudio={handleToggleAudio}
+            onLoadPlan={handleLoadPlan}
+          />
+        </>
       )}
     />
   );
 }
+
+const audioCaptionStyle: React.CSSProperties = {
+  background: 'rgba(0, 0, 0, 0.72)',
+  border: '1px solid rgba(0,255,0,0.65)',
+  borderRadius: 4,
+  color: '#0f0',
+  fontFamily: 'monospace',
+  fontSize: 12,
+  fontWeight: 800,
+  padding: '6px 8px',
+};
