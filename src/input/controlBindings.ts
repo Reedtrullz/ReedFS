@@ -11,7 +11,13 @@ export type ControlBindingId =
   | 'flaps'
   | 'trim'
   | 'camera'
-  | 'overlay';
+  | 'overlay'
+  | 'audio'
+  | 'simControl'
+  | 'mcpFlightDirector'
+  | 'mcpHeading'
+  | 'mcpAltitude'
+  | 'mcpSpeed';
 
 export interface ControlBinding {
   id: ControlBindingId;
@@ -93,15 +99,57 @@ export const DEFAULT_CONTROL_BINDINGS: ControlBinding[] = [
     id: 'camera',
     label: 'Camera',
     keyboard: ['C'],
-    gamepad: [],
-    description: 'Cycle chase, cockpit, and tower camera modes.',
+    gamepad: ['Gamepad X/Square'],
+    description: 'Edge-triggered camera cycle through chase, cockpit, and tower modes.',
   },
   {
     id: 'overlay',
     label: 'Overlay',
     keyboard: ['O'],
-    gamepad: [],
-    description: 'Cycle flight, minimal, and debug overlays.',
+    gamepad: ['Gamepad B/Circle'],
+    description: 'Edge-triggered cycle through flight, minimal, and debug overlays.',
+  },
+  {
+    id: 'audio',
+    label: 'Audio',
+    keyboard: [],
+    gamepad: ['Gamepad Y/Triangle'],
+    description: 'Edge-triggered audio toggle; browser audio still requires a user gesture.',
+  },
+  {
+    id: 'simControl',
+    label: 'Simulator start/pause/reset',
+    keyboard: [],
+    gamepad: ['Gamepad Start/Menu', 'Gamepad Back/View'],
+    description: 'Start/Menu starts, resumes, or pauses the loop; Back/View resets for repeated practice.',
+  },
+  {
+    id: 'mcpFlightDirector',
+    label: 'MCP Flight Director',
+    keyboard: [],
+    gamepad: ['Gamepad L3'],
+    description: 'Edge-triggered left Flight Director switch toggle for legal guidance setup.',
+  },
+  {
+    id: 'mcpHeading',
+    label: 'MCP heading mode',
+    keyboard: [],
+    gamepad: ['Gamepad R3'],
+    description: 'Edge-triggered HDG SEL engagement when the MCP mode is available.',
+  },
+  {
+    id: 'mcpAltitude',
+    label: 'MCP altitude hold',
+    keyboard: [],
+    gamepad: ['Gamepad D-pad left'],
+    description: 'Edge-triggered ALT HOLD engagement when the MCP mode is available.',
+  },
+  {
+    id: 'mcpSpeed',
+    label: 'MCP speed mode',
+    keyboard: [],
+    gamepad: ['Gamepad D-pad right'],
+    description: 'Edge-triggered SPEED autothrottle engagement when the MCP mode is available.',
   },
 ];
 
@@ -115,6 +163,7 @@ export function controlBindingLabels(bindings: ControlBinding[]): Record<Control
 export function validateControlBindings(bindings: ControlBinding[]): ControlBindingValidationResult {
   const errors: string[] = [];
   const keyboardOwners = new Map<string, ControlBindingId>();
+  const gamepadOwners = new Map<string, ControlBindingId>();
 
   for (const binding of bindings) {
     for (const key of binding.keyboard) {
@@ -125,6 +174,16 @@ export function validateControlBindings(bindings: ControlBinding[]): ControlBind
         errors.push(`Duplicate keyboard binding "${key}" assigned to ${existing} and ${binding.id}`);
       } else {
         keyboardOwners.set(normalized, binding.id);
+      }
+    }
+    for (const button of binding.gamepad) {
+      const normalized = button.trim().toLowerCase();
+      if (!normalized) continue;
+      const existing = gamepadOwners.get(normalized);
+      if (existing && existing !== binding.id) {
+        errors.push(`Duplicate gamepad binding "${button}" assigned to ${existing} and ${binding.id}`);
+      } else {
+        gamepadOwners.set(normalized, binding.id);
       }
     }
   }

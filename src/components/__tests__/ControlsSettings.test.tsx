@@ -21,13 +21,27 @@ describe('ControlsSettings', () => {
     expect(screen.getByText(/W\/S/)).toBeTruthy();
     expect(screen.getByText(/Gamepad left stick Y/)).toBeTruthy();
     expect(screen.getByText('Overlay')).toBeTruthy();
-    expect(screen.getByText('O')).toBeTruthy();
+    expect(screen.getByText(/O · Gamepad B\/Circle/)).toBeTruthy();
     expect(screen.getByText('Camera')).toBeTruthy();
-    expect(screen.getByText('C')).toBeTruthy();
+    expect(screen.getByText(/C · Gamepad X\/Square/)).toBeTruthy();
     expect(screen.getByText('Gear')).toBeTruthy();
     expect(screen.getByText(/Gamepad RB\/R1/)).toBeTruthy();
     expect(screen.getByText('Differential brake')).toBeTruthy();
     expect(screen.getByText(/Z\/X/)).toBeTruthy();
+    expect(screen.getByText('Audio')).toBeTruthy();
+    expect(screen.getByText(/Gamepad Y\/Triangle/)).toBeTruthy();
+    expect(screen.getByText('Simulator start/pause/reset')).toBeTruthy();
+    expect(screen.getByText(/Gamepad Start\/Menu/)).toBeTruthy();
+    expect(screen.getByText(/Gamepad Back\/View/)).toBeTruthy();
+    expect(screen.getByText('MCP Flight Director')).toBeTruthy();
+    expect(screen.getByText(/Gamepad L3/)).toBeTruthy();
+    expect(screen.getByText('MCP heading mode')).toBeTruthy();
+    expect(screen.getByText(/Gamepad R3/)).toBeTruthy();
+    expect(screen.getByText('MCP altitude hold')).toBeTruthy();
+    expect(screen.getByText(/Gamepad D-pad left/)).toBeTruthy();
+    expect(screen.getByText('MCP speed mode')).toBeTruthy();
+    expect(screen.getByText(/Gamepad D-pad right/)).toBeTruthy();
+    expect(screen.getAllByText(/edge-triggered/i).length).toBeGreaterThan(3);
   });
 
   it('shows validation problems for duplicate bindings', () => {

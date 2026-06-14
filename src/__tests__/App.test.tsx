@@ -32,7 +32,7 @@ class MockOscillatorNode {
 }
 vi.stubGlobal('OscillatorNode', MockOscillatorNode);
 
-const { mockSetInput, mockApplyInputActions, mockStart, mockStartTakeoffRoll, mockAbortTakeoff, mockPause, mockResume, mockReset, mockSetScenario, mockSetTutorialStep, mockSetFlightPlan, mockSetApState, mockSetWind, mockFetchMetar, mockCloudLayer } = vi.hoisted(() => ({
+const { mockSetInput, mockApplyInputActions, mockStart, mockStartTakeoffRoll, mockAbortTakeoff, mockPause, mockResume, mockReset, mockSetScenario, mockSetTutorialStep, mockSetFlightPlan, mockSetApState, mockSetWind, mockFetchMetar, mockCloudLayer, mockReadGamepadActions } = vi.hoisted(() => ({
   mockSetInput: vi.fn(),
   mockApplyInputActions: vi.fn(),
   mockStart: vi.fn(),
@@ -48,6 +48,7 @@ const { mockSetInput, mockApplyInputActions, mockStart, mockStartTakeoffRoll, mo
   mockSetWind: vi.fn(),
   mockFetchMetar: vi.fn(async () => null),
   mockCloudLayer: vi.fn(() => null),
+  mockReadGamepadActions: vi.fn((): unknown => null),
 }));
 
 vi.mock('../store/simStore', () => {
@@ -192,6 +193,10 @@ vi.mock('../store/simStore', () => {
   );
   return { useSimStore: mock };
 });
+
+vi.mock('../input/GamepadManager', () => ({
+  readGamepadActions: mockReadGamepadActions,
+}));
 
 vi.mock('../sim/physics/derived', () => ({
   computeDerived: vi.fn(() => ({
@@ -443,6 +448,7 @@ describe('App', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockReadGamepadActions.mockReturnValue(null);
     mockAudioContexts.length = 0;
     useSimStore.getState().apState = structuredClone(defaultAppTestApState);
     useSimStore.getState().status = 'stopped';
@@ -557,6 +563,109 @@ describe('App', () => {
 
     expect(mockSetFlightPlan).toHaveBeenLastCalledWith(expect.objectContaining({ origin: 'KSEA', destination: 'KPDX' }));
     expect(screen.queryByText(/no default route/i)).toBeNull();
+  });
+
+  it('drives simulator, camera, and overlay commands from edge-triggered gamepad input', async () => {
+    const rafCallbacks: FrameRequestCallback[] = [];
+    const requestAnimationFrameSpy = vi
+      .spyOn(globalThis, 'requestAnimationFrame')
+      .mockImplementation((callback: FrameRequestCallback): number => {
+        rafCallbacks.push(callback);
+        return rafCallbacks.length;
+      });
+    const cancelAnimationFrameSpy = vi
+      .spyOn(globalThis, 'cancelAnimationFrame')
+      .mockImplementation(() => undefined);
+
+    const flushRaf = (timestamp: number) => {
+      const pendingCallbacks = rafCallbacks.splice(0);
+      act(() => {
+        pendingCallbacks.forEach((callback) => callback(timestamp));
+      });
+    };
+
+    const store = useSimStore.getState();
+    store.aircraft.ground = {
+      weightOnWheels: false,
+      onRunway: false,
+      aglFt: 1200,
+      groundAltFt: 432,
+      normalForceN: 0,
+      contact: 'none' as const,
+      lastTouchdownSinkRateMps: 0,
+      tailstrike: false,
+      gearStations: [],
+    };
+    mockReadGamepadActions.mockReturnValueOnce({
+      brake: 1,
+      commands: ['startPause', 'camera', 'overlay', 'reset'],
+    }).mockReturnValue(null);
+
+    try {
+      render(<App />);
+      await settleLazyImports();
+      mockApplyInputActions.mockClear();
+      flushRaf(1000);
+
+      expect(mockApplyInputActions).toHaveBeenCalledWith(expect.objectContaining({ brake: 1 }), expect.any(Number));
+      expect(mockStartTakeoffRoll).toHaveBeenCalledTimes(1);
+      expect(mockReset).toHaveBeenCalledTimes(1);
+      expect(screen.getByRole('button', { name: 'CAM: COCKPIT' })).toBeTruthy();
+      expect(screen.getByRole('button', { name: 'OVL: MINIMAL' })).toBeTruthy();
+      expect(mockSetApState).not.toHaveBeenCalled();
+    } finally {
+      requestAnimationFrameSpy.mockRestore();
+      cancelAnimationFrameSpy.mockRestore();
+    }
+  });
+
+  it('drives legal MCP commands from edge-triggered gamepad input while running and airborne', async () => {
+    const rafCallbacks: FrameRequestCallback[] = [];
+    const requestAnimationFrameSpy = vi
+      .spyOn(globalThis, 'requestAnimationFrame')
+      .mockImplementation((callback: FrameRequestCallback): number => {
+        rafCallbacks.push(callback);
+        return rafCallbacks.length;
+      });
+    const cancelAnimationFrameSpy = vi
+      .spyOn(globalThis, 'cancelAnimationFrame')
+      .mockImplementation(() => undefined);
+
+    const store = useSimStore.getState();
+    store.status = 'running';
+    store.aircraft.ground = {
+      weightOnWheels: false,
+      onRunway: false,
+      aglFt: 1200,
+      groundAltFt: 432,
+      normalForceN: 0,
+      contact: 'none' as const,
+      lastTouchdownSinkRateMps: 0,
+      tailstrike: false,
+      gearStations: [],
+    };
+    mockReadGamepadActions.mockReturnValueOnce({
+      commands: ['mcpFdLeft', 'mcpHdgSel', 'mcpAltHold', 'mcpSpeed'],
+    }).mockReturnValue(null);
+
+    try {
+      render(<App />);
+      await settleLazyImports();
+      mockApplyInputActions.mockClear();
+      const pendingCallbacks = rafCallbacks.splice(0);
+      act(() => {
+        pendingCallbacks.forEach((callback) => callback(1000));
+      });
+
+      expect(mockApplyInputActions).toHaveBeenCalledWith({}, expect.any(Number));
+      expect(mockSetApState).toHaveBeenCalledWith(expect.objectContaining({ boeing: expect.objectContaining({ fdLeft: true }) }));
+      expect(mockSetApState).toHaveBeenCalledWith(expect.objectContaining({ boeing: expect.objectContaining({ hdgSel: true }) }));
+      expect(mockSetApState).toHaveBeenCalledWith(expect.objectContaining({ boeing: expect.objectContaining({ altHold: true }) }));
+      expect(mockSetApState).toHaveBeenCalledWith(expect.objectContaining({ boeing: expect.objectContaining({ speedMode: true }) }));
+    } finally {
+      requestAnimationFrameSpy.mockRestore();
+      cancelAnimationFrameSpy.mockRestore();
+    }
   });
 
   it('tracks Z/X differential brake keys in the live input path and clears them on blur and cleanup', () => {
@@ -716,7 +825,9 @@ describe('App', () => {
         groundAltFt: 432,
         normalForceN: 600_000,
         contact: 'gear',
-        stations: [],
+        lastTouchdownSinkRateMps: 0,
+        tailstrike: false,
+        gearStations: [],
       },
     });
 
@@ -806,6 +917,36 @@ describe('App', () => {
     expect(await screen.findByRole('button', { name: 'AUDIO: ON' })).toBeTruthy();
     expect(mockAudioContexts).toHaveLength(1);
     expect(mockAudioContexts[0].resume).toHaveBeenCalledTimes(1);
+  });
+
+  it('starts audio from the edge-triggered gamepad audio command', async () => {
+    const rafCallbacks: FrameRequestCallback[] = [];
+    const requestAnimationFrameSpy = vi
+      .spyOn(globalThis, 'requestAnimationFrame')
+      .mockImplementation((callback: FrameRequestCallback): number => {
+        rafCallbacks.push(callback);
+        return rafCallbacks.length;
+      });
+    const cancelAnimationFrameSpy = vi
+      .spyOn(globalThis, 'cancelAnimationFrame')
+      .mockImplementation(() => undefined);
+
+    mockReadGamepadActions.mockReturnValueOnce({ commands: ['audio'] }).mockReturnValue(null);
+
+    try {
+      render(<App />);
+      expect(screen.getByRole('button', { name: 'AUDIO: OFF' })).toBeTruthy();
+
+      const pendingCallbacks = rafCallbacks.splice(0);
+      act(() => {
+        pendingCallbacks.forEach((callback) => callback(1000));
+      });
+
+      expect(await screen.findByRole('button', { name: 'AUDIO: ON' })).toBeTruthy();
+    } finally {
+      requestAnimationFrameSpy.mockRestore();
+      cancelAnimationFrameSpy.mockRestore();
+    }
   });
 
   it('cycles camera and overlay modes from keyboard shortcuts', () => {

@@ -7,7 +7,7 @@ import { useSimLoop } from '../hooks/useSimLoop';
 import { useAudioLoop } from '../hooks/useAudioLoop';
 import { getAudioEngine } from '../audio/AudioEngine';
 import { useSimStore } from '../store/simStore';
-import { readGamepadActions } from '../input/GamepadManager';
+import { readGamepadActions, type GamepadCommand } from '../input/GamepadManager';
 import {
   applyDiscreteKeyAction,
   computeHeldKeyActions,
@@ -28,6 +28,9 @@ import { BottomControlBar, type AudioUiStatus } from '../components/BottomContro
 import { RfsLayout } from '../components/layout/RfsLayout';
 import type { FramePhase, FramePhaseContext } from '../runtime/frameScheduler';
 import { useScenarioWeather } from './useScenarioWeather';
+import { createDefaultAutopilotStateFromAircraft } from '../instruments/defaultAutopilotState';
+import { applyMcpMode, toggleFlightDirectorSwitch } from '../instruments/mcpCommands';
+import { selectMcpViewModel, type EnabledMcpMode } from '../store/selectors';
 
 const CesiumViewport = lazy(() => import('../viewport/CesiumViewport').then((m) => ({ default: m.CesiumViewport })));
 const ThreeLayer = lazy(() => import('../viewport/ThreeLayer').then((m) => ({ default: m.ThreeLayer })));
@@ -45,16 +48,28 @@ const ControlsSettings = lazy(() => import('../components/ControlsSettings').the
 
 const cesiumScenePolicy = getCesiumScenePolicy();
 
+function gamepadMcpModeForCommand(command: GamepadCommand): EnabledMcpMode | null {
+  if (command === 'mcpHdgSel') return 'HDG_SEL';
+  if (command === 'mcpAltHold') return 'ALT_HOLD';
+  if (command === 'mcpSpeed') return 'SPEED';
+  return null;
+}
+
 export function RfsShell() {
   const viewerRef = useRef<CesiumViewer | null>(null);
   const keysRef = useRef(new Set<string>());
   const renderEffectsRef = useRef(new Set<FramePhase>());
+  const gamepadCommandHandlerRef = useRef<(commands: readonly GamepadCommand[]) => void>(() => undefined);
   const [audioEnabled, setAudioEnabled] = useState(false);
   const [audioStatus, setAudioStatus] = useState<AudioUiStatus>('off');
   const audioFrame = useAudioLoop(audioEnabled);
   const inputFrame = useCallback(({ dt }: FramePhaseContext) => {
-    const actions = mergeInputActions(computeHeldKeyActions(keysRef.current), readGamepadActions());
+    const gamepadActions = readGamepadActions();
+    const actions = mergeInputActions(computeHeldKeyActions(keysRef.current), gamepadActions);
     useSimStore.getState().applyInputActions(actions, dt);
+    if (gamepadActions?.commands?.length) {
+      gamepadCommandHandlerRef.current(gamepadActions.commands);
+    }
   }, []);
   const renderEffectsFrame = useCallback((context: FramePhaseContext) => {
     for (const effect of renderEffectsRef.current) effect(context);
@@ -177,7 +192,7 @@ export function RfsShell() {
     });
   }, []);
 
-  const handleToggleAudio = async () => {
+  const handleToggleAudio = useCallback(async () => {
     if (audioEnabled) {
       getAudioEngine().setMasterVolume(0);
       setAudioEnabled(false);
@@ -196,7 +211,7 @@ export function RfsShell() {
       setAudioEnabled(false);
       setAudioStatus('blocked');
     }
-  };
+  }, [audioEnabled]);
 
   const handleLoadPlan = () => {
     const store = useSimStore.getState();
@@ -211,6 +226,47 @@ export function RfsShell() {
       `${fp.origin}→${fp.destination} route loaded. Takeoff setup reminder: confirm flaps for takeoff, set takeoff trim, keep throttle idle until ready, then press START ROLL.`,
     );
   };
+
+  const applyGamepadMcpCommand = useCallback((command: GamepadCommand) => {
+    const store = useSimStore.getState();
+    const next = structuredClone(store.apState ?? createDefaultAutopilotStateFromAircraft(store.aircraft, store.wind));
+    if (command === 'mcpFdLeft') {
+      toggleFlightDirectorSwitch(next, 'left');
+      store.setApState(next);
+      return;
+    }
+
+    const mode = gamepadMcpModeForCommand(command);
+    if (!mode) return;
+    if (!selectMcpViewModel(store).modeAvailability[mode].available) return;
+    applyMcpMode(next, mode);
+    store.setApState(next);
+  }, []);
+
+  const handleGamepadCommands = useCallback((commands: readonly GamepadCommand[]) => {
+    for (const command of commands) {
+      if (command === 'startPause') {
+        const store = useSimStore.getState();
+        if (store.status === 'running') store.pause();
+        else if (store.status === 'paused') store.resume();
+        else store.startTakeoffRoll();
+      } else if (command === 'reset') {
+        useSimStore.getState().reset();
+      } else if (command === 'camera') {
+        setCamMode(nextCameraMode);
+      } else if (command === 'overlay') {
+        setOverlayMode(nextOverlayMode);
+      } else if (command === 'audio') {
+        void handleToggleAudio();
+      } else {
+        applyGamepadMcpCommand(command);
+      }
+    }
+  }, [applyGamepadMcpCommand, handleToggleAudio]);
+
+  useEffect(() => {
+    gamepadCommandHandlerRef.current = handleGamepadCommands;
+  }, [handleGamepadCommands]);
 
   const showDebugOverlays = shouldShowDebugOverlays(overlayMode);
   const showFlightInstruments = shouldShowFlightInstruments(overlayMode);

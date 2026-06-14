@@ -20,6 +20,12 @@ describe('controlBindings', () => {
       'trim',
       'camera',
       'overlay',
+      'audio',
+      'simControl',
+      'mcpFlightDirector',
+      'mcpHeading',
+      'mcpAltitude',
+      'mcpSpeed',
     ]);
   });
 
@@ -34,7 +40,16 @@ describe('controlBindings', () => {
     expect(labels.flaps).toContain('Gamepad LB/L1');
     expect(labels.differentialBrake).toContain('Z/X');
     expect(labels.camera).toContain('C');
+    expect(labels.camera).toContain('Gamepad X/Square');
     expect(labels.overlay).toContain('O');
+    expect(labels.overlay).toContain('Gamepad B/Circle');
+    expect(labels.audio).toContain('Gamepad Y/Triangle');
+    expect(labels.simControl).toContain('Gamepad Start/Menu');
+    expect(labels.simControl).toContain('Gamepad Back/View');
+    expect(labels.mcpFlightDirector).toContain('Gamepad L3');
+    expect(labels.mcpHeading).toContain('Gamepad R3');
+    expect(labels.mcpAltitude).toContain('Gamepad D-pad left');
+    expect(labels.mcpSpeed).toContain('Gamepad D-pad right');
   });
 
   it('validates defaults without duplicate keys and exposes a differential brake row', () => {
@@ -68,5 +83,18 @@ describe('controlBindings', () => {
 
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.errors[0]).toMatch(/duplicate/i);
+  });
+
+  it('rejects duplicate gamepad assignments inside the editable model', () => {
+    const duplicate = DEFAULT_CONTROL_BINDINGS.map((binding) => (
+      binding.id === 'overlay'
+        ? { ...binding, gamepad: ['Gamepad X/Square'] }
+        : binding
+    ));
+
+    const result = validateControlBindings(duplicate);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors[0]).toMatch(/duplicate gamepad binding/i);
   });
 });

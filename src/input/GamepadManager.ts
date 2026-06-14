@@ -1,6 +1,22 @@
 import type { ControlInputs } from '../sim/types';
 import type { InputActions } from './InputManager';
 
+export type GamepadCommand =
+  | 'startPause'
+  | 'reset'
+  | 'camera'
+  | 'overlay'
+  | 'audio'
+  | 'mcpFdLeft'
+  | 'mcpHdgSel'
+  | 'mcpAltHold'
+  | 'mcpSpeed';
+
+export interface GamepadInputActions extends InputActions {
+  /** Edge-triggered non-axis simulator/gamepad commands for the app shell. */
+  commands?: GamepadCommand[];
+}
+
 export interface GamepadCalibration {
   axisDeadzone: number;
   triggerDeadzone: number;
@@ -16,6 +32,20 @@ export const DEFAULT_GAMEPAD_CALIBRATION: GamepadCalibration = {
   invertAileron: false,
   invertRudder: false,
 };
+
+const FLAP_NEXT_BUTTON = 4;
+const GEAR_TOGGLE_BUTTON = 5;
+const COMMAND_BUTTONS: ReadonlyArray<readonly [number, GamepadCommand]> = [
+  [2, 'camera'],
+  [1, 'overlay'],
+  [3, 'audio'],
+  [8, 'reset'],
+  [9, 'startPause'],
+  [10, 'mcpFdLeft'],
+  [11, 'mcpHdgSel'],
+  [14, 'mcpAltHold'],
+  [15, 'mcpSpeed'],
+];
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
@@ -53,19 +83,29 @@ function getFirstGamepad(): Gamepad | null {
   return Array.from(gamepads).find((pad): pad is Gamepad => pad != null) ?? null;
 }
 
-let previousFlapButtonPressed = false;
-let previousGearButtonPressed = false;
+let previousPressedButtons = new Set<number>();
 
 function buttonPressed(gp: Gamepad, index: number): boolean {
   return gp.buttons?.[index]?.pressed === true || (gp.buttons?.[index]?.value ?? 0) > 0.5;
 }
 
-export function __resetGamepadStateForTests(): void {
-  previousFlapButtonPressed = false;
-  previousGearButtonPressed = false;
+function pressedButtonSet(gp: Gamepad): Set<number> {
+  const pressed = new Set<number>();
+  for (let index = 0; index < (gp.buttons?.length ?? 0); index += 1) {
+    if (buttonPressed(gp, index)) pressed.add(index);
+  }
+  return pressed;
 }
 
-export function readGamepadActions(calibration: GamepadCalibration = DEFAULT_GAMEPAD_CALIBRATION): InputActions | null {
+function edgePressed(pressed: ReadonlySet<number>, index: number): boolean {
+  return pressed.has(index) && !previousPressedButtons.has(index);
+}
+
+export function __resetGamepadStateForTests(): void {
+  previousPressedButtons = new Set<number>();
+}
+
+export function readGamepadActions(calibration: GamepadCalibration = DEFAULT_GAMEPAD_CALIBRATION): GamepadInputActions | null {
   const gp = getFirstGamepad();
   if (!gp) return null;
 
@@ -77,10 +117,11 @@ export function readGamepadActions(calibration: GamepadCalibration = DEFAULT_GAM
   const trimNoseUp = gp.buttons?.[12]?.pressed ? 1 : 0;
   const trimNoseDown = gp.buttons?.[13]?.pressed ? 1 : 0;
   const brakeButton = buttonPressed(gp, 0) ? 1 : 0;
-  const flapButtonPressed = buttonPressed(gp, 4);
-  const gearButtonPressed = buttonPressed(gp, 5);
+  const pressed = pressedButtonSet(gp);
+  const flapButtonPressed = edgePressed(pressed, FLAP_NEXT_BUTTON);
+  const gearButtonPressed = edgePressed(pressed, GEAR_TOGGLE_BUTTON);
 
-  const actions: InputActions = {};
+  const actions: GamepadInputActions = {};
 
   if (leftY !== undefined) actions.pitch = maybeInvert(leftY, calibration.invertElevator);
   if (leftX !== undefined) actions.roll = maybeInvert(leftX, calibration.invertAileron);
@@ -95,11 +136,15 @@ export function readGamepadActions(calibration: GamepadCalibration = DEFAULT_GAM
   }
 
   if (brakeButton > 0) actions.brake = brakeButton;
-  if (flapButtonPressed && !previousFlapButtonPressed) actions.flapNext = true;
-  if (gearButtonPressed && !previousGearButtonPressed) actions.gearToggle = true;
-  previousFlapButtonPressed = flapButtonPressed;
-  previousGearButtonPressed = gearButtonPressed;
+  if (flapButtonPressed) actions.flapNext = true;
+  if (gearButtonPressed) actions.gearToggle = true;
 
+  const commands = COMMAND_BUTTONS
+    .filter(([buttonIndex]) => edgePressed(pressed, buttonIndex))
+    .map(([, command]) => command);
+  if (commands.length > 0) actions.commands = commands;
+
+  previousPressedButtons = pressed;
   return Object.keys(actions).length > 0 ? actions : null;
 }
 

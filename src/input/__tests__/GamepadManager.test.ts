@@ -209,4 +209,34 @@ describe('readGamepad', () => {
 
     expect(result).toEqual({ pitch: 0.3 });
   });
+
+  it('emits edge-triggered full-loop gamepad commands without repeating held toggles', () => {
+    setGamepads([
+      {
+        axes: [0, 0, 0],
+        buttons: Array.from({ length: 16 }, (_, i) => button([0, 1, 2, 3, 4, 5, 8, 9, 10, 11, 14, 15].includes(i) ? 1 : 0)),
+      },
+    ]);
+
+    const first = readGamepadActions() as ReturnType<typeof readGamepadActions> & { commands?: string[] };
+    expect(first).toEqual({
+      brake: 1,
+      flapNext: true,
+      gearToggle: true,
+      commands: [
+        'camera',
+        'overlay',
+        'audio',
+        'reset',
+        'startPause',
+        'mcpFdLeft',
+        'mcpHdgSel',
+        'mcpAltHold',
+        'mcpSpeed',
+      ],
+    });
+
+    const held = readGamepadActions() as ReturnType<typeof readGamepadActions> & { commands?: string[] };
+    expect(held).toEqual({ brake: 1 });
+  });
 });

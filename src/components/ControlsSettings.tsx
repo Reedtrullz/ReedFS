@@ -54,11 +54,14 @@ export function ControlsSettings({ bindings = DEFAULT_CONTROL_BINDINGS }: Contro
         Controls settings {expanded ? '▾' : '▸'}
       </button>
       {expanded && (
-        <div style={{ display: 'grid', gridTemplateColumns: '86px 1fr', gap: '6px 10px', fontSize: 11, marginTop: 8 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '116px 1fr', gap: '6px 10px', fontSize: 11, marginTop: 8 }}>
           {bindings.map((binding) => (
             <div key={binding.id} style={{ display: 'contents' }}>
               <div style={{ color: '#ffffff', fontWeight: 800 }}>{binding.label}</div>
-              <div style={{ color: '#cfe5ef' }}>{labels[binding.id]}</div>
+              <div style={{ color: '#cfe5ef' }}>
+                <div>{labels[binding.id]}</div>
+                <div style={{ color: '#9db2bc', marginTop: 2 }}>{binding.description}</div>
+              </div>
             </div>
           ))}
         </div>
