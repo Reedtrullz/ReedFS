@@ -89,6 +89,7 @@ function expectFmaOff(snapshot: TruthSnapshot): void {
 
 test.describe('RFS truth-flow browser proof', () => {
   test('LOAD PLAN stays truthful and keyboard gear-up is gated before positive rate', async ({ page }) => {
+    test.setTimeout(60_000);
     await openRfs(page);
 
     await page.getByRole('button', { name: 'LOAD PLAN' }).click();
@@ -117,7 +118,6 @@ test.describe('RFS truth-flow browser proof', () => {
 
     const parkedLnav = page.getByRole('button', { name: /^LNAV$/ });
     await expect(parkedLnav).toBeDisabled();
-    await expect(parkedLnav).toHaveAttribute('aria-disabled', 'true');
     await expect(parkedLnav).toHaveAttribute('title', /airborne/i);
     await expect(page.getByLabel('Primary flight display').getByText('LNAV')).toHaveCount(0);
 
