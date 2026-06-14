@@ -88,20 +88,29 @@ Use Node 22. The local shell default may be older, so source nvm before Node/npm
 source ~/.nvm/nvm.sh && nvm use 22
 ```
 
-RFS imports RFMS shared types through the Vite alias `@shared`, which resolves to a sibling checkout:
+RFS imports RFMS shared types through the Vite alias `@shared`, which resolves to a sibling checkout managed by the bootstrap script:
 
 ```text
 /Users/reidar/Projectos/RFS
 /Users/reidar/Projectos/RFMS/shared
 ```
 
-CI and Docker clone `https://github.com/Reedtrullz/RFMC.git` into an `RFMS` directory before installing/building.
+Fresh clones should bootstrap the sibling dependency before installing packages:
+
+```bash
+source ~/.nvm/nvm.sh && nvm use 22
+npm run bootstrap
+npm run bootstrap:check
+```
+
+The bootstrap script fetches `https://github.com/Reedtrullz/RFMC.git` at the audited RFMS/RFMC commit `810fc9652da431eaf8978b85bf4af131605559b5`. Local developer checkouts at another commit are allowed for day-to-day work when `../RFMS/shared/package.json` exists, but CI and Docker use the pinned bootstrap path for reproducible builds.
 
 ## Local development
 
 ```bash
 cd /Users/reidar/Projectos/RFS
 source ~/.nvm/nvm.sh && nvm use 22
+npm run bootstrap
 npm install --legacy-peer-deps
 npm run dev -- --host 127.0.0.1
 ```

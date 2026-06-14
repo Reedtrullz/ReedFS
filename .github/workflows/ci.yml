@@ -36,17 +36,15 @@ jobs:
     steps:
       # actions/checkout@v6
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
-      - name: Clone RFMS (shared types dependency)
-        run: |
-          git init ../RFMS
-          git -C ../RFMS remote add origin https://github.com/Reedtrullz/RFMC.git
-          git -C ../RFMS fetch --depth 1 origin 810fc9652da431eaf8978b85bf4af131605559b5
-          git -C ../RFMS checkout --detach FETCH_HEAD
       # actions/setup-node@v6
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         with:
           node-version: 22
           cache: npm
+      - name: Bootstrap RFMS shared dependency
+        run: node scripts/bootstrap-rfms-shared.mjs
+      - name: Verify RFMS shared dependency
+        run: node scripts/bootstrap-rfms-shared.mjs --check
       - run: npm ci --legacy-peer-deps
       - run: npm run check:deps
       - run: npm run check:release
@@ -139,17 +137,15 @@ jobs:
     steps:
       # actions/checkout@v6
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
-      - name: Clone RFMS (shared types dependency)
-        run: |
-          git init ../RFMS
-          git -C ../RFMS remote add origin https://github.com/Reedtrullz/RFMC.git
-          git -C ../RFMS fetch --depth 1 origin 810fc9652da431eaf8978b85bf4af131605559b5
-          git -C ../RFMS checkout --detach FETCH_HEAD
       # actions/setup-node@v6
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         with:
           node-version: 22
           cache: npm
+      - name: Bootstrap RFMS shared dependency
+        run: node scripts/bootstrap-rfms-shared.mjs
+      - name: Verify RFMS shared dependency
+        run: node scripts/bootstrap-rfms-shared.mjs --check
       - run: npm ci --legacy-peer-deps
       - name: Define immutable image ref
         id: image-meta

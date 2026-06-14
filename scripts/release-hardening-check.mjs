@@ -23,6 +23,7 @@ const codeql = read(".github/workflows/codeql.yml");
 const dependabot = read(".github/dependabot.yml");
 const dockerfile = read("Dockerfile");
 const dockerignore = read(".dockerignore");
+const bootstrapRfmsShared = read("scripts/bootstrap-rfms-shared.mjs");
 const nginx = read("nginx.conf");
 const packageJson = JSON.parse(read("package.json"));
 const ansibleCfg = read("ansible.cfg");
@@ -36,6 +37,8 @@ for (const [name, command] of Object.entries(packageJson.scripts ?? {})) {
     check(!command.includes("--pass-with-no-tests"), `${name} must not use --pass-with-no-tests`);
   }
 }
+check(packageJson.scripts?.bootstrap === "node scripts/bootstrap-rfms-shared.mjs", "package.json must expose npm run bootstrap for RFMS shared setup");
+check(packageJson.scripts?.["bootstrap:check"] === "node scripts/bootstrap-rfms-shared.mjs --check", "package.json must expose npm run bootstrap:check for RFMS shared verification");
 
 const allWorkflowYaml = `${ci}\n${codeql}`;
 const requiredActions = [
@@ -72,7 +75,7 @@ check(ci.includes("severity: HIGH,CRITICAL") && ci.includes("exit-code: '1'"), "
 check(/concurrency:\n\s+group:\s+\$\{\{ github\.workflow \}\}-\$\{\{ github\.ref \}\}\n\s+cancel-in-progress:\s+false/m.test(ci), "workflow must serialize runs per workflow/ref with cancel-in-progress: false so VPS deploys cannot overlap");
 check(ci.includes("security-events: write"), "gitleaks job must have security-events write permission");
 check(ci.includes("pull-requests: read"), "gitleaks job must have pull-requests read permission for pull_request runs");
-check(ci.includes("810fc9652da431eaf8978b85bf4af131605559b5"), "workflow must pin RFMS/RFMC checkout to the audited commit");
+check(ci.includes("node scripts/bootstrap-rfms-shared.mjs") && bootstrapRfmsShared.includes("810fc9652da431eaf8978b85bf4af131605559b5"), "workflow must bootstrap RFMS/RFMC from the audited commit");
 check((ci.match(/npm ci --legacy-peer-deps/g) ?? []).length >= 2, "workflow must use npm ci --legacy-peer-deps");
 check(ci.includes("npm run check:deps"), "workflow test job must run npm run check:deps before build/test");
 check(ci.includes("push: false"), "workflow must include a PR-safe Docker smoke build with push: false");
@@ -99,7 +102,7 @@ check(ci.includes('docker logs --tail=50 rfs_canary') && ci.includes('docker rm 
 
 check(dockerfile.includes("node:22-alpine@sha256:968df39aedcea65eeb078fb336ed7191baf48f972b4479711397108be0966920"), "Dockerfile must pin node:22-alpine by digest");
 check(dockerfile.includes("nginx:alpine@sha256:8b1e78743a03dbb2c95171cc58639fef29abc8816598e27fb910ed2e621e589a"), "Dockerfile must pin nginx:alpine by digest");
-check(dockerfile.includes("810fc9652da431eaf8978b85bf4af131605559b5"), "Dockerfile must checkout the audited RFMS/RFMC commit");
+check(dockerfile.includes("COPY scripts/bootstrap-rfms-shared.mjs") && dockerfile.includes("RUN node scripts/bootstrap-rfms-shared.mjs") && bootstrapRfmsShared.includes("810fc9652da431eaf8978b85bf4af131605559b5"), "Dockerfile must bootstrap the audited RFMS/RFMC commit");
 check(dockerfile.includes("npm ci --legacy-peer-deps"), "Dockerfile must use npm ci --legacy-peer-deps");
 check(dockerfile.includes("RFS_COMMIT_SHA") && dockerfile.includes("RFS_IMAGE_REF"), "Dockerfile must pass release metadata into the build");
 check(dockerfile.includes("USER 101:101"), "Dockerfile runtime stage must run nginx as fixed non-root UID/GID 101:101");

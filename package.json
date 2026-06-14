@@ -23,6 +23,8 @@
   ],
   "scripts": {
     "dev": "vite",
+    "bootstrap": "node scripts/bootstrap-rfms-shared.mjs",
+    "bootstrap:check": "node scripts/bootstrap-rfms-shared.mjs --check",
     "build": "tsc -b && vite build && node scripts/write-version-metadata.mjs dist/rfs-version.json",
     "typecheck": "tsc -b",
     "test": "vitest run",

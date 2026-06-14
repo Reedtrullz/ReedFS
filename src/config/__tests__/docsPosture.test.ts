@@ -21,8 +21,15 @@ const automationFiles = import.meta.glob('../../../.github/{dependabot.yml,workf
   import: 'default',
   query: '?raw',
 }) as Record<string, string>;
+const bootstrapFiles = import.meta.glob('../../../scripts/bootstrap-rfms-shared.mjs', {
+  eager: true,
+  import: 'default',
+  query: '?raw',
+}) as Record<string, string>;
 const dependabotConfig = automationFiles['../../../.github/dependabot.yml'] ?? '';
 const codeqlWorkflow = automationFiles['../../../.github/workflows/codeql.yml'] ?? '';
+const bootstrapScript = bootstrapFiles['../../../scripts/bootstrap-rfms-shared.mjs'] ?? '';
+const RFMS_SHARED_COMMIT = '810fc9652da431eaf8978b85bf4af131605559b5';
 
 describe('canonical docs posture', () => {
   it('keeps COOP/COEP and worker/SAB policy aligned with Cesium compatibility', () => {
@@ -119,6 +126,29 @@ describe('canonical docs posture', () => {
     expect(nginxConf).not.toMatch(/Cross-Origin-Opener-Policy|Cross-Origin-Embedder-Policy/);
     expect(architecture).toMatch(/Cesium-compatible security headers/i);
     expect(architecture).toMatch(/does not set COOP\/COEP/i);
+  });
+
+  it('provides a one-command RFMS shared bootstrap that CI and Docker reuse', () => {
+    expect(packageJson.scripts.bootstrap).toBe('node scripts/bootstrap-rfms-shared.mjs');
+    expect(packageJson.scripts['bootstrap:check']).toBe('node scripts/bootstrap-rfms-shared.mjs --check');
+    expect(bootstrapScript).toContain(RFMS_SHARED_COMMIT);
+    expect(bootstrapScript).toContain('https://github.com/Reedtrullz/RFMC.git');
+    expect(bootstrapScript.indexOf('if (status.length > 0)')).toBeGreaterThanOrEqual(0);
+    expect(bootstrapScript.indexOf('if (status.length > 0)')).toBeLessThan(
+      bootstrapScript.indexOf('if (head === RFMS_COMMIT && existsSync(RFMS_SHARED_PACKAGE))'),
+    );
+
+    expect(ciWorkflow).toContain('node scripts/bootstrap-rfms-shared.mjs');
+    expect(ciWorkflow).toContain('node scripts/bootstrap-rfms-shared.mjs --check');
+    expect(ciWorkflow).not.toContain('git -C ../RFMS fetch --depth 1 origin');
+
+    expect(dockerfile).toContain('COPY scripts/bootstrap-rfms-shared.mjs');
+    expect(dockerfile).toContain('RUN node scripts/bootstrap-rfms-shared.mjs');
+    expect(dockerfile).not.toContain('git -C RFMS fetch --depth 1 origin');
+
+    expect(readme).toContain('npm run bootstrap');
+    expect(readme).toContain('npm run bootstrap:check');
+    expect(readme).toContain(RFMS_SHARED_COMMIT);
   });
 
   it('automates dependency updates, CodeQL analysis, and PR-safe container scanning', () => {

@@ -6,18 +6,13 @@ ARG RFS_IMAGE_DIGEST=unknown
 ARG RFS_VERSION=0.0.0
 ARG VITE_CESIUM_ION_TOKEN=
 
-# Clone RFMS for shared/ types (needed by RFS @shared imports) at the audited RFMC/RFMS commit.
-RUN apk add --no-cache git
-WORKDIR /
-RUN git init RFMS \
-  && git -C RFMS remote add origin https://github.com/Reedtrullz/RFMC.git \
-  && git -C RFMS fetch --depth 1 origin 810fc9652da431eaf8978b85bf4af131605559b5 \
-  && git -C RFMS checkout --detach FETCH_HEAD
-
 # Build RFS
+RUN apk add --no-cache git
 WORKDIR /app
 # Install deps first (file:../RFMS/shared resolves to /RFMS/shared)
 COPY package*.json ./
+COPY scripts/bootstrap-rfms-shared.mjs scripts/bootstrap-rfms-shared.mjs
+RUN node scripts/bootstrap-rfms-shared.mjs
 RUN npm ci --legacy-peer-deps
 # Copy source and build
 COPY . .
