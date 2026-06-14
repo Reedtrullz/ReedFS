@@ -57,6 +57,75 @@ describe('scenario persistence', () => {
     }
   });
 
+  it('persists named slots with scenario, route, phase, timestamp, and restore metadata', () => {
+    const storage = memoryStorage();
+    useSimStore.getState().setScenario(KSEA_LIGHT_PATTERN_SCENARIO.id);
+    useSimStore.getState().setFlightPlan(createKseaKpdxFlight());
+    useSimStore.getState().startTakeoffRoll();
+    const snapshot = createScenarioSnapshot(useSimStore.getState());
+
+    saveScenarioSnapshot(storage, snapshot, {
+      slotId: 'pattern-practice',
+      slotName: 'Pattern Practice',
+      overwrite: true,
+    });
+
+    const saved = JSON.parse(storage.getItem(SCENARIO_SAVE_KEY) ?? 'null');
+    expect(saved.version).toBe(3);
+    expect(saved.slots['pattern-practice'].metadata).toEqual(expect.objectContaining({
+      id: 'pattern-practice',
+      name: 'Pattern Practice',
+      selectedScenarioId: KSEA_LIGHT_PATTERN_SCENARIO.id,
+      status: 'running',
+      restoreStatus: 'paused',
+      routeSummary: 'KSEA → KPDX',
+    }));
+    expect(saved.slots['pattern-practice'].metadata.savedAtIso).toEqual(expect.any(String));
+  });
+
+  it('loads named slots independently and restores running saves paused', () => {
+    const storage = memoryStorage();
+    useSimStore.getState().setScenario(KSEA_LIGHT_PATTERN_SCENARIO.id);
+    useSimStore.getState().startTakeoffRoll();
+    useSimStore.getState().saveScenarioState(storage, {
+      slotId: 'pattern-practice',
+      slotName: 'Pattern Practice',
+      overwrite: true,
+    });
+
+    useSimStore.getState().setScenario(KSEA_TUTORIAL_SCENARIO.id);
+    useSimStore.getState().saveScenarioState(storage, {
+      slotId: 'gate-setup',
+      slotName: 'Gate Setup',
+      overwrite: true,
+    });
+
+    useSimStore.getState().loadScenarioState(storage, 'pattern-practice');
+    const restored = useSimStore.getState();
+
+    expect(restored.selectedScenarioId).toBe(KSEA_LIGHT_PATTERN_SCENARIO.id);
+    expect(restored.status).toBe('paused');
+    expect(restored.scenarioPersistenceMessage).toMatch(/Pattern Practice/);
+  });
+
+  it('migrates legacy single-slot saves to the default named slot', () => {
+    const storage = memoryStorage();
+    useSimStore.getState().setScenario(KSEA_LIGHT_PATTERN_SCENARIO.id);
+    const legacySnapshot = createScenarioSnapshot(useSimStore.getState());
+    storage.setItem(SCENARIO_SAVE_KEY, JSON.stringify(legacySnapshot));
+
+    const loaded = loadScenarioSnapshot(storage, 'default');
+    const migrated = JSON.parse(storage.getItem(SCENARIO_SAVE_KEY) ?? 'null');
+
+    expect(loaded.ok).toBe(true);
+    expect(migrated.version).toBe(3);
+    expect(migrated.slots.default.metadata).toEqual(expect.objectContaining({
+      id: 'default',
+      name: 'Default save',
+      selectedScenarioId: KSEA_LIGHT_PATTERN_SCENARIO.id,
+    }));
+  });
+
   it('store load restores aircraft, inputs, route, AP state, wind, and scenario id', () => {
     const storage = memoryStorage();
     useSimStore.getState().setScenario(KSEA_LIGHT_PATTERN_SCENARIO.id);

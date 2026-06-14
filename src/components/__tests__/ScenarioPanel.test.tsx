@@ -3,12 +3,17 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { ScenarioPanel } from '../ScenarioPanel';
 import { useSimStore } from '../../store/simStore';
 import { KSEA_LIGHT_PATTERN_SCENARIO, KSEA_TUTORIAL_SCENARIO } from '../../sim/scenarios';
+import { SCENARIO_SAVE_KEY } from '../../store/scenarioPersistence';
 
 describe('ScenarioPanel', () => {
   beforeEach(() => {
     window.localStorage.clear();
     useSimStore.getState().setScenario(KSEA_TUTORIAL_SCENARIO.id);
     useSimStore.getState().reset();
+    useSimStore.setState({
+      scenarioPersistenceMessage: null,
+      scenarioSaveSlots: [],
+    });
   });
 
   it('renders a scenario picker and the active tutorial step', () => {
@@ -82,6 +87,64 @@ describe('ScenarioPanel', () => {
 
     expect(useSimStore.getState().selectedScenarioId).toBe(KSEA_LIGHT_PATTERN_SCENARIO.id);
     expect(screen.getByText(/saved scenario loaded/i)).toBeTruthy();
+  });
+
+  it('shows named save slots with metadata and loads the selected slot', () => {
+    render(<ScenarioPanel />);
+    fireEvent.change(screen.getByLabelText('Scenario'), { target: { value: KSEA_LIGHT_PATTERN_SCENARIO.id } });
+    fireEvent.change(screen.getByLabelText('Save slot name'), { target: { value: 'Pattern Practice' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save scenario state' }));
+
+    expect(screen.getAllByText('Pattern Practice').length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/KSEA Light Pattern/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/No route/)).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText('Scenario'), { target: { value: KSEA_TUTORIAL_SCENARIO.id } });
+    fireEvent.change(screen.getByLabelText('Saved scenario slot'), { target: { value: 'pattern-practice' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Load saved scenario state' }));
+
+    expect(useSimStore.getState().selectedScenarioId).toBe(KSEA_LIGHT_PATTERN_SCENARIO.id);
+    expect(screen.getByText(/Pattern Practice loaded/i)).toBeTruthy();
+  });
+
+  it('requires explicit confirmation before overwriting an existing named slot', () => {
+    render(<ScenarioPanel />);
+    fireEvent.change(screen.getByLabelText('Save slot name'), { target: { value: 'Pattern Practice' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save scenario state' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save scenario state' }));
+
+    expect(screen.getByText(/Overwrite Pattern Practice/i)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm overwrite Pattern Practice' }));
+
+    expect(screen.getByText(/Pattern Practice overwritten/i)).toBeTruthy();
+  });
+
+  it('shows a load warning when a selected named slot is corrupt', () => {
+    window.localStorage.setItem(SCENARIO_SAVE_KEY, JSON.stringify({
+      version: 3,
+      slots: {
+        broken: {
+          metadata: {
+            id: 'broken',
+            name: 'Broken Slot',
+            savedAtIso: '2026-06-14T12:00:00.000Z',
+            selectedScenarioId: KSEA_LIGHT_PATTERN_SCENARIO.id,
+            status: 'stopped',
+            restoreStatus: 'stopped',
+            routeSummary: 'No route',
+            simulationTimeSeconds: 0,
+          },
+          snapshot: { version: 999 },
+        },
+      },
+    }));
+
+    render(<ScenarioPanel />);
+    fireEvent.change(screen.getByLabelText('Saved scenario slot'), { target: { value: 'broken' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Load saved scenario state' }));
+
+    expect(screen.getByText(/ignored saved scenario/i)).toBeTruthy();
+    expect(screen.getAllByText(/Broken Slot/).length).toBeGreaterThan(0);
   });
 
   it('shows a load warning when saved scenario data is corrupt', () => {

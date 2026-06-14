@@ -11,7 +11,11 @@ import type { RouteStatusSnapshot } from '../sim/systems/navigation';
 import type { AutopilotControllerState } from '../sim/systems/autopilot';
 import type { InputActions, InputManagerState } from '../input/InputManager';
 
-import type { ScenarioPersistenceStorage } from './scenarioPersistence';
+import type {
+  ScenarioPersistenceStorage,
+  ScenarioSaveOptions,
+  ScenarioSaveSlotMetadata,
+} from './scenarioPersistence';
 import { createAircraftSlice, type SimStoreSet } from './slices/aircraftSlice';
 import { createInputSlice } from './slices/inputSlice';
 import { createAutoflightSlice } from './slices/autoflightSlice';
@@ -46,6 +50,7 @@ export interface SimStore {
   selectedScenarioId: string;
   guidance: GuidanceState;
   scenarioPersistenceMessage: string | null;
+  scenarioSaveSlots: ScenarioSaveSlotMetadata[];
   setInput: (partial: Partial<ControlInputs>) => void;
   applyInputActions: (actions: InputActions, dt: number) => void;
   tick: (timestamp: number) => void;
@@ -60,8 +65,9 @@ export interface SimStore {
   setApState: (ap: AutopilotState | null) => void;
   setFlightPlan: (fp: FlightPlan | null) => void;
   setWind: (w: WindInfo | null) => void;
-  saveScenarioState: (storage?: ScenarioPersistenceStorage) => void;
-  loadScenarioState: (storage?: ScenarioPersistenceStorage) => void;
+  saveScenarioState: (storage?: ScenarioPersistenceStorage, options?: ScenarioSaveOptions) => void;
+  loadScenarioState: (storage?: ScenarioPersistenceStorage, slotId?: string) => void;
+  refreshScenarioSaveSlots: (storage?: ScenarioPersistenceStorage) => void;
 }
 
 const FIXED_STEP_SECONDS = 1 / 60;

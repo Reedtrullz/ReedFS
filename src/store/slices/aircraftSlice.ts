@@ -42,6 +42,7 @@ export function createAircraftSlice(set: SimStoreSet): Pick<
   | 'selectedScenarioId'
   | 'guidance'
   | 'scenarioPersistenceMessage'
+  | 'scenarioSaveSlots'
   | 'start'
   | 'startTakeoffRoll'
   | 'abortTakeoff'
@@ -82,6 +83,7 @@ export function createAircraftSlice(set: SimStoreSet): Pick<
     selectedScenarioId: ENVA_TUTORIAL_SCENARIO.id,
     guidance: initialGuidance,
     scenarioPersistenceMessage: null,
+    scenarioSaveSlots: [],
 
     start: () => set((s) => {
       const scenario = scenarioById(s.selectedScenarioId);

@@ -137,8 +137,10 @@ const layoutCss = `
 }
 
 .rfs-layout__top-left [data-rfs-panel="scenario"] {
-  flex: 0 1 330px;
-  width: min(330px, 35vw);
+  flex: 0 1 min(330px, 25vw);
+  width: min(330px, 25vw);
+  max-height: min(560px, calc(100vh - 340px));
+  overflow: auto;
 }
 
 .rfs-layout__top-left [data-rfs-panel="takeoff-setup"] {
