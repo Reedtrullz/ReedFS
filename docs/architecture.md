@@ -197,6 +197,11 @@ push master
   -> Caddy serves https://fly.reidar.tech
 ```
 
+Runtime browser security posture:
+
+- `nginx.conf` serves Cesium-compatible security headers on both SPA and immutable asset responses: `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=()`, `X-Frame-Options: DENY`, and `Strict-Transport-Security: max-age=31536000; includeSubDomains`.
+- The header policy intentionally does not set COOP/COEP. RFS does not rely on SharedArrayBuffer, and avoiding cross-origin isolation keeps Cesium tile/asset loading compatible with third-party providers.
+
 ## Not implemented yet
 
 These are intentional gaps, not regressions:

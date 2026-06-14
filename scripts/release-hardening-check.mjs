@@ -84,6 +84,19 @@ check(dockerfile.includes("ARG VITE_CESIUM_ION_TOKEN") && dockerfile.includes("V
 check(nginx.includes("listen 8080;"), "nginx.conf must listen on non-privileged port 8080");
 check(nginx.includes("client_body_temp_path /tmp/client_temp;") && nginx.includes("proxy_temp_path /tmp/proxy_temp;"), "nginx.conf must put temp paths on tmpfs-compatible /tmp locations");
 
+const requiredSecurityHeaders = [
+  'add_header X-Content-Type-Options "nosniff" always;',
+  'add_header Referrer-Policy "strict-origin-when-cross-origin" always;',
+  'add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=()" always;',
+  'add_header X-Frame-Options "DENY" always;',
+  'add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;',
+];
+for (const header of requiredSecurityHeaders) {
+  const occurrences = nginx.match(new RegExp(header.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")) ?? [];
+  check(occurrences.length >= 2, `nginx.conf must set ${header} at server and /assets levels with always`);
+}
+check(!/Cross-Origin-Opener-Policy|Cross-Origin-Embedder-Policy/.test(nginx), "nginx.conf must not set COOP/COEP headers");
+
 const hardenedRunFlags = [
   "--read-only",
   "--cap-drop ALL",

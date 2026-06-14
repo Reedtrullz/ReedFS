@@ -60,6 +60,21 @@ describe('canonical docs posture', () => {
     expect(ciWorkflow).toContain('127.0.0.1:3004:8080');
   });
 
+  it('serves browser security headers without enabling COOP or COEP', () => {
+    for (const header of [
+      'X-Content-Type-Options "nosniff" always',
+      'Referrer-Policy "strict-origin-when-cross-origin" always',
+      'Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=()" always',
+      'X-Frame-Options "DENY" always',
+      'Strict-Transport-Security "max-age=31536000; includeSubDomains" always',
+    ]) {
+      expect(nginxConf).toContain(`add_header ${header};`);
+    }
+    expect(nginxConf).not.toMatch(/Cross-Origin-Opener-Policy|Cross-Origin-Embedder-Policy/);
+    expect(architecture).toMatch(/Cesium-compatible security headers/i);
+    expect(architecture).toMatch(/does not set COOP\/COEP/i);
+  });
+
   it('serves immutable post-push image digest provenance in release metadata', () => {
     expect(ciWorkflow).toContain('EXPECTED_IMAGE_DIGEST=${{ needs.publish.outputs.image_digest }}');
     expect(ciWorkflow).toContain('VERSION_METADATA_PATH');
