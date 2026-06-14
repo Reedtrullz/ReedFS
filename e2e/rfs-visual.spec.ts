@@ -18,8 +18,10 @@ test.describe('RFS deterministic visual states', () => {
 
   test('route overlay and safe AP modes are visible after LOAD PLAN', async ({ page }) => {
     await openRfs(page);
+    await page.getByLabel('Scenario', { exact: true }).selectOption('ksea-tutorial');
     await clickButton(page, /LOAD PLAN/i);
-    await expect(page.getByLabel('Route status')).toContainText(/NO ROUTE|KSEA→KPDX/);
+    await expect(page.getByLabel('Route status')).toContainText('KSEA→KPDX');
+    await expect(page.getByLabel('Route status')).toContainText(/KSEA\s+→\s+OLM/);
     await expect(page).toHaveScreenshot('route-loaded.png', { fullPage: true, timeout: 10_000 });
   });
 
