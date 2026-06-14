@@ -16,6 +16,14 @@ import architecture from '../../../docs/architecture.md?raw';
 import physicsInvariants from '../../../docs/physics-invariants.md?raw';
 import packageJson from '../../../package.json';
 
+const automationFiles = import.meta.glob('../../../.github/{dependabot.yml,workflows/codeql.yml}', {
+  eager: true,
+  import: 'default',
+  query: '?raw',
+}) as Record<string, string>;
+const dependabotConfig = automationFiles['../../../.github/dependabot.yml'] ?? '';
+const codeqlWorkflow = automationFiles['../../../.github/workflows/codeql.yml'] ?? '';
+
 describe('canonical docs posture', () => {
   it('keeps COOP/COEP and worker/SAB policy aligned with Cesium compatibility', () => {
     expect(readme).not.toMatch(/dev server sets COOP\/COEP headers/i);
@@ -111,6 +119,28 @@ describe('canonical docs posture', () => {
     expect(nginxConf).not.toMatch(/Cross-Origin-Opener-Policy|Cross-Origin-Embedder-Policy/);
     expect(architecture).toMatch(/Cesium-compatible security headers/i);
     expect(architecture).toMatch(/does not set COOP\/COEP/i);
+  });
+
+  it('automates dependency updates, CodeQL analysis, and PR-safe container scanning', () => {
+    for (const ecosystem of [
+      'package-ecosystem: npm',
+      'package-ecosystem: github-actions',
+      'package-ecosystem: docker',
+    ]) {
+      expect(dependabotConfig).toContain(ecosystem);
+    }
+    expect(dependabotConfig).toContain('directory: /');
+    expect(dependabotConfig).toContain('interval: weekly');
+
+    expect(codeqlWorkflow).toContain('github/codeql-action/init@');
+    expect(codeqlWorkflow).toContain('github/codeql-action/analyze@');
+    expect(codeqlWorkflow).toContain('security-events: write');
+    expect(codeqlWorkflow).toContain('javascript-typescript');
+
+    expect(ciWorkflow).toContain('aquasecurity/trivy-action@');
+    expect(ciWorkflow).toContain('image-ref: rfs:pr-smoke-${{ github.sha }}');
+    expect(ciWorkflow).toContain("exit-code: '1'");
+    expect(ciWorkflow).toContain('severity: HIGH,CRITICAL');
   });
 
   it('has OSS package metadata and contributor/security governance files', () => {

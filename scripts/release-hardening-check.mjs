@@ -19,6 +19,8 @@ function dockerignoreHasLine(pattern) {
 }
 
 const ci = read(".github/workflows/ci.yml");
+const codeql = read(".github/workflows/codeql.yml");
+const dependabot = read(".github/dependabot.yml");
 const dockerfile = read("Dockerfile");
 const dockerignore = read(".dockerignore");
 const nginx = read("nginx.conf");
@@ -35,6 +37,7 @@ for (const [name, command] of Object.entries(packageJson.scripts ?? {})) {
   }
 }
 
+const allWorkflowYaml = `${ci}\n${codeql}`;
 const requiredActions = [
   ["actions/checkout", "df4cb1c069e1874edd31b4311f1884172cec0e10"],
   ["actions/setup-node", "48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e"],
@@ -42,12 +45,30 @@ const requiredActions = [
   ["docker/build-push-action", "f9f3042f7e2789586610d6e8b85c8f03e5195baf"],
   ["appleboy/ssh-action", "0ff4204d59e8e51228ff73bce53f80d53301dee2"],
   ["gitleaks/gitleaks-action", "e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e"],
+  ["github/codeql-action/init", "8aad20d150bbac5944a9f9d289da16a4b0d87c1e"],
+  ["github/codeql-action/analyze", "8aad20d150bbac5944a9f9d289da16a4b0d87c1e"],
+  ["aquasecurity/trivy-action", "57a97c7e7821a5776cebc9bb87c984fa69cba8f1"],
 ];
 for (const [action, sha] of requiredActions) {
-  check(ci.includes(`uses: ${action}@${sha}`), `workflow must pin ${action} to ${sha}`);
+  check(allWorkflowYaml.includes(`uses: ${action}@${sha}`), `workflow must pin ${action} to ${sha}`);
 }
 
 check(/^permissions:\n\s+contents: read/m.test(ci), "workflow must define least-privilege top-level permissions");
+
+for (const ecosystem of ["npm", "github-actions", "docker"]) {
+  check(dependabot.includes(`package-ecosystem: ${ecosystem}`), `Dependabot must monitor ${ecosystem}`);
+}
+check((dependabot.match(/directory:\s*\//g) ?? []).length >= 3, "Dependabot npm/actions/docker updates must target the repository root");
+check((dependabot.match(/interval:\s*weekly/g) ?? []).length >= 3, "Dependabot npm/actions/docker updates must run weekly");
+
+check(codeql.includes("security-events: write"), "CodeQL workflow must have security-events write permission");
+check(codeql.includes("languages: javascript-typescript"), "CodeQL workflow must analyze JavaScript/TypeScript");
+check(codeql.includes("build-mode: none"), "CodeQL workflow must use no-build analysis for JS/TS");
+
+check(ci.includes("aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1"), "docker-smoke job must run pinned Trivy image scan");
+check(ci.includes("image-ref: rfs:pr-smoke-${{ github.sha }}"), "Trivy scan must inspect the PR-safe smoke image");
+check(ci.includes("severity: HIGH,CRITICAL") && ci.includes("exit-code: '1'"), "Trivy scan must fail on HIGH/CRITICAL vulnerabilities");
+
 check(/concurrency:\n\s+group:\s+\$\{\{ github\.workflow \}\}-\$\{\{ github\.ref \}\}\n\s+cancel-in-progress:\s+false/m.test(ci), "workflow must serialize runs per workflow/ref with cancel-in-progress: false so VPS deploys cannot overlap");
 check(ci.includes("security-events: write"), "gitleaks job must have security-events write permission");
 check(ci.includes("pull-requests: read"), "gitleaks job must have pull-requests read permission for pull_request runs");
