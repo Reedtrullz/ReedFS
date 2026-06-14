@@ -1,27 +1,22 @@
 import { useSimStore } from '../store/simStore';
+import { selectEngineStripViewModel } from '../store/selectors';
 
 /** Compact always-visible actual/commanded engine, flap, and gear strip.
  *  Sits at bottom-center above the button bar. */
 export function EngineStrip() {
-  const engines = useSimStore((s) => s.aircraft.engines);
-  const flapsActual = useSimStore((s) => s.aircraft.config.flapSetting);
-  const gearDownActual = useSimStore((s) => s.aircraft.config.gearDown);
-  const gearPositionActual = useSimStore((s) => s.aircraft.config.gearPosition);
-  const controls = useSimStore((s) => s.effectiveControls);
+  const vm = useSimStore(selectEngineStripViewModel);
 
-  const n1L = Math.round(engines[0].n1 * 10) / 10;
-  const n1R = Math.round(engines[1].n1 * 10) / 10;
-  const throttleCommandPercent = Math.round(Math.max(controls.throttle1, controls.throttle2) * 100);
-  const gearCommand = controls.gearLever;
-  const gearActualLabel = gearTransitLabel(gearDownActual, gearPositionActual);
-  const gearActualColor = gearActualLabel.startsWith('TRN') ? '#f6d365' : gearDownActual ? '#0f0' : '#ff0';
+  const n1L = Math.round(vm.leftN1 * 10) / 10;
+  const n1R = Math.round(vm.rightN1 * 10) / 10;
+  const gearActualLabel = gearTransitLabel(vm.gearDownActual, vm.gearPositionActual);
+  const gearActualColor = gearActualLabel.startsWith('TRN') ? '#f6d365' : vm.gearDownActual ? '#0f0' : '#ff0';
 
   return (
     <div style={containerStyle}>
       <div style={engineBlock}>
         <span style={labelStyle}>N1 ACT L</span>
         <div style={barTrack}>
-          <div style={{ ...barFill, width: `${engines[0].n1}%`, background: n1Color(engines[0].n1) }} />
+          <div style={{ ...barFill, width: `${vm.leftN1}%`, background: n1Color(vm.leftN1) }} />
         </div>
         <span style={valueStyle}>{n1L.toFixed(1)}%</span>
       </div>
@@ -29,26 +24,26 @@ export function EngineStrip() {
       <div style={engineBlock}>
         <span style={labelStyle}>N1 ACT R</span>
         <div style={barTrack}>
-          <div style={{ ...barFill, width: `${engines[1].n1}%`, background: n1Color(engines[1].n1) }} />
+          <div style={{ ...barFill, width: `${vm.rightN1}%`, background: n1Color(vm.rightN1) }} />
         </div>
         <span style={valueStyle}>{n1R.toFixed(1)}%</span>
       </div>
 
       <div style={indicatorBlock}>
         <span style={labelStyle}>THR CMD</span>
-        <span style={{ ...valueStyle, color: throttleCommandPercent > 0 ? '#0f0' : '#666' }}>{throttleCommandPercent}%</span>
+        <span style={{ ...valueStyle, color: vm.throttleCommandPercent > 0 ? '#0f0' : '#666' }}>{vm.throttleCommandPercent}%</span>
       </div>
 
       <div style={divider} />
 
       <div style={indicatorBlock}>
         <span style={labelStyle}>FLAPS ACT</span>
-        <span style={{ ...valueStyle, color: flapsActual > 0 ? '#0f0' : '#666' }}>{flapsActual}°</span>
+        <span style={{ ...valueStyle, color: vm.flapsActual > 0 ? '#0f0' : '#666' }}>{vm.flapsActual}°</span>
       </div>
 
       <div style={indicatorBlock}>
         <span style={labelStyle}>FLAPS CMD</span>
-        <span style={{ ...valueStyle, color: controls.flapLever > 0 ? '#9df' : '#666' }}>{controls.flapLever}°</span>
+        <span style={{ ...valueStyle, color: vm.flapCommand > 0 ? '#9df' : '#666' }}>{vm.flapCommand}°</span>
       </div>
 
       <div style={indicatorBlock}>
@@ -60,8 +55,8 @@ export function EngineStrip() {
 
       <div style={indicatorBlock}>
         <span style={labelStyle}>GEAR CMD</span>
-        <span style={{ ...valueStyle, color: gearCommand === 'DOWN' ? '#9df' : '#ff0' }}>
-          {gearCommand === 'DOWN' ? 'DN' : 'UP'}
+        <span style={{ ...valueStyle, color: vm.gearCommand === 'DOWN' ? '#9df' : '#ff0' }}>
+          {vm.gearCommand === 'DOWN' ? 'DN' : 'UP'}
         </span>
       </div>
     </div>

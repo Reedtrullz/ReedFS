@@ -1,7 +1,16 @@
 import { useSimStore } from '../store/simStore';
 import type { AutopilotState, LateralMode, ThrustMode, VerticalMode } from '@shared/autopilot/autopilotTypes';
-import { createDefaultAutopilotState, createDefaultAutopilotStateFromAircraft } from './defaultAutopilotState';
-import { deriveEffectiveAutoflightTruth } from '../sim/systems/effectiveAutoflightTruth';
+import { createDefaultAutopilotStateFromAircraft } from './defaultAutopilotState';
+import {
+  mcpModeAvailability,
+  selectMcpViewModel,
+  type EnabledMcpMode,
+  type McpModeAvailability,
+  type McpModeAvailabilityState,
+} from '../store/selectors';
+
+export { mcpModeAvailability };
+export type { EnabledMcpMode, McpModeAvailability, McpModeAvailabilityState };
 
 const btnStyle: React.CSSProperties = {
   background: '#333',
@@ -39,19 +48,6 @@ const targetDisplayStyle: React.CSSProperties = {
 
 type McpTarget = 'speed' | 'heading' | 'altitude' | 'verticalSpeed';
 type FlightDirectorSide = 'left' | 'right';
-
-type EnabledMcpMode = 'HDG_SEL' | 'LNAV' | 'VNAV' | 'ALT_HOLD' | 'VS' | 'SPEED' | 'N1' | 'OFF';
-
-export interface McpModeAvailability {
-  available: boolean;
-  reason: string | null;
-}
-
-export type McpModeAvailabilityState = Pick<ReturnType<typeof useSimStore.getState>,
-  'status' | 'aircraft' | 'routeStatus' | 'apState' | 'flightPlan'
->;
-
-const VNAV_DISPLAY_MODES = new Set<VerticalMode>(['VNAV', 'VNAV_PTH', 'ALT*', 'ALT_HOLD']);
 
 function clearBoeingModeFlags(apState: AutopilotState): void {
   apState.boeing.hdgSel = false;
@@ -91,24 +87,6 @@ function selectedVerticalSpeedFpm(apState: AutopilotState | null): number {
   return clamp(Math.round(finiteTarget(apState?.boeing.verticalSpeed, 0) / 100) * 100, -6000, 6000);
 }
 
-function deriveBackedVnavMode(
-  apState: AutopilotState | null,
-  context: Parameters<typeof deriveEffectiveAutoflightTruth>[1],
-): VerticalMode {
-  const aircraft = context?.aircraft;
-  const probe = structuredClone(
-    apState ?? (aircraft ? createDefaultAutopilotStateFromAircraft(aircraft) : createDefaultAutopilotState()),
-  );
-  probe.truth.autopilotStatus = 'CMD_A';
-  probe.truth.verticalActive = 'VNAV';
-  probe.boeing.cmdA = true;
-  probe.boeing.vnav = true;
-  probe.boeing.altHold = false;
-  probe.boeing.vs = false;
-
-  return deriveEffectiveAutoflightTruth(probe, context).verticalActive;
-}
-
 function formatVerticalSpeed(value: number): string {
   return value > 0 ? `+${value}` : `${value}`;
 }
@@ -123,29 +101,6 @@ function applyMcpTargetDelta(apState: AutopilotState, target: McpTarget, delta: 
   } else {
     apState.boeing.verticalSpeed = clamp(selectedVerticalSpeedFpm(apState) + delta, -6000, 6000);
   }
-}
-
-function mcpFlightAvailabilityReason(state: McpModeAvailabilityState): string | null {
-  if (state.status !== 'running') return 'start the simulator and get airborne first';
-  if (state.aircraft.ground.weightOnWheels) return 'aircraft must be airborne';
-  return null;
-}
-
-export function mcpModeAvailability(state: McpModeAvailabilityState, mode: EnabledMcpMode): McpModeAvailability {
-  if (mode === 'OFF') return { available: true, reason: null };
-
-  const flightReason = mcpFlightAvailabilityReason(state);
-  const routeReason = mode === 'LNAV' && !state.routeStatus.lnavAvailable
-    ? `LNAV unavailable: ${state.routeStatus.lnavUnavailableReason ?? 'route guidance unavailable'}`
-    : null;
-  const vnavReason = mode === 'VNAV' && deriveBackedVnavMode(state.apState, state) === 'OFF'
-    ? 'VNAV unavailable: no active altitude constraint'
-    : null;
-  const reasons = [flightReason, routeReason, vnavReason].filter((reason): reason is string => Boolean(reason));
-  return {
-    available: reasons.length === 0,
-    reason: reasons.length > 0 ? reasons.join('; ') : null,
-  };
 }
 
 function toggleFlightDirectorSwitch(apState: AutopilotState, side: FlightDirectorSide): void {
@@ -202,16 +157,25 @@ function applyMcpMode(apState: AutopilotState, mode: EnabledMcpMode): void {
 }
 
 export function RfsMCP() {
-  const apState = useSimStore((s) => s.apState);
-  const aircraft = useSimStore((s) => s.aircraft);
-  const wind = useSimStore((s) => s.wind);
-  const flightPlan = useSimStore((s) => s.flightPlan);
-  const routeStatus = useSimStore((s) => s.routeStatus);
-  const status = useSimStore((s) => s.status);
+  const {
+    vertActive,
+    thrActive,
+    vnavAvailable,
+    vnavActive,
+    fdLeft,
+    fdRight,
+    displayedLatActive,
+    modeAvailability,
+    unavailableSummary,
+    speedTarget,
+    headingTarget,
+    altitudeTarget,
+    verticalSpeedTarget,
+  } = useSimStore(selectMcpViewModel);
 
   const toggleMode = (mode: EnabledMcpMode) => {
     const state = useSimStore.getState();
-    const availability = mcpModeAvailability(state, mode);
+    const availability = selectMcpViewModel(state).modeAvailability[mode];
     if (!availability.available) return;
     const current = state.apState;
     const next = structuredClone(current ?? createDefaultAutopilotStateFromAircraft(state.aircraft, state.wind));
@@ -235,31 +199,6 @@ export function RfsMCP() {
     state.setApState(next);
   };
 
-  const effectiveTruth = deriveEffectiveAutoflightTruth(apState, { aircraft, flightPlan, routeStatus });
-  const latActive = effectiveTruth.lateralActive;
-  const vertActive = effectiveTruth.verticalActive;
-  const thrActive = effectiveTruth.thrustActive;
-  const backedVnavMode = deriveBackedVnavMode(apState, { aircraft, flightPlan, routeStatus });
-  const vnavAvailable = backedVnavMode !== 'OFF';
-  const vnavActive = Boolean(apState?.boeing.vnav) && VNAV_DISPLAY_MODES.has(vertActive);
-  const fdLeft = apState?.boeing.fdLeft ?? false;
-  const fdRight = apState?.boeing.fdRight ?? false;
-  const lnavAvailable = routeStatus.lnavAvailable;
-  const displayedLatActive = latActive === 'LNAV' && !lnavAvailable ? 'OFF' : latActive;
-  const displayApState = apState ?? createDefaultAutopilotStateFromAircraft(aircraft, wind);
-  const availabilityState: McpModeAvailabilityState = { status, aircraft, routeStatus, apState, flightPlan };
-  const modeAvailability: Record<EnabledMcpMode, McpModeAvailability> = {
-    HDG_SEL: mcpModeAvailability(availabilityState, 'HDG_SEL'),
-    LNAV: mcpModeAvailability(availabilityState, 'LNAV'),
-    VNAV: mcpModeAvailability(availabilityState, 'VNAV'),
-    ALT_HOLD: mcpModeAvailability(availabilityState, 'ALT_HOLD'),
-    VS: mcpModeAvailability(availabilityState, 'VS'),
-    SPEED: mcpModeAvailability(availabilityState, 'SPEED'),
-    N1: mcpModeAvailability(availabilityState, 'N1'),
-    OFF: mcpModeAvailability(availabilityState, 'OFF'),
-  };
-  const unavailableSummary = [modeAvailability.SPEED, modeAvailability.VS, modeAvailability.N1, modeAvailability.LNAV]
-    .find((availability) => !availability.available)?.reason ?? null;
   const modeButtonStyle = (mode: EnabledMcpMode, active: boolean): React.CSSProperties => {
     if (active) return activeStyle;
     return modeAvailability[mode].available
@@ -269,11 +208,6 @@ export function RfsMCP() {
   const modeTitle = (mode: EnabledMcpMode, availableTitle: string): string => (
     modeAvailability[mode].available ? availableTitle : `MCP mode unavailable: ${modeAvailability[mode].reason}`
   );
-  const speedTarget = selectedSpeedKt(displayApState);
-  const headingTarget = selectedHeadingDeg(displayApState);
-  const altitudeTarget = selectedAltitudeFt(displayApState);
-  const verticalSpeedTarget = selectedVerticalSpeedFpm(displayApState);
-
   return (
     <section
       aria-label="Mode control panel"
