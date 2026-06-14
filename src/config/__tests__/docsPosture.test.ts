@@ -11,7 +11,9 @@ describe('canonical docs posture', () => {
   it('keeps COOP/COEP and worker/SAB policy aligned with Cesium compatibility', () => {
     expect(readme).not.toMatch(/dev server sets COOP\/COEP headers/i);
     expect(readme).toMatch(/does \*\*not\*\* set COOP\/COEP headers/i);
-    expect(readme).toMatch(/does not instantiate a browser Worker or require SharedArrayBuffer\/COOP\/COEP/i);
+    expect(readme).toMatch(/instantiates a real browser module Worker/i);
+    expect(readme).toMatch(/does \*\*not\*\* require SharedArrayBuffer\/COOP\/COEP/i);
+    expect(readme).toMatch(/does \*\*not\*\* set COOP\/COEP headers/i);
     expect(architecture).toMatch(/no SharedArrayBuffer\/COOP\/COEP dependency is introduced/i);
   });
 

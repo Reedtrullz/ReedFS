@@ -54,9 +54,21 @@ function expectExplicitLandingSequence(phases: string[]): void {
   expect(phases.indexOf('ROLLOUT')).toBeLessThan(phases.indexOf('STOPPED'));
 }
 
+async function expectWorkerRuntimeWhenFlagged(page: Parameters<typeof openRfs>[0]): Promise<void> {
+  if (process.env.VITE_RFS_WORKER_PHYSICS !== '1') return;
+
+  const runtimeKind = await page.evaluate(async () => {
+    const mod = await import('/src/sim/simulationRuntime.ts');
+    return mod.getSimulationRuntime().kind;
+  });
+
+  expect(runtimeKind).toBe('browser-worker');
+}
+
 test.describe('RFS playable flight loops', () => {
   test('ENVA tutorial reaches clean climb with phase-aware guidance', async ({ page }) => {
     await openRfs(page);
+    await expectWorkerRuntimeWhenFlagged(page);
     await startRoll(page);
 
     const snapshot = await flyEnvaTakeoffToCleanClimb(page);

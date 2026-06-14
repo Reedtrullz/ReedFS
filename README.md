@@ -184,7 +184,7 @@ React App
       -> computeAutopilotCommandsForState (HDG/LNAV/VNAV/VS plus SPEED/N1 thrust)
       -> compose pilotInputs + apCommands into effectiveControls
       -> getSimulationRuntime().step(...)
-        -> MainThreadSimulationRuntime (default) or WorkerHandlerSimulationRuntime parity adapter
+        -> MainThreadSimulationRuntime (default) or BrowserWorkerSimulationRuntime sync fallback when explicitly flagged
         -> advanceSimulationStep(..., cloneAircraft=false inside the store loop)
           -> integrate(state, effectiveControls, spec, dt, wind)
         -> updateEngines
@@ -199,15 +199,15 @@ React App
       -> Zustand state update
 ```
 
-Moving physics to a default-on browser `Worker` remains a recommended follow-up after the state/control/route contracts stabilize. The current bridge slice provides runtime adapters and main-thread/worker-handler parity tests, but production still uses the main-thread adapter.
+Moving physics to a default-on browser `Worker` remains a recommended follow-up after the state/control/route contracts stabilize. The current bridge slice provides runtime adapters, main-thread/worker-handler parity tests, and an experimental browser module Worker selected only by `VITE_RFS_WORKER_PHYSICS=1`; production still defaults to the main-thread adapter.
 
 Autopilot thrust guidance currently includes SPEED airspeed hold and a conservative phase-based N1 target mode. Both produce AP-owned, rate-limited throttle commands before engine integration; N1 is gated by Boeing A/T arm state, uses target N1 versus average current engine N1 rather than the SPEED airspeed-error law, and clears stale `boeing.n1` on AP disconnect/override.
 
 ### Experimental worker physics flag
 
-`VITE_RFS_WORKER_PHYSICS` is parsed by `src/config/workerPhysics.ts` as an experimental, default-off feature flag for future browser-Worker physics wiring. Truthy tokens are `1`, `true`, `yes`, `on`, and `enabled`; false/off tokens are `0`, `false`, `no`, `off`, `disabled`, and an empty value. Invalid values fall back safely to main-thread physics with an explanatory config reason.
+`VITE_RFS_WORKER_PHYSICS` is parsed by `src/config/workerPhysics.ts` as an experimental, default-off feature flag for browser-Worker physics wiring. Truthy tokens are `1`, `true`, `yes`, `on`, and `enabled`; false/off tokens are `0`, `false`, `no`, `off`, `disabled`, and an empty value. Invalid values fall back safely to main-thread physics with an explanatory config reason.
 
-The current runtime still keeps `simStore.tick()` and physics execution on the main thread. The bridge adapter in `src/sim/simulationRuntime.ts` can route a step through the same worker message codec/handler for parity tests, but enabling the flag today does not instantiate a browser Worker or require SharedArrayBuffer/COOP/COEP.
+With `VITE_RFS_WORKER_PHYSICS=1`, `src/sim/simulationRuntime.ts` instantiates a real browser module Worker and exposes Worker-backed `stepAsync()` with request/response IDs, one-request backpressure, timeout/error main-thread fallback, and `dispose()`. The current `simStore.tick()` path remains synchronous, so sync `step()` still falls back to main-thread physics until the frame scheduler becomes async-aware. The flag does **not** require SharedArrayBuffer/COOP/COEP, and RFS still does **not** set COOP/COEP headers.
 
 ### Audio startup
 
