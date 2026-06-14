@@ -1,5 +1,11 @@
 import { defineConfig, devices, type PlaywrightTestConfig } from '@playwright/test';
 
+export function resolvePlaywrightWebServerEnv(env: { VITE_RFS_VISUAL_TEST?: string } = process.env) {
+  return env.VITE_RFS_VISUAL_TEST === '1' ? { VITE_RFS_VISUAL_TEST: '1' } : undefined;
+}
+
+const visualTestWebServerEnv = resolvePlaywrightWebServerEnv();
+
 export default defineConfig({
   testDir: './e2e',
   snapshotPathTemplate: '{testDir}/{testFilePath}-snapshots/{arg}{ext}',
@@ -28,9 +34,7 @@ export default defineConfig({
     url: 'http://127.0.0.1:5173',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
-    env: {
-      VITE_RFS_VISUAL_TEST: '1',
-    },
+    ...(visualTestWebServerEnv ? { env: visualTestWebServerEnv } : {}),
   },
   projects: [{ name: 'chromium', use: { browserName: 'chromium' } }],
 }) as PlaywrightTestConfig;
