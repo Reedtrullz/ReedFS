@@ -1,0 +1,5 @@
+{
+  "entrypoints": [
+    "e2e/rfs-blackbox-player-loop.spec.ts"
+  ]
+}
