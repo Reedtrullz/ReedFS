@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import simStoreSource from '../simStore.ts?raw';
 import { useSimStore } from '../simStore';
 import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
 import type { FlightPlan } from '@shared/types/fmc';
@@ -150,6 +151,17 @@ function memoryScenarioStorage(): ScenarioPersistenceStorage {
 
 describe('useSimStore', () => {
   beforeEach(() => useSimStore.getState().reset());
+
+  it('assembles stable domain slices while preserving the public compatibility API', () => {
+    const state = useSimStore.getState();
+    for (const action of ['startTakeoffRoll', 'setInput', 'setApState', 'setFlightPlan', 'reset', 'tick'] as const) {
+      expect(typeof state[action]).toBe('function');
+    }
+
+    for (const factory of ['createAircraftSlice', 'createInputSlice', 'createAutoflightSlice', 'createRouteSlice', 'createPersistenceSlice']) {
+      expect(simStoreSource).toMatch(new RegExp(`${factory}\\b`));
+    }
+  });
 
   it('starts stopped', () => expect(useSimStore.getState().status).toBe('stopped'));
 

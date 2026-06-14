@@ -41,7 +41,8 @@ src/
   components/BottomControlBar.tsx  Bottom simulator controls and route-load status
   runtime/frameScheduler.ts          Single app RAF scheduler: input -> fixed sim -> render/effects -> audio
   hooks/useSimLoop.ts              Central scheduler hook into store tick and frame phases
-  store/simStore.ts                Zustand sim state, inputs, AP state, wind, flight plan
+  store/simStore.ts                Compatibility API + fixed-step tick assembly for the Zustand simulator store
+  store/slices/                    Domain slices for aircraft lifecycle, input, autoflight, route, persistence
   sim/
     types.ts                       Aircraft state/spec/control types and initial state
     physics/
