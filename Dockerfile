@@ -24,6 +24,7 @@ ENV RFS_COMMIT_SHA=${RFS_COMMIT_SHA} \
 RUN npm run build
 
 FROM nginx:alpine@sha256:8b1e78743a03dbb2c95171cc58639fef29abc8816598e27fb910ed2e621e589a
+RUN apk upgrade --no-cache libcrypto3 libssl3 libxml2
 ARG RFS_COMMIT_SHA=unknown
 ARG RFS_IMAGE_REF=unknown
 ARG RFS_VERSION=0.0.0

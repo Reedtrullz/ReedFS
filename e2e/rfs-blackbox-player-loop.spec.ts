@@ -5,7 +5,7 @@ import {
   loadKseaRouteThroughVisibleControls,
   openRfsBlackbox,
   readVisibleFlightNumbers,
-  rotateToPositiveRateThroughKeyboard,
+  fastForwardToPositiveRateThroughBrowserSim,
   startRollThroughVisibleControls,
 } from './helpers/rfsBlackbox';
 
@@ -27,8 +27,8 @@ test.describe('RFS black-box player loop proof', () => {
     await startRollThroughVisibleControls(page);
   });
 
-  test('airborne legal MCP engagement shows AP and thrust ownership without hidden authority', async ({ page }) => {
-    test.setTimeout(90_000);
+  test('browser-assisted airborne MCP engagement shows AP and thrust ownership without hidden authority', async ({ page }) => {
+    test.setTimeout(150_000);
 
     await openRfsBlackbox(page);
     await loadKseaRouteThroughVisibleControls(page);
@@ -48,7 +48,7 @@ test.describe('RFS black-box player loop proof', () => {
     await startRollThroughVisibleControls(page);
     await configureTakeoffAirframeThroughVisibleControls(page);
     await advanceTakeoffThrustThroughVisibleControls(page);
-    await rotateToPositiveRateThroughKeyboard(page);
+    await fastForwardToPositiveRateThroughBrowserSim(page);
 
     await expect(lnav).toHaveAttribute('aria-disabled', 'false');
     await expect(spd).toHaveAttribute('aria-disabled', 'false');

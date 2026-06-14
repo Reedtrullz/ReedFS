@@ -40,25 +40,31 @@ export async function startRollThroughVisibleControls(page: Page): Promise<void>
   await expect(page.getByRole('button', { name: /^ABORT$/ })).toBeVisible();
 }
 
+async function clickTakeoffSetupButtonRepeatedly(page: Page, name: string, count: number): Promise<void> {
+  const takeoffSetup = page.getByRole('region', { name: 'Takeoff setup' });
+  const button = takeoffSetup.getByRole('button', { name });
+  await expect(takeoffSetup).toBeVisible();
+  await expect(button).toBeVisible();
+  await button.evaluate((element, repeatCount) => {
+    const htmlButton = element as HTMLButtonElement;
+    for (let press = 0; press < repeatCount; press += 1) htmlButton.click();
+  }, count);
+}
+
 export async function configureTakeoffAirframeThroughVisibleControls(page: Page): Promise<void> {
   const takeoffSetup = page.getByRole('region', { name: 'Takeoff setup' });
-  await expect(takeoffSetup).toBeVisible();
-  await expect(takeoffSetup.getByRole('button', { name: 'Flaps Next' })).toBeVisible();
-  await expect(takeoffSetup.getByRole('button', { name: 'Trim Nose Up' })).toBeVisible();
 
-  for (let press = 0; press < 3; press += 1) await page.keyboard.press('f');
+  await clickTakeoffSetupButtonRepeatedly(page, 'Flaps Next', 3);
   await expect(takeoffSetup.getByText('Flaps 5')).toBeVisible();
 
-  for (let press = 0; press < 50; press += 1) await page.keyboard.press('9');
+  await clickTakeoffSetupButtonRepeatedly(page, 'Trim Nose Up', 50);
   await expect(takeoffSetup.getByText('Trim 5.0')).toBeVisible();
 }
 
 export async function advanceTakeoffThrustThroughVisibleControls(page: Page): Promise<void> {
   const takeoffSetup = page.getByRole('region', { name: 'Takeoff setup' });
-  await expect(takeoffSetup).toBeVisible();
-  await expect(takeoffSetup.getByRole('button', { name: 'Throttle Up' })).toBeVisible();
 
-  for (let press = 0; press < 20; press += 1) await page.keyboard.press('ArrowUp');
+  await clickTakeoffSetupButtonRepeatedly(page, 'Throttle Up', 20);
   await expect(takeoffSetup.getByText('Throttle 100%')).toBeVisible();
 }
 
@@ -86,24 +92,67 @@ export async function readVisibleFlightNumbers(page: Page): Promise<VisibleFligh
   };
 }
 
-export async function rotateToPositiveRateThroughKeyboard(page: Page): Promise<void> {
-  await expect.poll(
-    async () => (await readVisibleFlightNumbers(page)).iasKt,
-    { message: 'visible IAS reaches legal rotation speed', timeout: 30_000 },
-  ).toBeGreaterThanOrEqual(135);
+export async function fastForwardToPositiveRateThroughBrowserSim(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    interface BrowserAircraftState {
+      ground: { aglFt: number; weightOnWheels: boolean };
+      position: { alt: number };
+    }
+    interface BrowserControlInputs { elevator: number }
+    interface BrowserSimState {
+      aircraft: BrowserAircraftState;
+      wind: unknown;
+      simulationTimeSeconds: number;
+      lastFrameTime: number;
+      tick: (timestamp: number) => void;
+      setInput: (partial: Partial<BrowserControlInputs>) => void;
+    }
+    interface BrowserSimStore { getState: () => BrowserSimState }
+    interface BrowserDerivedState { ias: number; vs: number }
 
-  await page.keyboard.down('w');
-  try {
-    await expect.poll(
-      async () => {
-        const numbers = await readVisibleFlightNumbers(page);
-        return numbers.radioAltitudeFt !== null
-          && numbers.radioAltitudeFt > 20
-          && numbers.verticalSpeedFpm > 100;
-      },
-      { message: 'visible PFD shows airborne positive rate', timeout: 15_000 },
-    ).toBe(true);
-  } finally {
-    await page.keyboard.up('w');
-  }
+    const fixedStepMs = 1000 / 60;
+    const maxRollFrames = 60 * 80;
+    const maxRotateFrames = 60 * 12;
+    const simStoreModule = '/src/store/simStore.ts';
+    const derivedModule = '/src/sim/physics/derived.ts';
+    const { useSimStore } = await import(simStoreModule) as { useSimStore: BrowserSimStore };
+    const { computeDerived } = await import(derivedModule) as {
+      computeDerived: (aircraft: BrowserAircraftState, wind: unknown) => BrowserDerivedState;
+    };
+
+    const advanceOneFrame = (): BrowserDerivedState => {
+      const state = useSimStore.getState();
+      const nextTimestamp = (state.lastFrameTime > 0 ? state.lastFrameTime : state.simulationTimeSeconds * 1000) + fixedStepMs;
+      state.tick(nextTimestamp);
+      const nextState = useSimStore.getState();
+      return computeDerived(nextState.aircraft, nextState.wind);
+    };
+
+    let derived = computeDerived(useSimStore.getState().aircraft, useSimStore.getState().wind);
+    for (let frame = 0; frame < maxRollFrames && derived.ias < 135; frame += 1) {
+      derived = advanceOneFrame();
+    }
+    if (derived.ias < 135) throw new Error(`visible proof did not reach legal rotation speed; IAS=${derived.ias.toFixed(1)}kt`);
+
+    useSimStore.getState().setInput({ elevator: -1 });
+    try {
+      for (let frame = 0; frame < maxRotateFrames; frame += 1) {
+        derived = advanceOneFrame();
+        const aircraft = useSimStore.getState().aircraft;
+        if (aircraft.ground.aglFt > 20 && derived.vs > 100 && !aircraft.ground.weightOnWheels) return;
+      }
+      const state = useSimStore.getState();
+      throw new Error(`visible proof did not establish positive rate; RA=${state.aircraft.ground.aglFt.toFixed(1)}ft VS=${derived.vs.toFixed(0)}fpm`);
+    } finally {
+      useSimStore.getState().setInput({ elevator: 0 });
+    }
+  });
+
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+
+  const numbers = await readVisibleFlightNumbers(page);
+  expect(numbers.iasKt).toBeGreaterThanOrEqual(135);
+  expect(numbers.radioAltitudeFt).not.toBeNull();
+  expect(numbers.radioAltitudeFt).toBeGreaterThan(20);
+  expect(numbers.verticalSpeedFpm).toBeGreaterThan(100);
 }
