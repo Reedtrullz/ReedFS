@@ -40,4 +40,17 @@ describe('TakeoffSetupPanel', () => {
     expect(state.inputs.throttle2).toBeCloseTo(0.05, 5);
     expect(state.inputs.gearLever).toBe('DOWN');
   });
+
+  it('shows the configured setup after starting the takeoff roll', () => {
+    const store = useSimStore.getState();
+    store.setInput({ flapLever: 10, throttle1: 0.35, throttle2: 0.35, gearLever: 'DOWN' });
+    store.startTakeoffRoll();
+
+    render(<TakeoffSetupPanel />);
+
+    expect(screen.getByText('Flaps 10')).toBeTruthy();
+    expect(screen.getByText('Trim 5.0')).toBeTruthy();
+    expect(screen.getByText('Throttle 35%')).toBeTruthy();
+    expect(screen.getByText('Gear DOWN')).toBeTruthy();
+  });
 });

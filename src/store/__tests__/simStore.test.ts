@@ -196,6 +196,18 @@ describe('useSimStore', () => {
     expect(state.inputs).toBe(state.effectiveControls);
   });
   it('start → running', () => { useSimStore.getState().start(); expect(useSimStore.getState().status).toBe('running'); });
+
+  it('preserves configured takeoff flaps and trim when starting the roll', () => {
+    const store = useSimStore.getState();
+    store.setScenario('ksea-tutorial');
+    store.setInput({ flapLever: 5, throttle1: 0, throttle2: 0 });
+    store.startTakeoffRoll();
+    const next = useSimStore.getState();
+    expect(next.aircraft.flightPhase).toBe('TAKEOFF');
+    expect(next.inputs.flapLever).toBe(5);
+    expect(next.aircraft.config.stabilizerTrimUnits).toBeCloseTo(5.0, 1);
+  });
+
   it('startTakeoffRoll sets inputs, running status, and TAKEOFF phase', () => {
     useSimStore.getState().startTakeoffRoll();
 
@@ -204,17 +216,21 @@ describe('useSimStore', () => {
     expect(state.inputs).toEqual(expect.objectContaining({
       throttle1: 0,
       throttle2: 0,
-      flapLever: 0,
+      flapLever: ENVA_TUTORIAL_SCENARIO.flapSetting,
       gearLever: 'DOWN',
       brake: 0,
       elevator: 0,
     }));
-    expect(state.pilotInputs).toEqual(expect.objectContaining({ throttle1: 0, throttle2: 0, elevator: 0 }));
+    expect(state.pilotInputs).toEqual(expect.objectContaining({
+      throttle1: 0,
+      throttle2: 0,
+      flapLever: ENVA_TUTORIAL_SCENARIO.flapSetting,
+      elevator: 0,
+    }));
+    expect(state.aircraft.config.stabilizerTrimUnits).toBe(ENVA_TUTORIAL_SCENARIO.stabilizerTrimUnits);
     expect(state.inputs).toBe(state.effectiveControls);
     expect(state.aircraft.flightPhase).toBe('TAKEOFF');
     expect(state.guidance.phase).toBe('takeoff-roll');
-    expect(state.guidance.coachMessage).toMatch(/set flaps 5/i);
-    expect(state.guidance.coachMessage).toMatch(/trim 5\.0/i);
     expect(state.guidance.coachMessage).toMatch(/takeoff thrust/i);
   });
 

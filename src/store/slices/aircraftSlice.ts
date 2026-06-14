@@ -98,13 +98,8 @@ export function createAircraftSlice(set: SimStoreSet): Pick<
     startTakeoffRoll: () => set((s) => {
       const aircraft = structuredClone(s.aircraft);
       aircraft.flightPhase = 'TAKEOFF';
-      aircraft.config.flapSetting = 0;
-      aircraft.config.stabilizerTrimUnits = 0;
       const pilotInputs: ControlInputs = {
         ...s.pilotInputs,
-        throttle1: 0,
-        throttle2: 0,
-        flapLever: 0,
         gearLever: 'DOWN',
         brake: 0,
         leftBrake: 0,
@@ -119,7 +114,7 @@ export function createAircraftSlice(set: SimStoreSet): Pick<
         ...controlsSlice,
         inputManager: createInputManagerState({
           ...pilotInputs,
-          stabilizerTrimUnits: 0,
+          stabilizerTrimUnits: aircraft.config.stabilizerTrimUnits,
         }),
         apState: null,
         apControllerState,
