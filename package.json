@@ -1,8 +1,26 @@
 {
   "name": "rfs",
-  "private": true,
+  "private": false,
   "version": "0.0.0",
+  "description": "Browser-native Boeing 737-800 flight simulator with Cesium, Three.js, and a TypeScript 6-DOF flight model.",
+  "license": "MIT",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Reedtrullz/ReedFS.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Reedtrullz/ReedFS/issues"
+  },
+  "homepage": "https://github.com/Reedtrullz/ReedFS#readme",
+  "keywords": [
+    "flight-simulator",
+    "boeing-737",
+    "cesium",
+    "threejs",
+    "typescript",
+    "webgl"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build && node scripts/write-version-metadata.mjs dist/rfs-version.json",

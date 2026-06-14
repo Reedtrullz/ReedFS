@@ -1,12 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import dockerignore from '../../../.dockerignore?raw';
+import codeowners from '../../../.github/CODEOWNERS?raw';
+import bugReportTemplate from '../../../.github/ISSUE_TEMPLATE/bug_report.yml?raw';
+import featureRequestTemplate from '../../../.github/ISSUE_TEMPLATE/feature_request.yml?raw';
+import pullRequestTemplate from '../../../.github/pull_request_template.md?raw';
 import ciWorkflow from '../../../.github/workflows/ci.yml?raw';
 import dockerfile from '../../../Dockerfile?raw';
 import nginxConf from '../../../nginx.conf?raw';
 import releaseMetadataScript from '../../../scripts/write-version-metadata.mjs?raw';
+import contributing from '../../../CONTRIBUTING.md?raw';
+import license from '../../../LICENSE?raw';
 import readme from '../../../README.md?raw';
+import security from '../../../SECURITY.md?raw';
 import architecture from '../../../docs/architecture.md?raw';
 import physicsInvariants from '../../../docs/physics-invariants.md?raw';
+import packageJson from '../../../package.json';
 
 describe('canonical docs posture', () => {
   it('keeps COOP/COEP and worker/SAB policy aligned with Cesium compatibility', () => {
@@ -103,6 +111,29 @@ describe('canonical docs posture', () => {
     expect(nginxConf).not.toMatch(/Cross-Origin-Opener-Policy|Cross-Origin-Embedder-Policy/);
     expect(architecture).toMatch(/Cesium-compatible security headers/i);
     expect(architecture).toMatch(/does not set COOP\/COEP/i);
+  });
+
+  it('has OSS package metadata and contributor/security governance files', () => {
+    expect(packageJson.private).toBe(false);
+    expect(packageJson.license).toBe('MIT');
+    expect(packageJson.repository).toEqual({
+      type: 'git',
+      url: 'git+https://github.com/Reedtrullz/ReedFS.git',
+    });
+    expect(packageJson.bugs).toEqual({ url: 'https://github.com/Reedtrullz/ReedFS/issues' });
+    expect(packageJson.homepage).toBe('https://github.com/Reedtrullz/ReedFS#readme');
+
+    expect(license).toMatch(/MIT License/);
+    expect(security).toMatch(/Reporting a vulnerability/i);
+    expect(contributing).toMatch(/Proof boundary/i);
+    expect(codeowners).toContain('* @Reedtrullz');
+    expect(bugReportTemplate).toMatch(/name: Bug report/);
+    expect(featureRequestTemplate).toMatch(/name: Feature request/);
+    expect(pullRequestTemplate).toMatch(/Proof boundary \/ non-claims/);
+
+    expect(readme).toMatch(/Contributing/i);
+    expect(readme).toMatch(/Security/i);
+    expect(readme).toMatch(/License/i);
   });
 
   it('serves immutable post-push image digest provenance in release metadata', () => {

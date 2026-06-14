@@ -1,0 +1,34 @@
+name: Feature request
+description: Suggest a simulator, avionics, usability, documentation, or release-hardening improvement
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or gap
+      description: What meaningful-use, realism, usability, truth, or release-readiness gap does this address?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the desired behavior and any constraints.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance evidence
+      description: What test, browser proof, telemetry, or documentation would prove this is done?
+      placeholder: "Example: targeted unit test + CI-shaped visual route proof; not a full-flight claim."
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Optional notes on other approaches or tradeoffs.
+    validations:
+      required: false

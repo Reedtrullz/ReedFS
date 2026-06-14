@@ -1,0 +1,19 @@
+# Default ownership
+* @Reedtrullz
+
+# Release, security, and deployment-sensitive paths
+.github/ @Reedtrullz
+Dockerfile @Reedtrullz
+.dockerignore @Reedtrullz
+nginx.conf @Reedtrullz
+scripts/release-hardening-check.mjs @Reedtrullz
+scripts/write-version-metadata.mjs @Reedtrullz
+ansible-playbook.yml @Reedtrullz
+inventory/ @Reedtrullz
+
+# Core simulator truth/physics/autoflight paths
+src/sim/ @Reedtrullz
+src/store/ @Reedtrullz
+src/instruments/ @Reedtrullz
+src/input/ @Reedtrullz
+src/runtime/ @Reedtrullz

@@ -4,6 +4,7 @@ RFS is a standalone web-based Boeing 737-800 flight simulator. It combines a Typ
 
 Live deployment: https://fly.reidar.tech
 Repository: https://github.com/Reedtrullz/ReedFS
+License: MIT — see [`LICENSE`](LICENSE)
 
 ## Current status
 
@@ -134,7 +135,7 @@ npm run check
 `npm run check` expands to:
 
 ```text
-npm run check:deps && npm run lint:ci && npm run typecheck && npm run test && npm run build
+npm run check:deps && npm run check:release && npm run lint:ci && npm run typecheck && npm run test && npm run build && npm run check:bundle
 ```
 
 Useful targeted commands:
@@ -152,6 +153,14 @@ Expected non-blocking warnings today:
 - ESLint may print a React-version settings warning while still exiting 0.
 - jsdom may print canvas `getContext()` notices while tests pass.
 - Vite may warn about large Cesium-heavy chunks.
+
+## Contributing, Security, and License
+
+RFS is open source under the MIT License. See [`LICENSE`](LICENSE) for the full text.
+
+Contributions are welcome when they preserve RFS's proof discipline: simulator displays must match actual backing state, partial or seeded proofs must not be overstated, and release/deploy success requires real CI or endpoint evidence. Start with [`CONTRIBUTING.md`](CONTRIBUTING.md), use the GitHub issue templates for bugs and feature requests, and include a proof-boundary section in pull requests.
+
+Report vulnerabilities, suspected secret exposure, CI/deploy bypasses, or supply-chain issues through [`SECURITY.md`](SECURITY.md) rather than public issues.
 
 ## Physics conventions
 

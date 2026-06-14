@@ -1,0 +1,50 @@
+name: Bug report
+description: Report a reproducible RFS bug or simulator correctness issue
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Please do not include secrets, tokens, or private deployment data. Security issues should use SECURITY.md instead of a public issue.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened, and what did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Include the scenario, controls used, route/setup state, and timing if relevant.
+      placeholder: |
+        1. Open RFS
+        2. Select scenario ...
+        3. Click START ROLL ...
+        4. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Screenshots, telemetry, console output, test output, or short video if available.
+    validations:
+      required: false
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and OS
+      placeholder: Chrome 126 on macOS / Firefox on Linux / etc.
+    validations:
+      required: false
+  - type: textarea
+    id: proof-boundary
+    attributes:
+      label: Proof boundary
+      description: What does your evidence prove, and what does it not prove?
+      placeholder: "Example: local browser only; not verified in CI/live deployment."
+    validations:
+      required: false
