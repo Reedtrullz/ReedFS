@@ -6,7 +6,10 @@ import { B737_800_SPEC, createInitialState } from '../types';
 import { buildGuidanceState } from '../guidanceState';
 import { KSEA_TUTORIAL_SCENARIO } from '../scenarios';
 import { computeRouteStatus, createNoRouteStatus } from '../systems/navigation';
-import { resetAutopilotPID } from '../systems/autopilot';
+import {
+  createAutopilotControllerState,
+  resetAutopilotPID,
+} from '../systems/autopilot';
 import { eulerToQuat } from '../physics/quaternion';
 import { advanceSimulationStep, composeControlsSlice } from '../simulationStep';
 
@@ -419,6 +422,42 @@ describe('advanceSimulationStep', () => {
     expect(result.controls.effectiveControls.aileron).toBe(pilotInputs.aileron);
     expect(result.controls.effectiveControls.throttle1).toBe(result.apCommands.throttle1);
     expect(result.aircraft.engines[0].n1).toBeGreaterThan(0);
+  });
+
+  it('returns advanced AP controller state without mutating the input controller state', () => {
+    const aircraft = createInitialState(B737_800_SPEC);
+    aircraft.flightPhase = 'CRUISE';
+    aircraft.ground = { ...aircraft.ground, weightOnWheels: false, contact: 'none', onRunway: false, aglFt: 5000 };
+    aircraft.velocity.u = 80;
+    const pilotInputs = { ...tutorialControls(), throttle1: 0, throttle2: 0, flapLever: 0, gearLever: 'UP' as const };
+    const apState = speedAutothrottleOnlyState();
+    const guidance = buildGuidanceState({
+      scenario: KSEA_TUTORIAL_SCENARIO,
+      status: 'running',
+      aircraft,
+      controls: pilotInputs,
+    });
+    const apControllerState = createAutopilotControllerState();
+
+    const result = advanceSimulationStep({
+      aircraft,
+      spec: B737_800_SPEC,
+      pilotInputs,
+      apState,
+      flightPlan: null,
+      activeLegIndex: null,
+      routeStatus: createNoRouteStatus(),
+      wind: null,
+      dt: 1 / 60,
+      status: 'running',
+      selectedScenarioId: KSEA_TUTORIAL_SCENARIO.id,
+      guidance,
+      apControllerState,
+    });
+
+    expect(apControllerState).toEqual(createAutopilotControllerState());
+    expect(result.apControllerState.throttleLimited).toBeGreaterThan(0);
+    expect(result.apControllerState).not.toBe(apControllerState);
   });
 
   it('feeds N1 autothrottle commands into effective controls before engine integration', () => {

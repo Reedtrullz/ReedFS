@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createDefaultAutopilotState } from '../../instruments/defaultAutopilotState';
+import { createAutopilotControllerState } from '../../sim/systems/autopilot';
 import { createKseaKpdxFlight } from '../../sim/flightPlanLoader';
 import { KSEA_LIGHT_PATTERN_SCENARIO, KSEA_TUTORIAL_SCENARIO } from '../../sim/scenarios';
 import {
@@ -39,6 +40,7 @@ describe('scenario persistence', () => {
     expect(Object.keys(snapshot)).not.toContain('tick');
     expect(Object.keys(snapshot)).not.toContain('setInput');
     expect(snapshot.selectedScenarioId).toBe(KSEA_LIGHT_PATTERN_SCENARIO.id);
+    expect(snapshot.apControllerState).toEqual(createAutopilotControllerState());
   });
 
   it('saves and loads a valid snapshot from storage', () => {
@@ -77,7 +79,24 @@ describe('scenario persistence', () => {
     expect(restored.effectiveControls.elevator).toBe(-0.12);
     expect(restored.flightPlan?.origin).toBe('KSEA');
     expect(restored.apState?.truth.autopilotStatus).toBe('CMD_A');
+    expect(restored.apControllerState).toEqual(createAutopilotControllerState());
     expect(restored.wind).toEqual(KSEA_LIGHT_PATTERN_SCENARIO.wind);
+  });
+
+  it('serializes and restores AP controller state explicitly', () => {
+    const storage = memoryStorage();
+    const snapshot = createScenarioSnapshot(useSimStore.getState());
+    snapshot.apControllerState = {
+      ...createAutopilotControllerState(),
+      throttleLimited: 0.42,
+      thrustPid: { value: 1.25, prevError: -3.5 },
+    };
+
+    saveScenarioSnapshot(storage, snapshot);
+    useSimStore.getState().loadScenarioState(storage);
+
+    expect(useSimStore.getState().apControllerState.throttleLimited).toBe(0.42);
+    expect(useSimStore.getState().apControllerState.thrustPid).toEqual({ value: 1.25, prevError: -3.5 });
   });
 
   it('loads saved running states paused for repeatable training loops', () => {

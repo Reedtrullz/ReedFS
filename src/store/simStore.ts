@@ -19,7 +19,8 @@ import {
   type RouteStatusSnapshot,
 } from '../sim/systems/navigation';
 import {
-  resetAutopilotPID,
+  createAutopilotControllerState,
+  type AutopilotControllerState,
 } from '../sim/systems/autopilot';
 import {
   deriveEffectiveAutoflightTruth,
@@ -71,6 +72,7 @@ export interface SimStore {
   simulationTimeSeconds: number;
   droppedSimulationTimeSeconds: number;
   apState: AutopilotState | null;
+  apControllerState: AutopilotControllerState;
   flightPlan: FlightPlan | null;
   activeLegIndex: number | null;
   routeStatus: RouteStatusSnapshot;
@@ -163,7 +165,6 @@ function gateGearLeverPatch(
 
 function disconnectAutopilot(apState: AutopilotState | null): AutopilotState | null {
   if (!apState) return null;
-  resetAutopilotPID();
   const next = structuredClone(apState);
   next.truth = {
     ...next.truth,
@@ -209,6 +210,7 @@ const initialGuidance = buildGuidanceState({
   controls: initialControls.effectiveControls,
 });
 const initialRouteStatus = createNoRouteStatus();
+const initialAutopilotControllerState = createAutopilotControllerState();
 
 function defaultScenarioStorage(): ScenarioPersistenceStorage | null {
   return typeof globalThis.localStorage === 'undefined' ? null : globalThis.localStorage;
@@ -218,6 +220,7 @@ function restoreSnapshotSlice(snapshot: ScenarioSnapshot): Partial<SimStore> {
   const aircraft = structuredClone(snapshot.aircraft);
   aircraft.config = normalizeAircraftConfig(aircraft.config);
   const apState = structuredClone(snapshot.apState);
+  const apControllerState = structuredClone(snapshot.apControllerState ?? createAutopilotControllerState());
   const apCommands = structuredClone(snapshot.apCommands);
   const pilotInputs = normalizeControlInputs(structuredClone(snapshot.pilotInputs));
   const flightPlan = structuredClone(snapshot.flightPlan);
@@ -245,6 +248,7 @@ function restoreSnapshotSlice(snapshot: ScenarioSnapshot): Partial<SimStore> {
     simulationTimeSeconds: snapshot.simulationTimeSeconds,
     droppedSimulationTimeSeconds: 0,
     apState,
+    apControllerState,
     flightPlan,
     activeLegIndex: routeStatus.activeLegIndex,
     routeStatus,
@@ -270,6 +274,7 @@ export const useSimStore = create<SimStore>((set, get) => ({
   simulationTimeSeconds: 0,
   droppedSimulationTimeSeconds: 0,
   apState: null,
+  apControllerState: initialAutopilotControllerState,
   flightPlan: null,
   activeLegIndex: null,
   routeStatus: initialRouteStatus,
@@ -292,12 +297,14 @@ export const useSimStore = create<SimStore>((set, get) => ({
       );
       const pilotInputs = { ...s.pilotInputs, ...pilotPatch };
       const apState = shouldDisconnect ? disconnectAutopilot(s.apState) : s.apState;
+      const apControllerState = shouldDisconnect ? createAutopilotControllerState() : s.apControllerState;
       const apCommands = shouldDisconnect ? {} : commandsForThrustOwnership(s.apCommands, apOwnsThrust);
       const controlsSlice = composeControlsSlice(pilotInputs, apCommands, apState, s);
       const scenario = scenarioById(s.selectedScenarioId);
       return {
         ...controlsSlice,
         apState,
+        apControllerState,
         inputManager: syncInputManagerWithInputPartial(s.inputManager, pilotPatch),
         guidance: syncGuidanceState(s.guidance, scenario, s.status, s.aircraft, controlsSlice.effectiveControls),
       };
@@ -344,6 +351,7 @@ export const useSimStore = create<SimStore>((set, get) => ({
       const pilotInputs = Object.keys(inputPatch).length > 0 ? { ...s.pilotInputs, ...inputPatch } : s.pilotInputs;
       const shouldDisconnect = inputActionsIncludeManualApAxis(actions, apActive);
       const apState = shouldDisconnect ? disconnectAutopilot(s.apState) : s.apState;
+      const apControllerState = shouldDisconnect ? createAutopilotControllerState() : s.apControllerState;
       const apCommands = shouldDisconnect ? {} : commandsForThrustOwnership(s.apCommands, apOwnsThrust);
       const controlsSlice = composeControlsSlice(pilotInputs, apCommands, apState, { ...s, aircraft });
       const scenario = scenarioById(s.selectedScenarioId);
@@ -353,6 +361,7 @@ export const useSimStore = create<SimStore>((set, get) => ({
         inputManager,
         aircraft,
         apState,
+        apControllerState,
         guidance: syncGuidanceState(s.guidance, scenario, s.status, aircraft, controlsSlice.effectiveControls),
       };
     }),
@@ -368,6 +377,7 @@ export const useSimStore = create<SimStore>((set, get) => ({
       pilotInputs,
       spec,
       apState,
+      apControllerState,
       flightPlan,
       activeLegIndex,
       routeStatus,
@@ -404,6 +414,7 @@ export const useSimStore = create<SimStore>((set, get) => ({
     let nextActiveLegIndex = activeLegIndex;
     let nextRouteStatus = routeStatus;
     let nextGuidance = guidance;
+    let nextApControllerState = apControllerState;
     let nextControls = composeControlsSlice(pilotInputs, get().apCommands, apState, {
       aircraft: nextAircraft,
       flightPlan,
@@ -425,6 +436,7 @@ export const useSimStore = create<SimStore>((set, get) => ({
         status,
         selectedScenarioId,
         guidance: nextGuidance,
+        apControllerState: nextApControllerState,
         cloneAircraft: false,
       });
       nextAircraft = next.aircraft;
@@ -432,6 +444,7 @@ export const useSimStore = create<SimStore>((set, get) => ({
       nextActiveLegIndex = next.activeLegIndex;
       nextRouteStatus = next.routeStatus;
       nextGuidance = next.guidance;
+      nextApControllerState = next.apControllerState;
     }
 
     accumulator -= stepCount * FIXED_STEP_SECONDS;
@@ -444,6 +457,7 @@ export const useSimStore = create<SimStore>((set, get) => ({
       simulationTimeSeconds: simulationTimeSeconds + stepCount * FIXED_STEP_SECONDS,
       droppedSimulationTimeSeconds: droppedTime,
       ...nextControls,
+      apControllerState: nextApControllerState,
       activeLegIndex: nextActiveLegIndex,
       routeStatus: nextRouteStatus,
       guidance: nextGuidance,
@@ -476,7 +490,7 @@ export const useSimStore = create<SimStore>((set, get) => ({
       rightBrake: 0,
       elevator: 0,
     };
-    resetAutopilotPID();
+    const apControllerState = createAutopilotControllerState();
     const controlsSlice = composeControlsSlice(pilotInputs);
     const scenario = scenarioById(s.selectedScenarioId);
     return {
@@ -487,6 +501,7 @@ export const useSimStore = create<SimStore>((set, get) => ({
         stabilizerTrimUnits: 0,
       }),
       apState: null,
+      apControllerState,
       status: 'running',
       lastFrameTime: 0,
       fixedStepAccumulatorSeconds: 0,
@@ -510,7 +525,7 @@ export const useSimStore = create<SimStore>((set, get) => ({
       elevator: 0,
       gearLever: 'DOWN',
     };
-    resetAutopilotPID();
+    const apControllerState = createAutopilotControllerState();
     const controlsSlice = composeControlsSlice(pilotInputs);
     const scenario = scenarioById(s.selectedScenarioId);
     return {
@@ -521,6 +536,7 @@ export const useSimStore = create<SimStore>((set, get) => ({
         stabilizerTrimUnits: aircraft.config.stabilizerTrimUnits,
       }),
       apState: null,
+      apControllerState,
       apCommands: {},
       status: 'running',
       lastFrameTime: 0,
@@ -550,7 +566,7 @@ export const useSimStore = create<SimStore>((set, get) => ({
     const pilotInputs = inputsForScenario(scenario);
     const aircraft = createAircraftStateForScenario(B737_800_SPEC, scenario);
     const controlsSlice = composeControlsSlice(pilotInputs);
-    resetAutopilotPID();
+    const apControllerState = createAutopilotControllerState();
     return {
       aircraft,
       ...controlsSlice,
@@ -561,6 +577,7 @@ export const useSimStore = create<SimStore>((set, get) => ({
       simulationTimeSeconds: 0,
       droppedSimulationTimeSeconds: 0,
       apState: null,
+      apControllerState,
       flightPlan: null,
       activeLegIndex: null,
       routeStatus: createNoRouteStatus(),
@@ -579,7 +596,7 @@ export const useSimStore = create<SimStore>((set, get) => ({
     const pilotInputs = inputsForScenario(scenario);
     const aircraft = createAircraftStateForScenario(B737_800_SPEC, scenario);
     const controlsSlice = composeControlsSlice(pilotInputs);
-    resetAutopilotPID();
+    const apControllerState = createAutopilotControllerState();
     return {
       selectedScenarioId: scenario.id,
       aircraft,
@@ -591,6 +608,7 @@ export const useSimStore = create<SimStore>((set, get) => ({
       simulationTimeSeconds: 0,
       droppedSimulationTimeSeconds: 0,
       apState: null,
+      apControllerState,
       flightPlan: null,
       activeLegIndex: null,
       routeStatus: createNoRouteStatus(),
@@ -613,13 +631,14 @@ export const useSimStore = create<SimStore>((set, get) => ({
 
   setApState: (ap) => set((s) => {
     const modesChanged = autopilotModesChanged(s.apState, ap);
-    if (modesChanged) resetAutopilotPID();
+    const apControllerState = modesChanged ? createAutopilotControllerState() : s.apControllerState;
     const nextOwnsThrust = effectiveTruthOwnsThrust(ap, s);
     const apCommands = modesChanged ? {} : commandsForThrustOwnership(s.apCommands, nextOwnsThrust);
     const controlsSlice = composeControlsSlice(s.pilotInputs, apCommands, ap, s);
     const scenario = scenarioById(s.selectedScenarioId);
     return {
       apState: ap,
+      apControllerState,
       ...controlsSlice,
       guidance: syncGuidanceState(s.guidance, scenario, s.status, s.aircraft, controlsSlice.effectiveControls),
     };

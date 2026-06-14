@@ -14,13 +14,45 @@ import { bodyToNed } from '../physics/frames';
 import { computeDerived } from '../physics/derived';
 import { deriveEffectiveAutoflightTruth } from './effectiveAutoflightTruth';
 
-// ── Module-level PID state ──────────────────────────────────────────────
+// ── Serializable controller state ───────────────────────────────────────
 
-const pitchPid = { value: 0, prevError: 0 };
-const rollPid = { value: 0, prevError: 0 };
-const thrustPid = { value: 0, prevError: 0 };
-const pitchTargetIntegral = { value: 0, prevError: 0 };
-let throttleLimited = 0; // rate-limited throttle output
+export interface AutopilotPidState {
+  value: number;
+  prevError: number;
+}
+
+export interface AutopilotControllerState {
+  pitchPid: AutopilotPidState;
+  rollPid: AutopilotPidState;
+  thrustPid: AutopilotPidState;
+  pitchTargetIntegral: AutopilotPidState;
+  throttleLimited: number;
+}
+
+export interface AutopilotCommandResult {
+  commands: AutopilotCommands;
+  controllerState: AutopilotControllerState;
+}
+
+function createPidState(): AutopilotPidState {
+  return { value: 0, prevError: 0 };
+}
+
+export function createAutopilotControllerState(): AutopilotControllerState {
+  return {
+    pitchPid: createPidState(),
+    rollPid: createPidState(),
+    thrustPid: createPidState(),
+    pitchTargetIntegral: createPidState(),
+    throttleLimited: 0,
+  };
+}
+
+export function cloneAutopilotControllerState(
+  state: AutopilotControllerState | null | undefined,
+): AutopilotControllerState {
+  return structuredClone(state ?? createAutopilotControllerState());
+}
 
 // ── Constants ───────────────────────────────────────────────────────────
 
@@ -74,11 +106,8 @@ function throttleForN1(targetN1: number): number {
 // ── Public API ──────────────────────────────────────────────────────────
 
 export function resetAutopilotPID(): void {
-  pitchPid.value = 0; pitchPid.prevError = 0;
-  rollPid.value = 0; rollPid.prevError = 0;
-  thrustPid.value = 0; thrustPid.prevError = 0;
-  pitchTargetIntegral.value = 0; pitchTargetIntegral.prevError = 0;
-  throttleLimited = 0;
+  // Legacy compatibility for one-step unit tests. Runtime/store resets now replace their
+  // explicit AutopilotControllerState instead of mutating module globals.
 }
 
 export function isAutopilotEngaged(ap: AutopilotState | null | undefined): boolean {
@@ -151,18 +180,18 @@ export function resolveAutopilotTargets(
 // ── Inner loops: attitude control ───────────────────────────────────────
 
 /** Pitch inner loop: holds a target pitch angle via elevator. */
-function pitchHold(targetPitchDeg: number, state: AircraftState, dt: number): number {
+function pitchHold(controllerState: AutopilotControllerState, targetPitchDeg: number, state: AircraftState, dt: number): number {
   const currentPitchDeg = radToDeg(state.attitude.theta);
   const err = targetPitchDeg - currentPitchDeg;
   // elevator convention: negative = nose-up, positive = nose-down
-  return clampSigned(pid(pitchPid, -err, 0.30, 0.08, 0.10, dt, 4, 4));
+  return clampSigned(pid(controllerState.pitchPid, -err, 0.30, 0.08, 0.10, dt, 4, 4));
 }
 
 /** Roll inner loop: holds a target bank angle via aileron. */
-function bankHold(targetBankDeg: number, state: AircraftState, dt: number): number {
+function bankHold(controllerState: AutopilotControllerState, targetBankDeg: number, state: AircraftState, dt: number): number {
   const currentBankDeg = radToDeg(state.attitude.phi);
   const err = targetBankDeg - currentBankDeg;
-  return clampSigned(pid(rollPid, err, 0.06, 0.01, 0.03, dt, 2));
+  return clampSigned(pid(controllerState.rollPid, err, 0.06, 0.01, 0.03, dt, 2));
 }
 
 // ── Outer loops: navigation targets → attitude targets ──────────────────
@@ -176,17 +205,17 @@ function headingToBank(targetHeadingRad: number, state: AircraftState): number {
 }
 
 /** Altitude outer loop: converts altitude error to pitch target. */
-function altitudeToPitch(targetAltFt: number, state: AircraftState, dt: number): number {
+function altitudeToPitch(controllerState: AutopilotControllerState, targetAltFt: number, state: AircraftState, dt: number): number {
   const err = targetAltFt - state.position.alt;
   // P=0.004: 250ft error → 1° pitch adjustment
-  const pitchAdjustDeg = pid(pitchTargetIntegral, err, 0.004, 0.0008, 0, dt, 4);
+  const pitchAdjustDeg = pid(controllerState.pitchTargetIntegral, err, 0.004, 0.0008, 0, dt, 4);
   return clamp(pitchAdjustDeg, -10, 15);
 }
 
 /** VS outer loop: adjusts pitch to track vertical speed. */
-function vsToPitch(targetVerticalSpeedFpm: number, state: AircraftState, dt: number): number {
+function vsToPitch(controllerState: AutopilotControllerState, targetVerticalSpeedFpm: number, state: AircraftState, dt: number): number {
   const err = targetVerticalSpeedFpm - currentVsFpm(state);
-  const pitchAdjustDeg = pid(pitchTargetIntegral, err, 0.00015, 0.00003, 0, dt, 2);
+  const pitchAdjustDeg = pid(controllerState.pitchTargetIntegral, err, 0.00015, 0.00003, 0, dt, 2);
   return clamp(pitchAdjustDeg, -8, 15);
 }
 
@@ -203,9 +232,37 @@ export function computeAutopilotCommands(
   targetN1Percent?: number,
   wind: WindInfo | null = null,
 ): AutopilotCommands {
+  return computeAutopilotCommandsWithControllerState(
+    state,
+    ap,
+    targetHeadingRad,
+    targetAltFt,
+    targetSpeedKt,
+    dt,
+    targetVerticalSpeedFpm,
+    targetN1Percent,
+    wind,
+  ).commands;
+}
+
+export function computeAutopilotCommandsWithControllerState(
+  state: AircraftState,
+  ap: AutopilotState,
+  targetHeadingRad: number,
+  targetAltFt: number,
+  targetSpeedKt: number,
+  dt: number,
+  targetVerticalSpeedFpm?: number,
+  targetN1Percent?: number,
+  wind: WindInfo | null = null,
+  controllerState: AutopilotControllerState = createAutopilotControllerState(),
+): AutopilotCommandResult {
   const t = ap.truth;
   const autopilotEngaged = isAutopilotEngaged(ap);
-  if (!autopilotEngaged && !hasThrustGuidance(t)) return {};
+  const nextControllerState = cloneAutopilotControllerState(controllerState);
+  if (!autopilotEngaged && !hasThrustGuidance(t)) {
+    return { commands: {}, controllerState: nextControllerState };
+  }
 
   const cmd: AutopilotCommands = {};
 
@@ -214,18 +271,18 @@ export function computeAutopilotCommands(
 
   if (autopilotEngaged && hasVerticalGuidance(t)) {
     if (t.verticalActive === 'ALT_HOLD') {
-      pitchTargetDeg = altitudeToPitch(targetAltFt, state, dt);
+      pitchTargetDeg = altitudeToPitch(nextControllerState, targetAltFt, state, dt);
     } else if (t.verticalActive === 'VS') {
       const vs = finiteOrUndefined(targetVerticalSpeedFpm) ?? finiteOrUndefined(ap.boeing.verticalSpeed) ?? 0;
-      pitchTargetDeg = vsToPitch(vs, state, dt);
+      pitchTargetDeg = vsToPitch(nextControllerState, vs, state, dt);
     } else if (t.verticalActive === 'VNAV' || t.verticalActive === 'VNAV_PTH' || t.verticalActive === 'ALT*') {
       const vs = finiteOrUndefined(targetVerticalSpeedFpm);
-      if (vs !== undefined) pitchTargetDeg = vsToPitch(vs, state, dt);
+      if (vs !== undefined) pitchTargetDeg = vsToPitch(nextControllerState, vs, state, dt);
     }
 
     if (pitchTargetDeg !== undefined) {
       pitchTargetDeg = clamp(pitchTargetDeg, PITCH_MIN_DEG, PITCH_MAX_DEG);
-      cmd.elevator = pitchHold(pitchTargetDeg, state, dt);
+      cmd.elevator = pitchHold(nextControllerState, pitchTargetDeg, state, dt);
     }
   }
 
@@ -235,7 +292,7 @@ export function computeAutopilotCommands(
     if (t.lateralActive === 'HDG_SEL' || t.lateralActive === 'LNAV') {
       bankTargetDeg = headingToBank(targetHeadingRad, state);
     }
-    cmd.aileron = bankHold(bankTargetDeg, state, dt);
+    cmd.aileron = bankHold(nextControllerState, bankTargetDeg, state, dt);
   }
 
   // ── Thrust ──
@@ -247,7 +304,7 @@ export function computeAutopilotCommands(
     const vsFpm = currentVsFpm(state);
     const aboveTarget = t.verticalActive === 'ALT_HOLD' && state.position.alt > targetAltFt + 200;
 
-    const thr = pid(thrustPid, spdErr, aboveTarget ? 0.003 : 0.008, aboveTarget ? 0.0005 : 0.002, 0.003, dt, 5);
+    const thr = pid(nextControllerState.thrustPid, spdErr, aboveTarget ? 0.003 : 0.008, aboveTarget ? 0.0005 : 0.002, 0.003, dt, 5);
 
     let minT: number;
 
@@ -274,9 +331,13 @@ export function computeAutopilotCommands(
     const raw = clamp(thr, minT, 1);
     // Rate-limit throttle changes for smooth engine response
     const maxDelta = THROTTLE_RATE_PER_SEC * Math.max(0, dt);
-    throttleLimited = clamp(raw, throttleLimited - maxDelta, throttleLimited + maxDelta);
-    cmd.throttle1 = throttleLimited;
-    cmd.throttle2 = throttleLimited;
+    nextControllerState.throttleLimited = clamp(
+      raw,
+      nextControllerState.throttleLimited - maxDelta,
+      nextControllerState.throttleLimited + maxDelta,
+    );
+    cmd.throttle1 = nextControllerState.throttleLimited;
+    cmd.throttle2 = nextControllerState.throttleLimited;
   } else if (t.thrustActive === 'N1' && ap.boeing.autothrottleArm && targetN1Percent !== undefined) {
     const avgN1 = (state.engines[0].n1 + state.engines[1].n1) / 2;
     const base = throttleForN1(targetN1Percent);
@@ -285,7 +346,7 @@ export function computeAutopilotCommands(
     cmd.throttle2 = cmd.throttle1;
   }
 
-  return cmd;
+  return { commands: cmd, controllerState: nextControllerState };
 }
 
 // ── Convenience wrapper ─────────────────────────────────────────────────
@@ -299,7 +360,29 @@ export function computeAutopilotCommandsForState(
   routeStatus?: RouteStatusSnapshot | null,
   wind: WindInfo | null = null,
 ): AutopilotCommands {
-  if (!ap) return {};
+  return computeAutopilotCommandsForStateWithControllerState(
+    state,
+    ap,
+    flightPlan,
+    dt,
+    activeLegIndex,
+    routeStatus,
+    wind,
+  ).commands;
+}
+
+export function computeAutopilotCommandsForStateWithControllerState(
+  state: AircraftState,
+  ap: AutopilotState | null | undefined,
+  flightPlan: FlightPlan | null | undefined,
+  dt: number,
+  activeLegIndex?: number | null,
+  routeStatus?: RouteStatusSnapshot | null,
+  wind: WindInfo | null = null,
+  controllerState: AutopilotControllerState = createAutopilotControllerState(),
+): AutopilotCommandResult {
+  const nextControllerState = cloneAutopilotControllerState(controllerState);
+  if (!ap) return { commands: {}, controllerState: nextControllerState };
 
   const routeStatusForTruth = routeStatus
     ?? (flightPlan ? computeRouteStatus(state, flightPlan, activeLegIndex ?? null) : null);
@@ -308,11 +391,13 @@ export function computeAutopilotCommandsForState(
     flightPlan: flightPlan ?? null,
     routeStatus: routeStatusForTruth,
   });
-  if (truth.autopilotStatus === 'OFF' && !hasThrustGuidance(truth)) return {};
+  if (truth.autopilotStatus === 'OFF' && !hasThrustGuidance(truth)) {
+    return { commands: {}, controllerState: nextControllerState };
+  }
 
   const effectiveAp = apWithEffectiveTruth(ap, truth);
   const tgts = resolveAutopilotTargets(state, effectiveAp, flightPlan, activeLegIndex, routeStatusForTruth);
-  return computeAutopilotCommands(
+  return computeAutopilotCommandsWithControllerState(
     state,
     effectiveAp,
     tgts.targetHeadingRad,
@@ -322,6 +407,7 @@ export function computeAutopilotCommandsForState(
     tgts.targetVerticalSpeedFpm,
     tgts.targetN1Percent,
     wind,
+    nextControllerState,
   );
 }
 

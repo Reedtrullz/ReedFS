@@ -3,6 +3,8 @@ import {
   composeEffectiveControls,
   computeAutopilotCommands,
   computeAutopilotCommandsForState,
+  computeAutopilotCommandsWithControllerState,
+  createAutopilotControllerState,
   resetAutopilotPID,
   resolveAutopilotTargets,
 } from '../autopilot';
@@ -282,6 +284,43 @@ describe('computeAutopilotCommands SPEED', () => {
     expect(commands.throttle1).toBeGreaterThan(0);
     expect(commands.throttle1).toBeLessThan(0.15);
     expect(commands.throttle2).toBe(commands.throttle1);
+  });
+
+  it('does not leak controller state into an independent runtime command stream', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.velocity.u = 50; // far below target, raw SPEED demand would saturate.
+    const ap = makeAp('HDG_SEL', 'ALT_HOLD', 'SPEED');
+
+    const firstIndependentCommand = computeAutopilotCommands(s, ap, 0, 10000, 300, 1 / 60);
+    for (let i = 0; i < 12; i++) {
+      computeAutopilotCommands(s, ap, 0, 10000, 300, 1 / 60);
+    }
+    const secondIndependentCommand = computeAutopilotCommands(s, ap, 0, 10000, 300, 1 / 60);
+
+    expect(secondIndependentCommand.throttle1).toBeCloseTo(firstIndependentCommand.throttle1 ?? 0, 8);
+    expect(secondIndependentCommand.throttle2).toBe(secondIndependentCommand.throttle1);
+  });
+
+  it('advances only the supplied serializable controller state', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.velocity.u = 50; // far below target, raw SPEED demand would saturate.
+    const ap = makeAp('HDG_SEL', 'ALT_HOLD', 'SPEED');
+    const initialControllerState = createAutopilotControllerState();
+
+    const first = computeAutopilotCommandsWithControllerState(
+      s, ap, 0, 10000, 300, 1 / 60, undefined, undefined, null, initialControllerState,
+    );
+    const second = computeAutopilotCommandsWithControllerState(
+      s, ap, 0, 10000, 300, 1 / 60, undefined, undefined, null, first.controllerState,
+    );
+    const independent = computeAutopilotCommandsWithControllerState(
+      s, ap, 0, 10000, 300, 1 / 60, undefined, undefined, null, createAutopilotControllerState(),
+    );
+
+    expect(initialControllerState).toEqual(createAutopilotControllerState());
+    expect(second.commands.throttle1).toBeGreaterThan(first.commands.throttle1 ?? 0);
+    expect(independent.commands.throttle1).toBeCloseTo(first.commands.throttle1 ?? 0, 8);
+    expect(JSON.parse(JSON.stringify(second.controllerState))).toEqual(second.controllerState);
   });
 });
 

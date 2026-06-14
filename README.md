@@ -183,7 +183,7 @@ React App
     -> input phase: held keyboard + gamepad actions -> applyInputActions(dt)
     -> fixedSimulation phase: simStore.tick(timestamp)
       -> computeRouteStatus before physics for active-leg AP targets
-      -> computeAutopilotCommandsForState (HDG/LNAV/VNAV/VS plus SPEED/N1 thrust)
+      -> computeAutopilotCommandsForStateWithControllerState (HDG/LNAV/VNAV/VS plus SPEED/N1 thrust; AP PID/rate-limit state is explicit and serializable)
       -> compose pilotInputs + apCommands into effectiveControls
       -> getSimulationRuntime().step(...)
         -> MainThreadSimulationRuntime (default) or BrowserWorkerSimulationRuntime sync fallback when explicitly flagged

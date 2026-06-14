@@ -2,22 +2,25 @@ import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
 import type { FlightPlan } from '@shared/types/fmc';
 import type { InputManagerState } from '../input/InputManager';
 import type { AircraftState, AutopilotCommands, ControlInputs } from '../sim/types';
+import type { AutopilotControllerState } from '../sim/systems/autopilot';
 import type { WindInfo } from '../sim/weather';
 import type { SimStatus, SimStore } from './simStore';
 
 export const SCENARIO_SAVE_KEY = 'rfs.scenarioSnapshot.v1';
-const SCENARIO_SAVE_VERSION = 1;
+const SCENARIO_SAVE_VERSION = 2;
+type ScenarioSaveVersion = 1 | typeof SCENARIO_SAVE_VERSION;
 
 export type ScenarioPersistenceStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 
 export interface ScenarioSnapshot {
-  version: typeof SCENARIO_SAVE_VERSION;
+  version: ScenarioSaveVersion;
   savedAtIso: string;
   selectedScenarioId: string;
   status: SimStatus;
   aircraft: AircraftState;
   pilotInputs: ControlInputs;
   apCommands: AutopilotCommands;
+  apControllerState?: AutopilotControllerState;
   inputManager: InputManagerState;
   apState: AutopilotState | null;
   flightPlan: FlightPlan | null;
@@ -36,13 +39,19 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isValidSnapshot(value: unknown): value is ScenarioSnapshot {
   if (!isRecord(value)) return false;
+  const supportedVersion = value.version === 1 || value.version === SCENARIO_SAVE_VERSION;
+  const validControllerState = value.version === 1
+    ? (value.apControllerState === undefined || isRecord(value.apControllerState))
+    : isRecord(value.apControllerState);
   return (
-    value.version === SCENARIO_SAVE_VERSION &&
+    supportedVersion &&
     typeof value.savedAtIso === 'string' &&
     typeof value.selectedScenarioId === 'string' &&
     typeof value.status === 'string' &&
     isRecord(value.aircraft) &&
     isRecord(value.pilotInputs) &&
+    isRecord(value.apCommands) &&
+    validControllerState &&
     isRecord(value.inputManager) &&
     (value.apState === null || isRecord(value.apState)) &&
     (value.flightPlan === null || isRecord(value.flightPlan)) &&
@@ -61,6 +70,7 @@ export function createScenarioSnapshot(state: SimStore): ScenarioSnapshot {
     aircraft: state.aircraft,
     pilotInputs: state.pilotInputs,
     apCommands: state.apCommands,
+    apControllerState: state.apControllerState,
     inputManager: state.inputManager,
     apState: state.apState,
     flightPlan: state.flightPlan,

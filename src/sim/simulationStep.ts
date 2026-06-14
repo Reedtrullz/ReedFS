@@ -13,7 +13,9 @@ import {
 } from './systems/navigation';
 import {
   composeEffectiveControls,
-  computeAutopilotCommandsForState,
+  computeAutopilotCommandsForStateWithControllerState,
+  createAutopilotControllerState,
+  type AutopilotControllerState,
 } from './systems/autopilot';
 import {
   deriveEffectiveAutoflightTruth,
@@ -50,6 +52,7 @@ export interface SimulationStepInput {
   status: SimulationStatus;
   selectedScenarioId: string;
   guidance: GuidanceState;
+  apControllerState?: AutopilotControllerState;
   /**
    * Default true keeps direct callers isolated. Store/runtime loops can clone once before
    * repeated fixed steps and set this false to avoid cloning the aircraft every substep.
@@ -64,6 +67,7 @@ export interface SimulationStepResult {
   apCommands: AutopilotCommands;
   controls: ControlsSlice;
   guidance: GuidanceState;
+  apControllerState: AutopilotControllerState;
 }
 
 function filterApCommandsByEffectiveModes(
@@ -128,8 +132,9 @@ export function advanceSimulationStep(input: SimulationStepInput): SimulationSte
   const effectiveTruth = deriveEffectiveAutoflightTruth(input.apState, truthContext);
   const autoflightCommandsActive = effectiveTruth.autopilotStatus !== 'OFF'
     || AP_THRUST_SERVO_MODES.has(effectiveTruth.thrustActive);
-  const apCommands = autoflightCommandsActive
-    ? computeAutopilotCommandsForState(
+  const controllerStateBeforeStep = input.apControllerState ?? createAutopilotControllerState();
+  const apCommandResult = autoflightCommandsActive
+    ? computeAutopilotCommandsForStateWithControllerState(
       state,
       input.apState,
       input.flightPlan,
@@ -137,8 +142,10 @@ export function advanceSimulationStep(input: SimulationStepInput): SimulationSte
       routeBeforeTick.activeLegIndex,
       routeBeforeTick,
       input.wind,
+      controllerStateBeforeStep,
     )
-    : {};
+    : { commands: {}, controllerState: controllerStateBeforeStep };
+  const apCommands = apCommandResult.commands;
   const controlsForIntegration = composeControlsSlice(input.pilotInputs, apCommands, input.apState, truthContext);
 
   integrate(state, controlsForIntegration.effectiveControls, input.spec, input.dt, input.wind, scenario.weather);
@@ -160,5 +167,6 @@ export function advanceSimulationStep(input: SimulationStepInput): SimulationSte
     apCommands: controls.apCommands,
     controls,
     guidance: syncGuidanceState(input.guidance, scenario, input.status, state, controls.effectiveControls),
+    apControllerState: apCommandResult.controllerState,
   };
 }
