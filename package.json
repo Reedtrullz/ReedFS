@@ -12,8 +12,9 @@
     "lint:ci": "eslint . --max-warnings=0",
     "check:deps": "node scripts/check-single-three.mjs",
     "check:release": "node scripts/release-hardening-check.mjs",
+    "check:bundle": "node scripts/check-bundle-budget.mjs",
     "check:blackbox": "node scripts/check-blackbox-e2e.mjs",
-    "check": "npm run check:deps && npm run check:release && npm run lint:ci && npm run typecheck && npm run test && npm run build",
+    "check": "npm run check:deps && npm run check:release && npm run lint:ci && npm run typecheck && npm run test && npm run build && npm run check:bundle",
     "preview": "vite preview",
     "test:visual": "PLAYWRIGHT_JSON_OUTPUT_NAME=test-results/visual-timings.json playwright test --workers=1 --reporter=line,json && node scripts/check-visual-timings.mjs",
     "test:visual:update": "playwright test --update-snapshots"

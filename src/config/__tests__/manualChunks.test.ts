@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { rfsManualChunk } from '../../../manualChunks.config';
+import { RFS_BUNDLE_BUDGET_CATEGORIES, rfsManualChunk } from '../../../manualChunks.config';
 
 describe('RFS manual chunk policy', () => {
   it('pins Cesium and Three-heavy dependencies into explicit chunks', () => {
@@ -13,5 +13,16 @@ describe('RFS manual chunk policy', () => {
     expect(rfsManualChunk('/repo/node_modules/zustand/esm/index.mjs')).toBe('vendor-react');
     expect(rfsManualChunk('/repo/node_modules/lodash-es/lodash.js')).toBe('vendor');
     expect(rfsManualChunk('/repo/src/App.tsx')).toBeUndefined();
+  });
+
+  it('publishes every category enforced by the bundle budget script', () => {
+    expect(RFS_BUNDLE_BUDGET_CATEGORIES).toEqual([
+      'app',
+      'vendorReact',
+      'vendor',
+      'three',
+      'threeBridge',
+      'cesium',
+    ]);
   });
 });

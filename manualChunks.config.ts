@@ -1,3 +1,14 @@
+export const RFS_BUNDLE_BUDGET_CATEGORIES = [
+  'app',
+  'vendorReact',
+  'vendor',
+  'three',
+  'threeBridge',
+  'cesium',
+] as const;
+
+export type RfsBundleBudgetCategory = typeof RFS_BUNDLE_BUDGET_CATEGORIES[number];
+
 export function rfsManualChunk(id: string): string | undefined {
   const moduleId = id.replace(/\\/g, '/');
 

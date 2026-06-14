@@ -57,6 +57,7 @@ jobs:
         env:
           RFS_COMMIT_SHA: ${{ github.sha }}
           RFS_IMAGE_REF: ghcr.io/reedtrullz/rfs:sha-${{ github.sha }}
+      - run: npm run check:bundle
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
       - run: npm run test:visual
