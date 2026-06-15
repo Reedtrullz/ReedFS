@@ -32,7 +32,7 @@ class MockOscillatorNode {
 }
 vi.stubGlobal('OscillatorNode', MockOscillatorNode);
 
-const { mockSetInput, mockApplyInputActions, mockStart, mockStartTakeoffRoll, mockAbortTakeoff, mockPause, mockResume, mockReset, mockSetScenario, mockSetTutorialStep, mockSetFlightPlan, mockSetApState, mockSetWind, mockFetchMetar, mockCloudLayer, mockReadGamepadActions } = vi.hoisted(() => ({
+const { mockSetInput, mockApplyInputActions, mockStart, mockStartTakeoffRoll, mockAbortTakeoff, mockPause, mockResume, mockReset, mockCycleSimRate, mockSetScenario, mockSetTutorialStep, mockSetFlightPlan, mockSetApState, mockSetWind, mockFetchMetar, mockCloudLayer, mockReadGamepadActions } = vi.hoisted(() => ({
   mockSetInput: vi.fn(),
   mockApplyInputActions: vi.fn(),
   mockStart: vi.fn(),
@@ -41,6 +41,7 @@ const { mockSetInput, mockApplyInputActions, mockStart, mockStartTakeoffRoll, mo
   mockPause: vi.fn(),
   mockResume: vi.fn(),
   mockReset: vi.fn(),
+  mockCycleSimRate: vi.fn(),
   mockSetScenario: vi.fn(),
   mockSetTutorialStep: vi.fn(),
   mockSetFlightPlan: vi.fn(),
@@ -168,7 +169,9 @@ vi.mock('../store/simStore', () => {
     },
     inputs: { elevator: 0, aileron: 0, rudder: 0, throttle1: 0, throttle2: 0, flapLever: 0, gearLever: 'DOWN' as const, spoilers: 0, brake: 0, leftBrake: 0, rightBrake: 0 },
     effectiveControls: { elevator: 0, aileron: 0, rudder: 0, throttle1: 0, throttle2: 0, flapLever: 0, gearLever: 'DOWN' as const, spoilers: 0, brake: 0, leftBrake: 0, rightBrake: 0 },
+    simRate: 1,
     tick: vi.fn(),
+    cycleSimRate: mockCycleSimRate,
     start: mockStart,
     startTakeoffRoll: mockStartTakeoffRoll,
     abortTakeoff: mockAbortTakeoff,
@@ -857,6 +860,9 @@ describe('App', () => {
     expect(mockSetFlightPlan).toHaveBeenCalledTimes(1);
     expect(mockSetFlightPlan).toHaveBeenCalledWith(expect.objectContaining({ origin: 'KSEA', destination: 'KPDX' }));
     expect(mockSetApState).not.toHaveBeenCalled();
+    expect(screen.getByRole('status', { name: 'Route load result' }).textContent).toBe(
+      'CANNED TRAINING ROUTE KSEA→KPDX loaded. Route editing is unavailable; route guidance is active; use visible MCP LNAV, altitude, and VS/VNAV controls for climb/descent management.',
+    );
   });
 
   it('defers viewer-dependent layers until the Cesium viewer is ready', async () => {

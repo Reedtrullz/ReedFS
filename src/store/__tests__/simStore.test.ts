@@ -154,7 +154,7 @@ describe('useSimStore', () => {
 
   it('assembles stable domain slices while preserving the public compatibility API', () => {
     const state = useSimStore.getState();
-    for (const action of ['startTakeoffRoll', 'setInput', 'setTakeoffConfig', 'setApState', 'setFlightPlan', 'reset', 'tick'] as const) {
+    for (const action of ['startTakeoffRoll', 'setInput', 'setTakeoffConfig', 'setApState', 'setFlightPlan', 'reset', 'tick', 'cycleSimRate'] as const) {
       expect(typeof state[action]).toBe('function');
     }
 
@@ -164,6 +164,21 @@ describe('useSimStore', () => {
   });
 
   it('starts stopped', () => expect(useSimStore.getState().status).toBe('stopped'));
+
+  it('cycles visible simulator rate and reset returns it to 1x', () => {
+    const store = useSimStore.getState();
+
+    expect(store.simRate).toBe(1);
+    store.cycleSimRate();
+    expect(useSimStore.getState().simRate).toBe(4);
+    useSimStore.getState().cycleSimRate();
+    expect(useSimStore.getState().simRate).toBe(16);
+    useSimStore.getState().cycleSimRate();
+    expect(useSimStore.getState().simRate).toBe(1);
+    useSimStore.getState().cycleSimRate();
+    useSimStore.getState().reset();
+    expect(useSimStore.getState().simRate).toBe(1);
+  });
 
   it('starts with unified scenario guidance derived from the initial aircraft and controls', () => {
     const state = useSimStore.getState();

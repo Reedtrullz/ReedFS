@@ -598,6 +598,21 @@ export function RfsPFD() {
           AP LATERAL ONLY — NO PITCH AUTHORITY
         </div>
       )}
+      <div
+        role="status"
+        aria-label="PFD flight phase"
+        style={{
+          borderBottom: '1px solid rgba(120,180,210,0.22)',
+          background: 'rgba(0,0,0,0.32)',
+          color: flightPhase === 'DESCENT' || flightPhase === 'APPROACH' ? '#6dff8d' : '#9ddcff',
+          padding: '4px 10px',
+          fontSize: 11,
+          fontWeight: 900,
+          letterSpacing: 0.8,
+        }}
+      >
+        PHASE {flightPhase}
+      </div>
       <McpTargetStrip
         visible={hasMcpTargets}
         speed={displaySpeed}

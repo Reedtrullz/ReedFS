@@ -194,6 +194,7 @@ export function createAircraftSlice(set: SimStoreSet): Pick<
         fixedStepAccumulatorSeconds: 0,
         simulationTimeSeconds: 0,
         droppedSimulationTimeSeconds: 0,
+        simRate: 1,
         apState: null,
         apControllerState,
         flightPlan: null,

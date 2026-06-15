@@ -171,13 +171,14 @@ describe('RfsPFD', () => {
     useSimStore.getState().reset();
   });
 
-  it('renders a readable PFD frame with labeled speed, altitude, attitude, and heading sections', () => {
+  it('renders a readable PFD frame with labeled speed, altitude, attitude, heading, and phase sections', () => {
     render(<RfsPFD />);
 
     expect(screen.getByLabelText('Primary flight display')).toBeTruthy();
     expect(screen.getByRole('region', { name: 'Primary flight display' })).toBeTruthy();
     expect(screen.getByLabelText('Airspeed tape')).toBeTruthy();
     expect(screen.getByLabelText('Altitude tape')).toBeTruthy();
+    expect(screen.getByLabelText('PFD flight phase').textContent).toBe('PHASE PARKED');
     expect(screen.getByText('IAS')).toBeTruthy();
     expect(screen.getByText('ALT')).toBeTruthy();
     expect(screen.getByText('ATT')).toBeTruthy();

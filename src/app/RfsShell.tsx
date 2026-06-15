@@ -100,6 +100,8 @@ export function RfsShell() {
   const pause = useSimStore((s) => s.pause);
   const resume = useSimStore((s) => s.resume);
   const reset = useSimStore((s) => s.reset);
+  const simRate = useSimStore((s) => s.simRate);
+  const cycleSimRate = useSimStore((s) => s.cycleSimRate);
   const status = useSimStore((s) => s.status);
   const selectedScenarioId = useSimStore((s) => s.selectedScenarioId);
   const setInput = useSimStore((s) => s.setInput);
@@ -243,8 +245,11 @@ export function RfsShell() {
       setRouteLoadMessage(`No default route is available for ${scenario.name}.`);
       return;
     }
+    const routeGuidance = store.status === 'stopped'
+      ? `confirm flaps ${scenario.flapSetting}, trim ${scenario.stabilizerTrimUnits.toFixed(1)}, idle throttle, then START ROLL.`
+      : 'route guidance is active; use visible MCP LNAV, altitude, and VS/VNAV controls for climb/descent management.';
     setRouteLoadMessage(
-      `CANNED TRAINING ROUTE ${fp.origin}→${fp.destination} loaded. Route editing is unavailable; confirm flaps ${scenario.flapSetting}, trim ${scenario.stabilizerTrimUnits.toFixed(1)}, idle throttle, then START ROLL.`,
+      `CANNED TRAINING ROUTE ${fp.origin}→${fp.destination} loaded. Route editing is unavailable; ${routeGuidance}`,
     );
   };
 
@@ -364,7 +369,9 @@ export function RfsShell() {
             overlayMode={overlayMode}
             audioEnabled={audioEnabled}
             audioStatus={audioStatus}
+            simRate={simRate}
             routeLoadMessage={routeLoadMessage}
+            onCycleSimRate={cycleSimRate}
             onStartRoll={startTakeoffRoll}
             onAbortTakeoff={abortTakeoff}
             onPause={pause}

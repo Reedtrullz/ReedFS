@@ -12,6 +12,8 @@ export interface BottomControlBarProps {
   audioEnabled: boolean;
   audioStatus: AudioUiStatus;
   routeLoadMessage: string | null;
+  simRate: number;
+  onCycleSimRate: () => void;
   onStartRoll: () => void;
   onAbortTakeoff: () => void;
   onPause: () => void;
@@ -30,6 +32,8 @@ export function BottomControlBar({
   audioEnabled,
   audioStatus,
   routeLoadMessage,
+  simRate,
+  onCycleSimRate,
   onStartRoll,
   onAbortTakeoff,
   onPause,
@@ -62,6 +66,7 @@ export function BottomControlBar({
         </>
       )}
       <button onClick={onReset} style={btnStyle}>RESET</button>
+      <button onClick={onCycleSimRate} aria-label={`Cycle simulator rate target: ${simRate}X`} style={btnStyle}>SIM RATE TARGET: {simRate}X</button>
       <button onClick={onNextCameraMode} style={btnStyle}>CAM: {camMode.toUpperCase()}</button>
       <button
         onClick={onNextOverlayMode}
