@@ -80,6 +80,15 @@ describe('RouteStatus', () => {
     expect(useSimStore.getState().routeStatus.activeLegIndex).toBe(7);
   });
 
+  it('labels the current loaded route as a canned training route instead of a full route editor flow', () => {
+    useSimStore.setState({ routeStatus: routeStatus() });
+
+    render(<RouteStatus />);
+
+    expect(screen.getByText(/CANNED TRAINING ROUTE/i)).toBeTruthy();
+    expect(screen.getByText(/route editing unavailable/i)).toBeTruthy();
+  });
+
   it('keeps pilot-facing leg display coherent if route feedback has an inconsistent leg count', () => {
     useSimStore.setState({
       routeStatus: routeStatus({

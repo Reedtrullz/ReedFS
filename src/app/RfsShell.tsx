@@ -244,7 +244,7 @@ export function RfsShell() {
       return;
     }
     setRouteLoadMessage(
-      `${fp.origin}→${fp.destination} route loaded. Confirm flaps ${scenario.flapSetting}, trim ${scenario.stabilizerTrimUnits.toFixed(1)}, idle throttle, then START ROLL.`,
+      `CANNED TRAINING ROUTE ${fp.origin}→${fp.destination} loaded. Route editing is unavailable; confirm flaps ${scenario.flapSetting}, trim ${scenario.stabilizerTrimUnits.toFixed(1)}, idle throttle, then START ROLL.`,
     );
   };
 

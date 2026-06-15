@@ -802,10 +802,11 @@ describe('App', () => {
 
     expect(mockSetFlightPlan).toHaveBeenCalledWith(expect.objectContaining({ origin: 'KSEA', destination: 'KPDX' }));
     expect(mockSetApState).not.toHaveBeenCalled();
-    expect(screen.getByRole('status', { name: 'Route load result' }).textContent).toBe(
-      'KSEA→KPDX route loaded. Confirm flaps 5, trim 5.0, idle throttle, then START ROLL.',
+    const routeLoadResult = screen.getByRole('status', { name: 'Route load result' }).textContent;
+    expect(routeLoadResult).toBe(
+      'CANNED TRAINING ROUTE KSEA→KPDX loaded. Route editing is unavailable; confirm flaps 5, trim 5.0, idle throttle, then START ROLL.',
     );
-    expect(screen.getByRole('status', { name: 'Route load result' }).textContent).not.toMatch(/resets the takeoff levers|Takeoff setup reminder/i);
+    expect(routeLoadResult).not.toMatch(/resets the takeoff levers|Takeoff setup reminder/i);
   });
 
   it('LOAD PLAN derives takeoff setup guidance from the selected KSEA scenario', () => {
@@ -816,7 +817,7 @@ describe('App', () => {
 
     expect(mockSetFlightPlan).toHaveBeenCalledWith(expect.objectContaining({ origin: 'KSEA', destination: 'KPDX' }));
     expect(screen.getByRole('status', { name: 'Route load result' }).textContent).toBe(
-      'KSEA→KPDX route loaded. Confirm flaps 5, trim 4.5, idle throttle, then START ROLL.',
+      'CANNED TRAINING ROUTE KSEA→KPDX loaded. Route editing is unavailable; confirm flaps 5, trim 4.5, idle throttle, then START ROLL.',
     );
   });
 

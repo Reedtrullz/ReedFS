@@ -33,6 +33,17 @@ const routeNameStyle: CSSProperties = {
   marginTop: 5,
 };
 
+const routeSourceStyle: CSSProperties = {
+  border: '1px solid rgba(255,216,74,0.45)',
+  borderRadius: 4,
+  color: '#ffd84a',
+  fontSize: 11,
+  fontWeight: 800,
+  lineHeight: 1.35,
+  marginTop: 8,
+  padding: '6px 7px',
+};
+
 const rowStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'baseline',
@@ -76,6 +87,19 @@ function approachHandoffText(routeStatus: { approachHandoff: ApproachHandoff; ne
   }
 }
 
+function isLoadedRoute(routeStatus: { routeName: string; routeValid: boolean }): boolean {
+  return routeStatus.routeValid && routeStatus.routeName !== 'NO ROUTE';
+}
+
+function RouteSourceReadback() {
+  return (
+    <div style={routeSourceStyle}>
+      <div>CANNED TRAINING ROUTE</div>
+      <div style={{ color: '#ffefb8', fontWeight: 700 }}>Route editing unavailable</div>
+    </div>
+  );
+}
+
 function ApproachHandoffReadback({ text }: { text: string }) {
   return (
     <div style={{ color: '#7dffb2', fontSize: 12, lineHeight: 1.45, marginTop: 10 }}>
@@ -103,6 +127,7 @@ export function RouteStatus() {
     <section aria-label="Route status" aria-live="polite" style={panelStyle}>
       <div style={labelStyle}>Route status</div>
       <div style={routeNameStyle}>{routeStatus.routeName}</div>
+      {isLoadedRoute(routeStatus) && <RouteSourceReadback />}
 
       {routeStatus.routeComplete && handoffText ? (
         <ApproachHandoffReadback text={handoffText} />
