@@ -3,6 +3,19 @@ import { createRouteSourceFromFlightPlan, type RouteSource } from './fms/routeAd
 import type { FlightScenario } from './scenarios';
 import { KPDX_RUNWAY_10R_APPROACH, type RunwayApproachFixReference, type RunwayThresholdApproachReference } from '../viewport/runwayData';
 
+export const KSEA_KPDX_APPROACH_CONTRACT = {
+  id: 'ksea-kpdx-kpdx-10r-synthetic',
+  originAirport: 'KSEA',
+  destinationAirport: KPDX_RUNWAY_10R_APPROACH.airport,
+  destinationScenarioId: 'kpdx-tutorial',
+  runway: KPDX_RUNWAY_10R_APPROACH.runwayId,
+  initialApproachFixIdent: KPDX_RUNWAY_10R_APPROACH.initialApproachFix.ident,
+  finalApproachFixIdent: KPDX_RUNWAY_10R_APPROACH.finalApproachFix.ident,
+  thresholdIdent: KPDX_RUNWAY_10R_APPROACH.threshold.ident,
+  coordinateSource: KPDX_RUNWAY_10R_APPROACH.coordinateSource,
+  sourceNote: KPDX_RUNWAY_10R_APPROACH.sourceNote,
+} as const;
+
 const AIRPORT_COORDS: Record<string, Pick<FlightPlanWaypoint, 'lat' | 'lon' | 'coordinateSource'>> = {
   ENVA: { lat: 63.4583, lon: 10.9101, coordinateSource: 'synthetic' },
   KSEA: { lat: 47.45, lon: -122.31, coordinateSource: 'synthetic' },
@@ -60,8 +73,8 @@ export function createKseaKpdxFlight(): FlightPlan {
   const approach = KPDX_RUNWAY_10R_APPROACH;
 
   return {
-    origin: 'KSEA',
-    destination: 'KPDX',
+    origin: KSEA_KPDX_APPROACH_CONTRACT.originAirport,
+    destination: KSEA_KPDX_APPROACH_CONTRACT.destinationAirport,
     flightNumber: 'RFS123',
     route: [
       'KSEA',
@@ -94,10 +107,10 @@ export function createKseaKpdxRouteSource(): RouteSource {
   return createRouteSourceFromFlightPlan(createKseaKpdxFlight(), {
     id: 'canned:ksea-kpdx',
     type: 'canned',
-    label: 'KSEA to KPDX canned route',
+    label: `${KSEA_KPDX_APPROACH_CONTRACT.originAirport} to ${KSEA_KPDX_APPROACH_CONTRACT.destinationAirport} runway ${KSEA_KPDX_APPROACH_CONTRACT.runway} canned route`,
     limitations: [
       'Adapter wraps the current RFMS shared FlightPlan shape; CDU route editing UI is not implemented yet.',
-      'KPDX 10R approach waypoints are synthetic training fixtures for RFS only, not official procedure data.',
+      `${KSEA_KPDX_APPROACH_CONTRACT.destinationAirport} ${KSEA_KPDX_APPROACH_CONTRACT.runway} approach waypoints are synthetic training fixtures for RFS only, not official procedure data.`,
       'RFMS shared dependency remains a sibling checkout via @shared path mapping.',
     ],
   });

@@ -97,6 +97,7 @@ export interface B737LandingPerformanceEnvelope {
 
 export interface B737TakeoffPerformanceCard {
   scenarioId: string;
+  airport: FlightScenario['runway']['airport'];
   runway: string;
   grossWeightKg: number;
   flapSetting: number;
@@ -334,6 +335,7 @@ export const b737EngineLapseFixtures: B737EngineLapseFixture[] = [
 export const b737PerformanceCards: B737TakeoffPerformanceCard[] = [
   {
     scenarioId: 'enva-tutorial',
+    airport: 'ENVA',
     runway: '09',
     grossWeightKg: 61_913,
     flapSetting: 5,
@@ -375,6 +377,7 @@ export const b737PerformanceCards: B737TakeoffPerformanceCard[] = [
   },
   {
     scenarioId: 'ksea-tutorial',
+    airport: 'KSEA',
     runway: '16L',
     grossWeightKg: 61_913,
     flapSetting: 5,
@@ -416,6 +419,7 @@ export const b737PerformanceCards: B737TakeoffPerformanceCard[] = [
   },
   {
     scenarioId: 'ksea-light-pattern',
+    airport: 'KSEA',
     runway: '16L',
     grossWeightKg: 50_413,
     flapSetting: 5,
@@ -457,6 +461,7 @@ export const b737PerformanceCards: B737TakeoffPerformanceCard[] = [
   },
   {
     scenarioId: 'kpdx-tutorial',
+    airport: 'KPDX',
     runway: '10R',
     grossWeightKg: 58_413,
     flapSetting: 5,
@@ -522,6 +527,7 @@ export function assertPerformanceCardMatchesScenario(
   scenario: FlightScenario,
 ): void {
   assertEqual(card.scenarioId, scenario.id, 'scenario id');
+  assertEqual(card.airport, scenario.runway.airport, 'airport');
   assertEqual(card.runway, scenario.runway.runway, 'runway');
   assertEqual(card.grossWeightKg, scenario.grossWeightKg, 'gross weight');
   assertEqual(card.flapSetting, scenario.flapSetting, 'flap setting');

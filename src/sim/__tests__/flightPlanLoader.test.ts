@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createDefaultFlightForScenario, createKseaKpdxFlight, createKseaKpdxRouteSource } from '../flightPlanLoader';
+import { createDefaultFlightForScenario, createKseaKpdxFlight, createKseaKpdxRouteSource, KSEA_KPDX_APPROACH_CONTRACT } from '../flightPlanLoader';
 import { ENVA_TUTORIAL_SCENARIO, KPDX_TUTORIAL_SCENARIO } from '../scenarios';
 import { KPDX_RUNWAY_10R_APPROACH } from '../../viewport/runwayData';
 
@@ -10,6 +10,7 @@ describe('flightPlanLoader', () => {
 
     expect(KPDX_TUTORIAL_SCENARIO.runway.runway).toBe(approach.runwayId);
     expect(KPDX_TUTORIAL_SCENARIO.runway.approach).toEqual({
+      runwayId: KSEA_KPDX_APPROACH_CONTRACT.runway,
       finalApproachFixIdent: approach.finalApproachFix.ident,
       thresholdIdent: approach.threshold.ident,
       coordinateSource: 'synthetic',

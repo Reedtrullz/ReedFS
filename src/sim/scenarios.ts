@@ -17,6 +17,7 @@ export interface RunwayScenario {
   elevationFt: number;
   headingDeg: number;
   approach?: {
+    runwayId: string;
     finalApproachFixIdent: string;
     thresholdIdent: string;
     coordinateSource: 'synthetic';
@@ -200,6 +201,7 @@ export const KPDX_TUTORIAL_SCENARIO: FlightScenario = {
     elevationFt: KPDX_RUNWAY_10R.elevationFt,
     headingDeg: KPDX_RUNWAY_10R.headingDeg,
     approach: {
+      runwayId: KPDX_RUNWAY_10R_APPROACH.runwayId,
       finalApproachFixIdent: KPDX_RUNWAY_10R_APPROACH.finalApproachFix.ident,
       thresholdIdent: KPDX_RUNWAY_10R_APPROACH.threshold.ident,
       coordinateSource: KPDX_RUNWAY_10R_APPROACH.coordinateSource,
@@ -285,6 +287,9 @@ function validateScenario(spec: AircraftSpec, scenario: FlightScenario): void {
 
   if (scenario.weather.stationIcao !== scenario.runway.airport) {
     throw new Error(`${scenario.id} weather station must match runway airport`);
+  }
+  if (scenario.runway.approach && scenario.runway.approach.runwayId !== scenario.runway.runway) {
+    throw new Error(`${scenario.id} approach runway must match selected runway`);
   }
   if (!Number.isFinite(scenario.weather.qnhHpa) || scenario.weather.qnhHpa < 850 || scenario.weather.qnhHpa > 1100) {
     throw new Error(`${scenario.id} weather QNH is outside a plausible range`);

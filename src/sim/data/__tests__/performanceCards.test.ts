@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ENVA_TUTORIAL_SCENARIO, KPDX_TUTORIAL_SCENARIO, KSEA_LIGHT_PATTERN_SCENARIO, KSEA_TUTORIAL_SCENARIO, SCENARIOS } from '../../scenarios';
-import { createKseaKpdxFlight } from '../../flightPlanLoader';
+import { createKseaKpdxFlight, KSEA_KPDX_APPROACH_CONTRACT } from '../../flightPlanLoader';
 import { KPDX_RUNWAY_10R_APPROACH } from '../../../viewport/runwayData';
 import {
   assertPerformanceCardMatchesScenario,
@@ -36,6 +36,7 @@ interface LandingPerformanceCardForTest {
 
 interface CardWithLandingForTest {
   scenarioId: string;
+  airport: string;
   runway: string;
   approach: { iasKt: number; vrefKt: number };
   landing?: LandingPerformanceCardForTest;
@@ -75,15 +76,21 @@ describe('B737 performance-card scenario assertions', () => {
   });
 
   it('keeps KSEA route approach targets aligned with the KPDX runway scenario and performance card', () => {
-    const card = findPerformanceCardForScenario(KPDX_TUTORIAL_SCENARIO.id);
+    const card = findPerformanceCardForScenario(KSEA_KPDX_APPROACH_CONTRACT.destinationScenarioId);
     const route = createKseaKpdxFlight();
     const approach = KPDX_RUNWAY_10R_APPROACH;
     const finalApproach = route.waypoints.find((waypoint) => waypoint.ident === approach.finalApproachFix.ident);
     const threshold = route.waypoints.find((waypoint) => waypoint.ident === approach.threshold.ident);
 
-    expect(KPDX_TUTORIAL_SCENARIO.runway.runway).toBe(card.runway);
+    expect(route.destination).toBe(KSEA_KPDX_APPROACH_CONTRACT.destinationAirport);
+    expect(KPDX_TUTORIAL_SCENARIO.runway.airport).toBe(KSEA_KPDX_APPROACH_CONTRACT.destinationAirport);
+    expect(KPDX_TUTORIAL_SCENARIO.runway.runway).toBe(KSEA_KPDX_APPROACH_CONTRACT.runway);
+    expect(card.airport).toBe(KSEA_KPDX_APPROACH_CONTRACT.destinationAirport);
+    expect(card.runway).toBe(KSEA_KPDX_APPROACH_CONTRACT.runway);
     expect(KPDX_TUTORIAL_SCENARIO.runway.approach?.finalApproachFixIdent).toBe(approach.finalApproachFix.ident);
     expect(KPDX_TUTORIAL_SCENARIO.runway.approach?.thresholdIdent).toBe(approach.threshold.ident);
+    expect(threshold?.ident).toBe(KSEA_KPDX_APPROACH_CONTRACT.thresholdIdent);
+    expect(threshold?.ident).toMatch(new RegExp(`${card.airport}${card.runway}_RWY`));
     expect(finalApproach?.altitudeConstraint).toEqual({
       type: 'AT',
       altitude: approach.threshold.point.altFt + card.approach.heightAglFt,
