@@ -21,8 +21,10 @@ export interface VnavOutput {
   altitudeConstraint: boolean;
   targetAltitudeSource?: VnavAltitudeTargetSource;
   captureTargetAltFt?: number;
-  /** Honest vertical mode implied by the current VNAV path lifecycle. */
+  /** Honest vertical mode implied by the current VNAV path lifecycle. Null means no active pitch command. */
   verticalMode: VerticalMode | null;
+  /** Armed-but-not-active vertical mode, e.g. pre-TOD VNAV before an actual path target is commandable. */
+  verticalArmedMode?: Extract<VerticalMode, 'VNAV'>;
   /** True only when the active/future route waypoint has an actionable VNAV altitude and/or speed target. */
   available: boolean;
   unavailableReason: string | null;
@@ -159,7 +161,8 @@ function requiredVerticalSpeedFpm(state: AircraftState, targetAltFt: number, dis
 
 function lifecycleForAltitudeTarget(state: AircraftState, targetAltFt: number, distanceToConstraintNm: number): {
   lifecycle: VnavLifecycle;
-  verticalMode: VerticalMode;
+  verticalMode: VerticalMode | null;
+  verticalArmedMode?: Extract<VerticalMode, 'VNAV'>;
   todDistanceNm: number;
   distanceToTodNm: number;
 } {
@@ -175,7 +178,7 @@ function lifecycleForAltitudeTarget(state: AircraftState, targetAltFt: number, d
     return { lifecycle: 'ALT_CAPTURE', verticalMode: 'ALT*', todDistanceNm, distanceToTodNm };
   }
   if (altitudeDeltaFt < 0 && distanceToTodNm > VNAV_TOD_CAPTURE_TOLERANCE_NM) {
-    return { lifecycle: 'ARMED', verticalMode: 'VNAV', todDistanceNm, distanceToTodNm };
+    return { lifecycle: 'ARMED', verticalMode: null, verticalArmedMode: 'VNAV', todDistanceNm, distanceToTodNm };
   }
   return { lifecycle: 'PATH', verticalMode: 'VNAV_PTH', todDistanceNm, distanceToTodNm };
 }
@@ -216,6 +219,7 @@ export function computeVNAV(
     targetAltitudeSource: hasAltitudeTarget ? 'VNAV_CONSTRAINT' : undefined,
     captureTargetAltFt: target.altitudeTarget,
     verticalMode: altitudeLifecycle.verticalMode,
+    verticalArmedMode: altitudeLifecycle.verticalArmedMode,
     available: true,
     unavailableReason: null,
     speedConstraint: hasSpeedTarget,

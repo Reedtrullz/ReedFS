@@ -96,6 +96,14 @@ export function selectPfdFmaText(kind: 'thrustActive' | 'lateralActive' | 'verti
   })[kind]);
 }
 
+export function selectPfdFmaArmedVerticalText(s: SimStore): string {
+  return modeText(deriveDisplayFmaTruth(s.apState, {
+    aircraft: s.aircraft,
+    flightPlan: s.flightPlan,
+    routeStatus: s.routeStatus,
+  }).verticalArmed);
+}
+
 export function selectPfdManagedSpeedKt(s: SimStore): number | null {
   const truth = deriveDisplayFmaTruth(s.apState, {
     aircraft: s.aircraft,
@@ -140,7 +148,8 @@ function deriveBackedVnavMode(
   probe.boeing.altHold = false;
   probe.boeing.vs = false;
 
-  return deriveEffectiveAutoflightTruth(probe, context).verticalActive;
+  const effective = deriveEffectiveAutoflightTruth(probe, context);
+  return effective.verticalActive !== 'OFF' ? effective.verticalActive : effective.verticalArmed ?? 'OFF';
 }
 
 function mcpGuidanceAvailabilityReason(state: McpModeAvailabilityState): string | null {
@@ -211,7 +220,8 @@ export function selectMcpViewModel(s: SimStore): McpViewModel {
     routeStatus: s.routeStatus,
   });
   const vnavAvailable = backedVnavMode !== 'OFF';
-  const vnavActive = Boolean(s.apState?.boeing.vnav) && VNAV_DISPLAY_MODES.has(vertActive);
+  const vnavActive = Boolean(s.apState?.boeing.vnav)
+    && (VNAV_DISPLAY_MODES.has(vertActive) || effectiveTruth.verticalArmed === 'VNAV');
   const lnavAvailable = s.routeStatus.lnavAvailable;
   const displayedLatActive = latActive === 'LNAV' && !lnavAvailable ? 'OFF' : latActive;
   const displayApState = s.apState ?? createDefaultAutopilotStateFromAircraft(s.aircraft, s.wind);

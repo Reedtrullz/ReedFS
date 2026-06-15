@@ -6,6 +6,7 @@ import {
   selectPfdFlightDirectorEnabled,
   selectPfdFlightPhase,
   selectPfdFlightPlan,
+  selectPfdFmaArmedVerticalText,
   selectPfdFmaText,
   selectPfdHasMcpTargets,
   selectPfdHeadingDeg,
@@ -69,7 +70,10 @@ function FmaCell({ label, value }: { label: string; value: string }) {
       }}
     >
       <div style={{ color: '#7fa6b7', fontSize: 10, letterSpacing: 1.4 }}>{label}</div>
-      <div style={{ color: active ? '#6dff8d' : '#95a6ad', fontSize: 16, fontWeight: 800, whiteSpace: 'nowrap' }}>
+      <div
+        aria-label={`FMA ${label.toLowerCase()} active`}
+        style={{ color: active ? '#6dff8d' : '#95a6ad', fontSize: 16, fontWeight: 800, whiteSpace: 'nowrap' }}
+      >
         {value}
       </div>
     </div>
@@ -456,6 +460,10 @@ function useFmaText(kind: 'thrustActive' | 'lateralActive' | 'verticalActive' | 
   return useSimStore(selectPfdFmaText(kind));
 }
 
+function useFmaArmedVerticalText() {
+  return useSimStore(selectPfdFmaArmedVerticalText);
+}
+
 function useManagedSpeedKt(): number | null {
   return useSimStore(selectPfdManagedSpeedKt);
 }
@@ -479,6 +487,7 @@ export function RfsPFD() {
   const thrustMode = useFmaText('thrustActive');
   const lateralMode = useFmaText('lateralActive');
   const verticalMode = useFmaText('verticalActive');
+  const armedVerticalMode = useFmaArmedVerticalText();
   const autopilotMode = useFmaText('autopilotStatus');
   const hasMcpTargets = useSimStore(selectPfdHasMcpTargets);
   const selectedSpeed = useSimStore(selectPfdSelectedSpeed);
@@ -555,6 +564,23 @@ export function RfsPFD() {
         <FmaCell label="PITCH" value={verticalMode} />
         <FmaCell label="AP" value={autopilotMode} />
       </div>
+      {armedVerticalMode !== 'OFF' && (
+        <div
+          role="status"
+          aria-label="PFD armed vertical mode"
+          style={{
+            borderBottom: '1px solid rgba(120,180,210,0.24)',
+            background: 'rgba(0,0,0,0.38)',
+            color: '#9ddcff',
+            padding: '4px 10px',
+            fontSize: 11,
+            fontWeight: 900,
+            letterSpacing: 0.8,
+          }}
+        >
+          ARMED {armedVerticalMode}
+        </div>
+      )}
       {lateralOnlyAuthority && (
         <div
           role="status"

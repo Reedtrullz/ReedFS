@@ -82,6 +82,21 @@ function constrainedRoute(): FlightPlan {
   };
 }
 
+function routeWithFutureDescentConstraint(): FlightPlan {
+  return {
+    origin: 'KSEA',
+    destination: 'KPDX',
+    flightNumber: 'TST214',
+    route: 'KSEA OLM BTG KPDX',
+    waypoints: [
+      { ident: 'KSEA', lat: 47.45, lon: -122.31, discontinuity: false },
+      { ident: 'OLM', lat: 46.97, lon: -122.9, discontinuity: false },
+      { ident: 'BTG', lat: 45.75, lon: -122.59, discontinuity: false, altitudeConstraint: { type: 'AT_OR_BELOW', altitude: 12000 }, speedConstraint: { type: 'AT_OR_BELOW', speed: 280 } },
+      { ident: 'KPDX', lat: 45.59, lon: -122.6, discontinuity: false },
+    ],
+  };
+}
+
 function aircraftAtRoute(altitudeFt = 5000) {
   const aircraft = createInitialState(B737_800_SPEC);
   aircraft.position.lat = 47.45;
@@ -89,6 +104,31 @@ function aircraftAtRoute(altitudeFt = 5000) {
   aircraft.position.alt = altitudeFt;
   aircraft.velocity.u = 128.6;
   return aircraft;
+}
+
+function routeStatusBeforeTod(aircraft = aircraftAtRoute(30_000), flightPlan = routeWithFutureDescentConstraint()) {
+  return {
+    ...computeRouteStatus(aircraft, flightPlan, 0),
+    routeValid: true,
+    routeComplete: false,
+    lnavAvailable: true,
+    lnavUnavailableReason: null,
+    activeLegIndex: 0,
+    activeLegCount: 3,
+    fromWaypointIndex: 0,
+    toWaypointIndex: 1,
+    fromIdent: 'KSEA',
+    nextWaypointIdent: 'OLM',
+    distanceToNextM: 160 * 1852,
+    distanceToNextNm: 160,
+    desiredTrackRad: 0,
+    desiredTrackDegTrue: 0,
+    crossTrackErrorM: 0,
+    alongTrackM: 0,
+    legLengthM: 180 * 1852,
+    waypointReached: false,
+    sequenced: false,
+  };
 }
 
 describe('effective autoflight truth', () => {
@@ -240,6 +280,25 @@ describe('effective autoflight truth', () => {
     expect(effective.thrustActive).toBe('SPEED');
     expect(effective.lateralActive).toBe('LNAV');
     expect(effective.verticalActive).toBe('VNAV_PTH');
+  });
+
+  it('keeps pre-TOD VNAV armed out of active pitch command truth', () => {
+    const aircraft = aircraftAtRoute(30_000);
+    const flightPlan = routeWithFutureDescentConstraint();
+    const routeStatus = routeStatusBeforeTod(aircraft, flightPlan);
+    const ap = makeAp();
+    ap.truth.lateralActive = 'LNAV';
+    ap.truth.verticalActive = 'VNAV';
+    ap.boeing.lnav = true;
+    ap.boeing.vnav = true;
+
+    const effective = deriveEffectiveAutoflightTruth(ap, { aircraft, flightPlan, routeStatus });
+
+    expect(effective.autopilotStatus).toBe('CMD_A');
+    expect(effective.lateralActive).toBe('LNAV');
+    expect(effective.verticalActive).toBe('OFF');
+    expect(effective.verticalArmed).toBe('VNAV');
+    expect((effective as { lateralOnly?: boolean }).lateralOnly).toBe(true);
   });
 
   it('derives ALT* near the active VNAV altitude constraint', () => {

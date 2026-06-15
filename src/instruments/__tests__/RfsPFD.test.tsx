@@ -468,7 +468,8 @@ describe('RfsPFD', () => {
 
     render(<RfsPFD />);
 
-    expect(screen.getByText('VNAV')).toBeTruthy();
+    expect(screen.getByLabelText('FMA pitch active').textContent).toBe('OFF');
+    expect(screen.getByRole('status', { name: 'PFD armed vertical mode' }).textContent).toBe('ARMED VNAV');
     expect(screen.queryByLabelText('Flight director pitch bar')).toBeNull();
   });
 

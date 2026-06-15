@@ -193,6 +193,16 @@ function deriveVerticalMode(
   return 'OFF';
 }
 
+function deriveVerticalArmedMode(
+  ap: AutopilotState,
+  vnav: VnavOutput | null,
+  verticalActive: VerticalMode,
+): VerticalMode | undefined {
+  if (verticalActive !== 'OFF') return undefined;
+  if (!ap.boeing.vnav || !VNAV_FAMILY.has(ap.truth.verticalActive)) return undefined;
+  return vnav?.available && vnav.verticalArmedMode === 'VNAV' ? 'VNAV' : undefined;
+}
+
 export function deriveEffectiveAutoflightTruth(
   apState: AutopilotState | null | undefined,
   context: EffectiveAutoflightTruthContext = {},
@@ -210,6 +220,7 @@ export function deriveEffectiveAutoflightTruth(
 
   const vnav = VNAV_FAMILY.has(apState.truth.verticalActive) ? resolveVnavOutput(apState, context) : null;
   const verticalActive = deriveVerticalMode(apState, vnav, context.aircraft);
+  const verticalArmed = deriveVerticalArmedMode(apState, vnav, verticalActive);
   const lateralActive = deriveLateralMode(apState, context.routeStatus);
   const lateralOnly = lateralActive !== 'OFF' && verticalActive === 'OFF';
   const baseTruth = omitManagedAltitudeCaptureMetadata(apState.truth);
@@ -220,6 +231,7 @@ export function deriveEffectiveAutoflightTruth(
     thrustActive,
     lateralActive,
     verticalActive,
+    verticalArmed,
     ...(lateralOnly ? { lateralOnly: true } : {}),
     ...vnavManagedAltitudeCaptureMetadata(vnav),
     ...vnavManagedSpeedMetadata(vnav),

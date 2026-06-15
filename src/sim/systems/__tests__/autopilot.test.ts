@@ -206,7 +206,8 @@ describe('computeAutopilotCommandsForState effective truth gating', () => {
     const truth = deriveEffectiveAutoflightTruth(ap, { aircraft: s, flightPlan, routeStatus });
     const commands = computeAutopilotCommandsForState(s, ap, flightPlan, 1 / 60, 0, routeStatus);
 
-    expect(truth.verticalActive).toBe('VNAV');
+    expect(truth.verticalActive).toBe('OFF');
+    expect(truth.verticalArmed).toBe('VNAV');
     expect(commands.elevator).toBeUndefined();
   });
 

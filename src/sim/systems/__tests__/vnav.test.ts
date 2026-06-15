@@ -126,7 +126,8 @@ describe('computeVNAV', () => {
 
     expect(v.available).toBe(true);
     expect(v.lifecycle).toBe('ARMED');
-    expect(v.verticalMode).toBe('VNAV');
+    expect(v.verticalMode).toBeNull();
+    expect(v.verticalArmedMode).toBe('VNAV');
     expect(v.targetAlt).toBe(12000);
     expect(v.targetWaypointIdent).toBe('BTG');
     expect(v.targetWaypointIndex).toBe(2);
