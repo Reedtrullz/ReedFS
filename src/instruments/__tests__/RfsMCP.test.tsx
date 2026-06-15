@@ -90,6 +90,31 @@ describe('RfsMCP', () => {
     expect(ap).toBeNull();
   });
 
+  it('allows takeoff N1 while keeping AP lateral and vertical modes unavailable on the roll', () => {
+    useSimStore.getState().startTakeoffRoll();
+    render(<RfsMCP />);
+
+    const n1 = screen.getByRole('button', { name: 'N1' });
+    expect(n1).toHaveAttribute('aria-disabled', 'false');
+    expect(n1).not.toHaveProperty('disabled', true);
+    for (const name of ['LNAV', 'ALT', 'VS']) {
+      const button = screen.getByRole('button', { name });
+      expect(button).toHaveAttribute('aria-disabled', 'true');
+      expect(button.getAttribute('title')).toMatch(/airborne|route|unavailable/i);
+    }
+
+    fireEvent.click(n1);
+
+    const ap = useSimStore.getState().apState;
+    expect(ap?.truth.autopilotStatus).toBe('OFF');
+    expect(ap?.truth.lateralActive).toBe('OFF');
+    expect(ap?.truth.verticalActive).toBe('OFF');
+    expect(ap?.truth.thrustActive).toBe('N1');
+    expect(ap?.boeing.cmdA).toBe(false);
+    expect(ap?.boeing.autothrottleArm).toBe(true);
+    expect(ap?.boeing.n1).toBe(true);
+  });
+
   it('toggles FD switches independently without clearing active MCP modes', () => {
     setAirborneRuntime();
     render(<RfsMCP />);

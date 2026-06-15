@@ -130,6 +130,28 @@ describe('effective autoflight truth', () => {
     expect(effectiveAutopilotIsEngaged(ap, { routeStatus: createNoRouteStatus() })).toBe(false);
   });
 
+  it('keeps A/T N1 effective when the autopilot channels are OFF', () => {
+    const ap = makeAp();
+    ap.truth.autopilotStatus = 'OFF';
+    ap.truth.lateralActive = 'OFF';
+    ap.truth.verticalActive = 'OFF';
+    ap.truth.thrustActive = 'N1';
+    ap.boeing.cmdA = false;
+    ap.boeing.lnav = false;
+    ap.boeing.vnav = false;
+    ap.boeing.speedMode = false;
+    ap.boeing.autothrottleArm = true;
+    ap.boeing.n1 = true;
+
+    const effective = deriveEffectiveAutoflightTruth(ap, { routeStatus: createNoRouteStatus() });
+
+    expect(effective.autopilotStatus).toBe('OFF');
+    expect(effective.lateralActive).toBe('OFF');
+    expect(effective.verticalActive).toBe('OFF');
+    expect(effective.thrustActive).toBe('N1');
+    expect(effectiveAutopilotIsEngaged(ap, { routeStatus: createNoRouteStatus() })).toBe(false);
+  });
+
   it('keeps backed CMD_A while rejecting unbacked mode flags', () => {
     const ap = makeAp();
     ap.boeing.speedMode = false;

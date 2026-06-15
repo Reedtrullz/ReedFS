@@ -117,6 +117,7 @@ export interface McpModeAvailability {
 export interface McpModeAvailabilityState {
   status: SimStore['status'];
   weightOnWheels: boolean;
+  autothrottleArmed: boolean;
   lnavAvailable: boolean;
   lnavUnavailableReason: string | null;
   vnavBackedMode: VerticalMode;
@@ -142,23 +143,34 @@ function deriveBackedVnavMode(
   return deriveEffectiveAutoflightTruth(probe, context).verticalActive;
 }
 
-function mcpFlightAvailabilityReason(state: McpModeAvailabilityState): string | null {
+function mcpGuidanceAvailabilityReason(state: McpModeAvailabilityState): string | null {
   if (state.status !== 'running') return 'start the simulator and get airborne first';
   if (state.weightOnWheels) return 'aircraft must be airborne';
   return null;
 }
 
+function mcpThrustAvailabilityReason(state: McpModeAvailabilityState): string | null {
+  if (state.status !== 'running') return 'start the simulator first';
+  if (!state.autothrottleArmed) return 'autothrottle must be armed';
+  return null;
+}
+
+function isThrustMode(mode: EnabledMcpMode): mode is 'SPEED' | 'N1' {
+  return mode === 'SPEED' || mode === 'N1';
+}
+
 export function mcpModeAvailability(state: McpModeAvailabilityState, mode: EnabledMcpMode): McpModeAvailability {
   if (mode === 'OFF') return { available: true, reason: null };
 
-  const flightReason = mcpFlightAvailabilityReason(state);
+  const thrustReason = isThrustMode(mode) ? mcpThrustAvailabilityReason(state) : null;
+  const guidanceReason = isThrustMode(mode) ? null : mcpGuidanceAvailabilityReason(state);
   const routeReason = mode === 'LNAV' && !state.lnavAvailable
     ? `LNAV unavailable: ${state.lnavUnavailableReason ?? 'route guidance unavailable'}`
     : null;
   const vnavReason = mode === 'VNAV' && state.vnavBackedMode === 'OFF'
     ? 'VNAV unavailable: no active altitude constraint'
     : null;
-  const reasons = [flightReason, routeReason, vnavReason].filter((reason): reason is string => Boolean(reason));
+  const reasons = [thrustReason, guidanceReason, routeReason, vnavReason].filter((reason): reason is string => Boolean(reason));
   return {
     available: reasons.length === 0,
     reason: reasons.length > 0 ? reasons.join('; ') : null,
@@ -206,6 +218,7 @@ export function selectMcpViewModel(s: SimStore): McpViewModel {
   const availabilityState: McpModeAvailabilityState = {
     status: s.status,
     weightOnWheels: s.aircraft.ground.weightOnWheels,
+    autothrottleArmed: displayApState.boeing.autothrottleArm,
     lnavAvailable,
     lnavUnavailableReason: s.routeStatus.lnavUnavailableReason,
     vnavBackedMode: backedVnavMode,
