@@ -152,6 +152,25 @@ describe('computeAutopilotCommandsForState effective truth gating', () => {
     expect(commands.throttle2).toBeUndefined();
   });
 
+  it('does not command elevator for lateral-only CMD_A with PITCH OFF', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.position.alt = 5000;
+    s.velocity.u = 128.6;
+    const ap = makeAp('LNAV', 'OFF', 'SPEED');
+    ap.boeing.lnav = true;
+    ap.boeing.speedMode = true;
+    ap.boeing.autothrottleArm = true;
+    const flightPlan = routeWithFutureDescentConstraint();
+    const routeStatus = routeStatusBeforeTod();
+
+    const commands = computeAutopilotCommandsForState(s, ap, flightPlan, 1 / 60, 0, routeStatus);
+
+    expect(commands.aileron).toBeDefined();
+    expect(commands.elevator).toBeUndefined();
+    expect(commands.throttle1).toBeDefined();
+    expect(commands.throttle2).toBe(commands.throttle1);
+  });
+
   it('keeps VNAV armed before TOD without commanding pitch or falling back to MCP altitude', () => {
     const s = createInitialState(B737_800_SPEC);
     s.position.alt = 30000;

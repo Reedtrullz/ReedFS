@@ -141,6 +141,28 @@ describe('RfsMCP', () => {
     expect(ap?.boeing.n1).toBe(true);
   });
 
+  it('labels CMD_A LNAV/SPEED with PITCH OFF as lateral-only on the MCP', () => {
+    setVnavBackedKseaRoute();
+    const ap = createDefaultAutopilotState();
+    ap.truth.autopilotStatus = 'CMD_A';
+    ap.truth.lateralActive = 'LNAV';
+    ap.truth.verticalActive = 'OFF';
+    ap.truth.thrustActive = 'SPEED';
+    ap.boeing.cmdA = true;
+    ap.boeing.lnav = true;
+    ap.boeing.speedMode = true;
+    ap.boeing.vnav = false;
+    ap.boeing.altHold = false;
+    ap.boeing.vs = false;
+    useSimStore.getState().setApState(ap);
+
+    render(<RfsMCP />);
+
+    expect(screen.getByRole('status', { name: 'Autopilot authority warning' })).toHaveTextContent(
+      'AP lateral only — no pitch authority',
+    );
+  });
+
   it('toggles FD switches independently without clearing active MCP modes', () => {
     setAirborneRuntime();
     render(<RfsMCP />);

@@ -17,6 +17,7 @@ export type ManagedAltitudeCaptureTruth = AutoflightTruthState & {
   captureTargetAltFt?: number;
   managedSpeedKt?: VnavOutput['managedSpeedKt'];
   managedSpeedSource?: VnavOutput['managedSpeedSource'];
+  lateralOnly?: boolean;
 };
 
 function omitManagedAltitudeCaptureMetadata(truth: AutoflightTruthState): AutoflightTruthState {
@@ -25,6 +26,7 @@ function omitManagedAltitudeCaptureMetadata(truth: AutoflightTruthState): Autofl
   delete baseTruth.captureTargetAltFt;
   delete baseTruth.managedSpeedKt;
   delete baseTruth.managedSpeedSource;
+  delete baseTruth.lateralOnly;
   return baseTruth;
 }
 
@@ -75,6 +77,10 @@ export function offAutoflightTruth(apState: AutopilotState | null | undefined): 
     lastModeChangeTimestamps: apState?.truth.lastModeChangeTimestamps ?? { thrust: 0, lateral: 0, vertical: 0 },
     vsEntry: apState?.truth.vsEntry,
   };
+}
+
+export function isAutoflightLateralOnly(truth: AutoflightTruthState): boolean {
+  return Boolean((truth as ManagedAltitudeCaptureTruth).lateralOnly);
 }
 
 function autopilotStatusIsBacked(ap: AutopilotState): boolean {
@@ -159,14 +165,17 @@ export function deriveEffectiveAutoflightTruth(
 
   const vnav = VNAV_FAMILY.has(apState.truth.verticalActive) ? resolveVnavOutput(apState, context) : null;
   const verticalActive = deriveVerticalMode(apState, vnav);
+  const lateralActive = deriveLateralMode(apState, context.routeStatus);
+  const lateralOnly = lateralActive !== 'OFF' && verticalActive === 'OFF';
   const baseTruth = omitManagedAltitudeCaptureMetadata(apState.truth);
 
   return {
     ...baseTruth,
     autopilotStatus: apState.truth.autopilotStatus,
     thrustActive,
-    lateralActive: deriveLateralMode(apState, context.routeStatus),
+    lateralActive,
     verticalActive,
+    ...(lateralOnly ? { lateralOnly: true } : {}),
     ...vnavManagedAltitudeCaptureMetadata(vnav),
     ...vnavManagedSpeedMetadata(vnav),
   };

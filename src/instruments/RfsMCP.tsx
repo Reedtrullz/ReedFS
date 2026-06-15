@@ -10,6 +10,7 @@ import {
   type McpModeAvailabilityState,
 } from '../store/selectors';
 import { hasFlightDirectorGuidanceTarget, resolveGuidanceTargets } from '../sim/systems/guidanceTargets';
+import { deriveEffectiveAutoflightTruth, isAutoflightLateralOnly } from '../sim/systems/effectiveAutoflightTruth';
 
 export { mcpModeAvailability };
 export type { EnabledMcpMode, McpModeAvailability, McpModeAvailabilityState };
@@ -130,6 +131,11 @@ export function RfsMCP() {
     });
     return !hasFlightDirectorGuidanceTarget(sharedTargets);
   });
+  const lateralOnlyAuthority = useSimStore((s) => isAutoflightLateralOnly(deriveEffectiveAutoflightTruth(s.apState, {
+    aircraft: s.aircraft,
+    flightPlan: s.flightPlan,
+    routeStatus: s.routeStatus,
+  })));
 
   const toggleMode = (mode: EnabledMcpMode) => {
     const state = useSimStore.getState();
@@ -191,6 +197,11 @@ export function RfsMCP() {
       {fdGuidanceUnavailable && (
         <div role="status" style={advisoryStyle}>
           FD guidance unavailable until supported mode selected
+        </div>
+      )}
+      {lateralOnlyAuthority && (
+        <div role="status" aria-label="Autopilot authority warning" style={advisoryStyle}>
+          AP lateral only — no pitch authority
         </div>
       )}
       <div aria-label="Flight Director switches" style={{ marginBottom: 4 }}>

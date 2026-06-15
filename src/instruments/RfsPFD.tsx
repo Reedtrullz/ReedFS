@@ -34,6 +34,7 @@ import {
   resolveGuidanceTargets,
   type SharedGuidanceTargets,
 } from '../sim/systems/guidanceTargets';
+import { isAutoflightLateralOnly } from '../sim/systems/effectiveAutoflightTruth';
 import { maybeFindPerformanceCardForScenario, type B737VSpeeds } from '../sim/data/performance/b737PerformanceCards';
 import type { AircraftState } from '../sim/types';
 import type { FlightPlan } from '@shared/types/fmc';
@@ -504,6 +505,7 @@ export function RfsPFD() {
     flightPlan,
     routeStatus,
   });
+  const lateralOnlyAuthority = isAutoflightLateralOnly(sharedGuidanceTargets.truth);
   const fdCue = deriveFlightDirectorCue({
     enabled: flightDirectorEnabled,
     lateralMode,
@@ -553,6 +555,23 @@ export function RfsPFD() {
         <FmaCell label="PITCH" value={verticalMode} />
         <FmaCell label="AP" value={autopilotMode} />
       </div>
+      {lateralOnlyAuthority && (
+        <div
+          role="status"
+          aria-label="Autopilot authority warning"
+          style={{
+            borderBottom: '1px solid rgba(255,216,74,0.42)',
+            background: 'rgba(80,48,0,0.46)',
+            color: '#ffd84a',
+            padding: '5px 10px',
+            fontSize: 12,
+            fontWeight: 900,
+            letterSpacing: 0.6,
+          }}
+        >
+          AP LATERAL ONLY — NO PITCH AUTHORITY
+        </div>
+      )}
       <McpTargetStrip
         visible={hasMcpTargets}
         speed={displaySpeed}

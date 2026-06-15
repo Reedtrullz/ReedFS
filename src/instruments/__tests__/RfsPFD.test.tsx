@@ -545,6 +545,29 @@ describe('RfsPFD', () => {
     expect(screen.getByText('CMD_A')).toBeTruthy();
   });
 
+  it('labels CMD_A with PITCH OFF as lateral-only with no pitch authority on the PFD', () => {
+    setAircraftOnKseaRoute();
+    const ap = apStateWithModes();
+    ap.truth.lateralActive = 'LNAV';
+    ap.truth.verticalActive = 'OFF';
+    ap.truth.thrustActive = 'SPEED';
+    ap.boeing.lnav = true;
+    ap.boeing.vnav = false;
+    ap.boeing.altHold = false;
+    ap.boeing.vs = false;
+    ap.boeing.speedMode = true;
+    useSimStore.getState().setApState(ap);
+
+    render(<RfsPFD />);
+
+    expect(screen.getByText('CMD_A')).toBeTruthy();
+    expect(screen.getByText('OFF')).toBeTruthy();
+    expect(screen.getByRole('status', { name: 'Autopilot authority warning' }).textContent).toBe(
+      'AP LATERAL ONLY — NO PITCH AUTHORITY',
+    );
+    expect(screen.queryByLabelText('Flight director pitch bar')).toBeNull();
+  });
+
   it('shows N1 as an honest FMA thrust mode when truth state is N1', () => {
     const ap = apStateWithModes();
     ap.truth.thrustActive = 'N1';

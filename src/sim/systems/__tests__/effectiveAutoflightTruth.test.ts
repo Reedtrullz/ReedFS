@@ -152,6 +152,30 @@ describe('effective autoflight truth', () => {
     expect(effectiveAutopilotIsEngaged(ap, { routeStatus: createNoRouteStatus() })).toBe(false);
   });
 
+  it('labels CMD_A LNAV/SPEED with PITCH OFF as lateral-only instead of full AP control', () => {
+    const aircraft = aircraftAtRoute();
+    const flightPlan = constrainedRoute();
+    const routeStatus = computeRouteStatus(aircraft, flightPlan, 0);
+    const ap = makeAp();
+    ap.truth.lateralActive = 'LNAV';
+    ap.truth.verticalActive = 'OFF';
+    ap.truth.thrustActive = 'SPEED';
+    ap.boeing.cmdA = true;
+    ap.boeing.lnav = true;
+    ap.boeing.vnav = false;
+    ap.boeing.altHold = false;
+    ap.boeing.vs = false;
+    ap.boeing.speedMode = true;
+
+    const effective = deriveEffectiveAutoflightTruth(ap, { aircraft, flightPlan, routeStatus }) as ReturnType<typeof deriveEffectiveAutoflightTruth> & { lateralOnly?: boolean };
+
+    expect(effective.autopilotStatus).toBe('CMD_A');
+    expect(effective.lateralActive).toBe('LNAV');
+    expect(effective.verticalActive).toBe('OFF');
+    expect(effective.thrustActive).toBe('SPEED');
+    expect(effective.lateralOnly).toBe(true);
+  });
+
   it('keeps backed CMD_A while rejecting unbacked mode flags', () => {
     const ap = makeAp();
     ap.boeing.speedMode = false;

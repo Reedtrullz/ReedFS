@@ -159,6 +159,30 @@ describe('resolveGuidanceTargets', () => {
     expect(shared.thrust).toBeNull();
   });
 
+  it('keeps lateral-only CMD_A from exposing any vertical AP target', () => {
+    const aircraft = aircraftAtRoute();
+    const ap = apState();
+    ap.truth.lateralActive = 'LNAV';
+    ap.truth.verticalActive = 'OFF';
+    ap.truth.thrustActive = 'SPEED';
+    ap.boeing.lnav = true;
+    ap.boeing.vnav = false;
+    ap.boeing.altHold = false;
+    ap.boeing.vs = false;
+    ap.boeing.speedMode = true;
+    const flightPlan = routeWithVnavPathConstraint();
+    const routeStatus = computeRouteStatus(aircraft, flightPlan, 0);
+
+    const shared = resolveGuidanceTargets({ aircraft, apState: ap, flightPlan, routeStatus });
+
+    expect(shared.truth.autopilotStatus).toBe('CMD_A');
+    expect(shared.truth.lateralActive).toBe('LNAV');
+    expect(shared.truth.verticalActive).toBe('OFF');
+    expect(shared.lateral?.mode).toBe('LNAV');
+    expect(shared.thrust?.mode).toBe('SPEED');
+    expect(shared.vertical).toBeNull();
+  });
+
   it('filters shared guidance down to finite supported Flight Director targets', () => {
     const sharedTargets = {
       truth: {
