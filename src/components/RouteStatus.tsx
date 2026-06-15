@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react';
+import type { ApproachHandoff } from '../sim/systems/navigation';
 import { useSimStore } from '../store/simStore';
 
 const panelStyle: CSSProperties = {
@@ -64,6 +65,26 @@ function formatEtaMinutes(minutes: number | null): string | null {
     : null;
 }
 
+function approachHandoffText(routeStatus: { approachHandoff: ApproachHandoff; nextWaypointIdent: string | null }): string | null {
+  switch (routeStatus.approachHandoff) {
+    case 'final':
+      return `Final ${routeStatus.nextWaypointIdent ?? 'approach fix'}`;
+    case 'threshold':
+      return `Threshold ${routeStatus.nextWaypointIdent ?? 'runway'}`;
+    default:
+      return null;
+  }
+}
+
+function ApproachHandoffReadback({ text }: { text: string }) {
+  return (
+    <div style={{ color: '#7dffb2', fontSize: 12, lineHeight: 1.45, marginTop: 10 }}>
+      <div style={labelStyle}>Approach handoff</div>
+      <div style={{ color: '#e8f8ff', fontSize: 14, fontWeight: 900, marginTop: 4 }}>{text}</div>
+    </div>
+  );
+}
+
 export function RouteStatus() {
   const routeStatus = useSimStore((s) => s.routeStatus);
   const distanceText = formatDistanceNm(routeStatus.distanceToNextNm);
@@ -76,13 +97,16 @@ export function RouteStatus() {
     ? `${routeStatus.fromIdent} → ${routeStatus.nextWaypointIdent}`
     : routeStatus.nextWaypointIdent;
   const unavailableReason = routeStatus.lnavUnavailableReason ?? 'unknown route status';
+  const handoffText = approachHandoffText(routeStatus);
 
   return (
     <section aria-label="Route status" aria-live="polite" style={panelStyle}>
       <div style={labelStyle}>Route status</div>
       <div style={routeNameStyle}>{routeStatus.routeName}</div>
 
-      {routeStatus.routeComplete ? (
+      {routeStatus.routeComplete && handoffText ? (
+        <ApproachHandoffReadback text={handoffText} />
+      ) : routeStatus.routeComplete ? (
         <div style={{ color: '#7dffb2', fontSize: 12, lineHeight: 1.45, marginTop: 10 }}>
           Arrived — route complete
         </div>
@@ -97,6 +121,7 @@ export function RouteStatus() {
               {activeLegText}
             </div>
           )}
+          {handoffText && <ApproachHandoffReadback text={handoffText} />}
           {distanceText && (
             <div style={rowStyle}>
               <span style={labelStyle}>DTG</span>

@@ -8,6 +8,7 @@ import {
 } from '../navigation';
 import { createInitialState, B737_800_SPEC } from '../../types';
 import type { FlightPlan } from '@shared/types/fmc';
+import { KPDX_RUNWAY_10R_APPROACH } from '../../../viewport/runwayData';
 
 function makeState(lat: number, lon: number, speedMps = 100) {
   const state = createInitialState(B737_800_SPEC);
@@ -267,6 +268,7 @@ describe('computeRouteStatus', () => {
 
     expect(status.routeValid).toBe(true);
     expect(status.routeComplete).toBe(true);
+    expect(status.approachHandoff).toBe('complete');
     expect(status.lnavAvailable).toBe(false);
     expect(status.lnavUnavailableReason).toMatch(/route complete/i);
     expect(status.activeLegIndex).toBe(1);
@@ -274,6 +276,69 @@ describe('computeRouteStatus', () => {
     expect(status.nextWaypointIdent).toBe('DEST');
     expect(status.waypointReached).toBe(true);
     expect(routeStatusToNavOutput(status)).toBeNull();
+  });
+
+  it('marks route complete at a runway threshold with a landing-aware threshold handoff', () => {
+    const approach = KPDX_RUNWAY_10R_APPROACH;
+    const fp = makePlan([
+      { ident: 'BTG', lat: 45.75, lon: -122.59, discontinuity: false },
+      {
+        ident: approach.finalApproachFix.ident,
+        lat: approach.finalApproachFix.point.lat,
+        lon: approach.finalApproachFix.point.lon,
+        discontinuity: false,
+        legType: 'TF',
+      },
+      {
+        ident: approach.threshold.ident,
+        lat: approach.threshold.point.lat,
+        lon: approach.threshold.point.lon,
+        discontinuity: false,
+        legType: 'RW',
+      },
+    ]);
+    const state = makeState(approach.threshold.point.lat, approach.threshold.point.lon, 72);
+
+    const status = computeRouteStatus(state, fp, 1, { captureRadiusM: 100 });
+
+    expect(status.routeValid).toBe(true);
+    expect(status.routeComplete).toBe(true);
+    expect(status.lnavAvailable).toBe(false);
+    expect(status.approachHandoff).toBe('threshold');
+    expect(status.activeLegIndex).toBe(1);
+    expect(status.fromIdent).toBe(approach.finalApproachFix.ident);
+    expect(status.nextWaypointIdent).toBe(approach.threshold.ident);
+    expect(status.waypointReached).toBe(true);
+    expect(routeStatusToNavOutput(status)).toBeNull();
+  });
+
+  it('reports final approach handoff while tracking the FAF leg before route completion', () => {
+    const approach = KPDX_RUNWAY_10R_APPROACH;
+    const fp = makePlan([
+      { ident: 'BTG', lat: 45.75, lon: -122.59, discontinuity: false },
+      {
+        ident: approach.finalApproachFix.ident,
+        lat: approach.finalApproachFix.point.lat,
+        lon: approach.finalApproachFix.point.lon,
+        discontinuity: false,
+        legType: 'TF',
+      },
+      {
+        ident: approach.threshold.ident,
+        lat: approach.threshold.point.lat,
+        lon: approach.threshold.point.lon,
+        discontinuity: false,
+        legType: 'RW',
+      },
+    ]);
+    const state = makeState(45.745, -122.60, 100);
+
+    const status = computeRouteStatus(state, fp, 0, { captureRadiusM: 100 });
+
+    expect(status.routeComplete).toBe(false);
+    expect(status.lnavAvailable).toBe(true);
+    expect(status.approachHandoff).toBe('final');
+    expect(status.nextWaypointIdent).toBe(approach.finalApproachFix.ident);
   });
 
   it('marks the route complete after passing the final waypoint outside capture radius', () => {

@@ -18,10 +18,13 @@ export interface NavOutput {
   waypointReached: boolean;
 }
 
+export type ApproachHandoff = 'none' | 'final' | 'threshold' | 'complete';
+
 export interface RouteStatusSnapshot {
   routeName: string;
   routeValid: boolean;
   routeComplete: boolean;
+  approachHandoff: ApproachHandoff;
   lnavAvailable: boolean;
   lnavUnavailableReason: string | null;
   activeLegIndex: number | null;
@@ -61,6 +64,7 @@ interface RouteLeg {
   toWaypointIndex: number;
   fromIdent: string | null;
   toIdent: string;
+  toLegType: string | null;
   fromLat: number | null;
   fromLon: number | null;
   toLat: number;
@@ -134,6 +138,7 @@ function validateAndBuildLegs(flightPlan: FlightPlan | null | undefined): RouteV
         toWaypointIndex: 0,
         fromIdent: null,
         toIdent: only.ident,
+        toLegType: only.legType ?? null,
         fromLat: null,
         fromLon: null,
         toLat: only.lat as number,
@@ -153,6 +158,7 @@ function validateAndBuildLegs(flightPlan: FlightPlan | null | undefined): RouteV
       toWaypointIndex: waypointIndex,
       fromIdent: from.ident,
       toIdent: to.ident,
+      toLegType: to.legType ?? null,
       fromLat: from.lat as number,
       fromLon: from.lon as number,
       toLat: to.lat as number,
@@ -286,6 +292,14 @@ function sequencingReasonForLeg(
   return distanceToWaypointM <= boundedLeadM ? 'turnAnticipation' : null;
 }
 
+function approachHandoffForLeg(leg: RouteLeg, routeComplete: boolean): ApproachHandoff {
+  const toIdent = leg.toIdent.toUpperCase();
+  const toLegType = leg.toLegType?.toUpperCase() ?? null;
+  if (toLegType === 'RW' || toIdent.endsWith('_RWY')) return 'threshold';
+  if (toIdent.endsWith('_FAF')) return 'final';
+  return routeComplete ? 'complete' : 'none';
+}
+
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
@@ -298,6 +312,7 @@ export function createNoRouteStatus(
     routeName: routeNameFor(flightPlan),
     routeValid: false,
     routeComplete: false,
+    approachHandoff: 'none',
     lnavAvailable: false,
     lnavUnavailableReason: reason,
     activeLegIndex: null,
@@ -443,11 +458,13 @@ export function computeRouteStatus(
       captureRadiusM,
       turnAnticipationEnabled,
     ) !== null;
+  const approachHandoff = approachHandoffForLeg(leg, routeComplete);
 
   return {
     routeName: route.routeName,
     routeValid: true,
     routeComplete,
+    approachHandoff,
     lnavAvailable: !routeComplete,
     lnavUnavailableReason: routeComplete ? 'route complete' : null,
     activeLegIndex: leg.legIndex,
