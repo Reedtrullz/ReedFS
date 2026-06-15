@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createDirectFlight, createKseaKpdxFlight, createKseaKpdxRouteSource } from '../../flightPlanLoader';
+import { B737_800_SPEC, createInitialState } from '../../types';
+import { computeRouteStatus } from '../../systems/navigation';
 import {
   createRouteEditSession,
   createRouteSourceFromFlightPlan,
@@ -66,6 +68,19 @@ describe('RFMS route adapter seam', () => {
     const executed = executeRouteDraft(edited);
     expect(executed.active.waypoints[2]).toEqual(discontinuity);
     expect(executed.active.route).toBe(`KSEA OLM DISCONTINUITY BTG ${kpdxApproachTail().join(' ')}`);
+
+    const aircraft = createInitialState(B737_800_SPEC);
+    aircraft.position = {
+      lat: executed.active.waypoints[0].lat!,
+      lon: executed.active.waypoints[0].lon!,
+      alt: 432,
+    };
+    aircraft.velocity.u = 100;
+    const status = computeRouteStatus(aircraft, executed.active, 0);
+    expect(status.routeValid).toBe(true);
+    expect(status.lnavAvailable).toBe(true);
+    expect(status.nextWaypointIdent).toBe('OLM');
+    expect(status.lnavUnavailableReason).toBeNull();
   });
 
   it('wraps arbitrary FlightPlan sources so canned routes are not the whole FMS boundary', () => {

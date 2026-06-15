@@ -75,6 +75,7 @@ interface RouteValidationResult {
   routeName: string;
   legs: RouteLeg[];
   unavailableReason: string | null;
+  discontinuityBoundaryReason: string | null;
 }
 
 type SequencingReason = 'capture' | 'passed' | 'turnAnticipation' | null;
@@ -110,8 +111,11 @@ function routeNameFor(flightPlan: FlightPlan | null | undefined): string {
   return `${origin}→${destination}`;
 }
 
+function discontinuityReason(waypoint: FlightPlanWaypoint, index: number): string {
+  return `route discontinuity at waypoint ${waypoint.ident || index}`;
+}
+
 function waypointCoordReason(waypoint: FlightPlanWaypoint, index: number): string | null {
-  if (waypoint.discontinuity) return `route discontinuity at waypoint ${waypoint.ident || index}`;
   if (!isFiniteNumber(waypoint.lat) || !isFiniteNumber(waypoint.lon)) {
     return `missing coordinates for waypoint ${waypoint.ident || index}`;
   }
@@ -120,16 +124,37 @@ function waypointCoordReason(waypoint: FlightPlanWaypoint, index: number): strin
 
 function validateAndBuildLegs(flightPlan: FlightPlan | null | undefined): RouteValidationResult {
   const routeName = routeNameFor(flightPlan);
-  if (!flightPlan) return { routeName, legs: [], unavailableReason: 'no flight plan loaded' };
-  if (flightPlan.waypoints.length === 0) return { routeName, legs: [], unavailableReason: 'flight plan has no waypoints' };
-
-  for (let index = 0; index < flightPlan.waypoints.length; index++) {
-    const reason = waypointCoordReason(flightPlan.waypoints[index], index);
-    if (reason) return { routeName, legs: [], unavailableReason: reason };
+  if (!flightPlan) {
+    return { routeName, legs: [], unavailableReason: 'no flight plan loaded', discontinuityBoundaryReason: null };
+  }
+  if (flightPlan.waypoints.length === 0) {
+    return { routeName, legs: [], unavailableReason: 'flight plan has no waypoints', discontinuityBoundaryReason: null };
   }
 
-  if (flightPlan.waypoints.length === 1) {
-    const only = flightPlan.waypoints[0];
+  const firstDiscontinuityIndex = flightPlan.waypoints.findIndex((waypoint) => waypoint.discontinuity);
+  const discontinuityBoundaryReason = firstDiscontinuityIndex >= 0
+    ? discontinuityReason(flightPlan.waypoints[firstDiscontinuityIndex], firstDiscontinuityIndex)
+    : null;
+  const usableWaypoints = firstDiscontinuityIndex >= 0
+    ? flightPlan.waypoints.slice(0, firstDiscontinuityIndex)
+    : flightPlan.waypoints;
+
+  for (let index = 0; index < usableWaypoints.length; index++) {
+    const reason = waypointCoordReason(usableWaypoints[index], index);
+    if (reason) return { routeName, legs: [], unavailableReason: reason, discontinuityBoundaryReason: null };
+  }
+
+  if (usableWaypoints.length === 0) {
+    return {
+      routeName,
+      legs: [],
+      unavailableReason: discontinuityBoundaryReason ?? 'flight plan has no usable legs',
+      discontinuityBoundaryReason: null,
+    };
+  }
+
+  if (usableWaypoints.length === 1) {
+    const only = usableWaypoints[0];
     return {
       routeName,
       legs: [{
@@ -145,13 +170,14 @@ function validateAndBuildLegs(flightPlan: FlightPlan | null | undefined): RouteV
         toLon: only.lon as number,
       }],
       unavailableReason: null,
+      discontinuityBoundaryReason,
     };
   }
 
   const legs: RouteLeg[] = [];
-  for (let waypointIndex = 1; waypointIndex < flightPlan.waypoints.length; waypointIndex++) {
-    const from = flightPlan.waypoints[waypointIndex - 1];
-    const to = flightPlan.waypoints[waypointIndex];
+  for (let waypointIndex = 1; waypointIndex < usableWaypoints.length; waypointIndex++) {
+    const from = usableWaypoints[waypointIndex - 1];
+    const to = usableWaypoints[waypointIndex];
     legs.push({
       legIndex: legs.length,
       fromWaypointIndex: waypointIndex - 1,
@@ -170,6 +196,7 @@ function validateAndBuildLegs(flightPlan: FlightPlan | null | undefined): RouteV
     routeName,
     legs,
     unavailableReason: legs.length > 0 ? null : 'flight plan has no usable legs',
+    discontinuityBoundaryReason,
   };
 }
 
@@ -450,7 +477,7 @@ export function computeRouteStatus(
   const turnAnticipationDistanceM = computeTurnAnticipationDistanceM(speedMps, turnAngleRad);
   const turnAnticipationDistanceNm = turnAnticipationDistanceM === null ? null : turnAnticipationDistanceM / M_PER_NM;
   const waypointReached = distanceToNextM <= captureRadiusM;
-  const routeComplete = legIndex === legs.length - 1
+  const reachedSegmentEnd = legIndex === legs.length - 1
     && sequencingReasonForLeg(
       state,
       leg,
@@ -458,15 +485,22 @@ export function computeRouteStatus(
       captureRadiusM,
       turnAnticipationEnabled,
     ) !== null;
+  const blockedByDiscontinuity = reachedSegmentEnd && route.discontinuityBoundaryReason !== null;
+  const routeComplete = reachedSegmentEnd && !blockedByDiscontinuity;
   const approachHandoff = approachHandoffForLeg(leg, routeComplete);
+  const lnavUnavailableReason = routeComplete
+    ? 'route complete'
+    : blockedByDiscontinuity
+      ? route.discontinuityBoundaryReason
+      : null;
 
   return {
     routeName: route.routeName,
     routeValid: true,
     routeComplete,
     approachHandoff,
-    lnavAvailable: !routeComplete,
-    lnavUnavailableReason: routeComplete ? 'route complete' : null,
+    lnavAvailable: lnavUnavailableReason === null,
+    lnavUnavailableReason,
     activeLegIndex: leg.legIndex,
     activeLegCount: legs.length,
     fromWaypointIndex: leg.fromWaypointIndex,

@@ -785,7 +785,7 @@ describe('resolveAutopilotTargets LNAV', () => {
     expect(targets.targetHeadingRad).toBeCloseTo(Math.PI / 2, 1);
   });
 
-  it('keeps current heading when route status marks LNAV unavailable for a discontinuity', () => {
+  it('keeps current heading when route status marks LNAV unavailable at a discontinuity boundary', () => {
     const s = createInitialState(B737_800_SPEC);
     s.position.lat = 47.1;
     s.position.lon = -122.0;
@@ -795,15 +795,16 @@ describe('resolveAutopilotTargets LNAV', () => {
       origin: 'ORIG',
       destination: 'DEST',
       flightNumber: 'TST456',
-      route: 'ORIG DISCO DEST',
+      route: 'ORIG MID DISCO DEST',
       waypoints: [
         { ident: 'ORIG', lat: 47.0, lon: -122.0, discontinuity: false },
+        { ident: 'MID', lat: 47.1, lon: -122.0, discontinuity: false },
         { ident: 'DISCO', discontinuity: true },
         { ident: 'DEST', lat: 47.1, lon: -121.9, discontinuity: false },
       ],
     };
 
-    const targets = resolveAutopilotTargets(s, ap, fp, 1);
+    const targets = resolveAutopilotTargets(s, ap, fp, 0);
 
     expect(targets.targetHeadingRad).toBeCloseTo(s.attitude.psi, 12);
   });

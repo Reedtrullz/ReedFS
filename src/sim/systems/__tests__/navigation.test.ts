@@ -623,19 +623,62 @@ describe('computeRouteStatus', () => {
     expect(status.nextWaypointIdent).toBeNull();
   });
 
-  it('does not skip discontinuities when building route legs', () => {
+  it('allows LNAV on valid legs before the first route discontinuity', () => {
     const fp = makePlan([
       { ident: 'ORIG', lat: 47.0, lon: -122.0, discontinuity: false },
+      { ident: 'MID', lat: 47.1, lon: -122.0, discontinuity: false },
       { ident: 'DISCO', discontinuity: true },
       { ident: 'DEST', lat: 47.2, lon: -122.0, discontinuity: false },
     ]);
-    const state = makeState(47.0, -122.0);
+    const state = makeState(47.05, -122.0);
 
     const status = computeRouteStatus(state, fp, 0);
 
-    expect(status.routeValid).toBe(false);
+    expect(status.routeValid).toBe(true);
+    expect(status.lnavAvailable).toBe(true);
+    expect(status.lnavUnavailableReason).toBeNull();
+    expect(status.activeLegIndex).toBe(0);
+    expect(status.activeLegCount).toBe(1);
+    expect(status.fromIdent).toBe('ORIG');
+    expect(status.nextWaypointIdent).toBe('MID');
+    expect(routeStatusToNavOutput(status)).not.toBeNull();
+  });
+
+  it('ignores missing coordinates beyond the first discontinuity while guiding the valid prefix', () => {
+    const fp = makePlan([
+      { ident: 'ORIG', lat: 47.0, lon: -122.0, discontinuity: false },
+      { ident: 'MID', lat: 47.1, lon: -122.0, discontinuity: false },
+      { ident: 'DISCO', discontinuity: true },
+      { ident: 'BROKEN', discontinuity: false },
+    ]);
+    const state = makeState(47.05, -122.0);
+
+    const status = computeRouteStatus(state, fp, 0);
+
+    expect(status.routeValid).toBe(true);
+    expect(status.lnavAvailable).toBe(true);
+    expect(status.lnavUnavailableReason).toBeNull();
+    expect(status.nextWaypointIdent).toBe('MID');
+  });
+
+  it('stops LNAV at the first discontinuity boundary instead of calling the route complete', () => {
+    const fp = makePlan([
+      { ident: 'ORIG', lat: 47.0, lon: -122.0, discontinuity: false },
+      { ident: 'MID', lat: 47.1, lon: -122.0, discontinuity: false },
+      { ident: 'DISCO', discontinuity: true },
+      { ident: 'DEST', lat: 47.2, lon: -122.0, discontinuity: false },
+    ]);
+    const state = makeState(47.1, -122.0);
+
+    const status = computeRouteStatus(state, fp, 0, { captureRadiusM: 100 });
+
+    expect(status.routeValid).toBe(true);
+    expect(status.routeComplete).toBe(false);
     expect(status.lnavAvailable).toBe(false);
     expect(status.lnavUnavailableReason).toMatch(/discontinuity.*DISCO/i);
-    expect(status.nextWaypointIdent).toBeNull();
+    expect(status.activeLegIndex).toBe(0);
+    expect(status.nextWaypointIdent).toBe('MID');
+    expect(status.waypointReached).toBe(true);
+    expect(routeStatusToNavOutput(status)).toBeNull();
   });
 });
