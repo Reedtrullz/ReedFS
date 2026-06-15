@@ -108,6 +108,63 @@ describe('computeVNAV', () => {
     expect(v.lifecycle).toBe('SPEED_ONLY');
   });
 
+  it('resolves speed-only and later altitude VNAV targets independently', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.position.alt = 30000;
+    s.velocity.u = 128.6;
+    const fp: FlightPlan = {
+      origin: 'KSEA',
+      destination: 'KPDX',
+      flightNumber: 'TST217',
+      route: 'KSEA SPD ALT KPDX',
+      waypoints: [
+        {
+          ident: 'SPD',
+          lat: 47.0,
+          lon: -122.0,
+          discontinuity: false,
+          speedConstraint: { type: 'AT_OR_BELOW', speed: 240 },
+        },
+        {
+          ident: 'ALT',
+          lat: 46.0,
+          lon: -122.0,
+          discontinuity: false,
+          altitudeConstraint: { type: 'AT_OR_BELOW', altitude: 12000 },
+        },
+        { ident: 'KPDX', lat: 45.59, lon: -122.6, discontinuity: false },
+      ],
+    };
+
+    const v = computeVNAV(s, fp, { ...navOut, activeWaypointIndex: 0, alongTrackDist: 140 * M_PER_NM }) as ReturnType<typeof computeVNAV> & {
+      altitudeTargetWaypointIndex?: number;
+      altitudeTargetWaypointIdent?: string;
+      speedTargetWaypointIndex?: number;
+      speedTargetWaypointIdent?: string;
+    };
+
+    expect(v.available).toBe(true);
+    expect(v.speedConstraint).toBe(true);
+    expect(v.targetSpeedKt).toBe(240);
+    expect(v.managedSpeedKt).toBe(240);
+    expect(v.managedSpeedSource).toBe('VNAV_SPEED_CONSTRAINT');
+    expect(v.speedTargetWaypointIdent).toBe('SPD');
+    expect(v.speedTargetWaypointIndex).toBe(0);
+    expect(v.altitudeConstraint).toBe(true);
+    expect(v.targetAlt).toBe(12000);
+    expect(v.targetAltitudeSource).toBe('VNAV_CONSTRAINT');
+    expect(v.captureTargetAltFt).toBe(12000);
+    expect(v.lifecycle).toBe('ARMED');
+    expect(v.verticalMode).toBeNull();
+    expect(v.verticalArmedMode).toBe('VNAV');
+    expect(v.altitudeTargetWaypointIdent).toBe('ALT');
+    expect(v.altitudeTargetWaypointIndex).toBe(1);
+    expect(v.targetWaypointIdent).toBe('ALT');
+    expect(v.targetWaypointIndex).toBe(1);
+    expect(v.distanceToConstraintNm).toBeGreaterThan(180);
+    expect(v.distanceToTodNm).toBeGreaterThan(120);
+  });
+
   it('arms VNAV for a future descent constraint before TOD instead of requiring the active waypoint to be constrained', () => {
     const s = createInitialState(B737_800_SPEC);
     s.position.alt = 30000;
