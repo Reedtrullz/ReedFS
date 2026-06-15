@@ -154,7 +154,7 @@ describe('useSimStore', () => {
 
   it('assembles stable domain slices while preserving the public compatibility API', () => {
     const state = useSimStore.getState();
-    for (const action of ['startTakeoffRoll', 'setInput', 'setApState', 'setFlightPlan', 'reset', 'tick'] as const) {
+    for (const action of ['startTakeoffRoll', 'setInput', 'setTakeoffConfig', 'setApState', 'setFlightPlan', 'reset', 'tick'] as const) {
       expect(typeof state[action]).toBe('function');
     }
 
@@ -206,6 +206,40 @@ describe('useSimStore', () => {
     expect(next.aircraft.flightPhase).toBe('TAKEOFF');
     expect(next.inputs.flapLever).toBe(5);
     expect(next.aircraft.config.stabilizerTrimUnits).toBeCloseTo(5.0, 1);
+  });
+
+  it('sets active scenario takeoff config without trim click loops', () => {
+    const store = useSimStore.getState();
+    store.setInput({ flapLever: 30, throttle1: 0.65, throttle2: 0.65, gearLever: 'DOWN' });
+    store.applyInputActions({ trimDelta: 1.2 }, 0);
+    useSimStore.getState().setApState(speedAutothrottleOnlyState());
+    useSimStore.setState((state) => {
+      const apCommands: AutopilotCommands = { throttle1: 0.8, throttle2: 0.8 };
+      const effectiveControls = { ...state.pilotInputs, ...apCommands };
+      return { apCommands, effectiveControls, inputs: effectiveControls };
+    });
+
+    useSimStore.getState().setTakeoffConfig();
+
+    const next = useSimStore.getState();
+    expect(next.inputs).toEqual(expect.objectContaining({
+      flapLever: ENVA_TUTORIAL_SCENARIO.flapSetting,
+      gearLever: 'DOWN',
+      throttle1: 0,
+      throttle2: 0,
+    }));
+    expect(next.pilotInputs).toEqual(expect.objectContaining({
+      flapLever: ENVA_TUTORIAL_SCENARIO.flapSetting,
+      gearLever: 'DOWN',
+      throttle1: 0,
+      throttle2: 0,
+    }));
+    expect(next.aircraft.config.stabilizerTrimUnits).toBe(ENVA_TUTORIAL_SCENARIO.stabilizerTrimUnits);
+    expect(next.inputManager.stabilizerTrimUnits).toBe(ENVA_TUTORIAL_SCENARIO.stabilizerTrimUnits);
+    expect(next.inputManager.throttle).toBe(0);
+    expect(next.apState).toBeNull();
+    expect(next.apCommands).toEqual({});
+    expect(next.inputs).toBe(next.effectiveControls);
   });
 
   it('startTakeoffRoll sets inputs, running status, and TAKEOFF phase', () => {

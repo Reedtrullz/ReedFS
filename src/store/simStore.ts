@@ -52,6 +52,7 @@ export interface SimStore {
   scenarioPersistenceMessage: string | null;
   scenarioSaveSlots: ScenarioSaveSlotMetadata[];
   setInput: (partial: Partial<ControlInputs>) => void;
+  setTakeoffConfig: () => void;
   applyInputActions: (actions: InputActions, dt: number) => void;
   tick: (timestamp: number) => void;
   start: () => void;

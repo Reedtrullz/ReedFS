@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react';
 import { useSimStore } from '../store/simStore';
 import { THROTTLE_STEP, TRIM_STEP_UNITS } from '../input/keyboardControls';
+import { B737_FLAP_DETENTS } from '../input/flapDetents';
 
 const panelStyle: CSSProperties = {
   position: 'fixed',
@@ -65,9 +66,20 @@ function formatThrottlePercent(throttle1: number, throttle2: number): string {
   return `${Math.round(Math.max(throttle1, throttle2) * 100)}%`;
 }
 
+function previousB737FlapDetent(current: number): number {
+  let previous: number = B737_FLAP_DETENTS[0];
+  for (const detent of B737_FLAP_DETENTS) {
+    if (detent >= current) return previous;
+    previous = detent;
+  }
+  return previous;
+}
+
 export function TakeoffSetupPanel() {
   const inputs = useSimStore((s) => s.inputs);
   const stabilizerTrimUnits = useSimStore((s) => s.aircraft.config.stabilizerTrimUnits);
+  const setInput = useSimStore((s) => s.setInput);
+  const setTakeoffConfig = useSimStore((s) => s.setTakeoffConfig);
   const applyInputActions = useSimStore((s) => s.applyInputActions);
 
   return (
@@ -85,17 +97,29 @@ export function TakeoffSetupPanel() {
       </div>
 
       <div aria-label="Takeoff setup controls" style={buttonsStyle}>
+        <button style={buttonStyle} type="button" onClick={() => setInput({ flapLever: previousB737FlapDetent(inputs.flapLever) })}>
+          Flaps Previous
+        </button>
         <button style={buttonStyle} type="button" onClick={() => applyInputActions({ flapNext: true }, 0)}>
           Flaps Next
         </button>
+        <button style={buttonStyle} type="button" onClick={() => applyInputActions({ trimDelta: -TRIM_STEP_UNITS }, 0)}>
+          Trim Nose Down
+        </button>
         <button style={buttonStyle} type="button" onClick={() => applyInputActions({ trimDelta: TRIM_STEP_UNITS }, 0)}>
           Trim Nose Up
+        </button>
+        <button style={buttonStyle} type="button" onClick={() => applyInputActions({ throttleDelta: -THROTTLE_STEP }, 0)}>
+          Throttle Down
         </button>
         <button style={buttonStyle} type="button" onClick={() => applyInputActions({ throttleDelta: THROTTLE_STEP }, 0)}>
           Throttle Up
         </button>
         <button style={buttonStyle} type="button" onClick={() => applyInputActions({ gearToggle: true }, 0)}>
           Gear
+        </button>
+        <button style={buttonStyle} type="button" onClick={setTakeoffConfig}>
+          Set takeoff config
         </button>
       </div>
     </section>

@@ -43,7 +43,7 @@ function gateGearLeverPatch(
   return { ...partial, gearLever: gearCommand.gearLever };
 }
 
-export function createInputSlice(set: SimStoreSet): Pick<SimStore, 'setInput' | 'applyInputActions'> {
+export function createInputSlice(set: SimStoreSet): Pick<SimStore, 'setInput' | 'setTakeoffConfig' | 'applyInputActions'> {
   return {
     setInput: (partial) =>
       set((s) => {
@@ -69,6 +69,38 @@ export function createInputSlice(set: SimStoreSet): Pick<SimStore, 'setInput' | 
           apControllerState,
           inputManager: syncInputManagerWithInputPartial(s.inputManager, pilotPatch),
           guidance: syncGuidanceState(s.guidance, scenario, s.status, s.aircraft, controlsSlice.effectiveControls),
+        };
+      }),
+
+    setTakeoffConfig: () =>
+      set((s) => {
+        const scenario = scenarioById(s.selectedScenarioId);
+        const aircraft = structuredClone(s.aircraft);
+        aircraft.config.stabilizerTrimUnits = scenario.stabilizerTrimUnits;
+        const pilotInputs = {
+          ...s.pilotInputs,
+          flapLever: scenario.flapSetting,
+          gearLever: 'DOWN' as const,
+          throttle1: 0,
+          throttle2: 0,
+        };
+        const inputManager = createInputManagerState({
+          ...s.inputManager,
+          ...pilotInputs,
+          throttle: 0,
+          stabilizerTrimUnits: scenario.stabilizerTrimUnits,
+        });
+        const apControllerState = createAutopilotControllerState();
+        const controlsSlice = composeControlsSlice(pilotInputs);
+
+        return {
+          ...controlsSlice,
+          aircraft,
+          inputManager,
+          apState: null,
+          apControllerState,
+          apCommands: {},
+          guidance: syncGuidanceState(s.guidance, scenario, s.status, aircraft, controlsSlice.effectiveControls),
         };
       }),
 
