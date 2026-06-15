@@ -118,6 +118,36 @@ describe('resolveGuidanceTargets', () => {
     expect(shared.thrust?.targetSpeedKt).toBe(legacy.targetSpeedKt);
   });
 
+  it('uses route managed speed when selected speed intervention is absent', () => {
+    const aircraft = aircraftAtRoute();
+    const ap = apState();
+    ap.boeing.speed = null;
+    ap.truth.thrustActive = 'SPEED';
+    ap.boeing.speedMode = true;
+    const flightPlan = routeWithVnavPathConstraint();
+    const routeStatus = computeRouteStatus(aircraft, flightPlan, 0);
+
+    const shared = resolveGuidanceTargets({ aircraft, apState: ap, flightPlan, routeStatus });
+
+    expect(shared.thrust?.mode).toBe('SPEED');
+    expect(shared.thrust?.targetSpeedKt).toBe(220);
+  });
+
+  it('uses selected speed intervention over route managed speed only when selected speed is explicit', () => {
+    const aircraft = aircraftAtRoute();
+    const ap = apState();
+    ap.boeing.speed = 250;
+    ap.truth.thrustActive = 'SPEED';
+    ap.boeing.speedMode = true;
+    const flightPlan = routeWithVnavPathConstraint();
+    const routeStatus = computeRouteStatus(aircraft, flightPlan, 0);
+
+    const shared = resolveGuidanceTargets({ aircraft, apState: ap, flightPlan, routeStatus });
+
+    expect(shared.thrust?.mode).toBe('SPEED');
+    expect(shared.thrust?.targetSpeedKt).toBe(250);
+  });
+
   it('does not clamp an out-of-range active leg into a valid AP/FD route target without a route-status override', () => {
     const aircraft = aircraftAtRoute();
     const ap = apState();

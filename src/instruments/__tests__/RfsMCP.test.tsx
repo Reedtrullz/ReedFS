@@ -233,12 +233,18 @@ describe('RfsMCP', () => {
 
   it('first SPD click creates A/T-only state and honestly engages SPEED without CMD A', () => {
     setAirborneRuntime();
+    const aircraft = structuredClone(useSimStore.getState().aircraft);
+    aircraft.velocity = { u: ktToMs(149), v: 0, w: 0 };
+    useSimStore.setState({ aircraft, wind: null });
+    const expectedSpeed = Math.round(Math.max(0, computeDerived(aircraft).ias));
     render(
       <>
         <RfsMCP />
         <RfsPFD />
       </>,
     );
+
+    expect(screen.getByText(`SPD ${expectedSpeed}`)).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: 'SPD' }));
 
@@ -248,6 +254,7 @@ describe('RfsMCP', () => {
     expect(ap?.boeing.cmdA).toBe(false);
     expect(ap?.truth.thrustActive).toBe('SPEED');
     expect(ap?.boeing.speedMode).toBe(true);
+    expect(ap?.boeing.speed).toBe(expectedSpeed);
     expect(screen.getByText('SPEED')).toBeTruthy();
   });
 
@@ -335,6 +342,31 @@ describe('RfsMCP', () => {
     expect(ap?.boeing.speed).toBe(expectedSpeed + 5);
     expect(ap?.truth.thrustActive).toBe('OFF');
     expect(screen.getByText(`SPD ${expectedSpeed + 5}`)).toBeTruthy();
+  });
+
+  it('shows route managed speed until the player edits selected speed intervention', () => {
+    setVnavBackedKseaRoute();
+    const ap = createDefaultAutopilotState();
+    ap.truth.autopilotStatus = 'CMD_A';
+    ap.truth.lateralActive = 'LNAV';
+    ap.truth.verticalActive = 'VNAV';
+    ap.truth.thrustActive = 'SPEED';
+    ap.boeing.cmdA = true;
+    ap.boeing.lnav = true;
+    ap.boeing.vnav = true;
+    ap.boeing.speedMode = true;
+    ap.boeing.speed = null;
+    useSimStore.getState().setApState(ap);
+
+    render(<RfsMCP />);
+
+    expect(screen.getByText('MAN SPD 280')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'SPD +5' }));
+
+    const edited = useSimStore.getState().apState;
+    expect(edited?.boeing.speed).toBe(285);
+    expect(screen.getByText('SPD 285')).toBeTruthy();
   });
 
   it('edits selected MCP heading altitude and vertical-speed targets from current aircraft state', () => {

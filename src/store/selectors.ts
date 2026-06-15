@@ -23,8 +23,8 @@ function wrapHeadingDeg(value: number): number {
   return ((Math.round(value) % 360) + 360) % 360;
 }
 
-function selectedSpeedKt(apState: AutopilotState | null): number {
-  return clamp(Math.round(finiteTarget(apState?.boeing.speed, 250)), 100, 340);
+function speedBugKt(value: number | null | undefined, fallback: number): number {
+  return clamp(Math.round(finiteTarget(value, fallback)), 100, 340);
 }
 
 function selectedHeadingDeg(apState: AutopilotState | null): number {
@@ -198,6 +198,8 @@ export interface McpViewModel {
   modeAvailability: Record<EnabledMcpMode, McpModeAvailability>;
   unavailableSummary: string | null;
   speedTarget: number;
+  speedTargetManaged: boolean;
+  speedTargetLabel: string;
   headingTarget: number;
   altitudeTarget: number;
   verticalSpeedTarget: number;
@@ -246,6 +248,13 @@ export function selectMcpViewModel(s: SimStore): McpViewModel {
   const unavailableSummary = [modeAvailability.SPEED, modeAvailability.VS, modeAvailability.N1, modeAvailability.LNAV]
     .find((availability) => !availability.available)?.reason ?? null;
 
+  const selectedSpeed = finiteNumber(displayApState.boeing.speed);
+  const managedSpeed = finiteNumber((effectiveTruth as { managedSpeedKt?: number }).managedSpeedKt);
+  const currentIasSpeed = speedBugKt(computeDerived(s.aircraft, s.wind).ias, 250);
+  const speedTargetManaged = selectedSpeed === null && managedSpeed !== null;
+  const speedTarget = speedBugKt(selectedSpeed ?? managedSpeed ?? currentIasSpeed, currentIasSpeed);
+  const speedTargetLabel = `${speedTargetManaged ? 'MAN SPD' : 'SPD'} ${speedTarget}`;
+
   const next: McpViewModel = {
     latActive,
     vertActive,
@@ -257,7 +266,9 @@ export function selectMcpViewModel(s: SimStore): McpViewModel {
     displayedLatActive,
     modeAvailability,
     unavailableSummary,
-    speedTarget: selectedSpeedKt(displayApState),
+    speedTarget,
+    speedTargetManaged,
+    speedTargetLabel,
     headingTarget: selectedHeadingDeg(displayApState),
     altitudeTarget: selectedAltitudeFt(displayApState),
     verticalSpeedTarget: selectedVerticalSpeedFpm(displayApState),
@@ -275,6 +286,8 @@ export function selectMcpViewModel(s: SimStore): McpViewModel {
     && lastMcpVm.displayedLatActive === next.displayedLatActive
     && lastMcpVm.unavailableSummary === next.unavailableSummary
     && lastMcpVm.speedTarget === next.speedTarget
+    && lastMcpVm.speedTargetManaged === next.speedTargetManaged
+    && lastMcpVm.speedTargetLabel === next.speedTargetLabel
     && lastMcpVm.headingTarget === next.headingTarget
     && lastMcpVm.altitudeTarget === next.altitudeTarget
     && lastMcpVm.verticalSpeedTarget === next.verticalSpeedTarget
