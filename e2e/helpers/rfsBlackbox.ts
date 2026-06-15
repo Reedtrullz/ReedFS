@@ -7,12 +7,34 @@ export interface VisibleFlightNumbers {
   radioAltitudeFt: number | null;
 }
 
+export interface VisibleFmaModes {
+  thrustActive: string;
+  lateralActive: string;
+  verticalActive: string;
+  autopilotStatus: string;
+}
+
+type VisibleMcpModeButton = 'LNAV' | 'SPD' | 'ALT';
+type FmaTextExpectation = string | RegExp;
+
 function parseRequiredNumber(label: string, text: string, pattern: RegExp): number {
   const match = text.match(pattern);
   if (!match) throw new Error(`Unable to read ${label} from visible text: ${text}`);
   const value = Number(match[1]);
   if (!Number.isFinite(value)) throw new Error(`Visible ${label} was not finite: ${match[1]}`);
   return value;
+}
+
+async function readRequiredVisibleText(page: Page, label: string): Promise<string> {
+  const pfd = page.getByLabel('Primary flight display');
+  const text = await pfd.getByLabel(label).textContent();
+  const normalized = text?.trim();
+  if (!normalized) throw new Error(`Unable to read ${label} from visible PFD text.`);
+  return normalized;
+}
+
+function fmaTextMatches(actual: string, expected: FmaTextExpectation): boolean {
+  return typeof expected === 'string' ? actual === expected : expected.test(actual);
 }
 
 export async function openRfsBlackbox(page: Page): Promise<void> {
@@ -90,6 +112,59 @@ export async function waitForVisiblePositiveRate(page: Page): Promise<void> {
     timeout: 45_000,
     intervals: [500],
   }).toBe(true);
+}
+
+export async function clickVisibleMcpMode(page: Page, mode: VisibleMcpModeButton): Promise<void> {
+  const mcp = page.getByRole('region', { name: 'Mode control panel' });
+  const button = mcp.getByRole('button', { name: new RegExp(`^${mode}$`) });
+
+  await expect(mcp).toBeVisible();
+  await expect(button).toBeVisible();
+  await expect(button).toBeEnabled({ timeout: 15_000 });
+  await button.click();
+}
+
+export async function readVisibleFmaModes(page: Page): Promise<VisibleFmaModes> {
+  return {
+    thrustActive: await readRequiredVisibleText(page, 'FMA thr active'),
+    lateralActive: await readRequiredVisibleText(page, 'FMA roll active'),
+    verticalActive: await readRequiredVisibleText(page, 'FMA pitch active'),
+    autopilotStatus: await readRequiredVisibleText(page, 'FMA ap active'),
+  };
+}
+
+export async function waitForVisibleFmaModes(
+  page: Page,
+  expected: Partial<Record<keyof VisibleFmaModes, FmaTextExpectation>>,
+): Promise<VisibleFmaModes> {
+  let latest: VisibleFmaModes | null = null;
+
+  await expect.poll(async () => {
+    latest = await readVisibleFmaModes(page);
+    return (Object.entries(expected) as [keyof VisibleFmaModes, FmaTextExpectation][]).every(
+      ([key, value]) => fmaTextMatches(latest?.[key] ?? '', value),
+    );
+  }, {
+    timeout: 15_000,
+    intervals: [250],
+  }).toBe(true);
+
+  return latest ?? readVisibleFmaModes(page);
+}
+
+export async function sampleVisibleVerticalSpeeds(
+  page: Page,
+  samples: number,
+  intervalMs: number,
+): Promise<number[]> {
+  if (samples <= 0) throw new Error('sampleVisibleVerticalSpeeds requires at least one sample.');
+
+  const verticalSpeeds: number[] = [];
+  for (let sample = 0; sample < samples; sample += 1) {
+    verticalSpeeds.push((await readVisibleFlightNumbers(page)).verticalSpeedFpm);
+    if (sample < samples - 1) await page.waitForTimeout(intervalMs);
+  }
+  return verticalSpeeds;
 }
 
 export async function configureTakeoffAirframeThroughVisibleControls(page: Page): Promise<void> {
