@@ -7,6 +7,8 @@ export interface RunwayGeoPoint {
 export type SupportedAirport = 'ENVA' | 'KSEA' | 'KPDX';
 
 const FT_TO_M = 0.3048;
+const M_PER_NM = 1852;
+const EARTH_RADIUS_M = 6371000;
 
 export interface RunwayReference {
   airport: SupportedAirport;
@@ -18,6 +20,67 @@ export interface RunwayReference {
   elevationFt: number;
   lengthM: number;
   widthM: number;
+}
+
+export interface RunwayApproachFixReference {
+  ident: string;
+  point: RunwayGeoPoint;
+  distanceNmFromThreshold: number;
+  speedKt: number;
+}
+
+export interface RunwayThresholdApproachReference {
+  ident: string;
+  point: RunwayGeoPoint;
+  speedKt: number;
+}
+
+export interface RunwayApproachReference {
+  airport: SupportedAirport;
+  runwayId: string;
+  coordinateSource: 'synthetic';
+  sourceNote: string;
+  initialApproachFix: RunwayApproachFixReference;
+  finalApproachFix: RunwayApproachFixReference;
+  threshold: RunwayThresholdApproachReference;
+}
+
+function toRad(degrees: number): number {
+  return degrees * Math.PI / 180;
+}
+
+function toDeg(radians: number): number {
+  return radians * 180 / Math.PI;
+}
+
+function normalizeLon(degrees: number): number {
+  return ((degrees + 540) % 360) - 180;
+}
+
+function roundedCoordinate(value: number): number {
+  return Math.round(value * 1_000_000) / 1_000_000;
+}
+
+function pointFromRunwayThreshold(runway: RunwayReference, distanceNmBeforeThreshold: number, altFt: number): RunwayGeoPoint {
+  const angularDistance = distanceNmBeforeThreshold * M_PER_NM / EARTH_RADIUS_M;
+  const bearing = toRad(runway.headingDeg + 180);
+  const lat1 = toRad(runway.start.lat);
+  const lon1 = toRad(runway.start.lon);
+  const sinLat1 = Math.sin(lat1);
+  const cosLat1 = Math.cos(lat1);
+  const sinAngular = Math.sin(angularDistance);
+  const cosAngular = Math.cos(angularDistance);
+  const lat2 = Math.asin(sinLat1 * cosAngular + cosLat1 * sinAngular * Math.cos(bearing));
+  const lon2 = lon1 + Math.atan2(
+    Math.sin(bearing) * sinAngular * cosLat1,
+    cosAngular - sinLat1 * Math.sin(lat2),
+  );
+
+  return {
+    lat: roundedCoordinate(toDeg(lat2)),
+    lon: roundedCoordinate(normalizeLon(toDeg(lon2))),
+    altFt,
+  };
 }
 
 // ── ENVA (Trondheim Værnes) ────────────────────────────────────────────
@@ -109,6 +172,30 @@ export const KPDX_RUNWAY_03: RunwayReference = {
   elevationFt: 22,
   lengthM: 6000 * FT_TO_M,
   widthM: 150 * FT_TO_M,
+};
+
+export const KPDX_RUNWAY_10R_APPROACH: RunwayApproachReference = {
+  airport: KPDX_RUNWAY_10R.airport,
+  runwayId: KPDX_RUNWAY_10R.id,
+  coordinateSource: 'synthetic',
+  sourceNote: 'Synthetic training fixture for RFS route handoff only; not official procedure data.',
+  initialApproachFix: {
+    ident: 'KPDX10R_IF',
+    point: pointFromRunwayThreshold(KPDX_RUNWAY_10R, 12, 3000),
+    distanceNmFromThreshold: 12,
+    speedKt: 210,
+  },
+  finalApproachFix: {
+    ident: 'KPDX10R_FAF',
+    point: pointFromRunwayThreshold(KPDX_RUNWAY_10R, 5, KPDX_RUNWAY_10R.elevationFt + 1500),
+    distanceNmFromThreshold: 5,
+    speedKt: 138,
+  },
+  threshold: {
+    ident: 'KPDX10R_RWY',
+    point: { ...KPDX_RUNWAY_10R.start },
+    speedKt: 138,
+  },
 };
 
 export const ENVA_RUNWAYS: RunwayReference[] = [ENVA_RUNWAY_09];

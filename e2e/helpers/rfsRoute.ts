@@ -206,7 +206,7 @@ export async function loadKseaRouteAndVerifyStoppedAutomationGatingThroughUi(pag
 
   const routeStatus = page.getByLabel('Route status');
   await expect(routeStatus.getByText('KSEA→KPDX')).toBeVisible();
-  await expect(routeStatus.getByText(/LEG\s+1\/3/)).toBeVisible();
+  await expect(routeStatus.getByText(/LEG\s+1\/5/)).toBeVisible();
   await expect(routeStatus.getByText('KSEA → OLM')).toBeVisible();
   await expect(routeStatus.getByText('DTG')).toBeVisible();
 

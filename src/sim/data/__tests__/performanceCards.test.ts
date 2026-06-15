@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ENVA_TUTORIAL_SCENARIO, KPDX_TUTORIAL_SCENARIO, KSEA_LIGHT_PATTERN_SCENARIO, KSEA_TUTORIAL_SCENARIO, SCENARIOS } from '../../scenarios';
+import { createKseaKpdxFlight } from '../../flightPlanLoader';
+import { KPDX_RUNWAY_10R_APPROACH } from '../../../viewport/runwayData';
 import {
   assertPerformanceCardMatchesScenario,
   b737PerformanceCards,
@@ -70,6 +72,25 @@ describe('B737 performance-card scenario assertions', () => {
     expect(tutorialCard.vSpeeds.vrKt).toBeLessThan(tutorialCard.vSpeeds.v2Kt);
     expect(lightCard.vSpeeds.vrKt).toBeLessThan(tutorialCard.vSpeeds.vrKt);
     expect(kpdxCard.vSpeeds.vrKt).toBeLessThan(tutorialCard.vSpeeds.vrKt);
+  });
+
+  it('keeps KSEA route approach targets aligned with the KPDX runway scenario and performance card', () => {
+    const card = findPerformanceCardForScenario(KPDX_TUTORIAL_SCENARIO.id);
+    const route = createKseaKpdxFlight();
+    const approach = KPDX_RUNWAY_10R_APPROACH;
+    const finalApproach = route.waypoints.find((waypoint) => waypoint.ident === approach.finalApproachFix.ident);
+    const threshold = route.waypoints.find((waypoint) => waypoint.ident === approach.threshold.ident);
+
+    expect(KPDX_TUTORIAL_SCENARIO.runway.runway).toBe(card.runway);
+    expect(KPDX_TUTORIAL_SCENARIO.runway.approach?.finalApproachFixIdent).toBe(approach.finalApproachFix.ident);
+    expect(KPDX_TUTORIAL_SCENARIO.runway.approach?.thresholdIdent).toBe(approach.threshold.ident);
+    expect(finalApproach?.altitudeConstraint).toEqual({
+      type: 'AT',
+      altitude: approach.threshold.point.altFt + card.approach.heightAglFt,
+    });
+    expect(finalApproach?.speedConstraint).toEqual({ type: 'AT_OR_BELOW', speed: card.approach.iasKt });
+    expect(threshold?.altitudeConstraint).toEqual({ type: 'AT', altitude: KPDX_TUTORIAL_SCENARIO.runway.elevationFt });
+    expect(threshold?.speedConstraint).toEqual({ type: 'AT_OR_BELOW', speed: card.landing.targetApproachIasKt });
   });
 
   it.each(b737PerformanceCards)('labels $scenarioId performance-card ownership and runtime/test consumers', (card) => {

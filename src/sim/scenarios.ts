@@ -2,7 +2,7 @@ import type { AircraftSpec, AircraftState, FuelState, GeoPosition } from './type
 import { createB737GearStations, createInitialState } from './types';
 import { eulerToQuat } from './physics/quaternion';
 import type { WindInfo, ScenarioWeatherMetadata } from './weather';
-import { ENVA_RUNWAY_09, KPDX_RUNWAY_10R, KSEA_RUNWAY_16L } from '../viewport/runwayData';
+import { ENVA_RUNWAY_09, KPDX_RUNWAY_10R, KPDX_RUNWAY_10R_APPROACH, KSEA_RUNWAY_16L } from '../viewport/runwayData';
 
 export interface ScenarioFuelLoad {
   centerTank: number;
@@ -16,6 +16,11 @@ export interface RunwayScenario {
   runway: string;
   elevationFt: number;
   headingDeg: number;
+  approach?: {
+    finalApproachFixIdent: string;
+    thresholdIdent: string;
+    coordinateSource: 'synthetic';
+  };
 }
 
 export interface ScenarioTutorialStep {
@@ -189,7 +194,17 @@ export const KPDX_TUTORIAL_SCENARIO: FlightScenario = {
   name: 'KPDX Tutorial Takeoff',
   description: 'Medium-light 737-800 at Portland runway 10R with local KPDX weather metadata for scenario/weather binding checks.',
   position: { lat: KPDX_RUNWAY_10R.start.lat, lon: KPDX_RUNWAY_10R.start.lon, alt: KPDX_RUNWAY_10R.elevationFt },
-  runway: { airport: KPDX_RUNWAY_10R.airport, runway: KPDX_RUNWAY_10R.id, elevationFt: KPDX_RUNWAY_10R.elevationFt, headingDeg: KPDX_RUNWAY_10R.headingDeg },
+  runway: {
+    airport: KPDX_RUNWAY_10R.airport,
+    runway: KPDX_RUNWAY_10R.id,
+    elevationFt: KPDX_RUNWAY_10R.elevationFt,
+    headingDeg: KPDX_RUNWAY_10R.headingDeg,
+    approach: {
+      finalApproachFixIdent: KPDX_RUNWAY_10R_APPROACH.finalApproachFix.ident,
+      thresholdIdent: KPDX_RUNWAY_10R_APPROACH.threshold.ident,
+      coordinateSource: KPDX_RUNWAY_10R_APPROACH.coordinateSource,
+    },
+  },
   fuel: { centerTank: 6_000, leftTank: 2_000, rightTank: 2_000, totalFuel: 10_000 },
   zeroFuelWeightKg: 48_413,
   grossWeightKg: 58_413,
