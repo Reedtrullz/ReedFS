@@ -4,14 +4,16 @@ import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
 import type { AutopilotCommands, ControlInputs } from '../types';
 import { B737_800_SPEC, createInitialState } from '../types';
 import { buildGuidanceState } from '../guidanceState';
+import { createKseaKpdxFlight } from '../flightPlanLoader';
 import { KSEA_TUTORIAL_SCENARIO } from '../scenarios';
+import { KPDX_RUNWAY_10R, KPDX_RUNWAY_10R_APPROACH } from '../../viewport/runwayData';
 import { computeRouteStatus, createNoRouteStatus } from '../systems/navigation';
 import {
   createAutopilotControllerState,
   resetAutopilotPID,
 } from '../systems/autopilot';
 import { eulerToQuat } from '../physics/quaternion';
-import { advanceSimulationStep, composeControlsSlice } from '../simulationStep';
+import { advanceSimulationStep, composeControlsSlice, resolveRouteDescentTargetAltitudeFt } from '../simulationStep';
 
 function tutorialControls(): ControlInputs {
   return {
@@ -60,6 +62,31 @@ function aircraftApproachingTurn(): ReturnType<typeof createInitialState> {
   aircraft.position.lon = -122.0;
   aircraft.attitude.psi = 0;
   aircraft.velocity.u = 128.6;
+  return aircraft;
+}
+
+function aircraftOnKpdxFinalRoute(): ReturnType<typeof createInitialState> {
+  const aircraft = createInitialState(B737_800_SPEC);
+  const initialApproachFix = KPDX_RUNWAY_10R_APPROACH.initialApproachFix.point;
+  aircraft.flightPhase = 'CRUISE';
+  aircraft.position = { lat: initialApproachFix.lat, lon: initialApproachFix.lon, alt: 3_500 };
+  aircraft.attitude = { phi: 0, theta: 0, psi: KPDX_RUNWAY_10R.headingDeg * Math.PI / 180 };
+  aircraft.quaternion = eulerToQuat(aircraft.attitude.phi, aircraft.attitude.theta, aircraft.attitude.psi);
+  aircraft.velocity = { u: 120, v: 0, w: 0 };
+  aircraft.config = {
+    ...aircraft.config,
+    gearDown: true,
+    gearPosition: 1,
+    flapSetting: 30,
+  };
+  aircraft.ground = {
+    ...aircraft.ground,
+    weightOnWheels: false,
+    contact: 'none',
+    onRunway: false,
+    aglFt: 3_478,
+    groundAltFt: KPDX_RUNWAY_10R.elevationFt,
+  };
   return aircraft;
 }
 
@@ -168,6 +195,32 @@ function n1AutopilotState(): AutopilotState {
 beforeEach(() => resetAutopilotPID());
 
 describe('advanceSimulationStep', () => {
+  it('resolves BETWEEN altitude constraints only when current altitude is outside the band', () => {
+    const flightPlan: FlightPlan = {
+      origin: 'ORIG',
+      destination: 'BAND',
+      flightNumber: 'TST126',
+      route: 'ORIG BAND',
+      waypoints: [
+        { ident: 'ORIG', lat: 47.0, lon: -122.0, discontinuity: false },
+        {
+          ident: 'BAND',
+          lat: 47.1,
+          lon: -122.0,
+          discontinuity: false,
+          altitudeConstraint: { type: 'BETWEEN', altitude: 3_000, altitude2: 5_000 },
+        },
+      ],
+    };
+    const aircraft = createInitialState(B737_800_SPEC);
+    aircraft.position = { lat: 47.0, lon: -122.0, alt: 4_000 };
+    const routeStatus = computeRouteStatus(aircraft, flightPlan, 0);
+
+    expect(resolveRouteDescentTargetAltitudeFt(flightPlan, routeStatus, 4_000)).toBeNull();
+    expect(resolveRouteDescentTargetAltitudeFt(flightPlan, routeStatus, 5_600)).toBe(5_000);
+    expect(resolveRouteDescentTargetAltitudeFt(flightPlan, routeStatus, 2_600)).toBeNull();
+  });
+
   it('filters stale AP commands when backed AP modes are effectively unavailable', () => {
     const pilotInputs = tutorialControls();
     pilotInputs.elevator = 0.12;
@@ -381,6 +434,66 @@ describe('advanceSimulationStep', () => {
     expect(result.apCommands.aileron).toBeUndefined();
     expect(result.controls.apCommands.aileron).toBeUndefined();
     expect(result.controls.effectiveControls.aileron).toBe(pilotInputs.aileron);
+  });
+
+  it('advances a routed cruise flight to DESCENT, then APPROACH, across real simulation ticks without direct phase seeding', () => {
+    const aircraft = aircraftOnKpdxFinalRoute();
+    const flightPlan = createKseaKpdxFlight();
+    const pilotInputs = {
+      ...tutorialControls(),
+      throttle1: 0.35,
+      throttle2: 0.35,
+      flapLever: 30,
+      gearLever: 'DOWN' as const,
+    };
+    const initialActiveLegIndex = 3;
+    const routeBeforeTick = computeRouteStatus(aircraft, flightPlan, initialActiveLegIndex);
+    const guidance = buildGuidanceState({
+      scenario: KSEA_TUTORIAL_SCENARIO,
+      status: 'running',
+      aircraft,
+      controls: pilotInputs,
+    });
+
+    expect(aircraft.flightPhase).toBe('CRUISE');
+    expect(routeBeforeTick.approachHandoff).toBe('final');
+    expect(routeBeforeTick.routeComplete).toBe(false);
+
+    const descentStep = advanceSimulationStep({
+      aircraft,
+      spec: B737_800_SPEC,
+      pilotInputs,
+      apState: null,
+      flightPlan,
+      activeLegIndex: initialActiveLegIndex,
+      routeStatus: routeBeforeTick,
+      wind: null,
+      dt: 1 / 60,
+      status: 'running',
+      selectedScenarioId: KSEA_TUTORIAL_SCENARIO.id,
+      guidance,
+    });
+
+    expect(descentStep.aircraft.flightPhase).toBe('DESCENT');
+    expect(descentStep.guidance.phase).toBe('descent');
+
+    const approachStep = advanceSimulationStep({
+      aircraft: descentStep.aircraft,
+      spec: B737_800_SPEC,
+      pilotInputs,
+      apState: null,
+      flightPlan,
+      activeLegIndex: descentStep.activeLegIndex,
+      routeStatus: descentStep.routeStatus,
+      wind: null,
+      dt: 1 / 60,
+      status: 'running',
+      selectedScenarioId: KSEA_TUTORIAL_SCENARIO.id,
+      guidance: descentStep.guidance,
+    });
+
+    expect(approachStep.aircraft.flightPhase).toBe('APPROACH');
+    expect(approachStep.guidance.phase).toBe('approach');
   });
 
   it('feeds SPEED autothrottle-only commands into integration without overriding pilot pitch or roll', () => {

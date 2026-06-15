@@ -1,7 +1,55 @@
 import { describe, expect, it } from 'vitest';
 import { B737_800_SPEC, createInitialState } from '../types';
-import { isPositiveRateEstablished } from '../flightPhasePredicates';
+import { createNoRouteStatus, type RouteStatusSnapshot } from '../systems/navigation';
+import { deriveRouteDrivenFlightPhase, isPositiveRateEstablished } from '../flightPhasePredicates';
 import { eulerToQuat } from '../physics/quaternion';
+
+function lifecycleRouteStatus(overrides: Partial<RouteStatusSnapshot> = {}): RouteStatusSnapshot {
+  return {
+    ...createNoRouteStatus(),
+    routeName: 'KSEA→KPDX',
+    routeValid: true,
+    routeComplete: false,
+    approachHandoff: 'none',
+    lnavAvailable: true,
+    lnavUnavailableReason: null,
+    activeLegIndex: 3,
+    activeLegCount: 5,
+    fromWaypointIndex: 3,
+    toWaypointIndex: 4,
+    fromIdent: 'KPDX10R_IF',
+    nextWaypointIdent: 'KPDX10R_FAF',
+    distanceToNextM: 12_000,
+    distanceToNextNm: 6.5,
+    desiredTrackRad: 1.75,
+    desiredTrackDegTrue: 100,
+    crossTrackErrorM: 0,
+    alongTrackM: 0,
+    legLengthM: 12_000,
+    waypointReached: false,
+    sequenced: false,
+    ...overrides,
+  };
+}
+
+function airborneCruiseState() {
+  const state = createInitialState(B737_800_SPEC);
+  state.flightPhase = 'CRUISE';
+  state.position.alt = 10_000;
+  state.ground = {
+    ...state.ground,
+    weightOnWheels: false,
+    contact: 'none',
+    onRunway: false,
+    aglFt: 9_900,
+    groundAltFt: 100,
+  };
+  state.config.gearDown = false;
+  state.config.gearPosition = 0;
+  state.velocity.u = 130;
+  state.velocity.w = 0;
+  return state;
+}
 
 describe('isPositiveRateEstablished', () => {
   it('is false when airborne but descending above the runway', () => {
@@ -62,5 +110,71 @@ describe('isPositiveRateEstablished', () => {
 
     state.ground.aglFt = 0;
     expect(isPositiveRateEstablished(state)).toBe(false);
+  });
+});
+
+describe('deriveRouteDrivenFlightPhase', () => {
+  it('starts DESCENT from CRUISE when an upcoming route altitude target requires descent', () => {
+    const state = airborneCruiseState();
+
+    expect(deriveRouteDrivenFlightPhase(state, {
+      routeStatus: lifecycleRouteStatus({ approachHandoff: 'final' }),
+      descentTargetAltitudeFt: 1_550,
+    })).toBe('DESCENT');
+  });
+
+  it('does not start DESCENT hundreds of miles early just because the route has few remaining legs', () => {
+    const state = airborneCruiseState();
+
+    expect(deriveRouteDrivenFlightPhase(state, {
+      routeStatus: lifecycleRouteStatus({
+        approachHandoff: 'none',
+        activeLegIndex: 3,
+        activeLegCount: 5,
+        distanceToNextNm: 240,
+        distanceToNextM: 240 * 1852,
+      }),
+      descentTargetAltitudeFt: 1_550,
+    })).toBe('CRUISE');
+  });
+
+  it('does not auto-seed APPROACH directly from CRUISE even on a final route segment', () => {
+    const state = airborneCruiseState();
+    state.config.gearDown = true;
+    state.config.gearPosition = 1;
+    state.config.flapSetting = 30;
+
+    expect(deriveRouteDrivenFlightPhase(state, {
+      routeStatus: lifecycleRouteStatus({ approachHandoff: 'final' }),
+      descentTargetAltitudeFt: 1_550,
+    })).toBe('DESCENT');
+  });
+
+  it('moves from DESCENT to APPROACH only when near final and configured for landing', () => {
+    const state = airborneCruiseState();
+    state.flightPhase = 'DESCENT';
+    state.ground.aglFt = 2_400;
+    state.config.gearDown = true;
+    state.config.gearPosition = 1;
+    state.config.flapSetting = 30;
+
+    expect(deriveRouteDrivenFlightPhase(state, {
+      routeStatus: lifecycleRouteStatus({ approachHandoff: 'final' }),
+      descentTargetAltitudeFt: 1_550,
+    })).toBe('APPROACH');
+  });
+
+  it('keeps DESCENT instead of calling APPROACH when final is not configured', () => {
+    const state = airborneCruiseState();
+    state.flightPhase = 'DESCENT';
+    state.ground.aglFt = 2_400;
+    state.config.gearDown = false;
+    state.config.gearPosition = 0;
+    state.config.flapSetting = 5;
+
+    expect(deriveRouteDrivenFlightPhase(state, {
+      routeStatus: lifecycleRouteStatus({ approachHandoff: 'final' }),
+      descentTargetAltitudeFt: 1_550,
+    })).toBe('DESCENT');
   });
 });
