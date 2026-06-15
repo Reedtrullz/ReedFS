@@ -191,6 +191,44 @@ describe('effective autoflight truth', () => {
     expect(effectiveAutopilotIsEngaged(ap, { routeStatus: createNoRouteStatus() })).toBe(true);
   });
 
+  it('suppresses unsupported lateral raw modes until LOC or approach targets exist', () => {
+    for (const lateralMode of ['VOR_LOC', 'APP', 'LOC'] as const) {
+      const ap = makeAp();
+      ap.truth.lateralActive = lateralMode;
+      ap.truth.verticalActive = 'OFF';
+      ap.boeing.lnav = false;
+      ap.boeing.vnav = false;
+      ap.boeing.vorLoc = true;
+      ap.boeing.app = true;
+
+      const effective = deriveEffectiveAutoflightTruth(ap, { routeStatus: createNoRouteStatus() });
+
+      expect(effective.autopilotStatus).toBe('CMD_A');
+      expect(effective.lateralActive).toBe('OFF');
+      expect(effective.verticalActive).toBe('OFF');
+    }
+  });
+
+  it('suppresses unsupported vertical raw modes until backed pitch targets exist', () => {
+    for (const verticalMode of ['LVL_CHG', 'G_S'] as const) {
+      const ap = makeAp();
+      ap.truth.lateralActive = 'HDG_SEL';
+      ap.truth.verticalActive = verticalMode;
+      ap.boeing.hdgSel = true;
+      ap.boeing.lnav = false;
+      ap.boeing.vnav = false;
+      ap.boeing.lvlChg = true;
+      ap.boeing.app = true;
+
+      const effective = deriveEffectiveAutoflightTruth(ap, { routeStatus: createNoRouteStatus() });
+
+      expect(effective.autopilotStatus).toBe('CMD_A');
+      expect(effective.lateralActive).toBe('HDG_SEL');
+      expect(effective.verticalActive).toBe('OFF');
+      expect((effective as { lateralOnly?: boolean }).lateralOnly).toBe(true);
+    }
+  });
+
   it('derives backed LNAV, VNAV_PTH, SPEED, and CMD_A for a valid constrained route', () => {
     const aircraft = aircraftAtRoute();
     const flightPlan = constrainedRoute();

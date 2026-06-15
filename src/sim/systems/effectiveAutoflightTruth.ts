@@ -12,6 +12,8 @@ import { routeStatusToNavOutput, type RouteStatusSnapshot } from './navigation';
 import { computeVNAV, type VnavOutput } from './vnav';
 
 const VNAV_FAMILY = new Set<VerticalMode>(['VNAV', 'VNAV_PTH', 'ALT*']);
+const UNSUPPORTED_LATERAL_MODES = new Set<LateralMode>(['VOR_LOC', 'LOC', 'APP']);
+const UNSUPPORTED_VERTICAL_MODES = new Set<VerticalMode>(['LVL_CHG', 'G_S']);
 const ALT_HOLD_CAPTURE_MAX_ERROR_FT = 80;
 const ALT_HOLD_CAPTURE_MAX_ABS_VS_FPM = 300;
 
@@ -107,6 +109,12 @@ export function isAutoflightLateralOnly(truth: AutoflightTruthState): boolean {
   return Boolean((truth as ManagedAltitudeCaptureTruth).lateralOnly);
 }
 
+export function hasUnsupportedAutoflightModeRequest(apState: AutopilotState | null | undefined): boolean {
+  if (!apState) return false;
+  return UNSUPPORTED_LATERAL_MODES.has(apState.truth.lateralActive)
+    || UNSUPPORTED_VERTICAL_MODES.has(apState.truth.verticalActive);
+}
+
 function autopilotStatusIsBacked(ap: AutopilotState): boolean {
   switch (ap.truth.autopilotStatus) {
     case 'OFF':
@@ -151,8 +159,6 @@ function deriveLateralMode(ap: AutopilotState, routeStatus: RouteStatusSnapshot 
   if (ap.truth.lateralActive === 'LNAV') {
     return ap.boeing.lnav && routeStatus?.lnavAvailable ? 'LNAV' : 'OFF';
   }
-  if (ap.truth.lateralActive === 'VOR_LOC') return ap.boeing.vorLoc ? 'VOR_LOC' : 'OFF';
-  if (ap.truth.lateralActive === 'APP' || ap.truth.lateralActive === 'LOC') return ap.boeing.app ? ap.truth.lateralActive : 'OFF';
   return 'OFF';
 }
 
@@ -184,8 +190,6 @@ function deriveVerticalMode(
   }
   if (ap.truth.verticalActive === 'VS') return ap.boeing.vs ? 'VS' : 'OFF';
   if (VNAV_FAMILY.has(ap.truth.verticalActive)) return deriveVnavMode(vnav, aircraft);
-  if (ap.truth.verticalActive === 'LVL_CHG') return ap.boeing.lvlChg ? 'LVL_CHG' : 'OFF';
-  if (ap.truth.verticalActive === 'G_S') return ap.boeing.app ? 'G_S' : 'OFF';
   return 'OFF';
 }
 

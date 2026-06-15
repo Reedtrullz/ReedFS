@@ -163,6 +163,30 @@ describe('RfsMCP', () => {
     );
   });
 
+  it('keeps unsupported LOC/APP/G_S/LVL_CHG controls unavailable with a visible reason', () => {
+    setAirborneRuntime();
+    const ap = createDefaultAutopilotState();
+    ap.truth.autopilotStatus = 'CMD_A';
+    ap.truth.lateralActive = 'LOC';
+    ap.truth.verticalActive = 'G_S';
+    ap.boeing.cmdA = true;
+    ap.boeing.vorLoc = true;
+    ap.boeing.app = true;
+    ap.boeing.lvlChg = true;
+    useSimStore.getState().setApState(ap);
+
+    render(<RfsMCP />);
+
+    expect(screen.getByRole('status', { name: 'Unsupported MCP mode warning' })).toHaveTextContent(
+      'LOC/APP/G/S/LVL CHG unavailable — guidance targets not implemented',
+    );
+    for (const unsupportedButton of ['LOC', 'APP', 'G/S', 'LVL CHG']) {
+      expect(screen.queryByRole('button', { name: unsupportedButton })).toBeNull();
+    }
+    expect(screen.getByRole('button', { name: 'HDG' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: 'ALT' })).toHaveAttribute('aria-pressed', 'false');
+  });
+
   it('toggles FD switches independently without clearing active MCP modes', () => {
     setAirborneRuntime();
     render(<RfsMCP />);

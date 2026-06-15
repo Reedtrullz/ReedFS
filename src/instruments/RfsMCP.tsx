@@ -10,7 +10,11 @@ import {
   type McpModeAvailabilityState,
 } from '../store/selectors';
 import { hasFlightDirectorGuidanceTarget, resolveGuidanceTargets } from '../sim/systems/guidanceTargets';
-import { deriveEffectiveAutoflightTruth, isAutoflightLateralOnly } from '../sim/systems/effectiveAutoflightTruth';
+import {
+  deriveEffectiveAutoflightTruth,
+  hasUnsupportedAutoflightModeRequest,
+  isAutoflightLateralOnly,
+} from '../sim/systems/effectiveAutoflightTruth';
 
 export { mcpModeAvailability };
 export type { EnabledMcpMode, McpModeAvailability, McpModeAvailabilityState };
@@ -136,6 +140,7 @@ export function RfsMCP() {
     flightPlan: s.flightPlan,
     routeStatus: s.routeStatus,
   })));
+  const unsupportedModeRequested = useSimStore((s) => hasUnsupportedAutoflightModeRequest(s.apState));
 
   const toggleMode = (mode: EnabledMcpMode) => {
     const state = useSimStore.getState();
@@ -192,6 +197,11 @@ export function RfsMCP() {
       {unavailableSummary && (
         <div role="status" style={advisoryStyle}>
           MCP modes unavailable: {unavailableSummary}
+        </div>
+      )}
+      {unsupportedModeRequested && (
+        <div role="status" aria-label="Unsupported MCP mode warning" style={advisoryStyle}>
+          LOC/APP/G/S/LVL CHG unavailable — guidance targets not implemented
         </div>
       )}
       {fdGuidanceUnavailable && (
