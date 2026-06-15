@@ -226,6 +226,12 @@ export const B737_800_FDM: VersionedAircraftFdmData = {
       maxGroundPitchRad: 0.35,
       maxGroundRollRad: 0.2,
     },
+    rotation: {
+      // Gameplay-calibrated placeholder: trim/thrust may unload the nose, but
+      // liftoff release still requires deliberate nose-up elevator input. Not
+      // AFM/Boeing rotation law data.
+      minimumElevatorInputForLiftoff: -0.2,
+    },
     contact: {
       touchdownMinSinkRateMps: 0.25,
       touchdownAngularDamping: 0.35,

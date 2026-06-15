@@ -17,7 +17,6 @@ const KT_TO_MPS = 0.514444444;
 const PRE_ROTATION_MAX_PITCH_RAD = 3 * Math.PI / 180;
 const MAIN_GEAR_PIVOT_MAX_PITCH_RAD = 10.5 * Math.PI / 180;
 const MAIN_GEAR_PIVOT_MIN_SPEED_MPS = 125 * KT_TO_MPS;
-const MAIN_GEAR_PIVOT_ELEVATOR = -0.2;
 const TAIL_CONTACT_POINT_BODY_M: BodyStationPosition = {
   // Gameplay placeholder tail-skid point: aft/lower tail cone in body axes.
   // Combined with the current main-gear stations this yields a ~12.5° tailstrike
@@ -633,10 +632,15 @@ function noseGearPitchMomentAboutMainGearNm(gearStations: GearStationState[]): n
   return Math.max(0, (nose.positionBodyM.x - mainReference.x) * nose.normalForceN);
 }
 
-function allowsMainGearPivot(state: AircraftState, inputs: ControlInputs, options: GroundContactOptions): boolean {
+function allowsMainGearPivot(
+  state: AircraftState,
+  inputs: ControlInputs,
+  options: GroundContactOptions,
+  groundModel: GroundModelData,
+): boolean {
   const rotationSpeedMps = options.rotationReferenceSpeedMps ?? MAIN_GEAR_PIVOT_MIN_SPEED_MPS;
   const airspeedMps = options.airRelativeSpeedMps ?? groundSpeedMps(state);
-  return airspeedMps >= rotationSpeedMps && inputs.elevator <= MAIN_GEAR_PIVOT_ELEVATOR;
+  return airspeedMps >= rotationSpeedMps && inputs.elevator <= groundModel.rotation.minimumElevatorInputForLiftoff;
 }
 
 function redistributeForMainGearPivot(gearStations: GearStationState[], allowMainGearPivot: boolean): GearStationState[] {
@@ -767,7 +771,7 @@ export function applyGroundContact(
   let loadedGearStations = oleoLoads.gearStations;
   state.position.alt = atOrBelowGround ? groundAltFt : state.position.alt + contactPenetrationM / FT_TO_M;
 
-  const allowMainGearPivot = allowsMainGearPivot(state, inputs, options);
+  const allowMainGearPivot = allowsMainGearPivot(state, inputs, options, groundModel);
   const tailstrike = stabilizeGroundAttitude(state, allowMainGearPivot, loadedGearStations, groundModel);
   loadedGearStations = redistributeForMainGearPivot(loadedGearStations, allowMainGearPivot);
   applyTouchdownDamping(state, touchdownSinkRateMps ?? 0, groundModel);

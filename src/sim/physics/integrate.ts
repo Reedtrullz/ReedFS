@@ -149,8 +149,19 @@ function airRelativeSpeedMps(state: AircraftState, wind: WindInfo | null): numbe
   return Math.hypot(airRelativeVelocity.u, airRelativeVelocity.v, airRelativeVelocity.w);
 }
 
-function shouldAllowLiftoff(state: AircraftState, airspeedMps: number, normalForceN: number, weightN: number): boolean {
+function hasDeliberateRotationInput(controls: ControlInputs): boolean {
+  return controls.elevator <= B737_800_FDM.ground.rotation.minimumElevatorInputForLiftoff;
+}
+
+function shouldAllowLiftoff(
+  state: AircraftState,
+  controls: ControlInputs,
+  airspeedMps: number,
+  normalForceN: number,
+  weightN: number,
+): boolean {
   return (
+    hasDeliberateRotationInput(controls) &&
     normalForceN <= weightN * LIFTOFF_NORMAL_FORCE_FRACTION &&
     airspeedMps >= estimateMinimumLiftoffSpeedMps(state) &&
     state.attitude.theta >= MIN_LIFTOFF_PITCH_RAD
@@ -257,7 +268,7 @@ export function integrate(
   const rotationReferenceSpeedMps = estimateMinimumLiftoffSpeedMps(state);
   const allowLiftoff = state.ground.weightOnWheels
     && nearRunwaySurface
-    && shouldAllowLiftoff(state, airspeedMps, normalForceN, aero.weight);
+    && shouldAllowLiftoff(state, controls, airspeedMps, normalForceN, aero.weight);
 
   if (state.ground.weightOnWheels && nearRunwaySurface && !allowLiftoff) {
     constrainRunwayNormalVelocity(state);

@@ -118,6 +118,10 @@ export interface GroundModelData extends FdmSourceMetadata {
     maxGroundPitchRad: number;
     maxGroundRollRad: number;
   };
+  rotation: {
+    /** Nose-up elevator input required before ground contact may release liftoff. Placeholder, not AFM/Boeing data. */
+    minimumElevatorInputForLiftoff: number;
+  };
   contact: {
     touchdownMinSinkRateMps: number;
     touchdownAngularDamping: number;
