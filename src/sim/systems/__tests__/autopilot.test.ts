@@ -171,6 +171,25 @@ describe('computeAutopilotCommandsForState effective truth gating', () => {
     expect(commands.throttle2).toBe(commands.throttle1);
   });
 
+  it('commands pitch capture instead of ALT_HOLD while descending below selected altitude', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.position.alt = 9_650;
+    s.velocity.u = 128.6;
+    s.velocity.w = 12;
+    const ap = makeAp('HDG_SEL', 'ALT_HOLD', 'SPEED');
+    ap.boeing.hdgSel = true;
+    ap.boeing.altHold = true;
+    ap.boeing.altitude = 10_000;
+    ap.boeing.speedMode = true;
+    ap.boeing.autothrottleArm = true;
+
+    const truth = deriveEffectiveAutoflightTruth(ap, { aircraft: s, flightPlan: null, routeStatus: createNoRouteStatus() });
+    const commands = computeAutopilotCommandsForState(s, ap, null, 1 / 60, null, createNoRouteStatus());
+
+    expect(truth.verticalActive).toBe('ALT*');
+    expect(commands.elevator).toBeLessThan(0);
+  });
+
   it('keeps VNAV armed before TOD without commanding pitch or falling back to MCP altitude', () => {
     const s = createInitialState(B737_800_SPEC);
     s.position.alt = 30000;

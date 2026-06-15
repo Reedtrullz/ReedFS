@@ -89,6 +89,10 @@ function finiteOrUndefined(value: number | null | undefined): number | undefined
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 }
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
 function autopilotStatusIsEngaged(truth: AutoflightTruthState): boolean {
   return truth.autopilotStatus !== 'OFF';
 }
@@ -146,6 +150,12 @@ function verticalSpeedTargetWithAltitudeCapture(
   return targetVerticalSpeedFpm * Math.max(0, Math.abs(altitudeDeltaFt) / captureWindowFt);
 }
 
+function altitudeCaptureVerticalSpeedTarget(targetAltitudeFt: number, altitudeFt: number): number {
+  const altitudeDeltaFt = targetAltitudeFt - altitudeFt;
+  if (Math.abs(altitudeDeltaFt) <= 80) return 0;
+  return clamp(altitudeDeltaFt * 4, -1800, 1800);
+}
+
 function resolveLateralTarget(
   input: ResolveGuidanceTargetsInput,
   truth: AutoflightTruthState,
@@ -174,6 +184,18 @@ function resolveVerticalTarget(
     const targetAltitudeFt = managedCaptureAlt ?? (selectedAltitude !== undefined && selectedAltitude > 0 ? selectedAltitude : undefined);
     return targetAltitudeFt !== undefined ? { mode: 'ALT_HOLD', targetAltitudeFt } : null;
   }
+  if (truth.verticalActive === 'ALT*') {
+    const managedCaptureAlt = managedCaptureAltitudeFt(truth);
+    const selectedAltitude = finiteOrUndefined(input.apState?.boeing.altitude);
+    const targetAltitudeFt = managedCaptureAlt ?? (selectedAltitude !== undefined && selectedAltitude > 0 ? selectedAltitude : undefined);
+    return targetAltitudeFt !== undefined
+      ? {
+        mode: 'ALT*',
+        targetAltitudeFt,
+        targetVerticalSpeedFpm: altitudeCaptureVerticalSpeedTarget(targetAltitudeFt, input.aircraft.position.alt),
+      }
+      : null;
+  }
   if (truth.verticalActive === 'VS') {
     const rawVerticalSpeedFpm = finiteOrUndefined(input.apState?.boeing.verticalSpeed) ?? 0;
     const selectedAltitude = finiteOrUndefined(input.apState?.boeing.altitude);
@@ -183,7 +205,7 @@ function resolveVerticalTarget(
       targetAltitudeFt: selectedAltitude !== undefined && selectedAltitude > 0 ? selectedAltitude : undefined,
     };
   }
-  if ((truth.verticalActive === 'VNAV' || truth.verticalActive === 'VNAV_PTH' || truth.verticalActive === 'ALT*') && input.flightPlan && nav) {
+  if ((truth.verticalActive === 'VNAV' || truth.verticalActive === 'VNAV_PTH') && input.flightPlan && nav) {
     const vnav = computeVNAV(input.aircraft, input.flightPlan, nav);
     if (!vnav.available || !vnav.altitudeConstraint || vnav.verticalMode === 'VNAV') return null;
     return {
@@ -207,7 +229,7 @@ function resolveThrustTarget(
       && selectedSpeed === undefined
       && input.flightPlan
       && nav
-      && (truth.verticalActive === 'VNAV' || truth.verticalActive === 'VNAV_PTH' || truth.verticalActive === 'ALT*')) {
+      && (truth.verticalActive === 'VNAV' || truth.verticalActive === 'VNAV_PTH')) {
       const vnav = computeVNAV(input.aircraft, input.flightPlan, nav);
       routeManagedSpeed = vnav.available && vnav.speedConstraint ? vnav.targetSpeedKt : undefined;
     }

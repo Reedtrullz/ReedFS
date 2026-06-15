@@ -186,6 +186,22 @@ describe('deriveDisplayFmaTruth', () => {
     expect(fma.captureTargetAltFt).toBe(10000);
   });
 
+  it('does not show ALT_HOLD while descending rapidly below the selected altitude', () => {
+    const aircraft = aircraftAtRoute();
+    aircraft.position.alt = 9_650;
+    aircraft.velocity.w = 12;
+    const raw = apState();
+    raw.truth.verticalActive = 'ALT_HOLD';
+    raw.boeing.vnav = false;
+    raw.boeing.altHold = true;
+    raw.boeing.altitude = 10_000;
+    const routeStatus = createNoRouteStatus();
+
+    const fma = deriveDisplayFmaTruth(raw, { aircraft, flightPlan: null, routeStatus });
+
+    expect(fma.verticalActive).toBe('ALT*');
+  });
+
   it('downgrades VNAV-family truth when the active waypoint has no actionable VNAV constraint', () => {
     const aircraft = aircraftAtRoute();
     const flightPlan = unconstrainedRoute();

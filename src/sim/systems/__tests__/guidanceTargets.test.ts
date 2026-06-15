@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
 import type { FlightPlan } from '@shared/types/fmc';
 import { createInitialState, B737_800_SPEC } from '../../types';
-import { computeRouteStatus, routeStatusToNavOutput } from '../navigation';
+import { computeRouteStatus, createNoRouteStatus, routeStatusToNavOutput } from '../navigation';
 import { computeVNAV } from '../vnav';
 import { resolveAutopilotTargets } from '../autopilot';
 import {
@@ -181,6 +181,24 @@ describe('resolveGuidanceTargets', () => {
     expect(shared.lateral?.mode).toBe('LNAV');
     expect(shared.thrust?.mode).toBe('SPEED');
     expect(shared.vertical).toBeNull();
+  });
+
+  it('exposes selected-altitude ALT* capture targets before ALT_HOLD is stabilized', () => {
+    const aircraft = aircraftAtRoute();
+    aircraft.position.alt = 9_650;
+    aircraft.velocity.w = 12;
+    const ap = apState();
+    ap.truth.verticalActive = 'ALT_HOLD';
+    ap.boeing.vnav = false;
+    ap.boeing.altHold = true;
+    ap.boeing.altitude = 10_000;
+
+    const shared = resolveGuidanceTargets({ aircraft, apState: ap, flightPlan: null, routeStatus: createNoRouteStatus() });
+
+    expect(shared.truth.verticalActive).toBe('ALT*');
+    expect(shared.vertical?.mode).toBe('ALT*');
+    expect(shared.vertical?.targetAltitudeFt).toBe(10_000);
+    expect(shared.vertical?.targetVerticalSpeedFpm).toBeGreaterThan(0);
   });
 
   it('filters shared guidance down to finite supported Flight Director targets', () => {

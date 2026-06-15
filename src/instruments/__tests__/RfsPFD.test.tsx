@@ -389,7 +389,8 @@ describe('RfsPFD', () => {
 
   it('shows Flight Director pitch and roll command bars when FD switches and supported AFDS modes exist', () => {
     const aircraft = structuredClone(useSimStore.getState().aircraft);
-    aircraft.position.alt = 9_000;
+    aircraft.position.alt = 9_950;
+    aircraft.velocity.w = 0;
     aircraft.attitude = { phi: 0, theta: 0, psi: 180 * Math.PI / 180 };
     aircraft.quaternion = eulerToQuat(aircraft.attitude.phi, aircraft.attitude.theta, aircraft.attitude.psi);
     const ap = apStateWithModes();
@@ -409,7 +410,7 @@ describe('RfsPFD', () => {
     expect(screen.getByLabelText('Flight director roll bar')).toBeTruthy();
     expect(screen.getByText('FD ROLL +8.4°')).toBeTruthy();
     expect(screen.getByLabelText('Flight director pitch bar')).toBeTruthy();
-    expect(screen.getByText('FD PITCH +4.0°')).toBeTruthy();
+    expect(screen.getByText('FD PITCH +0.2°')).toBeTruthy();
   });
 
   it('does not draw Flight Director command bars for unsupported backed LNAV and VS modes', () => {
