@@ -45,10 +45,51 @@ async function clickTakeoffSetupButtonRepeatedly(page: Page, name: string, count
   const button = takeoffSetup.getByRole('button', { name });
   await expect(takeoffSetup).toBeVisible();
   await expect(button).toBeVisible();
-  await button.evaluate((element, repeatCount) => {
-    const htmlButton = element as HTMLButtonElement;
-    for (let press = 0; press < repeatCount; press += 1) htmlButton.click();
-  }, count);
+  for (let press = 0; press < count; press += 1) {
+    await button.click();
+  }
+}
+
+const discreteRepeatKeys = new Set(['ArrowUp', 'ArrowDown', 'Digit8', 'Digit9', 'KeyF', 'KeyG']);
+
+export async function holdKey(page: Page, key: string, countOrDurationUnits: number): Promise<void> {
+  if (discreteRepeatKeys.has(key)) {
+    for (let press = 0; press < countOrDurationUnits; press += 1) {
+      await page.keyboard.press(key);
+    }
+    return;
+  }
+
+  await page.keyboard.down(key);
+  try {
+    await page.waitForTimeout(countOrDurationUnits * 100);
+  } finally {
+    await page.keyboard.up(key);
+  }
+}
+
+export async function waitForVisibleAirspeedAtLeast(page: Page, minKt: number): Promise<void> {
+  await expect.poll(async () => (await readVisibleFlightNumbers(page)).iasKt, {
+    timeout: 90_000,
+    intervals: [500],
+  }).toBeGreaterThanOrEqual(minKt);
+}
+
+export async function waitForVisiblePitchAtLeast(page: Page, minPitchDeg: number): Promise<void> {
+  await expect.poll(async () => (await readVisibleFlightNumbers(page)).pitchDeg, {
+    timeout: 10_000,
+    intervals: [250],
+  }).toBeGreaterThanOrEqual(minPitchDeg);
+}
+
+export async function waitForVisiblePositiveRate(page: Page): Promise<void> {
+  await expect.poll(async () => {
+    const numbers = await readVisibleFlightNumbers(page);
+    return numbers.verticalSpeedFpm > 100 && (numbers.radioAltitudeFt ?? 0) >= 5;
+  }, {
+    timeout: 45_000,
+    intervals: [500],
+  }).toBe(true);
 }
 
 export async function configureTakeoffAirframeThroughVisibleControls(page: Page): Promise<void> {

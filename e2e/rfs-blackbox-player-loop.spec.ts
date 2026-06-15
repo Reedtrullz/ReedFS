@@ -1,8 +1,12 @@
 import { expect, test } from '@playwright/test';
 import {
+  holdKey,
   loadKseaRouteThroughVisibleControls,
   openRfsBlackbox,
   startRollThroughVisibleControls,
+  waitForVisibleAirspeedAtLeast,
+  waitForVisiblePitchAtLeast,
+  waitForVisiblePositiveRate,
 } from './helpers/rfsBlackbox';
 
 test.describe('RFS black-box player loop proof', () => {
@@ -24,5 +28,32 @@ test.describe('RFS black-box player loop proof', () => {
     await expect(page.getByRole('button', { name: /^START ROLL$/ })).toBeVisible();
 
     await startRollThroughVisibleControls(page);
+  });
+  test('KSEA route takeoff reaches positive rate and gear up through visible controls', async ({ page }) => {
+    test.setTimeout(180_000);
+
+    await openRfsBlackbox(page);
+    await loadKseaRouteThroughVisibleControls(page);
+
+    const takeoffSetup = page.getByRole('region', { name: 'Takeoff setup' });
+    const currentConfig = takeoffSetup.getByLabel('Current takeoff configuration');
+    await takeoffSetup.getByRole('button', { name: /Set takeoff config/i }).click();
+    await expect(currentConfig).toContainText(/Flaps\s+5/);
+    await expect(currentConfig).toContainText(/Trim\s+5\.0/);
+    await expect(currentConfig).toContainText(/Throttle\s+0%/);
+
+    await startRollThroughVisibleControls(page);
+    await holdKey(page, 'ArrowUp', 20);
+    await expect(currentConfig).toContainText(/Throttle\s+100%/);
+
+    await waitForVisibleAirspeedAtLeast(page, 145);
+    await holdKey(page, 'KeyW', 30);
+    await waitForVisiblePitchAtLeast(page, 5);
+    await waitForVisiblePositiveRate(page);
+
+    await takeoffSetup.getByRole('button', { name: /^Gear$/ }).click();
+    await expect(currentConfig).toContainText(/Gear\s+UP/);
+    await expect(page.getByText(/GEAR CMD\s*UP/).first()).toBeVisible();
+    await expect(page.getByText(/GEAR ACT\s*(?:TRN\s*\d+%|UP)/).first()).toBeVisible();
   });
 });
