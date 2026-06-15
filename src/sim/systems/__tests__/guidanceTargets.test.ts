@@ -5,7 +5,11 @@ import { createInitialState, B737_800_SPEC } from '../../types';
 import { computeRouteStatus, routeStatusToNavOutput } from '../navigation';
 import { computeVNAV } from '../vnav';
 import { resolveAutopilotTargets } from '../autopilot';
-import { resolveGuidanceTargets } from '../guidanceTargets';
+import {
+  hasFlightDirectorGuidanceTarget,
+  resolveFlightDirectorGuidanceTargets,
+  resolveGuidanceTargets,
+} from '../guidanceTargets';
 
 function apState(): AutopilotState {
   return {
@@ -153,5 +157,47 @@ describe('resolveGuidanceTargets', () => {
     expect(shared.lateral).toBeNull();
     expect(shared.vertical).toBeNull();
     expect(shared.thrust).toBeNull();
+  });
+
+  it('filters shared guidance down to finite supported Flight Director targets', () => {
+    const sharedTargets = {
+      truth: {
+        thrustActive: 'OFF' as const,
+        lateralActive: 'HDG_SEL' as const,
+        verticalActive: 'ALT_HOLD' as const,
+        autopilotStatus: 'CMD_A' as const,
+        lastModeChangeTimestamps: { thrust: 0, lateral: 0, vertical: 0 },
+      },
+      lateral: { mode: 'HDG_SEL' as const, targetHeadingRad: Math.PI / 2 },
+      vertical: { mode: 'ALT_HOLD' as const, targetAltitudeFt: 12_000 },
+      thrust: null,
+    };
+
+    const shared = resolveFlightDirectorGuidanceTargets(sharedTargets);
+
+    expect(shared.lateral).toEqual({ mode: 'HDG_SEL', targetHeadingRad: Math.PI / 2 });
+    expect(shared.vertical).toEqual({ mode: 'ALT_HOLD', targetAltitudeFt: 12_000 });
+    expect(hasFlightDirectorGuidanceTarget(sharedTargets)).toBe(true);
+  });
+
+  it('does not expose malformed or unsupported Flight Director targets as command guidance', () => {
+    const unsupportedTargets = {
+      truth: {
+        thrustActive: 'OFF' as const,
+        lateralActive: 'LNAV' as const,
+        verticalActive: 'VS' as const,
+        autopilotStatus: 'CMD_A' as const,
+        lastModeChangeTimestamps: { thrust: 0, lateral: 0, vertical: 0 },
+      },
+      lateral: { mode: 'LNAV' as const, targetHeadingRad: Number.NaN },
+      vertical: { mode: 'ALT_HOLD' as const },
+      thrust: null,
+    };
+
+    const malformed = resolveFlightDirectorGuidanceTargets(unsupportedTargets);
+
+    expect(malformed.lateral).toBeNull();
+    expect(malformed.vertical).toBeNull();
+    expect(hasFlightDirectorGuidanceTarget(unsupportedTargets)).toBe(false);
   });
 });

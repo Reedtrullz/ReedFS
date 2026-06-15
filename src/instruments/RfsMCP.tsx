@@ -9,6 +9,7 @@ import {
   type McpModeAvailability,
   type McpModeAvailabilityState,
 } from '../store/selectors';
+import { hasFlightDirectorGuidanceTarget, resolveGuidanceTargets } from '../sim/systems/guidanceTargets';
 
 export { mcpModeAvailability };
 export type { EnabledMcpMode, McpModeAvailability, McpModeAvailabilityState };
@@ -45,6 +46,14 @@ const targetDisplayStyle: React.CSSProperties = {
   minWidth: 64,
   display: 'inline-block',
   textAlign: 'center',
+};
+
+const advisoryStyle: React.CSSProperties = {
+  color: '#f6d365',
+  fontFamily: 'monospace',
+  fontSize: 10,
+  marginBottom: 4,
+  maxWidth: 220,
 };
 
 type McpTarget = 'speed' | 'heading' | 'altitude' | 'verticalSpeed';
@@ -109,6 +118,18 @@ export function RfsMCP() {
     altitudeTarget,
     verticalSpeedTarget,
   } = useSimStore(selectMcpViewModel);
+  const fdGuidanceUnavailable = useSimStore((s) => {
+    if (!s.apState?.boeing.fdLeft && !s.apState?.boeing.fdRight) return false;
+    const sharedTargets = resolveGuidanceTargets({
+      aircraft: s.aircraft,
+      apState: s.apState,
+      flightPlan: s.flightPlan,
+      routeStatus: s.routeStatus,
+      activeLegIndex: s.activeLegIndex,
+      wind: s.wind,
+    });
+    return !hasFlightDirectorGuidanceTarget(sharedTargets);
+  });
 
   const toggleMode = (mode: EnabledMcpMode) => {
     const state = useSimStore.getState();
@@ -163,8 +184,13 @@ export function RfsMCP() {
         MCP
       </div>
       {unavailableSummary && (
-        <div role="status" style={{ color: '#f6d365', fontFamily: 'monospace', fontSize: 10, marginBottom: 4, maxWidth: 220 }}>
+        <div role="status" style={advisoryStyle}>
           MCP modes unavailable: {unavailableSummary}
+        </div>
+      )}
+      {fdGuidanceUnavailable && (
+        <div role="status" style={advisoryStyle}>
+          FD guidance unavailable until supported mode selected
         </div>
       )}
       <div aria-label="Flight Director switches" style={{ marginBottom: 4 }}>

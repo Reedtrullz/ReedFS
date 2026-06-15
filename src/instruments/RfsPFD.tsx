@@ -28,9 +28,12 @@ import {
   selectPfdVelocityW,
   selectPfdVerticalSpeed,
 } from '../store/selectors';
-import { routeStatusToNavOutput, type RouteStatusSnapshot } from '../sim/systems/navigation';
-import { computeVNAV } from '../sim/systems/vnav';
-import { resolveGuidanceTargets, type SharedGuidanceTargets } from '../sim/systems/guidanceTargets';
+import type { RouteStatusSnapshot } from '../sim/systems/navigation';
+import {
+  resolveFlightDirectorGuidanceTargets,
+  resolveGuidanceTargets,
+  type SharedGuidanceTargets,
+} from '../sim/systems/guidanceTargets';
 import { maybeFindPerformanceCardForScenario, type B737VSpeeds } from '../sim/data/performance/b737PerformanceCards';
 import type { AircraftState } from '../sim/types';
 import type { FlightPlan } from '@shared/types/fmc';
@@ -139,8 +142,7 @@ function finiteNumber(value: number | null | undefined): number | null {
   return Number.isFinite(value) ? (value as number) : null;
 }
 
-type FlightDirectorMode = 'HDG_SEL' | 'LNAV' | 'ALT_HOLD' | 'VS' | 'VNAV' | 'VNAV_PTH' | 'ALT*';
-type VnavFlightDirectorMode = Extract<FlightDirectorMode, 'VNAV' | 'VNAV_PTH' | 'ALT*'>;
+type FlightDirectorMode = 'HDG_SEL' | 'ALT_HOLD';
 
 interface FlightDirectorAxisCue {
   commandDeg: number;
@@ -170,30 +172,6 @@ export interface FlightDirectorCueInput {
   guidanceTargets?: SharedGuidanceTargets | null;
 }
 
-const VNAV_FD_MODES: ReadonlySet<VnavFlightDirectorMode> = new Set(['VNAV', 'VNAV_PTH', 'ALT*']);
-
-function isVnavFlightDirectorMode(mode: string): mode is VnavFlightDirectorMode {
-  return VNAV_FD_MODES.has(mode as VnavFlightDirectorMode);
-}
-
-function verticalSpeedTargetWithAltitudeCapture(
-  targetVerticalSpeedFpm: number,
-  selectedAltitudeFt: number | null | undefined,
-  altitudeFt: number,
-): number {
-  const selectedAltitude = finiteNumber(selectedAltitudeFt);
-  if (selectedAltitude === null || selectedAltitude <= 0) return targetVerticalSpeedFpm;
-
-  const altitudeDeltaFt = selectedAltitude - altitudeFt;
-  const captureWindowFt = 500;
-  const enteringCaptureWindow = Math.abs(altitudeDeltaFt) < captureWindowFt * 2
-    && ((targetVerticalSpeedFpm > 0 && altitudeDeltaFt <= captureWindowFt)
-      || (targetVerticalSpeedFpm < 0 && altitudeDeltaFt >= -captureWindowFt));
-  if (!enteringCaptureWindow) return targetVerticalSpeedFpm;
-
-  return targetVerticalSpeedFpm * Math.max(0, Math.abs(altitudeDeltaFt) / captureWindowFt);
-}
-
 function rollCommandForHeadingTarget(targetHeadingDeg: number, currentHeadingDeg: number, currentRollDeg: number): number {
   const targetBankDeg = clampValue(headingErrorDeg(targetHeadingDeg, currentHeadingDeg) * 0.28, -30, 30);
   return clampValue(targetBankDeg - currentRollDeg, -30, 30);
@@ -204,15 +182,12 @@ function pitchCommandForAltitudeTarget(targetAltitudeFt: number, altitudeFt: num
   return clampValue(targetPitchDeg - currentPitchDeg, -10, 10);
 }
 
-function pitchCommandForVerticalSpeedTarget(targetVerticalSpeedFpm: number, currentVerticalSpeedFpm: number, currentPitchDeg: number): number {
-  const targetPitchDeg = clampValue((targetVerticalSpeedFpm - currentVerticalSpeedFpm) * 0.00015, -8, 15);
-  return clampValue(targetPitchDeg - currentPitchDeg, -10, 10);
-}
-
 export function deriveFlightDirectorCue(input: FlightDirectorCueInput): FlightDirectorCue {
   if (!input.enabled) return { roll: null, pitch: null };
 
-  const sharedTargets = input.guidanceTargets;
+  const sharedTargets = input.guidanceTargets
+    ? resolveFlightDirectorGuidanceTargets(input.guidanceTargets)
+    : null;
   let roll: FlightDirectorAxisCue | null = null;
   if (sharedTargets) {
     if (sharedTargets.lateral) {
@@ -229,14 +204,6 @@ export function deriveFlightDirectorCue(input: FlightDirectorCueInput): FlightDi
         mode: 'HDG_SEL',
       };
     }
-  } else if (input.lateralMode === 'LNAV' && input.routeStatus) {
-    const nav = routeStatusToNavOutput(input.routeStatus, { maxInterceptDeg: 25 });
-    if (nav) {
-      roll = {
-        commandDeg: rollCommandForHeadingTarget((nav.desiredTrack * 180) / Math.PI, input.currentHeadingDeg, input.currentRollDeg),
-        mode: 'LNAV',
-      };
-    }
   }
 
   let pitch: FlightDirectorAxisCue | null = null;
@@ -247,11 +214,6 @@ export function deriveFlightDirectorCue(input: FlightDirectorCueInput): FlightDi
         commandDeg: pitchCommandForAltitudeTarget(target.targetAltitudeFt as number, input.altitudeFt, input.currentPitchDeg),
         mode: target.mode,
       };
-    } else if (target && (target.mode === 'VS' || target.mode === 'VNAV_PTH' || target.mode === 'ALT*') && Number.isFinite(target.targetVerticalSpeedFpm)) {
-      pitch = {
-        commandDeg: pitchCommandForVerticalSpeedTarget(target.targetVerticalSpeedFpm as number, input.currentVerticalSpeedFpm, input.currentPitchDeg),
-        mode: target.mode,
-      };
     }
   } else if (input.verticalMode === 'ALT_HOLD') {
     const selectedAltitude = finiteNumber(input.selectedAltitudeFt);
@@ -260,30 +222,6 @@ export function deriveFlightDirectorCue(input: FlightDirectorCueInput): FlightDi
         commandDeg: pitchCommandForAltitudeTarget(selectedAltitude, input.altitudeFt, input.currentPitchDeg),
         mode: 'ALT_HOLD',
       };
-    }
-  } else if (input.verticalMode === 'VS') {
-    const selectedVerticalSpeed = finiteNumber(input.selectedVerticalSpeedFpm);
-    if (selectedVerticalSpeed !== null) {
-      const targetVerticalSpeed = verticalSpeedTargetWithAltitudeCapture(
-        selectedVerticalSpeed,
-        input.selectedAltitudeFt,
-        input.altitudeFt,
-      );
-      pitch = {
-        commandDeg: pitchCommandForVerticalSpeedTarget(targetVerticalSpeed, input.currentVerticalSpeedFpm, input.currentPitchDeg),
-        mode: 'VS',
-      };
-    }
-  } else if (isVnavFlightDirectorMode(input.verticalMode) && input.flightPlan && input.routeStatus) {
-    const nav = routeStatusToNavOutput(input.routeStatus, { maxInterceptDeg: 25 });
-    if (nav) {
-      const vnav = computeVNAV(input.aircraft, input.flightPlan, nav);
-      if (vnav.available && vnav.altitudeConstraint && vnav.lifecycle !== 'ARMED') {
-        pitch = {
-          commandDeg: pitchCommandForVerticalSpeedTarget(vnav.targetVs, input.currentVerticalSpeedFpm, input.currentPitchDeg),
-          mode: input.verticalMode,
-        };
-      }
     }
   }
 

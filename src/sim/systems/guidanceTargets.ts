@@ -45,6 +45,36 @@ export interface SharedGuidanceTargets {
   thrust: ThrustGuidanceTarget | null;
 }
 
+export interface FlightDirectorLateralGuidanceTarget {
+  mode: 'HDG_SEL';
+  targetHeadingRad: number;
+}
+
+export interface FlightDirectorVerticalGuidanceTarget {
+  mode: 'ALT_HOLD';
+  targetAltitudeFt: number;
+}
+
+export interface FlightDirectorGuidanceTargets {
+  lateral: FlightDirectorLateralGuidanceTarget | null;
+  vertical: FlightDirectorVerticalGuidanceTarget | null;
+}
+
+export function resolveFlightDirectorGuidanceTargets(targets: SharedGuidanceTargets): FlightDirectorGuidanceTargets {
+  const lateral: FlightDirectorLateralGuidanceTarget | null = targets.lateral?.mode === 'HDG_SEL' && Number.isFinite(targets.lateral.targetHeadingRad)
+    ? { mode: 'HDG_SEL', targetHeadingRad: targets.lateral.targetHeadingRad }
+    : null;
+  const vertical: FlightDirectorVerticalGuidanceTarget | null = targets.vertical?.mode === 'ALT_HOLD' && Number.isFinite(targets.vertical.targetAltitudeFt)
+    ? { mode: 'ALT_HOLD', targetAltitudeFt: targets.vertical.targetAltitudeFt as number }
+    : null;
+  return { lateral, vertical };
+}
+
+export function hasFlightDirectorGuidanceTarget(targets: SharedGuidanceTargets): boolean {
+  const fdTargets = resolveFlightDirectorGuidanceTargets(targets);
+  return fdTargets.lateral !== null || fdTargets.vertical !== null;
+}
+
 export interface ResolveGuidanceTargetsInput {
   aircraft: AircraftState;
   apState: AutopilotState | null | undefined;

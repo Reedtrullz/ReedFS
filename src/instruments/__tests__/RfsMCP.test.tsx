@@ -72,6 +72,32 @@ describe('RfsMCP', () => {
     expect(screen.getByRole('button', { name: 'FD L' }).getAttribute('aria-pressed')).toBe('true');
   });
 
+  it('labels Flight Director switch-only state as non-commanding until a supported mode is selected', () => {
+    setAirborneRuntime();
+    render(
+      <>
+        <RfsMCP />
+        <RfsPFD />
+      </>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'FD L' }));
+
+    expect(screen.getByText('FD guidance unavailable until supported mode selected')).toBeTruthy();
+    expect(screen.queryByLabelText('Flight director roll bar')).toBeNull();
+    expect(screen.queryByLabelText('Flight director pitch bar')).toBeNull();
+    const fdOnlyAp = useSimStore.getState().apState;
+    expect(fdOnlyAp?.boeing.cmdA).toBe(false);
+    expect(fdOnlyAp?.truth.autopilotStatus).toBe('OFF');
+    expect(fdOnlyAp?.truth.lateralActive).toBe('OFF');
+    expect(fdOnlyAp?.truth.verticalActive).toBe('OFF');
+
+    fireEvent.click(screen.getByRole('button', { name: 'HDG' }));
+
+    expect(screen.queryByText('FD guidance unavailable until supported mode selected')).toBeNull();
+    expect(screen.getByLabelText('Flight director roll bar')).toBeTruthy();
+  });
+
   it('marks parked MCP mode buttons unavailable with visible reasons and no active truth', () => {
     render(<RfsMCP />);
 
