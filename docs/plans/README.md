@@ -8,6 +8,8 @@ Current source-of-truth documents:
 - `../physics-invariants.md` — active physics contracts and regression checklist.
 - `../roadmap.md` — prioritized necessary enhancements.
 - `../runbooks/branch-protection.md` and `../runbooks/release-closeout.md` — current release-governance verification runbooks; `master` branch protection is enabled/verified and live/deployed claims require exact-SHA checker evidence.
+- `2026-06-15-rfs-comprehensive-remaining-work-remediation.md` — current comprehensive remediation implementation plan for the June 15 deep remaining-work review; sequences P0 proof blockers, visual/layout repair, KPDX 10R alignment, full-flight black-box acceptance, source-data/governance disposition, docs sync, and exact-SHA commit/push/CI/live verification.
+- `../reviews/2026-06-15-rfs-comprehensive-remaining-work-review.md` — latest deep remaining-work review for the current dirty `review/2026-06-14-meaningful-use-round3` tree; records local gate evidence, visual/E2E blockers, route/landing mismatch, proof-boundary risks, and remaining work.
 - `2026-06-14-rfs-strict-meaningful-use-round3-remediation.md` — reviewed implementation plan covering RFS-R3-001 through RFS-R3-044 with Task 7 as final continuous black-box acceptance after prerequisite fixes.
 - `../reviews/2026-06-14-rfs-strict-meaningful-use-round3.md` — current strict round-3 meaningful-use review; Task 7 remains blocked by visible takeoff setup truth, black-box proof scope, AP vertical truth, and route-to-approach/landing continuity gaps.
 - `../reviews/2026-06-13-rfs-meaningful-use-remediation-closeout.md` — final 46-finding closeout ledger and proof-boundary record for the June 13 meaningful-use remediation pass.

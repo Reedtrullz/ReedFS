@@ -4,6 +4,8 @@ This roadmap lists the enhancements that remain after the foundation stabilizati
 
 Latest comprehensive remaining-work audit, remediation closeout, and next implementation plan:
 
+- `docs/reviews/2026-06-15-rfs-comprehensive-remaining-work-review.md` — latest deep remaining-work review for the current dirty `review/2026-06-14-meaningful-use-round3` tree; local `npm run check` is green, local visual regression is red, full E2E hit a seeded-descent guidance mismatch before being killed, and full-flight/full-route claims remain blocked until the visible-control black-box proof, route/landing runway alignment, visual layout, and CI/live verification are complete.
+- `docs/plans/2026-06-15-rfs-comprehensive-remaining-work-remediation.md` — current implementation plan for closing the June 15 review findings in proof-safe order: classify dirty work, fix seeded/visible E2E truth, align KSEA→KPDX on KPDX 10R, repair visual/layout proof, disposition realism/data/source gaps, update docs, then commit/push and verify exact-SHA GitHub Actions/live evidence without overclaiming.
 - `docs/plans/2026-06-14-rfs-strict-meaningful-use-round3-remediation.md` — reviewed implementation plan covering RFS-R3-001 through RFS-R3-044 with Task 7 as final continuous black-box acceptance after prerequisite fixes.
 - `docs/reviews/2026-06-14-rfs-strict-meaningful-use-round3.md` — current strict round-3 meaningful-use review; Task 7 remains blocked by visible takeoff setup truth, black-box proof scope, AP vertical truth, and route-to-approach/landing continuity gaps.
 - `docs/reviews/2026-06-13-rfs-meaningful-use-remediation-closeout.md` — final 46-finding closeout ledger and proof-boundary record for the June 13 meaningful-use remediation pass.
