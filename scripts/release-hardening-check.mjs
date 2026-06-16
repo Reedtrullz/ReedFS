@@ -54,7 +54,7 @@ const requiredActions = [
   ["gitleaks/gitleaks-action", "e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e"],
   ["github/codeql-action/init", "8aad20d150bbac5944a9f9d289da16a4b0d87c1e"],
   ["github/codeql-action/analyze", "8aad20d150bbac5944a9f9d289da16a4b0d87c1e"],
-  ["aquasecurity/trivy-action", "57a97c7e7821a5776cebc9bb87c984fa69cba8f1"],
+  ["aquasecurity/trivy-action", "ed142fd0673e97e23eac54620cfb913e5ce36c25"],
 ];
 for (const [action, sha] of requiredActions) {
   check(allWorkflowYaml.includes(`uses: ${action}@${sha}`), `workflow must pin ${action} to ${sha}`);
@@ -72,7 +72,7 @@ check(codeql.includes("security-events: write"), "CodeQL workflow must have secu
 check(codeql.includes("languages: javascript-typescript"), "CodeQL workflow must analyze JavaScript/TypeScript");
 check(codeql.includes("build-mode: none"), "CodeQL workflow must use no-build analysis for JS/TS");
 
-check(ci.includes("aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1"), "docker-smoke job must run pinned Trivy image scan");
+check(ci.includes("aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25"), "docker-smoke job must run pinned Trivy image scan");
 check(ci.includes("image-ref: rfs:pr-smoke-${{ github.sha }}"), "Trivy scan must inspect the PR-safe smoke image");
 check(ci.includes("severity: HIGH,CRITICAL") && ci.includes("exit-code: '1'"), "Trivy scan must fail on HIGH/CRITICAL vulnerabilities");
 
