@@ -80,6 +80,7 @@ export function ScenarioPanel() {
   const checklist = guidance.checklist;
   const coach = guidance.coachMessage;
   const pickerDisabled = status === 'running';
+  const showPersistenceControls = status !== 'running';
   const selectedSlot = scenarioSaveSlots.find((slot) => slot.id === selectedSlotId) ?? scenarioSaveSlots[0] ?? null;
   const pendingOverwriteSlot = useMemo(
     () => scenarioSaveSlots.find((slot) => slot.id === pendingOverwriteSlotId) ?? null,
@@ -125,72 +126,76 @@ export function ScenarioPanel() {
       </select>
       <div style={{ color: '#9db2bc', fontSize: 11, marginTop: 6 }}>{scenario.description}</div>
 
-      <div aria-label="Scenario persistence controls" style={{ marginTop: 10, display: 'grid', gap: 8 }}>
-        <label htmlFor="save-slot-name" style={{ color: '#9ddcff', fontSize: 11, fontWeight: 800 }}>
-          Save slot name
-        </label>
-        <input
-          id="save-slot-name"
-          aria-label="Save slot name"
-          value={slotName}
-          onChange={(event) => {
-            setSlotName(event.currentTarget.value);
-            setPendingOverwriteSlotId(null);
-          }}
-          style={fieldStyle}
-        />
-        <label htmlFor="saved-scenario-slot" style={{ color: '#9ddcff', fontSize: 11, fontWeight: 800 }}>
-          Saved scenario slot
-        </label>
-        <select
-          id="saved-scenario-slot"
-          aria-label="Saved scenario slot"
-          value={selectedSlot?.id ?? ''}
-          onChange={(event) => setSelectedSlotId(event.currentTarget.value)}
-          style={fieldStyle}
-        >
-          {scenarioSaveSlots.length === 0 ? <option value="">No saved slots</option> : null}
-          {scenarioSaveSlots.map((slot) => (
-            <option key={slot.id} value={slot.id}>{slot.name}</option>
-          ))}
-        </select>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button aria-label="Save scenario state" style={buttonStyle} onClick={() => saveSlot(false)}>
-            SAVE
-          </button>
-          <button aria-label="Load saved scenario state" style={buttonStyle} onClick={loadSelectedSlot}>
-            LOAD
-          </button>
-        </div>
-        {pendingOverwriteSlot ? (
-          <div style={{ color: '#ffd84a', fontSize: 11 }}>
-            <div>Overwrite {pendingOverwriteSlot.name}?</div>
-            <div style={{ display: 'flex', gap: 6, marginTop: 5 }}>
-              <button aria-label={`Confirm overwrite ${pendingOverwriteSlot.name}`} style={buttonStyle} onClick={() => saveSlot(true)}>
-                CONFIRM
-              </button>
-              <button aria-label="Cancel overwrite" style={buttonStyle} onClick={() => setPendingOverwriteSlotId(null)}>
-                CANCEL
-              </button>
-            </div>
+      {showPersistenceControls ? (
+        <div aria-label="Scenario persistence controls" style={{ marginTop: 10, display: 'grid', gap: 8 }}>
+          <label htmlFor="save-slot-name" style={{ color: '#9ddcff', fontSize: 11, fontWeight: 800 }}>
+            Save slot name
+          </label>
+          <input
+            id="save-slot-name"
+            aria-label="Save slot name"
+            value={slotName}
+            onChange={(event) => {
+              setSlotName(event.currentTarget.value);
+              setPendingOverwriteSlotId(null);
+            }}
+            style={fieldStyle}
+          />
+          <label htmlFor="saved-scenario-slot" style={{ color: '#9ddcff', fontSize: 11, fontWeight: 800 }}>
+            Saved scenario slot
+          </label>
+          <select
+            id="saved-scenario-slot"
+            aria-label="Saved scenario slot"
+            value={selectedSlot?.id ?? ''}
+            onChange={(event) => setSelectedSlotId(event.currentTarget.value)}
+            style={fieldStyle}
+          >
+            {scenarioSaveSlots.length === 0 ? <option value="">No saved slots</option> : null}
+            {scenarioSaveSlots.map((slot) => (
+              <option key={slot.id} value={slot.id}>{slot.name}</option>
+            ))}
+          </select>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button aria-label="Save scenario state" style={buttonStyle} onClick={() => saveSlot(false)}>
+              SAVE
+            </button>
+            <button aria-label="Load saved scenario state" style={buttonStyle} onClick={loadSelectedSlot}>
+              LOAD
+            </button>
           </div>
-        ) : null}
-      </div>
-      {persistenceMessage ? (
+          {pendingOverwriteSlot ? (
+            <div style={{ color: '#ffd84a', fontSize: 11 }}>
+              <div>Overwrite {pendingOverwriteSlot.name}?</div>
+              <div style={{ display: 'flex', gap: 6, marginTop: 5 }}>
+                <button aria-label={`Confirm overwrite ${pendingOverwriteSlot.name}`} style={buttonStyle} onClick={() => saveSlot(true)}>
+                  CONFIRM
+                </button>
+                <button aria-label="Cancel overwrite" style={buttonStyle} onClick={() => setPendingOverwriteSlotId(null)}>
+                  CANCEL
+                </button>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+      {showPersistenceControls && persistenceMessage ? (
         <div role="status" style={{ color: '#ffd84a', fontSize: 11, marginTop: 6 }}>
           {persistenceMessage}
         </div>
       ) : null}
-      <div aria-label="Saved scenario slots" style={{ display: 'grid', gap: 6, marginTop: 8 }}>
-        {scenarioSaveSlots.map((slot) => (
-          <div key={slot.id} style={{ border: '1px solid rgba(157,220,255,0.18)', borderRadius: 4, padding: 6, fontSize: 11 }}>
-            <strong style={{ color: '#ffffff' }}>{slot.name}</strong>
-            <div style={{ color: '#9db2bc' }}>
-              {scenarioName(slot.selectedScenarioId)} · {slot.routeSummary} · restore {slot.restoreStatus} · {formatSlotTime(slot.savedAtIso)}
+      {showPersistenceControls ? (
+        <div aria-label="Saved scenario slots" style={{ display: 'grid', gap: 6, marginTop: 8 }}>
+          {scenarioSaveSlots.map((slot) => (
+            <div key={slot.id} style={{ border: '1px solid rgba(157,220,255,0.18)', borderRadius: 4, padding: 6, fontSize: 11 }}>
+              <strong style={{ color: '#ffffff' }}>{slot.name}</strong>
+              <div style={{ color: '#9db2bc' }}>
+                {scenarioName(slot.selectedScenarioId)} · {slot.routeSummary} · restore {slot.restoreStatus} · {formatSlotTime(slot.savedAtIso)}
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      ) : null}
 
       <div style={{ marginTop: 12, borderTop: '1px solid rgba(157,220,255,0.18)', paddingTop: 10 }}>
         <div style={{ color: '#9ddcff', fontSize: 12, fontWeight: 800, letterSpacing: 1.2 }}>Tutorial</div>

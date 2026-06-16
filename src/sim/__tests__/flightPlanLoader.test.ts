@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { createDefaultFlightForScenario, createKseaKpdxFlight, createKseaKpdxRouteSource, KSEA_KPDX_APPROACH_CONTRACT } from '../flightPlanLoader';
+import {
+  createDefaultFlightForScenario,
+  createEnvaAutopilotCheckoutFlight,
+  createKseaKpdxFlight,
+  createKseaKpdxRouteSource,
+  KSEA_KPDX_APPROACH_CONTRACT,
+} from '../flightPlanLoader';
 import { ENVA_TUTORIAL_SCENARIO, KPDX_TUTORIAL_SCENARIO } from '../scenarios';
 import { KPDX_RUNWAY_10R_APPROACH } from '../../viewport/runwayData';
 
@@ -73,7 +79,20 @@ describe('flightPlanLoader', () => {
     expect(source.limitations.join(' ')).toMatch(/not official procedure/i);
   });
 
-  it('keeps unsupported ENVA default route unavailable', () => {
-    expect(createDefaultFlightForScenario(ENVA_TUTORIAL_SCENARIO)).toBeNull();
+  it('provides an ENVA autopilot checkout route for the default tutorial scenario', () => {
+    const route = createEnvaAutopilotCheckoutFlight();
+
+    expect(route.origin).toBe('ENVA');
+    expect(route.destination).toBe('ENVA_APCHK');
+    expect(route.route).toBe('ENVA ENVA09_CLB ENVA_APCHK');
+    expect(route.waypoints).toHaveLength(3);
+    expect(route.waypoints.every((waypoint) => waypoint.coordinateSource === 'synthetic')).toBe(true);
+    expect(route.waypoints[1]).toMatchObject({
+      ident: 'ENVA09_CLB',
+      altitudeConstraint: { type: 'AT_OR_ABOVE', altitude: 3000 },
+      speedConstraint: { type: 'AT_OR_BELOW', speed: 250 },
+    });
+
+    expect(createDefaultFlightForScenario(ENVA_TUTORIAL_SCENARIO)).toEqual(route);
   });
 });

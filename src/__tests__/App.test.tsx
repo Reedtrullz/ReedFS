@@ -539,7 +539,7 @@ describe('App', () => {
     expect(screen.queryByText(/no default route/i)).toBeNull();
   });
 
-  it('LOAD PLAN keeps NO ROUTE and does not arm route AP modes for the default ENVA scenario', () => {
+  it('LOAD PLAN provides the default ENVA scenario with a local autopilot checkout route', () => {
     const store = useSimStore.getState();
     store.selectedScenarioId = 'enva-tutorial';
     store.aircraft.position = { lat: 63.4583, lon: 10.9101, alt: 40 };
@@ -549,25 +549,26 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: 'LOAD PLAN' }));
 
     expect(mockSetFlightPlan).toHaveBeenCalledTimes(1);
-    expect(mockSetFlightPlan).toHaveBeenCalledWith(null);
+    expect(mockSetFlightPlan).toHaveBeenCalledWith(expect.objectContaining({ origin: 'ENVA', destination: 'ENVA_APCHK' }));
     expect(mockSetApState).not.toHaveBeenCalled();
-    expect(screen.getByText(/no default route/i)).toBeTruthy();
+    expect(screen.getByRole('status', { name: 'Route load result' }).textContent).toMatch(/ENVA→ENVA_APCHK/);
+    expect(screen.queryByText(/no default route/i)).toBeNull();
   });
 
-  it('LOAD PLAN clears stale no-route feedback after loading a compatible KSEA route', () => {
+  it('LOAD PLAN replaces the ENVA checkout feedback after loading a compatible KSEA route', () => {
     const store = useSimStore.getState();
     store.selectedScenarioId = 'enva-tutorial';
 
     render(<App />);
 
     fireEvent.click(screen.getByRole('button', { name: 'LOAD PLAN' }));
-    expect(screen.getByText(/no default route/i)).toBeTruthy();
+    expect(screen.getByRole('status', { name: 'Route load result' }).textContent).toMatch(/ENVA→ENVA_APCHK/);
 
     store.selectedScenarioId = 'ksea-tutorial';
     fireEvent.click(screen.getByRole('button', { name: 'LOAD PLAN' }));
 
     expect(mockSetFlightPlan).toHaveBeenLastCalledWith(expect.objectContaining({ origin: 'KSEA', destination: 'KPDX' }));
-    expect(screen.queryByText(/no default route/i)).toBeNull();
+    expect(screen.getByRole('status', { name: 'Route load result' }).textContent).toMatch(/KSEA→KPDX/);
   });
 
   it('drives simulator, camera, and overlay commands from edge-triggered gamepad input', async () => {
@@ -863,6 +864,18 @@ describe('App', () => {
     expect(screen.getByRole('status', { name: 'Route load result' }).textContent).toBe(
       'CANNED TRAINING ROUTE KSEA→KPDX loaded. Route editing is unavailable; synthetic approach fixes are not official procedure data; route guidance is active; use visible MCP LNAV, altitude, and VS/VNAV controls for climb/descent management.',
     );
+  });
+
+  it('hides the takeoff setup panel after the aircraft reaches climb so flight overlay clutter drops away', () => {
+    const store = useSimStore.getState();
+    store.status = 'running';
+    store.aircraft.flightPhase = 'CLIMB';
+
+    render(<App />);
+
+    expect(screen.queryByRole('region', { name: 'Takeoff setup' })).toBeNull();
+    expect(screen.getByRole('region', { name: 'Scenario and tutorial' })).toBeTruthy();
+    expect(screen.getByLabelText('Route status')).toBeTruthy();
   });
 
   it('defers viewer-dependent layers until the Cesium viewer is ready', async () => {

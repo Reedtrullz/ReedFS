@@ -128,6 +128,20 @@ describe('ScenarioPanel', () => {
     expect(screen.getByText(/Pattern Practice overwritten/i)).toBeTruthy();
   });
 
+  it('hides verbose save/load controls while the scenario is running', () => {
+    useSimStore.setState({ status: 'running' });
+
+    render(<ScenarioPanel />);
+
+    expect(screen.getByRole('region', { name: 'Scenario and tutorial' })).toBeTruthy();
+    expect(screen.queryByLabelText('Save slot name')).toBeNull();
+    expect(screen.queryByLabelText('Saved scenario slot')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Save scenario state' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Load saved scenario state' })).toBeNull();
+    expect(screen.getByText('Tutorial')).toBeTruthy();
+    expect(screen.getByText('Checklist')).toBeTruthy();
+  });
+
   it('shows a load warning when a selected named slot is corrupt', () => {
     window.localStorage.setItem(SCENARIO_SAVE_KEY, JSON.stringify({
       version: 3,

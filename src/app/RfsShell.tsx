@@ -103,6 +103,7 @@ export function RfsShell() {
   const simRate = useSimStore((s) => s.simRate);
   const cycleSimRate = useSimStore((s) => s.cycleSimRate);
   const status = useSimStore((s) => s.status);
+  const flightPhase = useSimStore((s) => s.aircraft.flightPhase);
   const selectedScenarioId = useSimStore((s) => s.selectedScenarioId);
   const setInput = useSimStore((s) => s.setInput);
   const { activeScenario, metarData } = useScenarioWeather(selectedScenarioId);
@@ -248,9 +249,10 @@ export function RfsShell() {
     const routeGuidance = store.status === 'stopped'
       ? `confirm flaps ${scenario.flapSetting}, trim ${scenario.stabilizerTrimUnits.toFixed(1)}, idle throttle, then START ROLL.`
       : 'route guidance is active; use visible MCP LNAV, altitude, and VS/VNAV controls for climb/descent management.';
-    setRouteLoadMessage(
-      `CANNED TRAINING ROUTE ${fp.origin}→${fp.destination} loaded. Route editing is unavailable; synthetic approach fixes are not official procedure data; ${routeGuidance}`,
-    );
+    const routeLimitations = fp.destination === 'KPDX'
+      ? 'Route editing is unavailable; synthetic approach fixes are not official procedure data;'
+      : 'Route editing is unavailable; synthetic checkout fixes are for autopilot practice only, not official procedure data;';
+    setRouteLoadMessage(`CANNED TRAINING ROUTE ${fp.origin}→${fp.destination} loaded. ${routeLimitations} ${routeGuidance}`);
   };
 
   const applyGamepadMcpCommand = useCallback((command: GamepadCommand) => {
@@ -296,6 +298,7 @@ export function RfsShell() {
 
   const showDebugOverlays = shouldShowDebugOverlays(overlayMode);
   const showFlightInstruments = shouldShowFlightInstruments(overlayMode);
+  const showTakeoffSetupPanel = showFlightInstruments && ['PARKED', 'TAXI', 'TAKEOFF'].includes(flightPhase);
   const viewerReady = viewerGeneration > 0;
   const audioCaptionNode = audioSettings.captionsEnabled && audioCaption ? (
     <div aria-label="Audio caption" aria-live="polite" role="status" style={audioCaptionStyle}>
@@ -351,7 +354,7 @@ export function RfsShell() {
       sceneStatus={<SceneStatus policy={cesiumScenePolicy} />}
       scenarioPanel={showFlightInstruments ? <ScenarioPanel /> : null}
       routeStatus={showFlightInstruments ? <RouteStatus /> : null}
-      takeoffSetupPanel={showFlightInstruments ? <TakeoffSetupPanel /> : null}
+      takeoffSetupPanel={showTakeoffSetupPanel ? <TakeoffSetupPanel /> : null}
       engineStrip={<EngineStrip />}
       buildWatermark={showDebugOverlays ? <>RFS — Flight Test Build</> : null}
       fpsMonitor={showDebugOverlays ? <FPSMonitor registerFrameEffect={registerFrameEffect} /> : null}

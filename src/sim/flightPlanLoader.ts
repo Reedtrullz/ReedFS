@@ -1,7 +1,12 @@
 import type { FlightPlan, FlightPlanWaypoint } from '@shared/types/fmc';
 import { createRouteSourceFromFlightPlan, type RouteSource } from './fms/routeAdapter';
 import type { FlightScenario } from './scenarios';
-import { KPDX_RUNWAY_10R_APPROACH, type RunwayApproachFixReference, type RunwayThresholdApproachReference } from '../viewport/runwayData';
+import {
+  ENVA_RUNWAY_09,
+  KPDX_RUNWAY_10R_APPROACH,
+  type RunwayApproachFixReference,
+  type RunwayThresholdApproachReference,
+} from '../viewport/runwayData';
 
 export const KSEA_KPDX_APPROACH_CONTRACT = {
   id: 'ksea-kpdx-kpdx-10r-synthetic',
@@ -17,7 +22,7 @@ export const KSEA_KPDX_APPROACH_CONTRACT = {
 } as const;
 
 const AIRPORT_COORDS: Record<string, Pick<FlightPlanWaypoint, 'lat' | 'lon' | 'coordinateSource'>> = {
-  ENVA: { lat: 63.4583, lon: 10.9101, coordinateSource: 'synthetic' },
+  ENVA: { lat: ENVA_RUNWAY_09.start.lat, lon: ENVA_RUNWAY_09.start.lon, coordinateSource: 'synthetic' },
   KSEA: { lat: 47.45, lon: -122.31, coordinateSource: 'synthetic' },
   KPDX: { lat: 45.59, lon: -122.60, coordinateSource: 'synthetic' },
 };
@@ -103,6 +108,42 @@ export function createKseaKpdxFlight(): FlightPlan {
   };
 }
 
+export function createEnvaAutopilotCheckoutFlight(): FlightPlan {
+  return {
+    origin: 'ENVA',
+    destination: 'ENVA_APCHK',
+    flightNumber: 'RFS009',
+    route: 'ENVA ENVA09_CLB ENVA_APCHK',
+    waypoints: [
+      {
+        ident: 'ENVA',
+        lat: ENVA_RUNWAY_09.start.lat,
+        lon: ENVA_RUNWAY_09.start.lon,
+        coordinateSource: 'synthetic',
+        discontinuity: false,
+      },
+      {
+        ident: 'ENVA09_CLB',
+        lat: ENVA_RUNWAY_09.start.lat,
+        lon: 11.0353,
+        coordinateSource: 'synthetic',
+        discontinuity: false,
+        altitudeConstraint: { type: 'AT_OR_ABOVE', altitude: 3000 },
+        speedConstraint: { type: 'AT_OR_BELOW', speed: 250 },
+      },
+      {
+        ident: 'ENVA_APCHK',
+        lat: ENVA_RUNWAY_09.start.lat,
+        lon: 11.2585,
+        coordinateSource: 'synthetic',
+        discontinuity: false,
+        altitudeConstraint: { type: 'AT_OR_ABOVE', altitude: 6000 },
+        speedConstraint: { type: 'AT_OR_BELOW', speed: 280 },
+      },
+    ],
+  };
+}
+
 export function createKseaKpdxRouteSource(): RouteSource {
   return createRouteSourceFromFlightPlan(createKseaKpdxFlight(), {
     id: 'canned:ksea-kpdx',
@@ -118,6 +159,8 @@ export function createKseaKpdxRouteSource(): RouteSource {
 
 export function createDefaultFlightForScenario(scenario: FlightScenario): FlightPlan | null {
   switch (scenario.runway.airport.toUpperCase()) {
+    case 'ENVA':
+      return createEnvaAutopilotCheckoutFlight();
     case 'KSEA':
       return createKseaKpdxFlight();
     default:

@@ -12,15 +12,45 @@ describe('audio mapping', () => {
     expect(clampAudioUnit(1.7)).toBe(1);
   });
 
-  it('maps engine N1 to deterministic oscillator frequency and gain', () => {
-    expect(mapEngineN1ToSoundParams(0)).toEqual({ frequencyHz: 40, gain: 0 });
-    expect(mapEngineN1ToSoundParams(50)).toEqual({ frequencyHz: 110, gain: 0.06 });
-    expect(mapEngineN1ToSoundParams(100)).toEqual({ frequencyHz: 180, gain: 0.12 });
+  it('maps engine N1 to layered turbine/airflow parameters instead of a low-frequency hum', () => {
+    expect(mapEngineN1ToSoundParams(0)).toEqual({
+      fanFrequencyHz: 90,
+      coreFrequencyHz: 240,
+      fanGain: 0,
+      coreGain: 0,
+      noiseGain: 0,
+    });
+    expect(mapEngineN1ToSoundParams(50)).toEqual({
+      fanFrequencyHz: 205,
+      coreFrequencyHz: 540,
+      fanGain: 0.02,
+      coreGain: 0.015,
+      noiseGain: 0.021875,
+    });
+    expect(mapEngineN1ToSoundParams(100)).toEqual({
+      fanFrequencyHz: 320,
+      coreFrequencyHz: 840,
+      fanGain: 0.04,
+      coreGain: 0.03,
+      noiseGain: 0.055,
+    });
   });
 
   it('clamps engine N1 before mapping sound parameters', () => {
-    expect(mapEngineN1ToSoundParams(-20)).toEqual({ frequencyHz: 40, gain: 0 });
-    expect(mapEngineN1ToSoundParams(140)).toEqual({ frequencyHz: 180, gain: 0.12 });
+    expect(mapEngineN1ToSoundParams(-20)).toEqual({
+      fanFrequencyHz: 90,
+      coreFrequencyHz: 240,
+      fanGain: 0,
+      coreGain: 0,
+      noiseGain: 0,
+    });
+    expect(mapEngineN1ToSoundParams(140)).toEqual({
+      fanFrequencyHz: 320,
+      coreFrequencyHz: 840,
+      fanGain: 0.04,
+      coreGain: 0.03,
+      noiseGain: 0.055,
+    });
   });
 
   it('maps GPWS callout text to stable speech synthesis parameters', () => {
