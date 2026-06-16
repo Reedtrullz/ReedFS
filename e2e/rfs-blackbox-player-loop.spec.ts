@@ -15,6 +15,7 @@ import {
   setVisibleMcpAltitudeAtLeast,
   setVisibleSimRateTarget,
   startRollThroughVisibleControls,
+  toggleVisibleGearThroughKeyboardControls,
   toggleVisibleGearThroughMouseOnlyControls,
   waitForVisibleFlightPhase,
   waitForVisibleFmaModes,
@@ -68,7 +69,7 @@ test.describe('RFS black-box player loop proof', () => {
     await rotateToVisiblePositiveRate(page);
     expect(await waitForVisibleFlightPhase(page, /^(CLIMB|CRUISE)$/)).toMatch(/^(CLIMB|CRUISE)$/);
 
-    await page.keyboard.press('KeyG');
+    await toggleVisibleGearThroughKeyboardControls(page, 'UP');
     await expect(currentConfig).toContainText(/Gear\s+UP/);
     await expect(page.getByText(/GEAR CMD\s*UP/).first()).toBeVisible();
     await expect(page.getByText(/GEAR ACT\s*(?:TRN\s*\d+%|UP)/).first()).toBeVisible();

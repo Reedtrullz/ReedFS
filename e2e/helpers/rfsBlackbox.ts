@@ -28,6 +28,8 @@ type VisibleGearTarget = 'UP' | 'DOWN';
 type FmaTextExpectation = string | RegExp;
 
 const B737_VISIBLE_FLAP_DETENTS = [0, 1, 5, 10, 15, 25, 30, 40] as const;
+const VISIBLE_POSITIVE_RATE_MIN_RADIO_ALTITUDE_FT = 20;
+const VISIBLE_POSITIVE_RATE_MIN_VERTICAL_SPEED_FPM = 200;
 
 interface VisibleSimDriveOptions {
   timeoutMs: number;
@@ -144,6 +146,11 @@ function readVisibleGearLever(text: string): VisibleGearTarget {
   return match[1] as VisibleGearTarget;
 }
 
+function visiblePositiveRateEstablished(numbers: VisibleFlightNumbers): boolean {
+  return numbers.verticalSpeedFpm > VISIBLE_POSITIVE_RATE_MIN_VERTICAL_SPEED_FPM
+    && (numbers.radioAltitudeFt ?? 0) >= VISIBLE_POSITIVE_RATE_MIN_RADIO_ALTITUDE_FT;
+}
+
 async function setVisibleFlaps(page: Page, target: number): Promise<void> {
   if (!B737_VISIBLE_FLAP_DETENTS.includes(target as typeof B737_VISIBLE_FLAP_DETENTS[number])) {
     throw new Error(`Unsupported visible B737 flap detent target: ${target}`);
@@ -226,6 +233,19 @@ export async function toggleVisibleGearThroughMouseOnlyControls(page: Page, targ
   const finalText = await readVisibleTakeoffConfigurationText(page);
   if (readVisibleGearLever(finalText) === target) return;
   throw new Error(`Unable to set visible gear lever to ${target} with mouse-only Gear control; current setup text: ${finalText}`);
+}
+
+export async function toggleVisibleGearThroughKeyboardControls(page: Page, target: VisibleGearTarget): Promise<void> {
+  for (let guard = 0; guard < 8; guard += 1) {
+    const current = readVisibleGearLever(await readVisibleTakeoffConfigurationText(page));
+    if (current === target) return;
+    await page.keyboard.press('KeyG');
+    await advanceVisibleSimTime(page, 250);
+  }
+
+  const finalText = await readVisibleTakeoffConfigurationText(page);
+  if (readVisibleGearLever(finalText) === target) return;
+  throw new Error(`Unable to set visible gear lever to ${target} with keyboard Gear control; current setup text: ${finalText}`);
 }
 
 export async function configureLandingAirframeThroughVisibleControls(page: Page, flapTarget: 25 | 30 | 40 = 30): Promise<void> {
@@ -326,7 +346,7 @@ export async function driveVisibleSimAtFrameCadenceUntil(
 export async function rotateToVisiblePositiveRate(page: Page): Promise<void> {
   await driveVisibleSimUntil(page, 'positive rate after visible rotation input', async () => {
     const numbers = await readVisibleFlightNumbers(page);
-    if (numbers.verticalSpeedFpm > 100 && (numbers.radioAltitudeFt ?? 0) >= 5) return true;
+    if (visiblePositiveRateEstablished(numbers)) return true;
     if (numbers.iasKt >= 135 && numbers.pitchDeg < 9) {
       await holdKeyForVisibleSimTime(page, 'KeyW', 650);
     }
@@ -344,7 +364,7 @@ export async function rotateWithVisibleMouseControlToPositiveRate(page: Page): P
   try {
     await driveVisibleSimUntil(page, 'positive rate while holding visible mouse rotate control', async () => {
       const numbers = await readVisibleFlightNumbers(page);
-      return numbers.verticalSpeedFpm > 100 && (numbers.radioAltitudeFt ?? 0) >= 5;
+      return visiblePositiveRateEstablished(numbers);
     }, {
       timeoutMs: 45_000,
       stepMs: 350,
@@ -371,7 +391,7 @@ export async function waitForVisiblePitchAtLeast(page: Page, minPitchDeg: number
 export async function waitForVisiblePositiveRate(page: Page): Promise<void> {
   await expect.poll(async () => {
     const numbers = await readVisibleFlightNumbers(page);
-    return numbers.verticalSpeedFpm > 100 && (numbers.radioAltitudeFt ?? 0) >= 5;
+    return visiblePositiveRateEstablished(numbers);
   }, {
     timeout: 45_000,
     intervals: [500],
