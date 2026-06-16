@@ -59,6 +59,7 @@ jobs:
       - run: npm run check:bundle
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
       - run: npm run test:visual
 
   docker-smoke:

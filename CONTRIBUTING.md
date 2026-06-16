@@ -29,9 +29,10 @@ source ~/.nvm/nvm.sh && nvm use 22
 npm run check
 ```
 
-For browser/player changes, also run the visual/e2e suite when practical:
+For browser/player changes, also run the browser and visual suites when practical:
 
 ```bash
+CI=1 npm run test:e2e
 CI=1 npm run test:visual
 ```
 

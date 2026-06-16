@@ -37,7 +37,7 @@
     "check": "npm run check:deps && npm run check:release && npm run check:blackbox && npm run lint:ci && npm run typecheck && npm run test && npm run build && npm run check:bundle",
     "preview": "vite preview",
     "test:e2e": "VITE_RFS_VISUAL_TEST=0 CI=1 PLAYWRIGHT_JSON_OUTPUT_NAME=test-results/e2e-timings.json playwright test --workers=1 --reporter=line",
-    "test:visual": "VITE_RFS_VISUAL_TEST=1 PLAYWRIGHT_JSON_OUTPUT_NAME=test-results/visual-timings.json playwright test --workers=1 --reporter=line,json && node scripts/check-visual-timings.mjs",
+    "test:visual": "VITE_RFS_VISUAL_TEST=1 PLAYWRIGHT_JSON_OUTPUT_NAME=test-results/visual-timings.json playwright test e2e/rfs-visual.spec.ts --workers=1 --reporter=line,json && node scripts/check-visual-timings.mjs",
     "test:visual:update": "VITE_RFS_VISUAL_TEST=1 playwright test --update-snapshots"
   },
   "dependencies": {

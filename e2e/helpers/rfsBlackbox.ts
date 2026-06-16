@@ -28,7 +28,6 @@ type VisibleGearTarget = 'UP' | 'DOWN';
 type FmaTextExpectation = string | RegExp;
 
 const B737_VISIBLE_FLAP_DETENTS = [0, 1, 5, 10, 15, 25, 30, 40] as const;
-const VISIBLE_AIRBORNE_PHASES = /^(CLIMB|CRUISE|DESCENT|APPROACH)$/;
 
 interface VisibleSimDriveOptions {
   timeoutMs: number;
@@ -327,8 +326,6 @@ export async function driveVisibleSimAtFrameCadenceUntil(
 export async function rotateToVisiblePositiveRate(page: Page): Promise<void> {
   await driveVisibleSimUntil(page, 'positive rate after visible rotation input', async () => {
     const numbers = await readVisibleFlightNumbers(page);
-    const phase = await readVisibleFlightPhase(page);
-    if (VISIBLE_AIRBORNE_PHASES.test(phase)) return true;
     if (numbers.verticalSpeedFpm > 100 && (numbers.radioAltitudeFt ?? 0) >= 5) return true;
     if (numbers.iasKt >= 135 && numbers.pitchDeg < 9) {
       await holdKeyForVisibleSimTime(page, 'KeyW', 650);
@@ -347,9 +344,7 @@ export async function rotateWithVisibleMouseControlToPositiveRate(page: Page): P
   try {
     await driveVisibleSimUntil(page, 'positive rate while holding visible mouse rotate control', async () => {
       const numbers = await readVisibleFlightNumbers(page);
-      const phase = await readVisibleFlightPhase(page);
-      return VISIBLE_AIRBORNE_PHASES.test(phase)
-        || (numbers.verticalSpeedFpm > 100 && (numbers.radioAltitudeFt ?? 0) >= 5);
+      return numbers.verticalSpeedFpm > 100 && (numbers.radioAltitudeFt ?? 0) >= 5;
     }, {
       timeoutMs: 45_000,
       stepMs: 350,
@@ -376,9 +371,7 @@ export async function waitForVisiblePitchAtLeast(page: Page, minPitchDeg: number
 export async function waitForVisiblePositiveRate(page: Page): Promise<void> {
   await expect.poll(async () => {
     const numbers = await readVisibleFlightNumbers(page);
-    const phase = await readVisibleFlightPhase(page);
-    return VISIBLE_AIRBORNE_PHASES.test(phase)
-      || (numbers.verticalSpeedFpm > 100 && (numbers.radioAltitudeFt ?? 0) >= 5);
+    return numbers.verticalSpeedFpm > 100 && (numbers.radioAltitudeFt ?? 0) >= 5;
   }, {
     timeout: 45_000,
     intervals: [500],
