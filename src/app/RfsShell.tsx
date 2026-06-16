@@ -335,12 +335,12 @@ export function RfsShell() {
         </>
       ) : null}
       debugPanels={showDebugOverlays ? (
-        <Suspense fallback={null}>
-          <div data-rfs-debug-panel="telemetry"><Telemetry /></div>
-          <div data-rfs-debug-panel="help"><ControlsHelp /></div>
-          <div data-rfs-debug-panel="settings"><ControlsSettings /></div>
-          <div data-rfs-debug-panel="attitude"><AttitudeIndicator /></div>
-        </Suspense>
+        <>
+          <div data-rfs-debug-panel="telemetry"><Suspense fallback={null}><Telemetry /></Suspense></div>
+          <div data-rfs-debug-panel="help"><Suspense fallback={null}><ControlsHelp /></Suspense></div>
+          <div data-rfs-debug-panel="settings"><Suspense fallback={null}><ControlsSettings /></Suspense></div>
+          <div data-rfs-debug-panel="attitude"><Suspense fallback={null}><AttitudeIndicator /></Suspense></div>
+        </>
       ) : null}
       flightInstruments={showFlightInstruments ? (
         <Suspense fallback={null}>
