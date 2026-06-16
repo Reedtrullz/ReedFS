@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   createDefaultFlightForScenario,
-  createEnvaAutopilotCheckoutFlight,
+  createEnvaEngmFlight,
   createKseaKpdxFlight,
   createKseaKpdxRouteSource,
   KSEA_KPDX_APPROACH_CONTRACT,
@@ -79,18 +79,24 @@ describe('flightPlanLoader', () => {
     expect(source.limitations.join(' ')).toMatch(/not official procedure/i);
   });
 
-  it('provides an ENVA autopilot checkout route for the default tutorial scenario', () => {
-    const route = createEnvaAutopilotCheckoutFlight();
+  it('provides an ENVA to ENGM route for the default tutorial scenario', () => {
+    const route = createEnvaEngmFlight();
 
     expect(route.origin).toBe('ENVA');
-    expect(route.destination).toBe('ENVA_APCHK');
-    expect(route.route).toBe('ENVA ENVA09_CLB ENVA_APCHK');
-    expect(route.waypoints).toHaveLength(3);
+    expect(route.destination).toBe('ENGM');
+    expect(route.route).toBe('ENVA ENVA09_CLB RFS_DOVRE RFS_MJOSA ENGM');
+    expect(route.waypoints).toHaveLength(5);
     expect(route.waypoints.every((waypoint) => waypoint.coordinateSource === 'synthetic')).toBe(true);
     expect(route.waypoints[1]).toMatchObject({
       ident: 'ENVA09_CLB',
       altitudeConstraint: { type: 'AT_OR_ABOVE', altitude: 3000 },
       speedConstraint: { type: 'AT_OR_BELOW', speed: 250 },
+    });
+    expect(route.waypoints.at(-1)).toMatchObject({
+      ident: 'ENGM',
+      lat: 60.1939,
+      lon: 11.1004,
+      altitudeConstraint: { type: 'AT_OR_ABOVE', altitude: 10000 },
     });
 
     expect(createDefaultFlightForScenario(ENVA_TUTORIAL_SCENARIO)).toEqual(route);

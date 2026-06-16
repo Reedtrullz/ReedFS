@@ -23,6 +23,7 @@ export const KSEA_KPDX_APPROACH_CONTRACT = {
 
 const AIRPORT_COORDS: Record<string, Pick<FlightPlanWaypoint, 'lat' | 'lon' | 'coordinateSource'>> = {
   ENVA: { lat: ENVA_RUNWAY_09.start.lat, lon: ENVA_RUNWAY_09.start.lon, coordinateSource: 'synthetic' },
+  ENGM: { lat: 60.1939, lon: 11.1004, coordinateSource: 'synthetic' },
   KSEA: { lat: 47.45, lon: -122.31, coordinateSource: 'synthetic' },
   KPDX: { lat: 45.59, lon: -122.60, coordinateSource: 'synthetic' },
 };
@@ -108,12 +109,12 @@ export function createKseaKpdxFlight(): FlightPlan {
   };
 }
 
-export function createEnvaAutopilotCheckoutFlight(): FlightPlan {
+export function createEnvaEngmFlight(): FlightPlan {
   return {
     origin: 'ENVA',
-    destination: 'ENVA_APCHK',
+    destination: 'ENGM',
     flightNumber: 'RFS009',
-    route: 'ENVA ENVA09_CLB ENVA_APCHK',
+    route: 'ENVA ENVA09_CLB RFS_DOVRE RFS_MJOSA ENGM',
     waypoints: [
       {
         ident: 'ENVA',
@@ -132,13 +133,26 @@ export function createEnvaAutopilotCheckoutFlight(): FlightPlan {
         speedConstraint: { type: 'AT_OR_BELOW', speed: 250 },
       },
       {
-        ident: 'ENVA_APCHK',
-        lat: ENVA_RUNWAY_09.start.lat,
-        lon: 11.2585,
+        ident: 'RFS_DOVRE',
+        lat: 62.55,
+        lon: 10.85,
         coordinateSource: 'synthetic',
         discontinuity: false,
-        altitudeConstraint: { type: 'AT_OR_ABOVE', altitude: 6000 },
+        altitudeConstraint: { type: 'AT_OR_ABOVE', altitude: 12000 },
         speedConstraint: { type: 'AT_OR_BELOW', speed: 280 },
+      },
+      {
+        ident: 'RFS_MJOSA',
+        lat: 61.05,
+        lon: 10.95,
+        coordinateSource: 'synthetic',
+        discontinuity: false,
+        altitudeConstraint: { type: 'AT_OR_ABOVE', altitude: 10000 },
+        speedConstraint: { type: 'AT_OR_BELOW', speed: 280 },
+      },
+      {
+        ...airportWaypoint('ENGM'),
+        altitudeConstraint: { type: 'AT_OR_ABOVE', altitude: 10000 },
       },
     ],
   };
@@ -160,7 +174,7 @@ export function createKseaKpdxRouteSource(): RouteSource {
 export function createDefaultFlightForScenario(scenario: FlightScenario): FlightPlan | null {
   switch (scenario.runway.airport.toUpperCase()) {
     case 'ENVA':
-      return createEnvaAutopilotCheckoutFlight();
+      return createEnvaEngmFlight();
     case 'KSEA':
       return createKseaKpdxFlight();
     default:

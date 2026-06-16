@@ -251,7 +251,7 @@ export function RfsShell() {
       : 'route guidance is active; use visible MCP LNAV, altitude, and VS/VNAV controls for climb/descent management.';
     const routeLimitations = fp.destination === 'KPDX'
       ? 'Route editing is unavailable; synthetic approach fixes are not official procedure data;'
-      : 'Route editing is unavailable; synthetic checkout fixes are for autopilot practice only, not official procedure data;';
+      : 'Route editing is unavailable; synthetic en-route fixes are for autopilot practice only, not official procedure data;';
     setRouteLoadMessage(`CANNED TRAINING ROUTE ${fp.origin}→${fp.destination} loaded. ${routeLimitations} ${routeGuidance}`);
   };
 

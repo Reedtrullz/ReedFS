@@ -539,7 +539,7 @@ describe('App', () => {
     expect(screen.queryByText(/no default route/i)).toBeNull();
   });
 
-  it('LOAD PLAN provides the default ENVA scenario with a local autopilot checkout route', () => {
+  it('LOAD PLAN provides the default ENVA scenario with an ENGM flight route', () => {
     const store = useSimStore.getState();
     store.selectedScenarioId = 'enva-tutorial';
     store.aircraft.position = { lat: 63.4583, lon: 10.9101, alt: 40 };
@@ -549,20 +549,20 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: 'LOAD PLAN' }));
 
     expect(mockSetFlightPlan).toHaveBeenCalledTimes(1);
-    expect(mockSetFlightPlan).toHaveBeenCalledWith(expect.objectContaining({ origin: 'ENVA', destination: 'ENVA_APCHK' }));
+    expect(mockSetFlightPlan).toHaveBeenCalledWith(expect.objectContaining({ origin: 'ENVA', destination: 'ENGM' }));
     expect(mockSetApState).not.toHaveBeenCalled();
-    expect(screen.getByRole('status', { name: 'Route load result' }).textContent).toMatch(/ENVA→ENVA_APCHK/);
+    expect(screen.getByRole('status', { name: 'Route load result' }).textContent).toMatch(/ENVA→ENGM/);
     expect(screen.queryByText(/no default route/i)).toBeNull();
   });
 
-  it('LOAD PLAN replaces the ENVA checkout feedback after loading a compatible KSEA route', () => {
+  it('LOAD PLAN replaces the ENVA to ENGM feedback after loading a compatible KSEA route', () => {
     const store = useSimStore.getState();
     store.selectedScenarioId = 'enva-tutorial';
 
     render(<App />);
 
     fireEvent.click(screen.getByRole('button', { name: 'LOAD PLAN' }));
-    expect(screen.getByRole('status', { name: 'Route load result' }).textContent).toMatch(/ENVA→ENVA_APCHK/);
+    expect(screen.getByRole('status', { name: 'Route load result' }).textContent).toMatch(/ENVA→ENGM/);
 
     store.selectedScenarioId = 'ksea-tutorial';
     fireEvent.click(screen.getByRole('button', { name: 'LOAD PLAN' }));
