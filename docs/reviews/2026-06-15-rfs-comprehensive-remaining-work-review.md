@@ -19,6 +19,12 @@ This is a deep remaining-work review of the current RFS working tree. It covers:
 
 The goal is not to re-open every historical item. The goal is to identify what still blocks an honest claim that RFS is a credible playable browser-native 737-800 sim rather than a set of scoped proofs.
 
+## Remediation status
+
+As of the 2026-06-16 local remediation pass, the working tree has addressed the original P0 visual/E2E/runway/proof-boundary blockers with bounded evidence: refreshed visual/layout checks, deterministic manifest-listed visible-control black-box/stage specs, KPDX 10R-aligned route/landing fixtures, proof-layer docs, and local `npm run check` passing with 100 Vitest files / 911 tests plus build and bundle checks. This updates the status of the review findings but does not rewrite the review-time evidence below.
+
+Still not claimed: continuous full-route/full-flight proof, source-validated/certified 737 realism, CI green, deployment, or live verification for this branch. CI still requires a pushed exact SHA with GitHub Actions `completed/success`; live/deployed still requires `/rfs-version.json` to report that exact SHA.
+
 ## Non-claims for this review
 
 Do not claim any of the following from this branch yet:
@@ -28,7 +34,7 @@ Do not claim any of the following from this branch yet:
 - Not a proven full-route or full-flight browser acceptance pass.
 - Not a proven continuous route-coupled KSEA-to-KPDX descent / approach / landing.
 - Not a current live deployment of this local branch: live endpoint reports `fefca39...`, while local HEAD is `4e7bb70...` and the working tree is dirty.
-- Not CI green for this working tree: local `npm run check` is green, but local visual regression is red and the full E2E run was not completed.
+- Not CI green for this working tree: local remediation later made the visual/E2E layer deterministic, but CI still requires an exact pushed SHA with GitHub Actions `completed/success`.
 
 ## Evidence gathered
 
@@ -98,6 +104,8 @@ Observed failures:
 
 Source evidence: `e2e/rfs-visual.spec.ts:5-32` defines these four deterministic visual expectations.
 
+Post-remediation note: the local working tree now includes a visual non-overlap guard, updated product copy/layout, refreshed snapshots, and deterministic visual runs. This is local evidence only until it is committed and verified by exact-SHA CI.
+
 Full E2E status: failed before the run was killed. Earlier in this review pass, `npm run test:e2e` was started under Node 22, waited on repeatedly, and killed manually. The later background-process output plus a targeted rerun identified a concrete blocker before termination:
 
 ```text
@@ -147,12 +155,12 @@ RFS is much more than a toy demo now. The current tree has real strengths:
 - the PFD/MCP/FMA avoid inventing hidden AP truth while AP is off;
 - route status is visible and openly labels canned/synthetic route limitations;
 - gear-up is gated behind positive rate in the visible flow;
-- tests now contain a serious draft of visible-control-only full-flight acceptance.
+- tests now contain manifest-listed visible-control-only black-box/stage acceptance; keep it bounded unless a continuous full-route/full-flight proof is separately added and verified.
 
 But the remaining work is still substantial. The biggest blockers are not tiny polish items. They are:
 
 1. make the working tree coherent and green, including visual/E2E;
-2. prove the new full-flight black-box spec, or quarantine it until it is honest and stable;
+2. keep the new black-box/stage specs honest, deterministic, and distinct from continuous full-flight/full-route claims;
 3. align the route/approach/landing runway truth across KSEA→KPDX instead of proving route and landing through separate seeded/scoped bridges;
 4. replace broad placeholder aircraft/performance data with source-lineaged data before claiming realism;
 5. build real VNAV/FMS/route-editing depth beyond current truth-preserving MCP/FMA scaffolding;
@@ -166,13 +174,13 @@ But the remaining work is still substantial. The biggest blockers are not tiny p
 Evidence:
 
 - 14 modified files and 2 untracked paths are present in the review branch.
-- The untracked full-flight black-box spec is referenced by the modified manifest: `e2e/blackbox-manifest.json:1-7`.
+- The untracked black-box spec was referenced by the modified manifest at review time: `e2e/blackbox-manifest.json:1-7`.
 - Package scripts make `check:blackbox` part of `npm run check`: `package.json:24-41`.
 
 Remaining work:
 
 - Decide whether every modified file belongs to the current remediation branch.
-- Add the new full-flight spec intentionally or remove it from the manifest.
+- Add the new black-box/stage spec intentionally or remove it from the manifest.
 - Remove or intentionally keep `dogfood-output/`; if kept, document what it is and avoid committing transient screenshots/traces unless wanted.
 - Re-run `npm run check`, `npm run test:visual`, and the relevant E2E suite after the tree is clean.
 
@@ -182,7 +190,7 @@ Acceptance:
 - All committed test manifests point only at tracked specs.
 - No transient local-only test artifacts are accidentally committed.
 
-### P0.2 — Visual regression is currently red
+### P0.2 — Visual regression was red at review time; remediation must stay bounded
 
 Evidence:
 
@@ -196,10 +204,8 @@ Evidence:
 
 Remaining work:
 
-- Determine whether the visual changes are intended.
-- If intended, update snapshots and assertions after confirming layout is actually better.
-- If not intended, fix layout/copy regressions.
-- Add a viewport-specific non-overlap guard for route/PFD/MCP/takeoff/controls/Cesium credits at 1280x720 and likely one wider desktop viewport.
+- Preserve the non-overlap guard and refreshed snapshots as intentional remediation evidence.
+- Keep visual/layout claims local-only until exact-SHA CI runs `npm run test:visual` successfully.
 
 Acceptance:
 
@@ -207,29 +213,26 @@ Acceptance:
 - Start-roll visual test asserts current product copy, not stale text.
 - The route panel, PFD, MCP, setup panel, controls, status messages, and Cesium credit are readable without critical overlap.
 
-### P0.3 — Full-flight / E2E acceptance exists as a draft but is not proven
+### P0.3 — Visible-control black-box proof is staged; do not overclaim it as continuous full-flight/full-route evidence
 
 Evidence:
 
-- The new full-flight spec uses visible controls only and spans setup, takeoff, climb, route sequencing, MCP modes, descent, final route handoff, landing configuration, touchdown/rollout/stop, reset: `e2e/rfs-full-flight-blackbox.spec.ts:34-209`.
-- It is now listed in the black-box manifest: `e2e/blackbox-manifest.json:1-7`.
-- It has a 720s timeout: `e2e/rfs-full-flight-blackbox.spec.ts:34-39`.
-- Earlier `npm run test:e2e` did not complete in this review and was killed; no full E2E pass exists.
-- The concrete E2E failure found before/after the kill is the seeded ENVA descent landing bridge: `e2e/rfs-flight.spec.ts:116-153` calls `flyDescentApproachToLandingRolloutAndReset()`, whose seed assertion at `e2e/helpers/rfsFlight.ts:839-848` requires `guidancePhase === 'approach'` while current `deriveGuidancePhase()` returns `descent` for `DESCENT` states (`src/sim/guidanceState.ts:85-87`). Because the helper clears route state (`e2e/helpers/rfsFlight.ts:818-829`), route-driven `APPROACH` promotion cannot occur (`src/sim/flightPhasePredicates.ts:54-68`).
+- Review-time evidence: the original draft full-flight spec was listed in the black-box manifest and had a 720s timeout, but the aggregate E2E run did not complete and the seeded ENVA descent bridge failed on a stale `guidancePhase === 'approach'` expectation.
+- Local remediation split the proof into deterministic, manifest-listed visible-control black-box/stage specs: visible route setup, takeoff/positive-rate/gear-up, route-progress/descent command, and KPDX 10R short-final rollout/reset.
+- The black-box guard now scans those manifest-listed specs and helpers; local `npm run test:e2e` completed after replacing the old long continuous proof with bounded stage evidence.
+- This is meaningful player-facing evidence, but it is not a continuous full-route/full-flight proof, not continuous route-coupled KSEA→KPDX descent/approach/landing, not VNAV proof, and not CI/deploy/live evidence.
 
 Remaining work:
 
-- Run the full spec by itself and capture the first real blocker.
-- Fix or intentionally retire the stale seeded descent proof expectation. Either the initial seed should assert `guidancePhase === 'descent'` and wait for a real approach-transition condition after configuration, or the helper must seed a route/approach-handoff state that can honestly produce `APPROACH`/`approach` under current product rules.
-- If it is too long/flaky for CI, split into deterministic P0 stages: visible takeoff/positive-rate, visible clean climb, visible route sequencing, visible descent response, visible final/approach handoff, visible landing/stop/reset.
-- Keep a single end-to-end smoke only after the stages are stable.
-- Avoid overclaiming: the current spec is promising, but not proof until it passes in a repeatable run.
+- Keep the stage specs in the manifest and black-box guard.
+- Add a separate continuous route-coupled full-route/full-flight proof only after route editing/FMS/VNAV/approach lifecycle work is ready for that claim.
+- Keep exact-SHA CI/live verification separate from local Playwright evidence.
 
 Acceptance:
 
-- `npx playwright test e2e/rfs-full-flight-blackbox.spec.ts --workers=1` passes from a clean tree.
-- Then `npm run test:e2e` passes or the spec is intentionally excluded with a documented reason.
-- The final report records elapsed time and whether it is suitable for CI.
+- `npm run check:blackbox` passes against all manifest-listed specs.
+- `npm run test:e2e` completes locally.
+- Docs and reports call the result visible-control black-box/stage evidence, not continuous full-flight/full-route or CI/live proof.
 
 ### P0.4 — Route/approach/landing runway truth is not yet coherent enough for full-route claims
 
@@ -238,15 +241,15 @@ Evidence:
 - The canned KSEA→KPDX route contract targets KPDX runway 10R: `src/sim/flightPlanLoader.ts:6-17`.
 - The route waypoints are synthetic and include KPDX 10R approach fixtures: `src/sim/flightPlanLoader.ts:72-115` and `src/viewport/runwayData.ts:177-199`.
 - Route status openly says route editing is unavailable and the approach is synthetic: `src/components/RouteStatus.tsx:94-103`.
-- A same-session landing bridge helper manually seeds a KPDX 10L short final: `e2e/helpers/rfsRoute.ts:893-966`.
-- The KPDX short-final E2E expects touchdown on KPDX 10L: `e2e/rfs-flight.spec.ts:155-180`.
+- Found at review time: a same-session landing bridge helper manually seeded a KPDX 10L short final: `e2e/helpers/rfsRoute.ts:893-966`.
+- Found at review time: the KPDX short-final E2E expected touchdown on KPDX 10L: `e2e/rfs-flight.spec.ts:155-180`.
+- Remediation status: the current local working tree has been aligned to KPDX 10R for the route bridge and short-final touchdown assertions; verify committed paths before treating this review finding as closed.
 - The roadmap itself still says full-route/full-flight proof and continuous route-coupled descent/approach/landing remain: `docs/roadmap.md:81-90`.
 
 Remaining work:
 
-- Choose the intended KPDX landing runway for the KSEA→KPDX route proof.
-- If the route is 10R, make the landing proof and runway surface target 10R.
-- If the landing proof is 10L, change the route/approach contract and labels to 10L.
+- The intended KSEA→KPDX route/landing proof runway is KPDX 10R.
+- Keep the landing proof, runway surface target, route contract, and labels on KPDX 10R.
 - Ensure route status, scenario metadata, approach fixtures, MCP/FMA truth, and landing/touchdown tests all refer to the same runway.
 
 Acceptance:
@@ -268,12 +271,19 @@ Remaining work:
 
 - Keep these scoped tests; they are valuable regression guards.
 - Label them as scoped seeded proofs in docs and reports.
-- Add the visible-control black-box tests as the evidence layer for player-facing claims.
+- Use the manifest-listed visible-control black-box/stage specs as the evidence layer for player-facing claims.
+- Keep CI/live claims separate: local black-box evidence is not CI green, deployed, or live-verified until the exact pushed SHA is verified in GitHub Actions and `/rfs-version.json`.
+
+Current local remediation note:
+
+- README, architecture, roadmap, and plan-index docs now name the proof classes explicitly: unit/static gates, seeded/scoped browser proofs, manifest-listed visible-control black-box specs, exact-SHA CI, and live endpoint evidence.
+- The local working tree now contains manifest-listed visible-control black-box/stage specs for visible takeoff/positive-rate/gear-up, route-progress/descent command, and KPDX 10R short-final rollout/reset. These improve player-facing evidence, but they still do not convert older seeded route/landing bridges into full-route/full-flight proof.
 
 Acceptance:
 
 - Docs and README distinguish: unit/static tests, seeded browser proofs, visible-control black-box proofs, and live/CI evidence.
 - No release notes call seeded route/landing bridges a full flight.
+- Reports state whether evidence is local-only, exact-SHA CI, or live endpoint verified.
 
 ### P0.6 — CI/live claims are blocked until visual/E2E and endpoint verification are real
 
@@ -281,12 +291,12 @@ Evidence:
 
 - CI includes `npm run test:visual`: `.github/workflows/ci.yml:60-63`.
 - CI also has secret scan, test/build/bundle, Docker smoke, and release metadata checks: `.github/workflows/ci.yml:16-63` and `.github/workflows/ci.yml:84-110`.
-- Local visual is red, so CI should be expected to fail until fixed.
+- At review time local visual was red. Local remediation later made visual/E2E deterministic, but CI should still be treated as unknown until the pushed SHA runs to `completed/success`.
 - Live endpoint is not this local HEAD.
 
 Remaining work:
 
-- Fix local visual and full E2E state first.
+- Keep local visual/E2E state green before pushing.
 - Push only when ready.
 - Verify GitHub Actions `completed/success` before saying CI green.
 - Verify `/rfs-version.json` reports the intended SHA before saying live/deployed.
@@ -380,7 +390,7 @@ Evidence:
 - Route status and takeoff setup are fixed panels: `src/components/RouteStatus.tsx:5-19`, `src/components/TakeoffSetupPanel.tsx:6-19`.
 - MCP is a fixed floating panel: `src/instruments/RfsMCP.tsx:185-196`.
 - Debug help/settings/telemetry can be mounted as debug panels: `src/app/RfsShell.tsx:337-344`.
-- Visual tests are currently red, so layout regressions are not protected.
+- At review time visual tests were red, so layout regressions were not protected; local remediation later added non-overlap guards and refreshed snapshots, but CI protection still requires exact-SHA verification.
 
 Remaining work:
 
@@ -500,13 +510,13 @@ Acceptance:
 
 1. P0 gate cleanup:
    - fix visual spec/copy/snapshots/layout;
-   - run the new full-flight black-box spec alone;
-   - split/quarantine if it is too long/flaky;
+   - run the manifest-listed visible-control black-box/stage specs;
+   - split/quarantine any continuous full-flight smoke if it is too long/flaky;
    - make `npm run test:e2e` finish deterministically;
    - clean/commit or discard dirty files.
 2. Route/landing truth alignment:
-   - choose KPDX 10R vs 10L for the KSEA→KPDX proof;
-   - align route contract, scenario, route panel, runway surface, touchdown assertions, and black-box spec.
+   - keep KPDX 10R as the chosen KSEA→KPDX proof runway;
+   - keep route contract, scenario, route panel, runway surface, touchdown assertions, and black-box spec aligned to KPDX 10R.
 3. Visible-control acceptance:
    - promote visible-control route/landing stages to stable CI tests;
    - keep seeded helper tests as lower-level scoped regression tests.
@@ -523,4 +533,4 @@ Acceptance:
 
 ## Current bottom line
 
-RFS is a serious playable-prototype candidate with a green local static/unit/build gate and visible takeoff flow. It is not yet safe to call this branch a proven full-flight or full-route simulator. The immediate remaining work is to make the uncommitted Task 7/full-flight work real: clean tree, green visual tests, completed E2E, consistent route/landing runway truth, and a passing visible-control black-box proof. After that, the next major work is realism depth: source-backed FDM/performance data, real VNAV/FMS behavior, broader ground/landing/taxi tuning, and a product-grade browser layout.
+RFS is a serious playable-prototype candidate with green local static/unit/build gates, deterministic visual/layout checks, KPDX 10R-aligned route/landing fixtures, and manifest-listed visible-control black-box/stage evidence. It is still not safe to call this branch a proven continuous full-flight/full-route simulator, CI green, deployed, or live without exact-SHA GitHub Actions and endpoint verification. The next major work is realism depth: source-backed FDM/performance data, real VNAV/FMS behavior, broader ground/landing/taxi tuning, continuous route-coupled descent/approach/landing proof, and product-grade browser polish.

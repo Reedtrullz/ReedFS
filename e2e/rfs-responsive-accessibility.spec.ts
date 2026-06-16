@@ -164,6 +164,6 @@ test.describe('RFS responsive layout and attribution safety', () => {
 
     await page.getByLabel('Scenario', { exact: true }).selectOption('ksea-tutorial');
     await clickButton(page, /^LOAD PLAN$/);
-    await expect(page.getByRole('status', { name: 'Route load result' })).toContainText(/route loaded/i);
+    await expect(page.getByRole('status', { name: 'Route load result' })).toContainText(/KSEA→KPDX loaded/i);
   });
 });

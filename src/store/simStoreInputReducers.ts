@@ -32,7 +32,13 @@ export function normalizeControlInputs(inputs: ControlInputs): ControlInputs {
 }
 
 export function inputsForScenario(scenario: FlightScenario): ControlInputs {
-  return { ...defaultInputs, flapLever: scenario.flapSetting, gearLever: 'DOWN' };
+  return {
+    ...defaultInputs,
+    flapLever: scenario.flapSetting,
+    gearLever: 'DOWN',
+    throttle1: scenario.initialAircraft?.throttle ?? 0,
+    throttle2: scenario.initialAircraft?.throttle ?? 0,
+  };
 }
 
 export function inputManagerForScenario(scenario: FlightScenario): InputManagerState {

@@ -1,4 +1,4 @@
-import type { AircraftSpec, AircraftState, FuelState, GeoPosition } from './types';
+import type { AircraftSpec, AircraftState, FlightPhase, FuelState, GeoPosition } from './types';
 import { createB737GearStations, createInitialState } from './types';
 import { eulerToQuat } from './physics/quaternion';
 import type { WindInfo, ScenarioWeatherMetadata } from './weather';
@@ -46,6 +46,28 @@ export interface FlightScenario {
   wind: WindInfo;
   weather: ScenarioWeatherMetadata;
   tutorialSteps: ScenarioTutorialStep[];
+  initialAircraft?: {
+    flightPhase: FlightPhase;
+    airspeedKt: number;
+    verticalSpeedFpm: number;
+    pitchDeg: number;
+    throttle: number;
+    weightOnWheels: boolean;
+  };
+}
+
+const KT_TO_MPS = 0.514444;
+const FPM_TO_MPS = 0.00508;
+
+function initialBodyVelocityForAirborneScenario(initialAircraft: NonNullable<FlightScenario['initialAircraft']>) {
+  const u = initialAircraft.airspeedKt * KT_TO_MPS;
+  const theta = (initialAircraft.pitchDeg * Math.PI) / 180;
+  const desiredDownMps = -initialAircraft.verticalSpeedFpm * FPM_TO_MPS;
+  return {
+    u,
+    v: 0,
+    w: (desiredDownMps + Math.sin(theta) * u) / Math.cos(theta),
+  };
 }
 
 function scenarioWeather(options: ScenarioWeatherMetadata): ScenarioWeatherMetadata {
@@ -244,7 +266,79 @@ export const KPDX_TUTORIAL_SCENARIO: FlightScenario = {
   ],
 };
 
-export const SCENARIOS: FlightScenario[] = [ENVA_TUTORIAL_SCENARIO, KSEA_TUTORIAL_SCENARIO, KSEA_LIGHT_PATTERN_SCENARIO, KPDX_TUTORIAL_SCENARIO];
+export const KPDX_10R_SHORT_FINAL_SCENARIO: FlightScenario = {
+  id: 'kpdx-10r-short-final',
+  name: 'KPDX 10R Short Final',
+  description: 'Visible-control landing practice staged on the synthetic KPDX 10R final approach fixture; not official procedure data.',
+  position: {
+    lat: KPDX_RUNWAY_10R_APPROACH.finalApproachFix.point.lat,
+    lon: KPDX_RUNWAY_10R_APPROACH.finalApproachFix.point.lon,
+    alt: KPDX_RUNWAY_10R_APPROACH.finalApproachFix.point.altFt,
+  },
+  runway: {
+    airport: KPDX_RUNWAY_10R.airport,
+    runway: KPDX_RUNWAY_10R.id,
+    elevationFt: KPDX_RUNWAY_10R.elevationFt,
+    headingDeg: KPDX_RUNWAY_10R.headingDeg,
+    approach: {
+      runwayId: KPDX_RUNWAY_10R_APPROACH.runwayId,
+      finalApproachFixIdent: KPDX_RUNWAY_10R_APPROACH.finalApproachFix.ident,
+      thresholdIdent: KPDX_RUNWAY_10R_APPROACH.threshold.ident,
+      coordinateSource: KPDX_RUNWAY_10R_APPROACH.coordinateSource,
+    },
+  },
+  fuel: { centerTank: 4_000, leftTank: 1_500, rightTank: 1_500, totalFuel: 7_000 },
+  zeroFuelWeightKg: 48_413,
+  grossWeightKg: 55_413,
+  payloadWeightKg: 7_000,
+  cgPercent: 25,
+  stabilizerTrimUnits: 4.8,
+  flapSetting: 30,
+  initialAircraft: {
+    flightPhase: 'APPROACH',
+    airspeedKt: KPDX_RUNWAY_10R_APPROACH.finalApproachFix.speedKt,
+    verticalSpeedFpm: -700,
+    pitchDeg: 2.5,
+    throttle: 0.35,
+    weightOnWheels: false,
+  },
+  wind: { dir: 120, speed: 5, gustSeed: 1011 },
+  weather: scenarioWeather({
+    stationIcao: 'KPDX',
+    surfaceTemperatureC: 21,
+    qnhHpa: 1011,
+    visibilityM: 9999,
+    clouds: [{ cover: 'SCT', base: 4_000 }],
+    cloudSeed: 1011,
+    gustSeed: 1011,
+    cloudAnchor: { lat: KPDX_RUNWAY_10R.start.lat, lon: KPDX_RUNWAY_10R.start.lon },
+  }),
+  tutorialSteps: [
+    {
+      id: 'short-final-configured',
+      title: 'Configured on short final',
+      body: 'Begin on the synthetic KPDX 10R final approach fixture with gear down, flaps 30, landing thrust set, and the runway ahead.',
+    },
+    {
+      id: 'flare-touchdown',
+      title: 'Flare and touchdown',
+      body: 'Use small pitch corrections, keep the 10R centerline ahead, and let the aircraft settle onto the prepared runway.',
+    },
+    {
+      id: 'rollout-stop',
+      title: 'Roll out and stop',
+      body: 'Hold wheel brakes after touchdown, confirm rollout deceleration, then reset when stopped.',
+    },
+  ],
+};
+
+export const SCENARIOS: FlightScenario[] = [
+  ENVA_TUTORIAL_SCENARIO,
+  KSEA_TUTORIAL_SCENARIO,
+  KSEA_LIGHT_PATTERN_SCENARIO,
+  KPDX_TUTORIAL_SCENARIO,
+  KPDX_10R_SHORT_FINAL_SCENARIO,
+];
 
 const CENTER_TANK_ARM_PERCENT_MAC = 22;
 const WING_TANK_ARM_PERCENT_MAC = 30;
@@ -281,7 +375,11 @@ function validateScenario(spec: AircraftSpec, scenario: FlightScenario): void {
     throw new Error(`${scenario.id} CG is outside aircraft limits`);
   }
 
-  if (!nearlyEqual(scenario.position.alt, scenario.runway.elevationFt)) {
+  if (scenario.initialAircraft?.weightOnWheels === false) {
+    if (scenario.position.alt <= scenario.runway.elevationFt) {
+      throw new Error(`${scenario.id} airborne scenario position must be above runway elevation`);
+    }
+  } else if (!nearlyEqual(scenario.position.alt, scenario.runway.elevationFt)) {
     throw new Error(`${scenario.id} runway elevation must match scenario position altitude`);
   }
 
@@ -335,10 +433,16 @@ export function createAircraftStateForScenario(spec: AircraftSpec, scenario: Fli
   const zeroFuelWeight = scenario.zeroFuelWeightKg;
   const grossWeight = scenario.grossWeightKg;
 
-  state.position = { ...scenario.position, alt: scenario.runway.elevationFt };
-  state.attitude = { phi: 0, theta: 0, psi: headingRad };
+  state.position = { ...scenario.position, alt: scenario.initialAircraft ? scenario.position.alt : scenario.runway.elevationFt };
+  state.attitude = {
+    phi: 0,
+    theta: ((scenario.initialAircraft?.pitchDeg ?? 0) * Math.PI) / 180,
+    psi: headingRad,
+  };
   state.quaternion = eulerToQuat(state.attitude.phi, state.attitude.theta, state.attitude.psi);
-  state.velocity = { u: 0, v: 0, w: 0 };
+  state.velocity = scenario.initialAircraft
+    ? initialBodyVelocityForAirborneScenario(scenario.initialAircraft)
+    : { u: 0, v: 0, w: 0 };
   state.angularVel = { p: 0, q: 0, r: 0 };
   state.config = {
     flapSetting: scenario.flapSetting,
@@ -355,18 +459,27 @@ export function createAircraftStateForScenario(spec: AircraftSpec, scenario: Fli
   state.zeroFuelCg = zeroFuelCgForScenario(scenario);
   state.grossWeight = grossWeight;
   state.cg = scenario.cgPercent;
+  const weightOnWheels = scenario.initialAircraft?.weightOnWheels ?? true;
   state.ground = {
-    aglFt: 0,
+    aglFt: Math.max(0, state.position.alt - scenario.runway.elevationFt),
     groundAltFt: scenario.runway.elevationFt,
-    weightOnWheels: true,
-    normalForceN: grossWeight * 9.80665,
+    weightOnWheels,
+    normalForceN: weightOnWheels ? grossWeight * 9.80665 : 0,
     lastTouchdownSinkRateMps: 0,
-    onRunway: true,
-    contact: 'gear',
+    onRunway: weightOnWheels,
+    contact: weightOnWheels ? 'gear' : 'none',
     tailstrike: false,
-    gearStations: createB737GearStations(grossWeight * 9.80665, true),
+    gearStations: createB737GearStations(weightOnWheels ? grossWeight * 9.80665 : 0, weightOnWheels),
   };
-  state.flightPhase = 'PARKED';
+  if (scenario.initialAircraft) {
+    const n1 = Math.max(0, Math.min(110, scenario.initialAircraft.throttle * 100));
+    state.engines = state.engines.map((engine) => ({
+      ...engine,
+      n1,
+      running: true,
+    })) as AircraftState['engines'];
+  }
+  state.flightPhase = scenario.initialAircraft?.flightPhase ?? 'PARKED';
   state.simTime = 0;
 
   return state;

@@ -302,6 +302,8 @@ export function computeAutopilotCommandsWithControllerState(
     const altFt = state.position.alt;
     const deficit = targetSpeedKt - iasKt;
     const vsFpm = currentVsFpm(state);
+    const selectedVerticalSpeedFpm = finiteOrUndefined(targetVerticalSpeedFpm) ?? finiteOrUndefined(ap.boeing.verticalSpeed);
+    const selectedVsDescent = t.verticalActive === 'VS' && selectedVerticalSpeedFpm !== undefined && selectedVerticalSpeedFpm < -100;
     const aboveTarget = t.verticalActive === 'ALT_HOLD' && state.position.alt > targetAltFt + 200;
 
     const thr = pid(nextControllerState.thrustPid, spdErr, aboveTarget ? 0.003 : 0.008, aboveTarget ? 0.0005 : 0.002, 0.003, dt, 5);
@@ -310,6 +312,10 @@ export function computeAutopilotCommandsWithControllerState(
 
     if (state.ground.weightOnWheels) {
       minT = 0;
+    } else if (selectedVsDescent && deficit <= 10) {
+      minT = 0.15; // commanded descent while on/above speed: idle enough to let VS capture
+    } else if (selectedVsDescent) {
+      minT = 0.25; // selected descent and slow: avoid adding climb/cruise power
     } else if (aboveTarget && vsFpm < 0) {
       minT = 0.15; // descending toward target: let the dive do the work
     } else if (aboveTarget && deficit > 10) {

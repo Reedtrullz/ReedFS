@@ -47,15 +47,20 @@ describe('flight scenarios', () => {
     expect(KPDX_TUTORIAL_SCENARIO.runway.approach?.thresholdIdent).toBe(KSEA_KPDX_APPROACH_CONTRACT.thresholdIdent);
   });
 
-  it('keeps each scenario weather station, fallback pressure/temperature, and cloud anchor aligned with its runway', () => {
+  it('keeps each scenario weather station, fallback pressure/temperature, and cloud anchor aligned with its authored start state', () => {
     for (const scenario of SCENARIOS) {
       expect(scenario.weather.stationIcao).toBe(scenario.runway.airport);
       expect(scenario.weather.qnhHpa).toBeGreaterThan(850);
       expect(scenario.weather.qnhHpa).toBeLessThan(1100);
       expect(scenario.weather.surfaceTemperatureC).toBeGreaterThan(-60);
       expect(scenario.weather.surfaceTemperatureC).toBeLessThan(60);
-      expect(scenario.weather.cloudAnchor.lat).toBeCloseTo(scenario.position.lat, 1);
-      expect(scenario.weather.cloudAnchor.lon).toBeCloseTo(scenario.position.lon, 1);
+      if (scenario.initialAircraft?.weightOnWheels === false) {
+        expect(scenario.weather.cloudAnchor.lat).toBeTypeOf('number');
+        expect(scenario.weather.cloudAnchor.lon).toBeTypeOf('number');
+      } else {
+        expect(scenario.weather.cloudAnchor.lat).toBeCloseTo(scenario.position.lat, 1);
+        expect(scenario.weather.cloudAnchor.lon).toBeCloseTo(scenario.position.lon, 1);
+      }
     }
   });
 
@@ -74,7 +79,12 @@ describe('flight scenarios', () => {
       expect(state.cg).toBe(scenario.cgPercent);
       expect(state.config.stabilizerTrimUnits).toBe(scenario.stabilizerTrimUnits);
       expect(state.ground.groundAltFt).toBe(scenario.runway.elevationFt);
-      expect(state.ground.normalForceN).toBeCloseTo(state.grossWeight * 9.80665, 6);
+      if (scenario.initialAircraft?.weightOnWheels === false) {
+        expect(state.ground.weightOnWheels).toBe(false);
+        expect(state.ground.normalForceN).toBe(0);
+      } else {
+        expect(state.ground.normalForceN).toBeCloseTo(state.grossWeight * 9.80665, 6);
+      }
     }
   });
 

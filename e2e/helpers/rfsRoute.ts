@@ -3,6 +3,8 @@ import { expect, type Page } from '@playwright/test';
 export interface RouteProofSnapshot {
   routeName: string;
   lnavAvailable: boolean;
+  routeComplete: boolean;
+  approachHandoff: string;
   activeLegIndex: number;
   fromIdent: string | null;
   nextWaypointIdent: string | null;
@@ -196,7 +198,7 @@ const FIXED_STEP_SECONDS = 1 / 60;
 const FIXED_STEP_MS = 1000 / 60;
 const ROUTE_FRAMES = 60 * 35;
 const FIRST_SEQUENCE_FRAMES = 60 * 12;
-const SECOND_SEQUENCE_FRAMES = 60 * 8;
+const SECOND_SEQUENCE_FRAMES = 60 * 18;
 const ROUTE_SAMPLE_INTERVAL_FRAMES = 300;
 const SEQUENCE_SAMPLE_INTERVAL_FRAMES = 30;
 
@@ -235,7 +237,7 @@ const KSEA_FIRST_SEQUENCE_PROOF: RouteProofSetup = {
 };
 
 const KSEA_SECOND_SEQUENCE_PROOF: RouteProofSetup = {
-  initialPosition: { lat: 45.7622, lon: -122.5931 },
+  initialPosition: { lat: 45.782773, lon: -122.598328 },
   initialHeadingDeg: 170.05376346096932,
   routeFrames: SECOND_SEQUENCE_FRAMES,
   sampleIntervalFrames: SEQUENCE_SAMPLE_INTERVAL_FRAMES,
@@ -262,12 +264,12 @@ const KSEA_MULTI_GATE_PROGRESSION_PROOF: RouteProofSetup = {
 };
 
 const KSEA_FINAL_ROUTE_CONFIGURED_APPROACH_PROOF: RouteProofSetup = {
-  initialPosition: { lat: 45.69, lon: -122.596 },
-  initialHeadingDeg: 183.5,
+  initialPosition: { lat: 45.63387, lon: -122.721508 },
+  initialHeadingDeg: 119,
   initialPitchDeg: -1.5,
-  initialAltitudeFt: 3_500,
-  initialGroundAltFt: 50,
-  initialAglFt: 3_450,
+  initialAltitudeFt: 1_800,
+  initialGroundAltFt: 22,
+  initialAglFt: 1_778,
   initialVelocity: { u: 96, v: 0, w: 1.5 },
   initialGearDown: false,
   initialFlapSetting: 5,
@@ -285,7 +287,7 @@ const KSEA_FINAL_ROUTE_CONFIGURED_APPROACH_PROOF: RouteProofSetup = {
     leftBrake: 0,
     rightBrake: 0,
   },
-  seedActiveLegIndex: 2,
+  seedActiveLegIndex: 4,
   autopilotVerticalActive: 'OFF',
   autopilotAltHold: false,
   autopilotSpeedKt: 180,
@@ -393,6 +395,8 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
       interface BrowserRouteStatus {
         routeName: string;
         lnavAvailable: boolean;
+        routeComplete: boolean;
+        approachHandoff: string;
         activeLegIndex: number | null;
         fromIdent: string | null;
         nextWaypointIdent: string | null;
@@ -478,7 +482,7 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
         computeRouteStatus: (aircraft: BrowserAircraftState, flightPlan: BrowserFlightPlan | null, activeLegIndex: number | null) => BrowserRouteStatus;
       };
       const { eulerToQuat } = (await import(quaternionModule)) as { eulerToQuat: (phi: number, theta: number, psi: number) => unknown };
-      const { KPDX_RUNWAY_10L } = (await import(runwayDataModule)) as { KPDX_RUNWAY_10L: RunwayReference };
+      const { KPDX_RUNWAY_10R } = (await import(runwayDataModule)) as { KPDX_RUNWAY_10R: RunwayReference };
       const { sampleSupportedAirportSurface } = (await import(runwaySurfaceModule)) as {
         sampleSupportedAirportSurface: (position: BrowserAircraftState['position']) => SurfaceSample;
       };
@@ -608,7 +612,8 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
 
       useSimStore.getState().setFlightPlan(flightPlan);
       if (proofSetup.seedActiveLegIndex !== undefined) {
-        useSimStore.setState({ activeLegIndex: proofSetup.seedActiveLegIndex });
+        const seededRouteStatus = computeRouteStatus(useSimStore.getState().aircraft, flightPlan, proofSetup.seedActiveLegIndex);
+        useSimStore.setState({ activeLegIndex: seededRouteStatus.activeLegIndex, routeStatus: seededRouteStatus });
       }
       useSimStore.getState().setApState(apState);
       seedControls(initialControls);
@@ -657,6 +662,8 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
         return {
           routeName: route.routeName,
           lnavAvailable: route.lnavAvailable,
+          routeComplete: route.routeComplete,
+          approachHandoff: route.approachHandoff,
           activeLegIndex: route.activeLegIndex,
           fromIdent: route.fromIdent,
           nextWaypointIdent: route.nextWaypointIdent,
@@ -686,6 +693,24 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
           effectiveControls: controlSnapshot(state.effectiveControls),
           apCommandCount: Object.keys(state.apCommands).length,
         };
+      };
+
+      const isKpdx10rApproachLeg = (current: RouteProofSnapshot): boolean => {
+        return current.routeName === 'KSEA→KPDX'
+          && current.lnavAvailable
+          && !current.routeComplete
+          && (current.approachHandoff === 'final' || current.approachHandoff === 'threshold')
+          && (current.nextWaypointIdent === 'KPDX10R_FAF' || current.nextWaypointIdent === 'KPDX10R_RWY');
+      };
+
+      const isKpdx10rThresholdLeg = (current: RouteProofSnapshot): boolean => {
+        return current.routeName === 'KSEA→KPDX'
+          && !current.lnavAvailable
+          && current.routeComplete
+          && current.approachHandoff === 'threshold'
+          && current.activeLegIndex === 4
+          && current.fromIdent === 'KPDX10R_FAF'
+          && current.nextWaypointIdent === 'KPDX10R_RWY';
       };
 
       const landingBridgeSnapshot = (): RouteLandingBridgeSnapshot => {
@@ -775,11 +800,7 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
           }
 
           if (
-            current.routeName === 'KSEA→KPDX'
-            && current.activeLegIndex === 2
-            && current.fromIdent === 'BTG'
-            && current.nextWaypointIdent === 'KPDX'
-            && current.lnavAvailable
+            isKpdx10rApproachLeg(current)
             && current.fmaLateralActive === 'LNAV'
             && current.autopilotStatus === 'CMD_A'
             && current.fmaAutopilotStatus === 'CMD_A'
@@ -815,11 +836,7 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
           const current = snapshot();
 
           if (
-            current.routeName !== 'KSEA→KPDX'
-            || current.activeLegIndex !== 2
-            || current.fromIdent !== 'BTG'
-            || current.nextWaypointIdent !== 'KPDX'
-            || !current.lnavAvailable
+            !isKpdx10rApproachLeg(current)
             || current.autopilotStatus !== 'CMD_A'
             || current.fmaAutopilotStatus !== 'CMD_A'
             || current.lateralActive !== 'LNAV'
@@ -863,11 +880,7 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
         samples.push(current);
 
         if (
-          current.routeName === 'KSEA→KPDX'
-          && current.activeLegIndex === 2
-          && current.fromIdent === 'BTG'
-          && current.nextWaypointIdent === 'KPDX'
-          && current.lnavAvailable
+          isKpdx10rApproachLeg(current)
           && current.autopilotStatus === 'OFF'
           && current.fmaAutopilotStatus === 'OFF'
           && current.lateralActive === 'OFF'
@@ -891,9 +904,10 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
       };
 
       const runLandingBridge = (): Pick<RouteLandingBridgeProofResult, 'landingApproach' | 'touchdown' | 'rollout' | 'reset' | 'landingPhases'> => {
-        const runway = KPDX_RUNWAY_10L;
-        // Stay on the KPDX 10L footprint while remaining just outside the synthetic KPDX
-        // waypoint capture radius so route-complete truth is not hidden by the seed.
+        const runway = KPDX_RUNWAY_10R;
+        // Stay on the KPDX 10R footprint while remaining just outside the
+        // KPDX10R_RWY threshold capture radius so route-complete truth is not
+        // hidden by the seed.
         const approachPosition = offsetRunwayPosition(runway, 1050, 0);
         const headingRad = runway.headingDeg * Math.PI / 180;
         const pitchRad = 2 * Math.PI / 180;
@@ -948,7 +962,7 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
             })),
           };
           aircraft.flightPhase = 'APPROACH';
-          const routeStatus = computeRouteStatus(aircraft, state.flightPlan, 2);
+          const routeStatus = computeRouteStatus(aircraft, state.flightPlan, 4);
 
           return {
             aircraft,
@@ -970,11 +984,7 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
         const landingApproach = landingBridgeSnapshot();
         samples.push(landingApproach);
         if (
-          landingApproach.routeName !== 'KSEA→KPDX'
-          || landingApproach.activeLegIndex !== 2
-          || landingApproach.fromIdent !== 'BTG'
-          || landingApproach.nextWaypointIdent !== 'KPDX'
-          || !landingApproach.lnavAvailable
+          !isKpdx10rThresholdLeg(landingApproach)
           || landingApproach.autopilotStatus !== 'OFF'
           || landingApproach.fmaAutopilotStatus !== 'OFF'
           || landingApproach.lateralActive !== 'OFF'
@@ -1016,8 +1026,7 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
               || current.touchdownSinkRateMps >= 15
               || current.surfaceAirport !== runway.airport
               || current.surfaceRunwayId !== runway.id
-              || current.routeName !== 'KSEA→KPDX'
-              || current.activeLegIndex !== 2
+              || !isKpdx10rThresholdLeg(current)
               || current.autopilotStatus !== 'OFF'
               || current.fmaAutopilotStatus !== 'OFF'
               || current.lateralActive !== 'OFF'

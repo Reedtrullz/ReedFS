@@ -807,7 +807,7 @@ describe('App', () => {
     expect(mockSetApState).not.toHaveBeenCalled();
     const routeLoadResult = screen.getByRole('status', { name: 'Route load result' }).textContent;
     expect(routeLoadResult).toBe(
-      'CANNED TRAINING ROUTE KSEA→KPDX loaded. Route editing is unavailable; confirm flaps 5, trim 5.0, idle throttle, then START ROLL.',
+      'CANNED TRAINING ROUTE KSEA→KPDX loaded. Route editing is unavailable; synthetic approach fixes are not official procedure data; confirm flaps 5, trim 5.0, idle throttle, then START ROLL.',
     );
     expect(routeLoadResult).not.toMatch(/resets the takeoff levers|Takeoff setup reminder/i);
   });
@@ -820,7 +820,7 @@ describe('App', () => {
 
     expect(mockSetFlightPlan).toHaveBeenCalledWith(expect.objectContaining({ origin: 'KSEA', destination: 'KPDX' }));
     expect(screen.getByRole('status', { name: 'Route load result' }).textContent).toBe(
-      'CANNED TRAINING ROUTE KSEA→KPDX loaded. Route editing is unavailable; confirm flaps 5, trim 4.5, idle throttle, then START ROLL.',
+      'CANNED TRAINING ROUTE KSEA→KPDX loaded. Route editing is unavailable; synthetic approach fixes are not official procedure data; confirm flaps 5, trim 4.5, idle throttle, then START ROLL.',
     );
   });
 
@@ -861,7 +861,7 @@ describe('App', () => {
     expect(mockSetFlightPlan).toHaveBeenCalledWith(expect.objectContaining({ origin: 'KSEA', destination: 'KPDX' }));
     expect(mockSetApState).not.toHaveBeenCalled();
     expect(screen.getByRole('status', { name: 'Route load result' }).textContent).toBe(
-      'CANNED TRAINING ROUTE KSEA→KPDX loaded. Route editing is unavailable; route guidance is active; use visible MCP LNAV, altitude, and VS/VNAV controls for climb/descent management.',
+      'CANNED TRAINING ROUTE KSEA→KPDX loaded. Route editing is unavailable; synthetic approach fixes are not official procedure data; route guidance is active; use visible MCP LNAV, altitude, and VS/VNAV controls for climb/descent management.',
     );
   });
 

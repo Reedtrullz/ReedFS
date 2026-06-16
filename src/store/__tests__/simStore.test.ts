@@ -5,8 +5,9 @@ import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
 import type { FlightPlan } from '@shared/types/fmc';
 import type { AutopilotCommands } from '../../sim/types';
 import { KSEA_RUNWAY_ALT_FT } from '../../sim/systems/ground';
-import { ENVA_TUTORIAL_SCENARIO, KSEA_LIGHT_PATTERN_SCENARIO, KSEA_TUTORIAL_SCENARIO, SCENARIOS } from '../../sim/scenarios';
+import { ENVA_TUTORIAL_SCENARIO, KPDX_10R_SHORT_FINAL_SCENARIO, KSEA_LIGHT_PATTERN_SCENARIO, KSEA_TUTORIAL_SCENARIO, SCENARIOS } from '../../sim/scenarios';
 import { createKseaKpdxFlight } from '../../sim/flightPlanLoader';
+import { computeDerived } from '../../sim/physics/derived';
 import {
   SCENARIO_SAVE_KEY,
   createScenarioSnapshot,
@@ -180,6 +181,21 @@ describe('useSimStore', () => {
     expect(useSimStore.getState().simRate).toBe(1);
   });
 
+  it('lets simulator-rate targets scale the per-frame catch-up budget', () => {
+    useSimStore.getState().cycleSimRate();
+    useSimStore.getState().cycleSimRate();
+    expect(useSimStore.getState().simRate).toBe(16);
+
+    useSimStore.getState().startTakeoffRoll();
+    useSimStore.getState().tick(1000);
+    useSimStore.getState().tick(1100);
+
+    const after = useSimStore.getState();
+    expect(after.simulationTimeSeconds).toBeGreaterThan(1.8);
+    expect(after.simulationTimeSeconds).toBeLessThan(1.9);
+    expect(after.droppedSimulationTimeSeconds).toBe(0);
+  });
+
   it('starts with unified scenario guidance derived from the initial aircraft and controls', () => {
     const state = useSimStore.getState();
 
@@ -199,6 +215,27 @@ describe('useSimStore', () => {
     useSimStore.getState().setScenario(ENVA_TUTORIAL_SCENARIO.id);
   });
 
+  it('starts the visible KPDX short-final scenario airborne instead of forcing a takeoff roll', () => {
+    useSimStore.getState().setScenario(KPDX_10R_SHORT_FINAL_SCENARIO.id);
+
+    const staged = useSimStore.getState();
+    expect(staged.aircraft.flightPhase).toBe('APPROACH');
+    expect(staged.aircraft.ground.weightOnWheels).toBe(false);
+    const stagedVerticalSpeedFpm = computeDerived(staged.aircraft, staged.wind).vs;
+    expect(stagedVerticalSpeedFpm).toBeGreaterThan(-750);
+    expect(stagedVerticalSpeedFpm).toBeLessThan(-650);
+    expect(staged.inputs.flapLever).toBe(30);
+    expect(staged.inputs.throttle1).toBeCloseTo(KPDX_10R_SHORT_FINAL_SCENARIO.initialAircraft?.throttle ?? 0, 6);
+
+    staged.startTakeoffRoll();
+
+    const started = useSimStore.getState();
+    expect(started.status).toBe('running');
+    expect(started.aircraft.flightPhase).toBe('APPROACH');
+    expect(started.aircraft.ground.weightOnWheels).toBe(false);
+    expect(started.inputs.gearLever).toBe('DOWN');
+    useSimStore.getState().setScenario(ENVA_TUTORIAL_SCENARIO.id);
+  });
   it('separates pilot inputs, AP commands, effective controls, and legacy inputs alias', () => {
     const state = useSimStore.getState();
 

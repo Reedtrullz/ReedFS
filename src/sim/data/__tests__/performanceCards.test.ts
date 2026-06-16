@@ -38,6 +38,7 @@ interface CardWithLandingForTest {
   scenarioId: string;
   airport: string;
   runway: string;
+  vSpeeds: { v1Kt: number; vrKt: number; v2Kt: number };
   approach: { iasKt: number; vrefKt: number };
   landing?: LandingPerformanceCardForTest;
 }
@@ -51,9 +52,12 @@ const fixtureCollections = [
 ] as const;
 
 describe('B737 performance-card scenario assertions', () => {
-  it('defines one takeoff performance card for each playable scenario', () => {
+  it('defines one takeoff performance card for each ground-start playable scenario', () => {
     const cardScenarioIds = b737PerformanceCards.map((card) => card.scenarioId).sort();
-    const playableScenarioIds = SCENARIOS.map((scenario) => scenario.id).sort();
+    const playableScenarioIds = SCENARIOS
+      .filter((scenario) => scenario.initialAircraft?.weightOnWheels !== false)
+      .map((scenario) => scenario.id)
+      .sort();
     expect(cardScenarioIds).toEqual(playableScenarioIds);
   });
 
@@ -82,6 +86,9 @@ describe('B737 performance-card scenario assertions', () => {
     const finalApproach = route.waypoints.find((waypoint) => waypoint.ident === approach.finalApproachFix.ident);
     const threshold = route.waypoints.find((waypoint) => waypoint.ident === approach.threshold.ident);
 
+    expect(KSEA_KPDX_APPROACH_CONTRACT.runway).toBe('10R');
+    expect(KSEA_KPDX_APPROACH_CONTRACT.runway).toBe(KPDX_TUTORIAL_SCENARIO.runway.runway);
+    expect(route.route).toContain(KPDX_RUNWAY_10R_APPROACH.threshold.ident);
     expect(route.destination).toBe(KSEA_KPDX_APPROACH_CONTRACT.destinationAirport);
     expect(KPDX_TUTORIAL_SCENARIO.runway.airport).toBe(KSEA_KPDX_APPROACH_CONTRACT.destinationAirport);
     expect(KPDX_TUTORIAL_SCENARIO.runway.runway).toBe(KSEA_KPDX_APPROACH_CONTRACT.runway);
@@ -129,6 +136,19 @@ describe('B737 performance-card scenario assertions', () => {
     expect(landingCard?.ownership.label).toBe('runtime-landing-proof-and-performance-test-card');
     expect(landingCard?.ownership.testConsumers).toContain('src/sim/data/__tests__/performanceCards.test.ts');
     expect(landingCard?.ownership.sourceNote).toMatch(/not a certified Boeing AFM table/i);
+  });
+
+  it.each(b737PerformanceCards)('defines a placeholder rejected-takeoff envelope for $scenarioId', (card) => {
+    expect(card.rejectedTakeoff.decisionSpeedKt).toBe(card.vSpeeds.v1Kt);
+    expect(card.rejectedTakeoff.decisionSpeedKt).toBeLessThanOrEqual(card.vSpeeds.vrKt);
+    expect(card.rejectedTakeoff.lowSpeedDistanceM[0]).toBeGreaterThan(0);
+    expect(card.rejectedTakeoff.lowSpeedDistanceM[1]).toBeGreaterThan(card.rejectedTakeoff.lowSpeedDistanceM[0]);
+    expect(card.rejectedTakeoff.targetLowSpeedKt).toBeGreaterThan(0);
+    expect(card.rejectedTakeoff.targetLowSpeedKt).toBeLessThan(card.vSpeeds.vrKt);
+    expect(card.rejectedTakeoff.ownership.label).toBe('runtime-rejected-takeoff-and-performance-test-card');
+    expect(card.rejectedTakeoff.ownership.testConsumers).toContain('src/sim/physics/__tests__/integrate.test.ts');
+    expect(card.rejectedTakeoff.ownership.testConsumers).toContain('src/sim/systems/__tests__/ground.test.ts');
+    expect(card.rejectedTakeoff.ownership.sourceNote).toMatch(/not a certified Boeing AFM table/i);
   });
 
   it.each(fixtureCollections)('labels %s fixture ownership as placeholder-only, non-AFM data', (_label, fixtures) => {

@@ -118,6 +118,26 @@ describe('resolveGuidanceTargets', () => {
     expect(shared.thrust?.targetSpeedKt).toBe(legacy.targetSpeedKt);
   });
 
+  it('reports computed VNAV_PTH target truth even when a raw VNAV truth override is supplied', () => {
+    const aircraft = aircraftAtRoute();
+    const ap = apState();
+    const flightPlan = routeWithVnavPathConstraint();
+    const routeStatus = computeRouteStatus(aircraft, flightPlan, 0);
+
+    const shared = resolveGuidanceTargets({
+      aircraft,
+      apState: ap,
+      flightPlan,
+      routeStatus,
+      truthOverride: ap.truth,
+    });
+
+    expect(shared.truth.verticalActive).toBe('VNAV');
+    expect(shared.vertical?.mode).toBe('VNAV_PTH');
+    expect(shared.vertical?.targetAltitudeFt).toBe(10_000);
+    expect(shared.vertical?.targetVerticalSpeedFpm).toBeGreaterThan(0);
+  });
+
   it('uses route managed speed when selected speed intervention is absent', () => {
     const aircraft = aircraftAtRoute();
     const ap = apState();

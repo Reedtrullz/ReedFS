@@ -1,5 +1,9 @@
 # RFS — Reed Flight Simulator
 
+[![CI/CD](https://github.com/Reedtrullz/ReedFS/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/Reedtrullz/ReedFS/actions/workflows/ci.yml?query=branch%3Amaster)
+[![CodeQL](https://github.com/Reedtrullz/ReedFS/actions/workflows/codeql.yml/badge.svg?branch=master)](https://github.com/Reedtrullz/ReedFS/actions/workflows/codeql.yml?query=branch%3Amaster)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 RFS is a standalone web-based Boeing 737-800 flight simulator. It combines a TypeScript 6-DOF flight model, CesiumJS globe rendering, a Three.js aircraft layer, RFMS shared avionics/autopilot types, METAR-driven weather, cockpit instruments, audio cues, and a Docker/GHCR deployment pipeline.
 
 Live deployment: https://fly.reidar.tech
@@ -13,12 +17,24 @@ The simulator now has a stabilized flight-model foundation plus the first gamepl
 - Quaternion attitude is authoritative; Euler attitude is mirrored only for compatibility and display boundaries.
 - Body/NED frame transforms, gravity signs, air-relative wind, signed drag, and physics regressions are covered by tests.
 - Ground contact now has explicit ground state, per-gear station loads, dynamic oleo spring/damper compression, runway-normal constraints, tire braking/rolling friction, anti-skid brake limiting, symmetric and side-specific brake commands for player differential braking, asymmetric brake-force helpers, normal-force-scaled tire side-loads, rudder-pedal-limited nosewheel steering, low-speed taxi, rollout braking, crosswind/weathercocking, and crosswind approach/touchdown/rollout scenario regressions, gear-up runway-tangent belly/crash slide damping, touchdown damping, ground effect, normal-force liftoff gating, and phase handling. It samples supported-airport prepared runway rectangles for KSEA and KPDX (KPDX 10L/28R, 10R/28L, and 03/21), distinguishes prepared-runway contact from off-runway ground contact, and treats `GroundState.onRunway` as prepared-runway surface status rather than generic ground contact; off-runway gear/belly/crashed contact stays explicit, with higher rolling resistance and reduced brake/side grip while preserving ground-relative velocity and runway-normal constraints. Off-runway elevation fallback is still a simplified nearest-supported-runway reference, not terrain mesh collision.
+- Ground realism non-claims: current runway/surface coverage is dry gameplay friction on handcrafted KSEA/KPDX prepared-runway rectangles plus simplified off-runway fallbacks. RFS does not yet model wet/contaminated runway surfaces, airport aprons/taxiway networks, source-backed tire relaxation/heat/wear or high-fidelity side-load curves, broad terrain mesh collision, or certified crosswind/rollout performance behavior.
 - Pilot inputs, autopilot commands, and effective controls are separated in the store; input dynamics, stabilizer trim, CG pitch moment, and AP-owned axes have regression coverage. `ControlInputs` keeps `brake` as symmetric braking and accepts optional `leftBrake`/`rightBrake` side channels; `Space` applies symmetric brakes, `Z` applies left brake, and `X` applies right brake as momentary controls that clear on key release, blur, visibility change, and cleanup, while old saved snapshots restore side-specific brakes as zero.
 - The aircraft renderer uses a persistent named visual contract with animated control surfaces/gear, Cesium-native runway references, and chase/cockpit camera management.
 - The default player view has scenario/tutorial/checklist/coach flow, readable PFD/FMA, MCP controls, route status, active-leg LNAV feedback, conservative VNAV/SPD/VS behavior, and honest SPEED/N1 thrust modes that do not advertise unsupported modes.
+- FDM/performance source-data governance is documented in [`docs/runbooks/fdm-source-governance.md`](docs/runbooks/fdm-source-governance.md). Current FDM/performance data remains gameplay-placeholder unless versioned metadata says otherwise; the 2026-06-16 source-packet disposition records P1.1 as blocked until permitted aero, engine, gear, tire/brake, performance-card, and runway/airport source packets exist.
 - CI enforces lint, typecheck, tests, and production build before publish/deploy.
 
-The next major enhancements are the prioritized realism/product phases documented in `docs/roadmap.md`, including deeper ground-handling tuning, broader terrain mesh collision and airport/runway surface coverage beyond KSEA/KPDX prepared runway rectangles, RFMS route-edit/FMA lifecycle fidelity, worker timing, flight-model data quality, and product polish.
+The next major enhancements are the prioritized realism/product phases documented in `docs/roadmap.md`, including source-backed ground-handling/tire tuning, broader terrain mesh collision and airport/runway surface coverage beyond KSEA/KPDX prepared runway rectangles, RFMS route-edit/FMA lifecycle fidelity, worker timing, flight-model data quality, and product polish.
+
+### Rendering/weather/audio/immersion disposition
+
+- Cockpit/interior: partial. RFS has a cockpit camera/shell, PFD/FMA, MCP, cockpit interaction hooks, route/scenario controls, and visual layout guards; a complete modeled 737 cockpit interior, panel-system depth, lighting, and product-grade instrument layout remain deferred.
+- Weather/atmosphere: partial. RFS parses METAR wind/cloud data, provides scenario weather fallback, deterministic gusts, and simple cloud billboards; visibility rendering, QNH/temperature pressure-altitude and density-altitude effects, precipitation, and weather-driven scene degradation remain deferred.
+- Audio: partial. RFS has explicit Web Audio startup, N1-driven engine tone mapping, persisted mute/volume/caption settings, and GPWS captions/speech; richer engine, cockpit, airframe, warning, and spatial sound layers remain deferred.
+- Scene loading/error states: partial. RFS has an app ErrorBoundary, a visible `SCENERY DEGRADED` status for missing Cesium Ion scenery, and degraded ellipsoid fallback; richer loading, retry, scenery-error, and network-failure UX remain deferred.
+- PWA: deferred. RFS does not yet claim installability/offline support; manifest icons, service worker strategy, cache policy, and offline/error fallback screens remain future product work.
+
+Visual snapshots are not proof of audio, weather, PWA, or error-state behavior; those claims require dedicated unit/component/browser evidence for the behavior itself.
 
 ## Stack
 
@@ -105,6 +121,8 @@ npm run bootstrap:check
 
 The bootstrap script fetches `https://github.com/Reedtrullz/RFMC.git` at the audited RFMS/RFMC commit `810fc9652da431eaf8978b85bf4af131605559b5`. Local developer checkouts at another commit are allowed for day-to-day work when `../RFMS/shared/package.json` exists, but CI and Docker use the pinned bootstrap path for reproducible builds.
 
+RFMS integration is currently a shared-type/source bridge, not a full CDU/FMS. `src/sim/fms/routeAdapter.ts` has pure data tests for route sources, staged `DIRECT_TO`, explicit `DISCONTINUITY`, undo, and `EXEC`, but the browser route panel still presents the KSEA→KPDX route as a canned training route and explicitly says route editing is unavailable. Do not claim a visible CDU, direct-to, discontinuity-resolution, or EXEC route-editing workflow until a dedicated UI wires those adapter operations into the store and route-status recompute path.
+
 ## Local development
 
 ```bash
@@ -147,6 +165,8 @@ npm run check
 npm run check:deps && npm run check:release && npm run check:blackbox && npm run lint:ci && npm run typecheck && npm run test && npm run build && npm run check:bundle
 ```
 
+Browser proof is split into layers: unit/static gates verify source contracts, seeded/scoped Playwright helpers guard specific physics/guidance states, and manifest-listed black-box specs use visible controls plus visible readbacks only. Seeded proofs are not full-flight/full-route evidence; full-flight claims require a continuous visible-control proof that actually covers that path, plus exact-SHA CI/live verification where applicable.
+
 Useful targeted commands:
 
 ```bash
@@ -170,6 +190,17 @@ RFS is open source under the MIT License. See [`LICENSE`](LICENSE) for the full 
 Contributions are welcome when they preserve RFS's proof discipline: simulator displays must match actual backing state, partial or seeded proofs must not be overstated, and release/deploy success requires real CI or endpoint evidence. Start with [`CONTRIBUTING.md`](CONTRIBUTING.md), use the GitHub issue templates for bugs and feature requests, and include a proof-boundary section in pull requests.
 
 Report vulnerabilities, suspected secret exposure, CI/deploy bypasses, or supply-chain issues through [`SECURITY.md`](SECURITY.md) rather than public issues.
+
+## Repository governance status
+
+Verified with `gh repo view`, branch-protection, and community-profile API checks on 2026-06-16:
+
+- Repository: public `Reedtrullz/ReedFS`, default branch `master`, MIT license, issues and wiki enabled, not archived.
+- Branch protection: `master` has admin enforcement enabled, force pushes and deletions disabled, and strict required status checks: `secret-scan`, `test`, `publish`, `deploy`.
+- Automation posture: pinned GitHub Actions, Gitleaks secret scan, CodeQL, Dependabot for npm/actions/Docker, PR-safe Docker smoke, Trivy image scan, CODEOWNERS, pull request template, and bug/feature issue forms are present in the repo.
+- Contributor/security posture: `CONTRIBUTING.md`, `SECURITY.md`, MIT `LICENSE`, proof-boundary PR checklist, and private-vulnerability reporting path are present.
+
+Governance is not yet complete: GitHub About description, homepage, and topics are still blank; the community profile API reports 71% health; no code of conduct is currently published; and GitHub's community-profile response did not surface an issue template despite the repository containing issue-form YAML files. Do not claim OSS governance complete until those repository-level items are fixed or intentionally accepted.
 
 ## Physics conventions
 
@@ -225,7 +256,7 @@ React App
     -> audio phase: when AUDIO is enabled, update EngineSound and GPWS from the committed sim state
 ```
 
-Moving physics to a default-on browser `Worker` remains a recommended follow-up after the state/control/route contracts stabilize. The current bridge slice provides runtime adapters, main-thread/worker-handler parity tests, and an experimental browser module Worker selected only by `VITE_RFS_WORKER_PHYSICS=1`; production still defaults to the main-thread adapter.
+Moving physics to a default-on browser `Worker` remains a recommended follow-up after the state/control/route contracts stabilize. The current bridge slice provides runtime adapters, main-thread/worker-handler parity tests, and an experimental browser module Worker selected only by `VITE_RFS_WORKER_PHYSICS=1`; production still defaults to the main-thread adapter. Current disposition: no default-on worker migration is claimed until an async `FrameScheduler`/`useSimLoop`/`simStore` bridge can await `stepAsync()` while preserving input, route, AP, wind, error-fallback, pause/resume/reset, and visual/E2E parity.
 
 Autopilot thrust guidance currently includes SPEED airspeed hold and a conservative phase-based N1 target mode. Both produce AP-owned, rate-limited throttle commands before engine integration; N1 is gated by Boeing A/T arm state, uses target N1 versus average current engine N1 rather than the SPEED airspeed-error law, and clears stale `boeing.n1` on AP disconnect/override.
 
@@ -233,7 +264,7 @@ Autopilot thrust guidance currently includes SPEED airspeed hold and a conservat
 
 `VITE_RFS_WORKER_PHYSICS` is parsed by `src/config/workerPhysics.ts` as an experimental, default-off feature flag for browser-Worker physics wiring. Truthy tokens are `1`, `true`, `yes`, `on`, and `enabled`; false/off tokens are `0`, `false`, `no`, `off`, `disabled`, and an empty value. Invalid values fall back safely to main-thread physics with an explanatory config reason.
 
-With `VITE_RFS_WORKER_PHYSICS=1`, `src/sim/simulationRuntime.ts` instantiates a real browser module Worker and exposes Worker-backed `stepAsync()` with request/response IDs, one-request backpressure, timeout/error main-thread fallback, and `dispose()`. The current `simStore.tick()` path remains synchronous, so sync `step()` still falls back to main-thread physics until the frame scheduler becomes async-aware. The flag does **not** require SharedArrayBuffer/COOP/COEP, and RFS still does **not** set COOP/COEP headers.
+With `VITE_RFS_WORKER_PHYSICS=1`, `src/sim/simulationRuntime.ts` instantiates a real browser module Worker and exposes Worker-backed `stepAsync()` with request/response IDs, one-request backpressure, timeout/error main-thread fallback, and `dispose()`. The current `simStore.tick()` path remains synchronous, so sync `step()` still falls back to main-thread physics until the frame scheduler becomes async-aware. This is an experimental parity/protocol path, not production-active worker physics. The flag does **not** require SharedArrayBuffer/COOP/COEP, and RFS still does **not** set COOP/COEP headers.
 
 ### Audio startup
 

@@ -2,6 +2,8 @@
 
 > **For Hermes:** Use `subagent-driven-development` for the implementation/review loop. Do not use the GPT-5.5 swarm: this is a tightly coupled helper/spec/docs proof-tightening slice touching the same route bridge files, so ordinary serialized subagents avoid git/file overlap.
 
+> **Status note, 2026-06-15:** This plan originally tightened a KPDX 10L short-final seed. The current KSEA→KPDX route/landing proof is aligned on KPDX 10R; any remaining 10L wording in this dated plan is historical context, not a current-state claim.
+
 ## Goal
 
 Tighten the KSEA-to-KPDX landing bridge proof so the manual KPDX short-final seed cannot carry stale `routeStatus` values from the earlier BTG→KPDX descent segment.

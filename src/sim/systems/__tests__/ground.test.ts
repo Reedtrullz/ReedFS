@@ -17,6 +17,8 @@ import { eulerToQuat } from '../../physics/quaternion';
 import { KSEA_RUNWAY_16L } from '../../../viewport/runwayData';
 import { sampleKseaSurface, sampleSupportedAirportSurface } from '../../runwaySurface';
 import { ktToMs } from '../../physics/units';
+import { findPerformanceCardForScenario } from '../../data/performance/b737PerformanceCards';
+import { KSEA_TUTORIAL_SCENARIO } from '../../scenarios';
 
 const DEG_TO_RAD = Math.PI / 180;
 
@@ -874,6 +876,25 @@ describe('applyGroundContact', () => {
     expect(forces.brakeForceN).toBeGreaterThan(forces.rollingFrictionForceN);
     expect(forces.brakeForceN).toBeLessThan(100_000 * (6 / 9.80665));
     expect(forces.accelerationMps2).toBeCloseTo(forces.retardingForceN / 10_000, 8);
+  });
+
+  it('computes rejected-takeoff braking from the scenario performance card without reverse acceleration', () => {
+    const card = findPerformanceCardForScenario(KSEA_TUTORIAL_SCENARIO.id);
+    const state = createInitialState(B737_800_SPEC);
+    state.position.alt = KSEA_RUNWAY_ALT_FT;
+    state.grossWeight = card.grossWeightKg;
+    state.velocity.u = ktToMs(card.rejectedTakeoff.decisionSpeedKt);
+    state.config.gearDown = true;
+    const loadedGearStations = createB737GearStations(state.grossWeight * 9.80665, true);
+    const reject: ControlInputs = { ...idle, brake: 1, spoilers: 1, gearLever: 'DOWN' };
+
+    const forces = computeGroundRollForces(state, reject, loadedGearStations);
+    applyGroundContact(state, reject, 1, KSEA_RUNWAY_ALT_FT, { normalForceN: state.grossWeight * 9.80665 });
+
+    expect(forces.retardingForceN).toBeGreaterThan(0);
+    expect(forces.accelerationMps2).toBeGreaterThan(0);
+    expect(state.velocity.u).toBeGreaterThanOrEqual(0);
+    expect(state.velocity.u).toBeLessThan(ktToMs(card.rejectedTakeoff.decisionSpeedKt));
   });
 
   it('uses side-specific brake controls to create yaw while rolling forward', () => {

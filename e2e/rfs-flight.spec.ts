@@ -11,6 +11,7 @@ import {
 const EXPECTED_LANDING_PHASES = ['TOUCHDOWN', 'DEROTATION', 'ROLLOUT', 'STOPPED'];
 const ROLLOUT_GUIDANCE_PHASES = ['landing-rollout', 'taxi', 'stopped'];
 const ENVA_LANDING_CARD = findPerformanceCardForScenario('enva-tutorial').landing;
+const KPDX_LANDING_CARD = findPerformanceCardForScenario('kpdx-tutorial').landing;
 
 interface LandingPerformanceProofSnapshot {
   iasKt: number;
@@ -119,13 +120,14 @@ test.describe('RFS playable flight loops', () => {
     const proof = await flyDescentApproachToLandingRolloutAndReset(page);
 
     expect(proof.descent.flightPhase).toBe('DESCENT');
-    expect(proof.descent.guidancePhase).toBe('approach');
+    expect(proof.descent.guidancePhase).toBe('descent');
     expect(proof.descent.weightOnWheels).toBe(false);
     expect(proof.descent.aglFt).toBeGreaterThan(300);
     expect(proof.descent.autopilotCleared).toBe(true);
     expect(proof.descent.routeCleared).toBe(true);
 
     expect(proof.configuredApproach.gearDown).toBe(true);
+    expect(proof.configuredApproach.flightPhase).toBe('APPROACH');
     expect(proof.configuredApproach.gearLever).toBe('DOWN');
     expect(proof.configuredApproach.flapSetting).toBeGreaterThanOrEqual(25);
     expect(proof.configuredApproach.guidancePhase).toBe('approach');
@@ -170,14 +172,14 @@ test.describe('RFS playable flight loops', () => {
     expect(proof.touchdown.weightOnWheels).toBe(true);
     expect(proof.touchdown.onRunway).toBe(true);
     expect(proof.touchdown.surfaceAirport).toBe('KPDX');
-    expect(proof.touchdown.surfaceRunwayId).toBe('10L');
+    expect(proof.touchdown.surfaceRunwayId).toBe('10R');
     expect(proof.touchdown.touchdownSinkRateMps).toBeGreaterThan(0);
     expect(proof.touchdown.touchdownSinkRateMps).toBeLessThan(15);
 
     expect(proof.rollout.groundSpeedKt).toBeLessThan(proof.touchdown.groundSpeedKt);
     expect(ROLLOUT_GUIDANCE_PHASES).toContain(proof.rollout.guidancePhase);
     expectExplicitLandingSequence(proof.landingPhases);
-    expectLandingPerformanceWithinCard(proof, ENVA_LANDING_CARD);
+    expectLandingPerformanceWithinCard(proof, KPDX_LANDING_CARD);
 
     expect(proof.reset.status).toBe('stopped');
     expect(proof.reset.guidancePhase).toBe('preflight');

@@ -5,7 +5,7 @@ import type { AutopilotCommands, ControlInputs } from '../types';
 import { B737_800_SPEC, createInitialState } from '../types';
 import { buildGuidanceState } from '../guidanceState';
 import { createKseaKpdxFlight } from '../flightPlanLoader';
-import { KSEA_TUTORIAL_SCENARIO } from '../scenarios';
+import { createAircraftStateForScenario, KSEA_TUTORIAL_SCENARIO } from '../scenarios';
 import { KPDX_RUNWAY_10R, KPDX_RUNWAY_10R_APPROACH } from '../../viewport/runwayData';
 import { computeRouteStatus, createNoRouteStatus } from '../systems/navigation';
 import {
@@ -195,6 +195,26 @@ function n1AutopilotState(): AutopilotState {
 beforeEach(() => resetAutopilotPID());
 
 describe('advanceSimulationStep', () => {
+  it('does not use distant runway-threshold constraints as the initial KSEA departure descent target', () => {
+    const aircraft = createAircraftStateForScenario(B737_800_SPEC, KSEA_TUTORIAL_SCENARIO);
+    const flightPlan = createKseaKpdxFlight();
+    const routeStatus = computeRouteStatus(aircraft, flightPlan, 0);
+
+    expect(routeStatus.activeLegIndex).toBe(0);
+    expect(routeStatus.nextWaypointIdent).toBe('OLM');
+    expect(resolveRouteDescentTargetAltitudeFt(flightPlan, routeStatus, aircraft.position.alt)).toBeNull();
+  });
+
+  it('resolves the first upcoming constrained waypoint without scanning to the runway threshold', () => {
+    const aircraft = createAircraftStateForScenario(B737_800_SPEC, KSEA_TUTORIAL_SCENARIO);
+    const flightPlan = createKseaKpdxFlight();
+    const routeStatus = computeRouteStatus(aircraft, flightPlan, 0);
+
+    expect(routeStatus.activeLegIndex).toBe(0);
+    expect(routeStatus.nextWaypointIdent).toBe('OLM');
+    expect(resolveRouteDescentTargetAltitudeFt(flightPlan, routeStatus, 15_000)).toBe(12_000);
+  });
+
   it('resolves BETWEEN altitude constraints only when current altitude is outside the band', () => {
     const flightPlan: FlightPlan = {
       origin: 'ORIG',

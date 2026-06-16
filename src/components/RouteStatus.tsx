@@ -37,11 +37,11 @@ const routeSourceStyle: CSSProperties = {
   border: '1px solid rgba(255,216,74,0.45)',
   borderRadius: 4,
   color: '#ffd84a',
-  fontSize: 11,
+  fontSize: 10,
   fontWeight: 800,
-  lineHeight: 1.35,
-  marginTop: 8,
-  padding: '6px 7px',
+  lineHeight: 1.25,
+  marginTop: 6,
+  padding: '4px 6px',
 };
 
 const rowStyle: CSSProperties = {
@@ -49,7 +49,7 @@ const rowStyle: CSSProperties = {
   alignItems: 'baseline',
   justifyContent: 'space-between',
   gap: 10,
-  marginTop: 7,
+  marginTop: 5,
 };
 
 const valueStyle: CSSProperties = {
@@ -91,11 +91,20 @@ function isLoadedRoute(routeStatus: { routeName: string; routeValid: boolean }):
   return routeStatus.routeValid && routeStatus.routeName !== 'NO ROUTE';
 }
 
-function RouteSourceReadback() {
+function RouteSourceReadback({ routeName }: { routeName: string }) {
+  const syntheticApproach = routeName === 'KSEA→KPDX';
   return (
     <div style={routeSourceStyle}>
       <div>CANNED TRAINING ROUTE</div>
       <div style={{ color: '#ffefb8', fontWeight: 700 }}>Route editing unavailable</div>
+      <div style={{ color: '#ffefb8', fontWeight: 700, marginTop: 2 }}>
+        RFMS adapter seam only — no CDU/EXEC route edit UI
+      </div>
+      {syntheticApproach && (
+        <div style={{ color: '#ffefb8', fontWeight: 700, marginTop: 2 }}>
+          Synthetic training approach — not official procedure data
+        </div>
+      )}
     </div>
   );
 }
@@ -127,7 +136,7 @@ export function RouteStatus() {
     <section aria-label="Route status" aria-live="polite" style={panelStyle}>
       <div style={labelStyle}>Route status</div>
       <div style={routeNameStyle}>{routeStatus.routeName}</div>
-      {isLoadedRoute(routeStatus) && <RouteSourceReadback />}
+      {isLoadedRoute(routeStatus) && <RouteSourceReadback routeName={routeStatus.routeName} />}
 
       {routeStatus.routeComplete && handoffText ? (
         <ApproachHandoffReadback text={handoffText} />

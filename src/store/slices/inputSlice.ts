@@ -26,8 +26,8 @@ function gateGearLeverPatch(
   partial: Partial<ControlInputs>,
   currentGearLever: ControlInputs['gearLever'],
   aircraft: SimStore['aircraft'],
-): Partial<ControlInputs> {
-  if (partial.gearLever === undefined) return partial;
+): { partial: Partial<ControlInputs>; rejectedReason: 'positive-rate-required' | null } {
+  if (partial.gearLever === undefined) return { partial, rejectedReason: null };
 
   const gearCommand = resolveGearLeverCommand({
     current: currentGearLever,
@@ -37,10 +37,17 @@ function gateGearLeverPatch(
   if (gearCommand.gearLever === currentGearLever) {
     const rest = { ...partial };
     delete rest.gearLever;
-    return rest;
+    return { partial: rest, rejectedReason: gearCommand.rejectedReason };
   }
 
-  return { ...partial, gearLever: gearCommand.gearLever };
+  return { partial: { ...partial, gearLever: gearCommand.gearLever }, rejectedReason: null };
+}
+
+function controlFeedbackMessageForGearRejection(reason: 'positive-rate-required' | null): string | null {
+  if (reason === 'positive-rate-required') {
+    return 'Gear up blocked — establish positive rate before retracting gear.';
+  }
+  return null;
 }
 
 export function createInputSlice(set: SimStoreSet): Pick<SimStore, 'setInput' | 'setTakeoffConfig' | 'applyInputActions'> {
@@ -49,7 +56,8 @@ export function createInputSlice(set: SimStoreSet): Pick<SimStore, 'setInput' | 
       set((s) => {
         const apActive = apIsEffectivelyEngaged(s);
         const apOwnsThrust = apEffectivelyOwnsThrust(s);
-        const gatedPartial = gateGearLeverPatch(partial, s.pilotInputs.gearLever, s.aircraft);
+        const gearGate = gateGearLeverPatch(partial, s.pilotInputs.gearLever, s.aircraft);
+        const gatedPartial = gearGate.partial;
         const { pilotPatch, shouldDisconnect } = sanitizeSetInputPartial(
           gatedPartial,
           s.pilotInputs,
@@ -68,6 +76,9 @@ export function createInputSlice(set: SimStoreSet): Pick<SimStore, 'setInput' | 
           apState,
           apControllerState,
           inputManager: syncInputManagerWithInputPartial(s.inputManager, pilotPatch),
+          controlFeedbackMessage: partial.gearLever !== undefined
+            ? controlFeedbackMessageForGearRejection(gearGate.rejectedReason)
+            : s.controlFeedbackMessage,
           guidance: syncGuidanceState(s.guidance, scenario, s.status, s.aircraft, controlsSlice.effectiveControls),
         };
       }),
@@ -100,6 +111,7 @@ export function createInputSlice(set: SimStoreSet): Pick<SimStore, 'setInput' | 
           apState: null,
           apControllerState,
           apCommands: {},
+          controlFeedbackMessage: null,
           guidance: syncGuidanceState(s.guidance, scenario, s.status, aircraft, controlsSlice.effectiveControls),
         };
       }),
@@ -134,7 +146,8 @@ export function createInputSlice(set: SimStoreSet): Pick<SimStore, 'setInput' | 
             throttle: Math.max(s.pilotInputs.throttle1, s.pilotInputs.throttle2),
           });
         }
-        inputPatch = gateGearLeverPatch(inputPatch, s.pilotInputs.gearLever, s.aircraft);
+        const gearGate = gateGearLeverPatch(inputPatch, s.pilotInputs.gearLever, s.aircraft);
+        inputPatch = gearGate.partial;
 
         const trimChanged = inputManager.stabilizerTrimUnits !== s.aircraft.config.stabilizerTrimUnits;
         const aircraft = trimChanged ? structuredClone(s.aircraft) : s.aircraft;
@@ -156,6 +169,9 @@ export function createInputSlice(set: SimStoreSet): Pick<SimStore, 'setInput' | 
           aircraft,
           apState,
           apControllerState,
+          controlFeedbackMessage: actions.gearToggle || inputPatch.gearLever !== undefined
+            ? controlFeedbackMessageForGearRejection(gearGate.rejectedReason)
+            : s.controlFeedbackMessage,
           guidance: syncGuidanceState(s.guidance, scenario, s.status, aircraft, controlsSlice.effectiveControls),
         };
       }),

@@ -249,7 +249,7 @@ export function RfsShell() {
       ? `confirm flaps ${scenario.flapSetting}, trim ${scenario.stabilizerTrimUnits.toFixed(1)}, idle throttle, then START ROLL.`
       : 'route guidance is active; use visible MCP LNAV, altitude, and VS/VNAV controls for climb/descent management.';
     setRouteLoadMessage(
-      `CANNED TRAINING ROUTE ${fp.origin}→${fp.destination} loaded. Route editing is unavailable; ${routeGuidance}`,
+      `CANNED TRAINING ROUTE ${fp.origin}→${fp.destination} loaded. Route editing is unavailable; synthetic approach fixes are not official procedure data; ${routeGuidance}`,
     );
   };
 
@@ -336,10 +336,10 @@ export function RfsShell() {
       ) : null}
       debugPanels={showDebugOverlays ? (
         <Suspense fallback={null}>
-          <Telemetry />
-          <ControlsHelp />
-          <ControlsSettings />
-          <AttitudeIndicator />
+          <div data-rfs-debug-panel="telemetry"><Telemetry /></div>
+          <div data-rfs-debug-panel="help"><ControlsHelp /></div>
+          <div data-rfs-debug-panel="settings"><ControlsSettings /></div>
+          <div data-rfs-debug-panel="attitude"><AttitudeIndicator /></div>
         </Suspense>
       ) : null}
       flightInstruments={showFlightInstruments ? (

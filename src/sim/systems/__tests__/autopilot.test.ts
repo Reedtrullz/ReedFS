@@ -190,6 +190,41 @@ describe('computeAutopilotCommandsForState effective truth gating', () => {
     expect(commands.elevator).toBeLessThan(0);
   });
 
+  it('reduces SPEED thrust floor and commands nose down for a selected VS descent', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.flightPhase = 'DESCENT';
+    s.position.alt = 21_500;
+    s.velocity.u = 250;
+    s.velocity.w = -2;
+    s.ground = { ...s.ground, weightOnWheels: false, contact: 'none', onRunway: false, aglFt: 21_500, normalForceN: 0 };
+    const ap = makeAp('HDG_SEL', 'VS', 'SPEED');
+    ap.boeing.hdgSel = true;
+    ap.boeing.vs = true;
+    ap.boeing.verticalSpeed = -1500;
+    ap.boeing.speedMode = true;
+    ap.boeing.autothrottleArm = true;
+    const controller = createAutopilotControllerState();
+    controller.throttleLimited = 0.5;
+    expect(computeDerived(s).ias).toBeGreaterThan(280);
+
+    const { commands } = computeAutopilotCommandsWithControllerState(
+      s,
+      ap,
+      s.attitude.psi,
+      2_000,
+      240,
+      1,
+      -1500,
+      undefined,
+      null,
+      controller,
+    );
+
+    expect(commands.elevator).toBeGreaterThan(0);
+    expect(commands.throttle1).toBeLessThanOrEqual(0.25);
+    expect(commands.throttle2).toBe(commands.throttle1);
+  });
+
   it('keeps VNAV armed before TOD without commanding pitch or falling back to MCP altitude', () => {
     const s = createInitialState(B737_800_SPEC);
     s.position.alt = 30000;

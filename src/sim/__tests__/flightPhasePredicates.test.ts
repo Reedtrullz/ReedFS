@@ -123,6 +123,25 @@ describe('deriveRouteDrivenFlightPhase', () => {
     })).toBe('DESCENT');
   });
 
+  it('starts DESCENT from CLIMB when selected VS commands descent inside the route window', () => {
+    const state = airborneCruiseState();
+    state.flightPhase = 'CLIMB';
+    state.position.alt = 2_400;
+    state.ground.aglFt = 2_300;
+
+    expect(deriveRouteDrivenFlightPhase(state, {
+      routeStatus: lifecycleRouteStatus({
+        approachHandoff: 'none',
+        activeLegIndex: 1,
+        activeLegCount: 5,
+        distanceToNextNm: 44,
+        distanceToNextM: 44 * 1852,
+      }),
+      descentTargetAltitudeFt: null,
+      selectedVerticalSpeedFpm: -1500,
+    })).toBe('DESCENT');
+  });
+
   it('does not start DESCENT hundreds of miles early just because the route has few remaining legs', () => {
     const state = airborneCruiseState();
 
@@ -176,5 +195,53 @@ describe('deriveRouteDrivenFlightPhase', () => {
       routeStatus: lifecycleRouteStatus({ approachHandoff: 'final' }),
       descentTargetAltitudeFt: 1_550,
     })).toBe('DESCENT');
+  });
+
+  it('keeps a route-guided configured descent in DESCENT until final or threshold handoff', () => {
+    const state = airborneCruiseState();
+    state.flightPhase = 'DESCENT';
+    state.ground.aglFt = 301;
+    state.config.gearDown = true;
+    state.config.gearPosition = 1;
+    state.config.flapSetting = 30;
+
+    expect(deriveRouteDrivenFlightPhase(state, {
+      routeStatus: lifecycleRouteStatus({
+        approachHandoff: 'none',
+        activeLegIndex: 1,
+        activeLegCount: 5,
+        distanceToNextNm: 18,
+        distanceToNextM: 18 * 1852,
+      }),
+      descentTargetAltitudeFt: 1_550,
+    })).toBe('DESCENT');
+  });
+
+  it('keeps route-less seeded DESCENT in descent while gear and landing flaps are not configured', () => {
+    const state = airborneCruiseState();
+    state.flightPhase = 'DESCENT';
+    state.ground.aglFt = 301;
+    state.config.gearDown = false;
+    state.config.gearPosition = 0;
+    state.config.flapSetting = 5;
+
+    expect(deriveRouteDrivenFlightPhase(state, {
+      routeStatus: createNoRouteStatus(),
+      descentTargetAltitudeFt: null,
+    })).toBe('DESCENT');
+  });
+
+  it('moves a route-less seeded DESCENT into APPROACH only after landing configuration is established', () => {
+    const state = airborneCruiseState();
+    state.flightPhase = 'DESCENT';
+    state.ground.aglFt = 301;
+    state.config.gearDown = true;
+    state.config.gearPosition = 1;
+    state.config.flapSetting = 30;
+
+    expect(deriveRouteDrivenFlightPhase(state, {
+      routeStatus: createNoRouteStatus(),
+      descentTargetAltitudeFt: null,
+    })).toBe('APPROACH');
   });
 });

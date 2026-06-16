@@ -64,10 +64,14 @@ export function resolveRouteDescentTargetAltitudeFt(
   currentAltitudeFt: number,
 ): number | null {
   if (!flightPlan?.waypoints.length || !routeStatus.routeValid || routeStatus.routeComplete) return null;
-  const startIndex = finiteNumber(routeStatus.toWaypointIndex) ?? finiteNumber(routeStatus.activeLegIndex) ?? 0;
-  for (let index = Math.max(0, Math.trunc(startIndex)); index < flightPlan.waypoints.length; index += 1) {
-    const altitudeTarget = altitudeTargetForConstraint(currentAltitudeFt, flightPlan.waypoints[index]?.altitudeConstraint);
-    if (altitudeTarget !== null) return altitudeTarget;
+  const toWaypointIndex = finiteNumber(routeStatus.toWaypointIndex);
+  const activeLegIndex = finiteNumber(routeStatus.activeLegIndex);
+  const targetIndex = toWaypointIndex ?? (activeLegIndex !== null ? Math.trunc(activeLegIndex) + 1 : null);
+  if (targetIndex === null) return null;
+  for (let index = Math.max(0, Math.trunc(targetIndex)); index < flightPlan.waypoints.length; index += 1) {
+    const waypoint = flightPlan.waypoints[index];
+    if (!waypoint?.altitudeConstraint) continue;
+    return altitudeTargetForConstraint(currentAltitudeFt, waypoint.altitudeConstraint);
   }
   return null;
 }
@@ -79,14 +83,30 @@ function setFlightPhase(state: AircraftState, phase: FlightPhase): void {
   }
 }
 
+function selectedVerticalSpeedForFlightPhase(
+  apState: AutopilotState | null,
+  state: AircraftState,
+  flightPlan: FlightPlan | null,
+  routeStatus: RouteStatusSnapshot,
+): number | null {
+  const truth = deriveEffectiveAutoflightTruth(apState, { aircraft: state, flightPlan, routeStatus });
+  if (truth.verticalActive !== 'VS') return null;
+  const boeingVs = apState?.boeing.verticalSpeed;
+  if (typeof boeingVs === 'number' && Number.isFinite(boeingVs)) return boeingVs;
+  const airbusVs = apState?.airbus.verticalSpeed;
+  return typeof airbusVs === 'number' && Number.isFinite(airbusVs) ? airbusVs : null;
+}
+
 function updateRouteDrivenFlightPhase(
   state: AircraftState,
   flightPlan: FlightPlan | null,
   routeStatus: RouteStatusSnapshot,
+  apState: AutopilotState | null,
 ): void {
   const phase = deriveRouteDrivenFlightPhase(state, {
     routeStatus,
     descentTargetAltitudeFt: resolveRouteDescentTargetAltitudeFt(flightPlan, routeStatus, state.position.alt),
+    selectedVerticalSpeedFpm: selectedVerticalSpeedForFlightPhase(apState, state, flightPlan, routeStatus),
   });
   setFlightPhase(state, phase);
 }
@@ -212,7 +232,7 @@ export function advanceSimulationStep(input: SimulationStepInput): SimulationSte
   const routeStatus = input.flightPlan
     ? computeRouteStatus(state, input.flightPlan, routeBeforeTick.activeLegIndex)
     : createNoRouteStatus();
-  updateRouteDrivenFlightPhase(state, input.flightPlan, routeStatus);
+  updateRouteDrivenFlightPhase(state, input.flightPlan, routeStatus, input.apState);
   const committedTruthContext: EffectiveAutoflightTruthContext = {
     aircraft: state,
     flightPlan: input.flightPlan,

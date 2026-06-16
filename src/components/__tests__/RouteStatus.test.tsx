@@ -87,6 +87,10 @@ describe('RouteStatus', () => {
 
     expect(screen.getByText(/CANNED TRAINING ROUTE/i)).toBeTruthy();
     expect(screen.getByText(/route editing unavailable/i)).toBeTruthy();
+    expect(screen.getByText(/RFMS adapter seam only/i)).toBeTruthy();
+    expect(screen.getByText(/no CDU\/EXEC route edit UI/i)).toBeTruthy();
+    expect(screen.getByText(/synthetic training approach/i)).toBeTruthy();
+    expect(screen.getByText(/not official procedure data/i)).toBeTruthy();
   });
 
   it('keeps pilot-facing leg display coherent if route feedback has an inconsistent leg count', () => {

@@ -58,7 +58,19 @@ describe('TakeoffSetupPanel', () => {
     expect(screen.getByRole('button', { name: /Flaps Previous/i })).toBeVisible();
     expect(screen.getByRole('button', { name: /Trim Nose Down/i })).toBeVisible();
     expect(screen.getByRole('button', { name: /Throttle Down/i })).toBeVisible();
+    expect(screen.getByRole('button', { name: /Hold Rotate/i })).toBeVisible();
+    expect(screen.getByRole('button', { name: /Yoke Neutral/i })).toBeVisible();
     expect(screen.getByRole('button', { name: /Set takeoff config/i })).toBeVisible();
+  });
+
+  it('exposes a mouse-hold rotate control that releases back to neutral', () => {
+    render(<TakeoffSetupPanel />);
+
+    fireEvent.pointerDown(screen.getByRole('button', { name: /Hold Rotate/i }));
+    expect(useSimStore.getState().inputs.elevator).toBeCloseTo(-0.75, 5);
+
+    fireEvent.pointerUp(screen.getByRole('button', { name: /Hold Rotate/i }));
+    expect(useSimStore.getState().inputs.elevator).toBe(0);
   });
 
   it('sets the active scenario takeoff configuration directly', () => {
@@ -92,5 +104,19 @@ describe('TakeoffSetupPanel', () => {
     expect(screen.getByText('Trim 5.0')).toBeTruthy();
     expect(screen.getByText('Throttle 35%')).toBeTruthy();
     expect(screen.getByText('Gear DOWN')).toBeTruthy();
+  });
+
+  it('shows visible feedback instead of silently ignoring gear-up before positive rate', () => {
+    const store = useSimStore.getState();
+    store.setInput({ gearLever: 'DOWN' });
+    store.startTakeoffRoll();
+
+    render(<TakeoffSetupPanel />);
+    fireEvent.click(screen.getByRole('button', { name: 'Gear' }));
+
+    expect(screen.getByText('Gear DOWN')).toBeTruthy();
+    expect(screen.getByRole('status', { name: 'Control feedback' })).toHaveTextContent(
+      /gear up blocked.*positive rate/i,
+    );
   });
 });

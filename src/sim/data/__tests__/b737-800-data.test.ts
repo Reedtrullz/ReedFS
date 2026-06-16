@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import architectureDoc from '../../../../docs/architecture.md?raw';
+import roadmapDoc from '../../../../docs/roadmap.md?raw';
+import readmeDoc from '../../../../README.md?raw';
 import { B737_800_SPEC, loadAircraftSpec } from '../../types';
 import {
   B737_800_AIRCRAFT_DATA,
@@ -8,6 +11,7 @@ import {
   B737_800_FDM,
   B737_800_FDM_DATA_VERSION,
 } from '../aircraft/b737-800-fdm.v1';
+import type { FdmSourceMetadata, SourceClassification } from '../aircraft/fdmTypes';
 
 describe('versioned B737-800 aircraft data', () => {
   it('declares a stable aircraft id, schema version, data version, and source notes', () => {
@@ -31,6 +35,17 @@ describe('versioned B737-800 aircraft data', () => {
 
 describe('versioned B737-800 FDM data shell', () => {
   const knownSourceReferenceIds = new Set(B737_800_FDM.lineage.sourceReferences.map((source) => source.id));
+  const placeholderClassifications = new Set<SourceClassification>(['gameplay-calibrated', 'placeholder-engineering-estimate']);
+  const sourceBackedClassifications = new Set<SourceClassification>(['public-reference', 'manufacturer-published', 'certified']);
+  const allowedSourceClassifications = new Set<SourceClassification>([
+    ...placeholderClassifications,
+    ...sourceBackedClassifications,
+  ]);
+  const placeholderSourceReferenceIds = new Set(B737_800_FDM.lineage.sourceReferences
+    .filter((source) => placeholderClassifications.has(source.classification))
+    .map((source) => source.id));
+
+  type FdmClaimBearingSection = FdmSourceMetadata & { sourceReferenceIds?: string[] };
 
   const isStrictIsoCalendarDate = (value: string): boolean => {
     const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
@@ -44,17 +59,13 @@ describe('versioned B737-800 FDM data shell', () => {
     expect(section, `${sectionName} section metadata target`).toBeTypeOf('object');
     expect(section, `${sectionName} section metadata target`).not.toBeNull();
 
-    const metadata = section as {
-      sourceQuality?: unknown;
-      sourceRefs?: unknown;
-      claimBoundary?: unknown;
-      lastReviewed?: unknown;
-      sourceReferenceIds?: unknown;
-    };
+    const metadata = section as Partial<FdmClaimBearingSection>;
 
-    expect(metadata.sourceQuality, `${sectionName}.sourceQuality`).toBe('gameplay-calibrated');
-    expect(metadata.sourceRefs, `${sectionName}.sourceRefs`).toEqual(expect.arrayContaining([expect.any(String)]));
-    for (const sourceRef of metadata.sourceRefs as string[]) {
+    expect(allowedSourceClassifications.has(metadata.sourceQuality as SourceClassification), `${sectionName}.sourceQuality`).toBe(true);
+    expect(Array.isArray(metadata.sourceRefs), `${sectionName}.sourceRefs should be an array`).toBe(true);
+    const sourceRefs = metadata.sourceRefs as string[];
+    expect(sourceRefs, `${sectionName}.sourceRefs`).toEqual(expect.arrayContaining([expect.any(String)]));
+    for (const sourceRef of sourceRefs) {
       expect(knownSourceReferenceIds.has(sourceRef), `${sectionName}.sourceRefs contains unknown source id ${sourceRef}`).toBe(true);
     }
     if (metadata.sourceReferenceIds !== undefined) {
@@ -64,9 +75,17 @@ describe('versioned B737-800 FDM data shell', () => {
 
     expect(metadata.claimBoundary, `${sectionName}.claimBoundary`).toBeTypeOf('string');
     const claimBoundary = (metadata.claimBoundary as string).toLowerCase();
-    expect(claimBoundary, `${sectionName}.claimBoundary should prevent certification overclaims`).toContain('not certified');
-    expect(claimBoundary, `${sectionName}.claimBoundary should prevent AFM overclaims`).toContain('not afm');
-    expect(claimBoundary, `${sectionName}.claimBoundary should identify gameplay placeholders`).toContain('gameplay placeholder');
+    const sourceQuality = metadata.sourceQuality as SourceClassification;
+    if (placeholderClassifications.has(sourceQuality)) {
+      expect(claimBoundary, `${sectionName}.claimBoundary should prevent certification overclaims`).toContain('not certified');
+      expect(claimBoundary, `${sectionName}.claimBoundary should prevent AFM overclaims`).toContain('not afm');
+      expect(claimBoundary, `${sectionName}.claimBoundary should identify gameplay placeholders`).toContain('gameplay placeholder');
+      expect(claimBoundary, `${sectionName}.claimBoundary should prevent Boeing-published overclaims`).toContain('not boeing-published');
+    } else {
+      for (const sourceRef of sourceRefs) {
+        expect(placeholderSourceReferenceIds.has(sourceRef), `${sectionName} source-backed metadata must not reuse placeholder lineage source ${sourceRef}`).toBe(false);
+      }
+    }
 
     expect(metadata.lastReviewed, `${sectionName}.lastReviewed`).toBeTypeOf('string');
     expect(isStrictIsoCalendarDate(metadata.lastReviewed as string), `${sectionName}.lastReviewed should be a real ISO calendar date`).toBe(true);
@@ -92,9 +111,40 @@ describe('versioned B737-800 FDM data shell', () => {
 
   it('requires source-lineage metadata on every FDM section', () => {
     expectSectionSourceMetadata('aero', B737_800_FDM.aero);
+    expectSectionSourceMetadata('configuration', B737_800_FDM.configuration);
+    expectSectionSourceMetadata('engine', B737_800_FDM.engine);
     for (const gearStation of B737_800_FDM.gearStations) {
       expectSectionSourceMetadata(`gearStations.${gearStation.id}`, gearStation);
     }
     expectSectionSourceMetadata('ground', B737_800_FDM.ground);
+  });
+
+  it('rejects source-backed metadata that still points at placeholder lineage', () => {
+    expect(placeholderSourceReferenceIds.size, 'test fixture must include placeholder lineage references').toBeGreaterThan(0);
+    const placeholderSourceRef = [...placeholderSourceReferenceIds][0] ?? '__missing_placeholder_source__';
+    const mixedSection: FdmClaimBearingSection = {
+      sourceQuality: 'manufacturer-published',
+      sourceRefs: [placeholderSourceRef],
+      claimBoundary: 'Manufacturer-published values with a public claim boundary.',
+      lastReviewed: '2026-06-16',
+    };
+
+    expect(() => expectSectionSourceMetadata('synthetic.sourceBackedWithPlaceholderRef', mixedSection)).toThrow();
+  });
+
+  it('keeps public current-state docs from overclaiming placeholder FDM/performance data', () => {
+    const docs = new Map([
+      ['README.md', readmeDoc],
+      ['docs/architecture.md', architectureDoc],
+      ['docs/roadmap.md', roadmapDoc],
+    ]);
+
+    expect(docs.get('README.md')).toContain('Current FDM/performance data remains gameplay-placeholder unless versioned metadata says otherwise');
+    expect(docs.get('docs/architecture.md')).toMatch(/gameplay-placeholder values preserved|gameplay-calibrated placeholders/i);
+    expect(docs.get('docs/roadmap.md')).toContain('Current disposition: P1.1 is blocked for source-backed replacement until permitted source packets exist');
+    expect(docs.get('README.md')).not.toContain('Current FDM/performance data is source-backed');
+    expect(docs.get('README.md')).not.toContain('Current FDM/performance data is certified');
+    expect(docs.get('docs/architecture.md')).not.toContain('Current FDM data is source-backed');
+    expect(docs.get('docs/roadmap.md')).not.toContain('Existing B737-800 performance data is AFM-backed');
   });
 });

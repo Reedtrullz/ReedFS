@@ -95,6 +95,13 @@ export interface B737LandingPerformanceEnvelope {
   ownership: B737PerformanceDataOwnership;
 }
 
+export interface B737RejectedTakeoffPerformanceEnvelope {
+  decisionSpeedKt: number;
+  lowSpeedDistanceM: [number, number];
+  targetLowSpeedKt: number;
+  ownership: B737PerformanceDataOwnership;
+}
+
 export interface B737TakeoffPerformanceCard {
   scenarioId: string;
   airport: FlightScenario['runway']['airport'];
@@ -104,6 +111,7 @@ export interface B737TakeoffPerformanceCard {
   stabilizerTrimUnits: number;
   assumedTemperatureC: number | null;
   vSpeeds: B737VSpeeds;
+  rejectedTakeoff: B737RejectedTakeoffPerformanceEnvelope;
   cleanClimb: B737CleanClimbEnvelope;
   approach: B737ApproachEnvelope;
   landing: B737LandingPerformanceEnvelope;
@@ -134,6 +142,30 @@ const landingPerformanceOwnership: B737PerformanceDataOwnership = {
   ],
   sourceNote: 'RFS gameplay landing envelope card for automated acceptance only; broad placeholder bounds, not a certified Boeing AFM table.',
 };
+
+const rejectedTakeoffOwnership: B737PerformanceDataOwnership = {
+  label: 'runtime-rejected-takeoff-and-performance-test-card',
+  runtimeConsumers: [],
+  testConsumers: [
+    'src/sim/data/__tests__/performanceCards.test.ts',
+    'src/sim/physics/__tests__/integrate.test.ts',
+    'src/sim/systems/__tests__/ground.test.ts',
+  ],
+  sourceNote: 'RFS gameplay rejected-takeoff envelope card for automated acceptance only; broad placeholder bounds, not a certified Boeing AFM table.',
+};
+
+function rejectedTakeoffPerformanceEnvelope(options: {
+  decisionSpeedKt: number;
+  lowSpeedDistanceM?: [number, number];
+  targetLowSpeedKt?: number;
+}): B737RejectedTakeoffPerformanceEnvelope {
+  return {
+    decisionSpeedKt: options.decisionSpeedKt,
+    lowSpeedDistanceM: options.lowSpeedDistanceM ?? [250, 1_500],
+    targetLowSpeedKt: options.targetLowSpeedKt ?? 6,
+    ownership: rejectedTakeoffOwnership,
+  };
+}
 
 function landingPerformanceEnvelope(options: {
   vrefKt: number;
@@ -342,6 +374,7 @@ export const b737PerformanceCards: B737TakeoffPerformanceCard[] = [
     stabilizerTrimUnits: 5.0,
     assumedTemperatureC: null,
     vSpeeds: { v1Kt: 141, vrKt: 149, v2Kt: 155 },
+    rejectedTakeoff: rejectedTakeoffPerformanceEnvelope({ decisionSpeedKt: 141 }),
     cleanClimb: {
       altitudeFt: 10_000,
       iasKt: 250,
@@ -367,7 +400,7 @@ export const b737PerformanceCards: B737TakeoffPerformanceCard[] = [
       runtimeConsumers: ['src/sim/takeoffCue.ts', 'src/instruments/RfsPFD.tsx'],
       testConsumers: [
         'src/sim/data/__tests__/performanceCards.test.ts',
-        'src/sim/physics/__tests__/performanceCards.test.ts',
+        'src/sim/physics/__tests__/integrate.test.ts',
       ],
       sourceNote: 'RFS gameplay baseline card; broad envelope guard, not a certified Boeing AFM table.',
     },
@@ -384,6 +417,7 @@ export const b737PerformanceCards: B737TakeoffPerformanceCard[] = [
     stabilizerTrimUnits: 5.0,
     assumedTemperatureC: null,
     vSpeeds: { v1Kt: 141, vrKt: 149, v2Kt: 155 },
+    rejectedTakeoff: rejectedTakeoffPerformanceEnvelope({ decisionSpeedKt: 141 }),
     cleanClimb: {
       altitudeFt: 10_000,
       iasKt: 250,
@@ -409,7 +443,7 @@ export const b737PerformanceCards: B737TakeoffPerformanceCard[] = [
       runtimeConsumers: ['src/sim/takeoffCue.ts', 'src/instruments/RfsPFD.tsx'],
       testConsumers: [
         'src/sim/data/__tests__/performanceCards.test.ts',
-        'src/sim/physics/__tests__/performanceCards.test.ts',
+        'src/sim/physics/__tests__/integrate.test.ts',
       ],
       sourceNote: 'RFS gameplay baseline card; broad envelope guard, not a certified Boeing AFM table.',
     },
@@ -426,6 +460,7 @@ export const b737PerformanceCards: B737TakeoffPerformanceCard[] = [
     stabilizerTrimUnits: 4.5,
     assumedTemperatureC: null,
     vSpeeds: { v1Kt: 129, vrKt: 137, v2Kt: 145 },
+    rejectedTakeoff: rejectedTakeoffPerformanceEnvelope({ decisionSpeedKt: 129, lowSpeedDistanceM: [200, 1_300] }),
     cleanClimb: {
       altitudeFt: 10_000,
       iasKt: 250,
@@ -451,7 +486,7 @@ export const b737PerformanceCards: B737TakeoffPerformanceCard[] = [
       runtimeConsumers: ['src/sim/takeoffCue.ts', 'src/instruments/RfsPFD.tsx'],
       testConsumers: [
         'src/sim/data/__tests__/performanceCards.test.ts',
-        'src/sim/physics/__tests__/performanceCards.test.ts',
+        'src/sim/physics/__tests__/integrate.test.ts',
       ],
       sourceNote: 'RFS gameplay baseline card; broad envelope guard, not a certified Boeing AFM table.',
     },
@@ -468,6 +503,7 @@ export const b737PerformanceCards: B737TakeoffPerformanceCard[] = [
     stabilizerTrimUnits: 4.8,
     assumedTemperatureC: null,
     vSpeeds: { v1Kt: 137, vrKt: 145, v2Kt: 152 },
+    rejectedTakeoff: rejectedTakeoffPerformanceEnvelope({ decisionSpeedKt: 137, lowSpeedDistanceM: [250, 1_450] }),
     cleanClimb: {
       altitudeFt: 10_000,
       iasKt: 250,
@@ -493,7 +529,7 @@ export const b737PerformanceCards: B737TakeoffPerformanceCard[] = [
       runtimeConsumers: ['src/sim/takeoffCue.ts', 'src/instruments/RfsPFD.tsx'],
       testConsumers: [
         'src/sim/data/__tests__/performanceCards.test.ts',
-        'src/sim/physics/__tests__/performanceCards.test.ts',
+        'src/sim/physics/__tests__/integrate.test.ts',
       ],
       sourceNote: 'RFS gameplay baseline card for the KPDX tutorial scenario; broad envelope guard, not a certified Boeing AFM table.',
     },

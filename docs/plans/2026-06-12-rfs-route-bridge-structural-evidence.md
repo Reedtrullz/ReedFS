@@ -2,6 +2,8 @@
 
 > **For Hermes:** This is a small follow-up from the KSEA-to-KPDX landing bridge review. Use `subagent-driven-development` if available, but do not escalate to the GPT-5.5 swarm: this is one tightly coupled helper/spec cleanup in the main worktree, not three independent tracks.
 
+> **Status note, 2026-06-15:** This plan originally described a KPDX 10L manual short-final bridge. The current KSEA→KPDX route/landing proof is aligned on KPDX 10R; any remaining 10L wording in this dated plan is historical context, not a current-state claim.
+
 ## Goal
 
 Remove the tautological `sameStoreSession: true` proof field from the KSEA-to-KPDX landing bridge helper and replace it with stronger structural evidence in the Playwright spec.

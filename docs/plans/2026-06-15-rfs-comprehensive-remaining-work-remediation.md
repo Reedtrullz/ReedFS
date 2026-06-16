@@ -2,11 +2,13 @@
 
 > **For Hermes:** Use subagent-driven-development skill to implement this plan task-by-task. Several tasks are marked `[PARENT-DIRECT]`; execute those directly in the controller session because they touch the simulation heartbeat, route/runway truth, release governance, or final push/CI/live verification.
 
-**Goal:** Turn the 2026-06-15 comprehensive remaining-work review into a truthful remediation path: clean and green P0 gates first, then route/landing/full-flight proof, product layout/playability, source-data realism, VNAV/FMS/runtime/public-repo follow-up, docs sync, final commit, and GitHub push.
+**Goal:** Turn the 2026-06-15 comprehensive remaining-work review into a truthful remediation path: clean and green P0 gates first, then route/landing/visible-control black-box proof, product layout/playability, source-data realism, VNAV/FMS/runtime/public-repo follow-up, docs sync, final commit, and GitHub push.
 
 **Architecture:** Fix proof boundaries in dependency order. Start with worktree classification and P0 failing gates; fix product/runtime truth before updating snapshots; align KSEA→KPDX route, approach, and landing to one runway; promote visible-control black-box proof above seeded helper proofs; keep FDM/VNAV/worker work behind explicit source/architecture boundaries; close with local gates, exact pushed SHA CI verification, and live SHA verification only if the pushed commit reaches `master` deployment.
 
 **Tech Stack:** React 19, TypeScript 6, Vite 8, Zustand, CesiumJS, Three.js, Vitest, Playwright, GitHub Actions, Docker/GHCR, nginx/Caddy. Always run Node/npm commands with `source ~/.nvm/nvm.sh && nvm use 22 >/dev/null`.
+
+**Execution status, 2026-06-16:** Tasks 1-21 have been executed locally through bounded remediation and verification. Current local evidence includes `npm run check` passing with 100 Vitest files / 911 tests plus production build and bundle checks, focused visible-control Playwright stage proofs, and a fresh public-clone RFMS bootstrap check through `npm run check:deps`. Remaining closeout tasks are docs sync/disposition, full local release gates including visual/E2E, OSS governance verification, then final commit/push/exact-SHA CI/live verification. No CI, deployed, live, continuous full-route/full-flight, or certified/source-validated realism claim is made by this local status note.
 
 ---
 
@@ -27,7 +29,7 @@ Current verified state before this plan was written:
 - `npm run check:blackbox`: PASS now; guard scanned `e2e/rfs-blackbox-player-loop.spec.ts`, `e2e/rfs-route-descent.spec.ts`, and `e2e/rfs-full-flight-blackbox.spec.ts`.
 - Visual regression: FAIL, 4/4 specs red (`e2e/rfs-visual.spec.ts:5-32`).
 - Targeted seeded descent E2E: FAIL with stale `DESCENT` -> `approach` expectation (`e2e/rfs-flight.spec.ts:116-153`, `e2e/helpers/rfsFlight.ts:839-848`).
-- Route contract targets KPDX 10R (`src/sim/flightPlanLoader.ts:6-17`), while scoped landing helper/tests still use KPDX 10L (`e2e/helpers/rfsRoute.ts:481`, `e2e/helpers/rfsRoute.ts:893-899`, `e2e/rfs-flight.spec.ts:172-174`).
+- At plan start, the route contract targeted KPDX 10R (`src/sim/flightPlanLoader.ts:6-17`), while scoped landing helper/tests still used KPDX 10L (`e2e/helpers/rfsRoute.ts:481`, `e2e/helpers/rfsRoute.ts:893-899`, `e2e/rfs-flight.spec.ts:172-174`). That was review-time mismatch evidence, not a current-state target.
 - Working tree is dirty; preserve user work and do not use `git add -A` until the final closeout task explicitly reviews every file.
 
 ## Truth boundaries and non-goals
@@ -64,9 +66,9 @@ Coverage semantics: each review finding is listed once below. Task references ar
 
 ```text
 Tasks 1-4: P0 E2E truth cleanup; serialize.
-Tasks 5, 9: KPDX runway identity; serialize before final/full-flight proof.
+Tasks 5, 9: KPDX runway identity; serialize before visible-control route/landing proof.
 Tasks 6-8A: visual/layout; serialize before snapshot updates and player/debug/attribution proof.
-Tasks 10-12: visible full-flight proof + proof boundary docs; serialize after Tasks 2-9.
+Tasks 10-12: visible black-box/stage proof + proof boundary docs; serialize after Tasks 2-9.
 Tasks 13-18: realism/VNAV/FMS; can be planned/executed after P0 gates, but source-data tasks may become blocked if no permitted source exists.
 Task 19: controls/accessibility input-heartbeat work; `[PARENT-DIRECT]` because it touches held keyboard/gamepad input mapping feeding `applyInputActions(dt)`.
 Tasks 20-21: runtime/public-clone; Task 20 is `[PARENT-DIRECT]`, while Task 21 can run after P0 with focused tests.
@@ -617,16 +619,16 @@ Expected: no unqualified current-state `KPDX 10L` route/landing claims remain.
 
 ---
 
-## Phase 1 — Visible-control full-flight acceptance and proof boundaries
+## Phase 1 — Visible-control black-box/stage acceptance and proof boundaries
 
 ### Task 10: Prove or fix the visible-control full-flight black-box spec
 
-**Objective:** Make the draft full-flight black-box spec a real passing acceptance test, using visible controls only.
+**Objective:** Make the visible-control black-box evidence real and passing. If the continuous full-flight path is too slow or unstable for the aggregate gate, split it into deterministic stage specs and keep the proof boundary explicit.
 
 **Covers findings:** P0.3 primary; P0.4 support.
 
 **Files:**
-- Modify: `e2e/rfs-full-flight-blackbox.spec.ts:34-209`
+- Modify: `e2e/rfs-full-flight-blackbox.spec.ts`
 - Modify: `e2e/helpers/rfsBlackbox.ts:71-589`
 - Modify: `e2e/blackbox-manifest.json:1-7`
 - Test: `scripts/check-blackbox-e2e.mjs:19-30` and `scripts/check-blackbox-e2e.mjs:221-293`
@@ -641,7 +643,7 @@ source ~/.nvm/nvm.sh && nvm use 22 >/dev/null && npm run check:blackbox
 
 Expected: PASS. If it fails, fix the black-box helper/spec before any E2E run. Do not add `page.evaluate()`, `useSimStore`, direct `src/` imports, or direct state seeding to black-box helpers.
 
-**Step 2: Run the full-flight spec alone**
+**Step 2: Run the full-flight/stage spec alone**
 
 Run:
 
@@ -649,7 +651,7 @@ Run:
 source ~/.nvm/nvm.sh && nvm use 22 >/dev/null && CI=1 VITE_RFS_VISUAL_TEST=0 npx playwright test e2e/rfs-full-flight-blackbox.spec.ts --workers=1 --reporter=line --timeout=720000
 ```
 
-Expected target: PASS.
+Expected target: PASS. A pass here is local visible-control/stage evidence, not CI/live or continuous full-route/full-flight proof unless the spec actually covers that uninterrupted path.
 
 If it fails, do not rerun unchanged more than once. Read the generated `test-results/**/error-context.md`, identify the first visible-control blocker, then add a narrow RED test or visible helper assertion for that blocker before patching product code.
 
@@ -702,7 +704,7 @@ Run:
 source ~/.nvm/nvm.sh && nvm use 22 >/dev/null && npm run test:e2e
 ```
 
-Expected: PASS. If it exceeds practical runtime, do not silently remove coverage. Split slow proof into deterministic stage specs and keep a documented single end-to-end smoke in the manifest; then prove `npm run test:e2e` completes.
+Expected: PASS. If it exceeds practical runtime, do not silently remove coverage. Split slow proof into deterministic stage specs, keep black-box/stage coverage in the manifest, and document that the result is bounded stage evidence rather than continuous full-route/full-flight proof; then prove `npm run test:e2e` completes.
 
 **Step 3: Record timing**
 
@@ -728,7 +730,7 @@ Keep `test-results/e2e-timings.json` as transient evidence. Do not commit it unl
 Add a concise paragraph under `## Quality gate`:
 
 ```markdown
-Browser proof is split into layers: seeded/scoped Playwright helpers guard specific physics/guidance states, while manifest-listed black-box specs use visible controls and visible readbacks only. Seeded proofs are not full-flight/full-route evidence; full-flight claims require the visible-control black-box spec plus CI/live exact-SHA evidence where applicable.
+Browser proof is split into layers: unit/static gates verify source contracts, seeded/scoped Playwright helpers guard specific physics/guidance states, and manifest-listed black-box specs use visible controls plus visible readbacks only. Seeded proofs are not full-flight/full-route evidence; full-flight claims require a continuous visible-control proof that actually covers that path, plus exact-SHA CI/live verification where applicable.
 ```
 
 **Step 2: Update current docs only**

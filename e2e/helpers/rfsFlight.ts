@@ -369,16 +369,17 @@ export async function flyApproachToLandingRolloutAndReset(page: Page, targetAirp
     const quaternionImport = (await import(quaternionModule)) as {
       eulerToQuat: (phi: number, theta: number, psi: number) => BrowserAircraftState['quaternion'];
     };
-    const runwayDataImport = (await import(runwayDataModule)) as { ENVA_RUNWAY_09: RunwayReference; KPDX_RUNWAY_10L: RunwayReference };
+    const runwayDataImport = (await import(runwayDataModule)) as { ENVA_RUNWAY_09: RunwayReference; KPDX_RUNWAY_10R: RunwayReference };
     const runwaySurfaceImport = (await import(runwaySurfaceModule)) as {
       sampleSupportedAirportSurface: (position: BrowserAircraftState['position']) => SurfaceSample;
     };
     const { useSimStore } = simStoreImport;
     const { computeDerived } = derivedImport;
     const { eulerToQuat } = quaternionImport;
-    const { ENVA_RUNWAY_09, KPDX_RUNWAY_10L } = runwayDataImport;
+    const { ENVA_RUNWAY_09, KPDX_RUNWAY_10R } = runwayDataImport;
     const { sampleSupportedAirportSurface } = runwaySurfaceImport;
-    const runway = targetAirport === 'KPDX' ? KPDX_RUNWAY_10L : ENVA_RUNWAY_09;
+    const runway = targetAirport === 'KPDX' ? KPDX_RUNWAY_10R : ENVA_RUNWAY_09;
+    const scenarioId = targetAirport === 'KPDX' ? 'kpdx-tutorial' : 'enva-tutorial';
 
     let timestamp = performance.now();
     const syncManualClock = (): void => {
@@ -436,7 +437,7 @@ export async function flyApproachToLandingRolloutAndReset(page: Page, targetAirp
       };
     };
 
-    useSimStore.getState().setScenario('enva-tutorial');
+    useSimStore.getState().setScenario(scenarioId);
     useSimStore.getState().reset();
 
     const approachPosition = offsetRunwayPosition(runway, 220, 0);
@@ -838,7 +839,7 @@ export async function flyDescentApproachToLandingRolloutAndReset(page: Page): Pr
     const descent = snapshot();
     if (
       descent.flightPhase !== 'DESCENT'
-      || descent.guidancePhase !== 'approach'
+      || descent.guidancePhase !== 'descent'
       || descent.weightOnWheels
       || descent.aglFt <= 300
       || !descent.autopilotCleared
@@ -864,7 +865,7 @@ export async function flyDescentApproachToLandingRolloutAndReset(page: Page): Pr
       stepFrame();
       const current = snapshot();
       if (
-        current.flightPhase === 'DESCENT'
+        current.flightPhase === 'APPROACH'
         && current.guidancePhase === 'approach'
         && current.gearDown
         && current.gearLever === 'DOWN'

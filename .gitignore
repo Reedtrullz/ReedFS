@@ -9,3 +9,4 @@ src/config/manualChunks.d.ts
 test-results/
 playwright-report/
 blob-report/
+dogfood-output/

@@ -207,9 +207,11 @@ function resolveVerticalTarget(
   }
   if ((truth.verticalActive === 'VNAV' || truth.verticalActive === 'VNAV_PTH') && input.flightPlan && nav) {
     const vnav = computeVNAV(input.aircraft, input.flightPlan, nav);
-    if (!vnav.available || !vnav.altitudeConstraint || vnav.verticalMode === 'VNAV') return null;
+    const verticalMode = vnav.verticalMode;
+    if (!vnav.available || !vnav.altitudeConstraint || !verticalMode || verticalMode === 'VNAV') return null;
+    if (verticalMode !== 'VNAV_PTH' && verticalMode !== 'ALT*' && verticalMode !== 'ALT_HOLD') return null;
     return {
-      mode: truth.verticalActive,
+      mode: verticalMode,
       targetAltitudeFt: vnav.targetAlt,
       targetVerticalSpeedFpm: vnav.targetVs,
     };

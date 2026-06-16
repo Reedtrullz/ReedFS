@@ -11,6 +11,8 @@ export interface VisibleFlightNumbers {
 export interface VisibleRouteStatus {
   text: string;
   activeLeg: string | null;
+  activeLegIndex: number | null;
+  activeLegCount: number | null;
   distanceToGoNm: number | null;
 }
 
@@ -22,11 +24,21 @@ export interface VisibleFmaModes {
 }
 
 type VisibleMcpModeButton = 'LNAV' | 'SPD' | 'ALT' | 'VS' | 'VNAV';
+type VisibleGearTarget = 'UP' | 'DOWN';
 type FmaTextExpectation = string | RegExp;
+
+const B737_VISIBLE_FLAP_DETENTS = [0, 1, 5, 10, 15, 25, 30, 40] as const;
+const VISIBLE_AIRBORNE_PHASES = /^(CLIMB|CRUISE|DESCENT|APPROACH)$/;
 
 interface VisibleSimDriveOptions {
   timeoutMs: number;
   stepMs?: number;
+}
+
+interface VisibleFrameCadenceDriveOptions {
+  timeoutMs: number;
+  frameMs?: number;
+  pollEveryMs?: number;
 }
 
 function parseRequiredNumber(label: string, text: string, pattern: RegExp): number {
@@ -71,6 +83,13 @@ export async function selectKseaScenarioThroughVisibleControls(page: Page): Prom
   await page.getByLabel('Scenario', { exact: true }).selectOption('ksea-tutorial');
 }
 
+export async function selectKpdxShortFinalScenarioThroughVisibleControls(page: Page): Promise<void> {
+  await page.getByLabel('Scenario', { exact: true }).selectOption('kpdx-10r-short-final');
+  const scenarioPanel = page.getByRole('region', { name: 'Scenario and tutorial' });
+  await expect(scenarioPanel).toContainText('KPDX 10R Short Final');
+  await expect(scenarioPanel).toContainText(/synthetic KPDX 10R final approach fixture; not official procedure data/i);
+}
+
 export async function loadSelectedRouteThroughVisibleControls(page: Page): Promise<void> {
   const loadPlanButton = page.getByRole('button', { name: /^LOAD PLAN$/ });
   await expect(loadPlanButton).toBeVisible();
@@ -91,7 +110,9 @@ export async function loadKseaRouteThroughVisibleControls(page: Page): Promise<v
 }
 
 export async function startRollThroughVisibleControls(page: Page): Promise<void> {
-  await page.getByRole('button', { name: /^START ROLL$/ }).click();
+  const startRollButton = page.getByRole('button', { name: /^START ROLL$/ });
+  await expect(startRollButton).toBeVisible();
+  await activateAlreadyVisibleControl(startRollButton);
   await expect(page.getByRole('button', { name: /^ABORT$/ })).toBeVisible();
 }
 
@@ -105,6 +126,135 @@ async function clickTakeoffSetupButtonRepeatedly(page: Page, name: string, count
     // this already-visible control without using hidden app state or DOM mutation.
     await activateAlreadyVisibleControl(button);
   }
+}
+
+async function readVisibleTakeoffConfigurationText(page: Page): Promise<string> {
+  return (await page
+    .getByRole('region', { name: 'Takeoff setup' })
+    .getByLabel('Current takeoff configuration')
+    .textContent())?.replace(/\s+/g, ' ').trim() ?? '';
+}
+
+function readVisibleFlapLever(text: string): number {
+  return parseRequiredNumber('visible flap lever', text, /Flaps\s+(\d+)/);
+}
+
+function readVisibleGearLever(text: string): VisibleGearTarget {
+  const match = text.match(/Gear\s+(UP|DOWN)/);
+  if (!match) throw new Error(`Unable to read visible gear lever from setup text: ${text}`);
+  return match[1] as VisibleGearTarget;
+}
+
+async function setVisibleFlaps(page: Page, target: number): Promise<void> {
+  if (!B737_VISIBLE_FLAP_DETENTS.includes(target as typeof B737_VISIBLE_FLAP_DETENTS[number])) {
+    throw new Error(`Unsupported visible B737 flap detent target: ${target}`);
+  }
+
+  const takeoffSetup = page.getByRole('region', { name: 'Takeoff setup' });
+  await expect(takeoffSetup).toBeVisible();
+
+  for (let guard = 0; guard < B737_VISIBLE_FLAP_DETENTS.length + 2; guard += 1) {
+    const current = readVisibleFlapLever(await readVisibleTakeoffConfigurationText(page));
+    if (current === target) return;
+    await activateAlreadyVisibleControl(takeoffSetup.getByRole('button', {
+      name: current < target ? 'Flaps Next' : 'Flaps Previous',
+    }));
+  }
+
+  throw new Error(`Unable to set visible flap lever to ${target}; current setup text: ${await readVisibleTakeoffConfigurationText(page)}`);
+}
+
+export async function setVisibleSimRateTarget(page: Page, target: 1 | 4 | 16): Promise<void> {
+  const button = page.getByRole('button', { name: /Cycle simulator rate/ });
+  await expect(button).toBeVisible();
+
+  for (let guard = 0; guard < 4; guard += 1) {
+    const text = (await button.textContent())?.trim() ?? '';
+    if (text === `SIM RATE TARGET: ${target}X`) return;
+    await activateAlreadyVisibleControl(button);
+  }
+
+  throw new Error(`Unable to set visible simulator rate target to ${target}X.`);
+}
+
+export async function configureScenarioTakeoffThroughVisibleControls(page: Page): Promise<void> {
+  const takeoffSetup = page.getByRole('region', { name: 'Takeoff setup' });
+  const button = takeoffSetup.getByRole('button', { name: /Set takeoff config/i });
+  await expect(takeoffSetup).toBeVisible();
+  await expect(button).toBeVisible();
+  await activateAlreadyVisibleControl(button);
+}
+
+export async function toggleVisibleGearThroughVisibleControls(page: Page, target: VisibleGearTarget): Promise<void> {
+  const takeoffSetup = page.getByRole('region', { name: 'Takeoff setup' });
+  const button = takeoffSetup.getByRole('button', { name: /^Gear$/ });
+  await expect(takeoffSetup).toBeVisible();
+  await expect(button).toBeVisible();
+
+  for (let guard = 0; guard < 3; guard += 1) {
+    const current = readVisibleGearLever(await readVisibleTakeoffConfigurationText(page));
+    if (current === target) return;
+    await activateAlreadyVisibleControl(button);
+    await advanceVisibleSimTime(page, 100);
+  }
+
+  const finalText = await readVisibleTakeoffConfigurationText(page);
+  if (readVisibleGearLever(finalText) === target) return;
+  await button.click({ force: true, timeout: 5_000 });
+  await advanceVisibleSimTime(page, 100);
+  const forceClickText = await readVisibleTakeoffConfigurationText(page);
+  if (readVisibleGearLever(forceClickText) === target) return;
+  await page.keyboard.press('KeyG');
+  await advanceVisibleSimTime(page, 100);
+  const keyboardText = await readVisibleTakeoffConfigurationText(page);
+  if (readVisibleGearLever(keyboardText) === target) return;
+  throw new Error(`Unable to set visible gear lever to ${target}; current setup text: ${keyboardText}`);
+}
+
+export async function toggleVisibleGearThroughMouseOnlyControls(page: Page, target: VisibleGearTarget): Promise<void> {
+  const takeoffSetup = page.getByRole('region', { name: 'Takeoff setup' });
+  const button = takeoffSetup.getByRole('button', { name: /^Gear$/ });
+  await expect(takeoffSetup).toBeVisible();
+  await expect(button).toBeVisible();
+
+  for (let guard = 0; guard < 3; guard += 1) {
+    const current = readVisibleGearLever(await readVisibleTakeoffConfigurationText(page));
+    if (current === target) return;
+    await activateAlreadyVisibleControl(button);
+    await advanceVisibleSimTime(page, 100);
+  }
+
+  const finalText = await readVisibleTakeoffConfigurationText(page);
+  if (readVisibleGearLever(finalText) === target) return;
+  throw new Error(`Unable to set visible gear lever to ${target} with mouse-only Gear control; current setup text: ${finalText}`);
+}
+
+export async function configureLandingAirframeThroughVisibleControls(page: Page, flapTarget: 25 | 30 | 40 = 30): Promise<void> {
+  await toggleVisibleGearThroughVisibleControls(page, 'DOWN');
+  await setVisibleFlaps(page, flapTarget);
+}
+
+export async function holdVisibleBrakeUntilStopped(page: Page): Promise<void> {
+  if ((await readVisibleFlightPhase(page)) === 'STOPPED') return;
+
+  await page.keyboard.down('Space');
+  try {
+    await driveVisibleSimUntil(page, 'visible STOPPED phase while holding wheel brakes', async () => {
+      return (await readVisibleFlightPhase(page)) === 'STOPPED';
+    }, {
+      timeoutMs: 180_000,
+      stepMs: 1000,
+    });
+  } finally {
+    await page.keyboard.up('Space');
+  }
+}
+
+export async function resetThroughVisibleControls(page: Page): Promise<void> {
+  const button = page.getByRole('button', { name: /^RESET$/ });
+  await expect(button).toBeVisible();
+  await activateAlreadyVisibleControl(button);
+  await expect(page.getByRole('button', { name: /^START ROLL$/ })).toBeVisible();
 }
 
 const discreteRepeatKeys = new Set(['ArrowUp', 'ArrowDown', 'Digit8', 'Digit9', 'KeyF', 'KeyG']);
@@ -153,9 +303,32 @@ export async function driveVisibleSimUntil(
   throw new Error(`Timed out after ${timeoutMs} ms of visible simulator time waiting for ${description}.`);
 }
 
+export async function driveVisibleSimAtFrameCadenceUntil(
+  page: Page,
+  description: string,
+  predicate: () => Promise<boolean>,
+  { timeoutMs, frameMs = 16, pollEveryMs = 1000 }: VisibleFrameCadenceDriveOptions,
+): Promise<void> {
+  let elapsedMs = 0;
+  let nextPollMs = 0;
+
+  while (elapsedMs <= timeoutMs) {
+    if (elapsedMs >= nextPollMs && await predicate()) return;
+    const nextStepMs = Math.min(frameMs, timeoutMs - elapsedMs);
+    if (nextStepMs <= 0) break;
+    await advanceVisibleSimTime(page, nextStepMs);
+    elapsedMs += nextStepMs;
+    if (elapsedMs >= nextPollMs) nextPollMs = elapsedMs + pollEveryMs;
+  }
+
+  throw new Error(`Timed out after ${timeoutMs} ms of frame-cadenced visible simulator time waiting for ${description}.`);
+}
+
 export async function rotateToVisiblePositiveRate(page: Page): Promise<void> {
   await driveVisibleSimUntil(page, 'positive rate after visible rotation input', async () => {
     const numbers = await readVisibleFlightNumbers(page);
+    const phase = await readVisibleFlightPhase(page);
+    if (VISIBLE_AIRBORNE_PHASES.test(phase)) return true;
     if (numbers.verticalSpeedFpm > 100 && (numbers.radioAltitudeFt ?? 0) >= 5) return true;
     if (numbers.iasKt >= 135 && numbers.pitchDeg < 9) {
       await holdKeyForVisibleSimTime(page, 'KeyW', 650);
@@ -165,6 +338,25 @@ export async function rotateToVisiblePositiveRate(page: Page): Promise<void> {
     timeoutMs: 45_000,
     stepMs: 350,
   });
+}
+
+export async function rotateWithVisibleMouseControlToPositiveRate(page: Page): Promise<void> {
+  const rotateButton = page.getByRole('region', { name: 'Takeoff setup' }).getByRole('button', { name: /^Hold Rotate$/ });
+  await expect(rotateButton).toBeVisible();
+  await rotateButton.dispatchEvent('pointerdown', { pointerType: 'mouse', button: 0, buttons: 1 });
+  try {
+    await driveVisibleSimUntil(page, 'positive rate while holding visible mouse rotate control', async () => {
+      const numbers = await readVisibleFlightNumbers(page);
+      const phase = await readVisibleFlightPhase(page);
+      return VISIBLE_AIRBORNE_PHASES.test(phase)
+        || (numbers.verticalSpeedFpm > 100 && (numbers.radioAltitudeFt ?? 0) >= 5);
+    }, {
+      timeoutMs: 45_000,
+      stepMs: 350,
+    });
+  } finally {
+    await rotateButton.dispatchEvent('pointerup', { pointerType: 'mouse', button: 0, buttons: 0 });
+  }
 }
 
 export async function waitForVisibleAirspeedAtLeast(page: Page, minKt: number): Promise<void> {
@@ -184,7 +376,9 @@ export async function waitForVisiblePitchAtLeast(page: Page, minPitchDeg: number
 export async function waitForVisiblePositiveRate(page: Page): Promise<void> {
   await expect.poll(async () => {
     const numbers = await readVisibleFlightNumbers(page);
-    return numbers.verticalSpeedFpm > 100 && (numbers.radioAltitudeFt ?? 0) >= 5;
+    const phase = await readVisibleFlightPhase(page);
+    return VISIBLE_AIRBORNE_PHASES.test(phase)
+      || (numbers.verticalSpeedFpm > 100 && (numbers.radioAltitudeFt ?? 0) >= 5);
   }, {
     timeout: 45_000,
     intervals: [500],
@@ -241,19 +435,16 @@ export async function sampleVisibleVerticalSpeeds(
   const verticalSpeeds: number[] = [];
   for (let sample = 0; sample < samples; sample += 1) {
     verticalSpeeds.push((await readVisibleFlightNumbers(page)).verticalSpeedFpm);
-    if (sample < samples - 1) await page.waitForTimeout(intervalMs);
+    if (sample < samples - 1) await advanceVisibleSimTime(page, intervalMs);
   }
   return verticalSpeeds;
 }
 
 export async function configureTakeoffAirframeThroughVisibleControls(page: Page): Promise<void> {
-  const takeoffSetup = page.getByRole('region', { name: 'Takeoff setup' });
-
-  await clickTakeoffSetupButtonRepeatedly(page, 'Flaps Next', 3);
-  await expect(takeoffSetup.getByText('Flaps 5')).toBeVisible();
-
-  await clickTakeoffSetupButtonRepeatedly(page, 'Trim Nose Up', 50);
-  await expect(takeoffSetup.getByText('Trim 5.0')).toBeVisible();
+  await configureScenarioTakeoffThroughVisibleControls(page);
+  const configurationText = await readVisibleTakeoffConfigurationText(page);
+  expect(configurationText).toMatch(/Flaps\s+5/);
+  expect(configurationText).toMatch(/Trim\s+5\.0/);
 }
 
 export async function advanceTakeoffThrustThroughVisibleControls(page: Page): Promise<void> {
@@ -279,10 +470,19 @@ export async function cleanUpAirframeThroughVisibleControls(page: Page): Promise
 
 export async function readVisibleRouteStatus(page: Page): Promise<VisibleRouteStatus> {
   const text = (await page.getByLabel('Route status').textContent())?.replace(/\s+/g, ' ').trim() ?? '';
-  const activeLeg = text.match(/([A-Z0-9]+\s+→\s+[A-Z0-9]+)/)?.[1] ?? null;
+  const activeLeg = text.match(/([A-Z0-9]+\s+→\s+[A-Z0-9_]+)/)?.[1] ?? null;
+  const legMatch = text.match(/LEG\s+(\d+)\/(\d+)/);
+  const activeLegIndex = legMatch ? Number(legMatch[1]) : null;
+  const activeLegCount = legMatch ? Number(legMatch[2]) : null;
   const dtgMatch = text.match(/DTG\s*([0-9]+(?:\.[0-9]+)?)\s*NM/);
   const distanceToGoNm = dtgMatch ? Number(dtgMatch[1]) : null;
-  return { text, activeLeg, distanceToGoNm: Number.isFinite(distanceToGoNm) ? distanceToGoNm : null };
+  return {
+    text,
+    activeLeg,
+    activeLegIndex: Number.isFinite(activeLegIndex) ? activeLegIndex : null,
+    activeLegCount: Number.isFinite(activeLegCount) ? activeLegCount : null,
+    distanceToGoNm: Number.isFinite(distanceToGoNm) ? distanceToGoNm : null,
+  };
 }
 
 export async function readVisibleFlightPhase(page: Page): Promise<string> {
@@ -336,6 +536,10 @@ function readMcpAltitudeTarget(text: string): number {
   return parseRequiredNumber('MCP altitude target', text, /ALT\s+(\d+)/);
 }
 
+function readMcpSpeedTarget(text: string): number {
+  return parseRequiredNumber('MCP speed target', text, /(?:MAN\s+)?SPD\s+(\d+)/);
+}
+
 function readMcpVerticalSpeedTarget(text: string): number {
   return parseRequiredNumber('MCP vertical speed target', text, /VS\s+([+-]?\d+)/);
 }
@@ -353,6 +557,28 @@ export async function setVisibleMcpAltitude(page: Page, targetFt: number): Promi
     await activateAlreadyVisibleControl(button);
   }
   throw new Error(`Unable to set visible MCP altitude target to ${targetFt}.`);
+}
+
+export async function setVisibleMcpSpeedAtMost(page: Page, maxTargetKt: number): Promise<number> {
+  const mcp = page.getByRole('region', { name: 'Mode control panel' });
+  const button = mcp.getByRole('button', { name: 'SPD -5' });
+  for (let guard = 0; guard < 60; guard += 1) {
+    const current = readMcpSpeedTarget(await readMcpText(page));
+    if (current <= maxTargetKt) return current;
+    await activateAlreadyVisibleControl(button);
+  }
+  throw new Error(`Unable to set visible MCP speed target at or below ${maxTargetKt}.`);
+}
+
+export async function setVisibleMcpSpeedAtLeast(page: Page, minTargetKt: number): Promise<number> {
+  const mcp = page.getByRole('region', { name: 'Mode control panel' });
+  const button = mcp.getByRole('button', { name: 'SPD +5' });
+  for (let guard = 0; guard < 60; guard += 1) {
+    const current = readMcpSpeedTarget(await readMcpText(page));
+    if (current >= minTargetKt) return current;
+    await activateAlreadyVisibleControl(button);
+  }
+  throw new Error(`Unable to set visible MCP speed target at or above ${minTargetKt}.`);
 }
 
 export async function setVisibleMcpAltitudeAtLeast(page: Page, minTargetFt: number): Promise<number> {

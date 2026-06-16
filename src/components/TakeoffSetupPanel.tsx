@@ -62,6 +62,18 @@ const buttonStyle: CSSProperties = {
   padding: '7px 8px',
 };
 
+const feedbackStyle: CSSProperties = {
+  background: 'rgba(255, 183, 77, 0.16)',
+  border: '1px solid rgba(255, 183, 77, 0.78)',
+  borderRadius: 4,
+  color: '#ffdfad',
+  fontSize: 12,
+  fontWeight: 800,
+  lineHeight: 1.4,
+  marginTop: 10,
+  padding: '7px 8px',
+};
+
 function formatThrottlePercent(throttle1: number, throttle2: number): string {
   return `${Math.round(Math.max(throttle1, throttle2) * 100)}%`;
 }
@@ -81,6 +93,9 @@ export function TakeoffSetupPanel() {
   const setInput = useSimStore((s) => s.setInput);
   const setTakeoffConfig = useSimStore((s) => s.setTakeoffConfig);
   const applyInputActions = useSimStore((s) => s.applyInputActions);
+  const controlFeedbackMessage = useSimStore((s) => s.controlFeedbackMessage);
+  const holdRotate = () => setInput({ elevator: -0.75 });
+  const neutralizeYoke = () => setInput({ elevator: 0 });
 
   return (
     <section aria-label="Takeoff setup" style={panelStyle}>
@@ -95,6 +110,12 @@ export function TakeoffSetupPanel() {
         <div style={valueStyle}>Throttle {formatThrottlePercent(inputs.throttle1, inputs.throttle2)}</div>
         <div style={valueStyle}>Gear {inputs.gearLever}</div>
       </div>
+
+      {controlFeedbackMessage && (
+        <div aria-label="Control feedback" aria-live="polite" role="status" style={feedbackStyle}>
+          {controlFeedbackMessage}
+        </div>
+      )}
 
       <div aria-label="Takeoff setup controls" style={buttonsStyle}>
         <button style={buttonStyle} type="button" onClick={() => setInput({ flapLever: previousB737FlapDetent(inputs.flapLever) })}>
@@ -117,6 +138,20 @@ export function TakeoffSetupPanel() {
         </button>
         <button style={buttonStyle} type="button" onClick={() => applyInputActions({ gearToggle: true }, 0)}>
           Gear
+        </button>
+        <button
+          style={buttonStyle}
+          type="button"
+          onBlur={neutralizeYoke}
+          onPointerCancel={neutralizeYoke}
+          onPointerDown={holdRotate}
+          onPointerLeave={neutralizeYoke}
+          onPointerUp={neutralizeYoke}
+        >
+          Hold Rotate
+        </button>
+        <button style={buttonStyle} type="button" onClick={neutralizeYoke}>
+          Yoke Neutral
         </button>
         <button style={buttonStyle} type="button" onClick={setTakeoffConfig}>
           Set takeoff config

@@ -139,6 +139,9 @@ test.describe('RFS truth-flow browser proof', () => {
     expect(gearSnapshot.positiveRate).toBe(false);
     expect(gearSnapshot.guidancePhase).toBe('takeoff-roll');
     expect(gearSnapshot.checklistLabels).not.toContain('Gear up');
+    await expect(page.getByRole('status', { name: 'Control feedback' })).toContainText(
+      /gear up blocked.*positive rate/i,
+    );
     expectFmaOff(gearSnapshot);
   });
 });

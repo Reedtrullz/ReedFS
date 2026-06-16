@@ -15,6 +15,7 @@ export interface RouteDrivenFlightPhaseContext {
     'routeValid' | 'routeComplete' | 'lnavAvailable' | 'approachHandoff' | 'distanceToNextNm' | 'activeLegIndex' | 'activeLegCount'
   > | null;
   descentTargetAltitudeFt?: number | null;
+  selectedVerticalSpeedFpm?: number | null;
 }
 
 function finiteNumber(value: number | null | undefined): number | null {
@@ -40,6 +41,8 @@ function isInDescentWindow(routeStatus: RouteDrivenFlightPhaseContext['routeStat
 function shouldEnterDescentPhase(state: AircraftState, context: RouteDrivenFlightPhaseContext): boolean {
   if ((state.flightPhase !== 'CLIMB' && state.flightPhase !== 'CRUISE') || !isAirborne(state)) return false;
   if (!routeHasUsableLifecycleContext(context) || !isInDescentWindow(context.routeStatus)) return false;
+  const selectedVerticalSpeedFpm = finiteNumber(context.selectedVerticalSpeedFpm);
+  if (selectedVerticalSpeedFpm !== null && selectedVerticalSpeedFpm < -100) return true;
   const descentTargetAltitudeFt = finiteNumber(context.descentTargetAltitudeFt);
   return descentTargetAltitudeFt !== null && state.position.alt - descentTargetAltitudeFt >= DESCENT_MIN_ALTITUDE_DELTA_FT;
 }
@@ -55,11 +58,18 @@ function shouldEnterApproachPhase(state: AircraftState, context: RouteDrivenFlig
   return state.ground.aglFt <= APPROACH_MAX_AGL_FT && isConfiguredForApproach(state);
 }
 
+function shouldEnterManualConfiguredApproachPhase(state: AircraftState, context: RouteDrivenFlightPhaseContext): boolean {
+  if (state.flightPhase !== 'DESCENT' || !isAirborne(state)) return false;
+  if (routeHasUsableLifecycleContext(context)) return false;
+  return state.ground.aglFt <= APPROACH_MAX_AGL_FT && isConfiguredForApproach(state);
+}
+
 export function deriveRouteDrivenFlightPhase(
   state: AircraftState,
   context: RouteDrivenFlightPhaseContext,
 ): FlightPhase {
   if (shouldEnterApproachPhase(state, context)) return 'APPROACH';
+  if (shouldEnterManualConfiguredApproachPhase(state, context)) return 'APPROACH';
   if (shouldEnterDescentPhase(state, context)) return 'DESCENT';
   return state.flightPhase;
 }
