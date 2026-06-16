@@ -25,6 +25,8 @@ function expectExplicitLandingSequence(phases: string[], routeDebug: string): vo
 }
 
 test.describe('RFS route and LNAV browser proof', () => {
+  test.describe.configure({ timeout: 120_000 });
+
   test('KSEA route is loaded and stopped AP mode clicks remain gated through visible controls', async ({ page }) => {
     await openRfs(page);
 

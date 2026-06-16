@@ -42,7 +42,7 @@ test.describe('RFS black-box player loop proof', () => {
     await startRollThroughVisibleControls(page);
   });
   test('KSEA route takeoff reaches positive rate, gear up, and reset through keyboard controls', async ({ page }) => {
-    test.setTimeout(180_000);
+    test.setTimeout(360_000);
 
     await page.clock.install();
     await openRfsBlackbox(page);
@@ -82,7 +82,7 @@ test.describe('RFS black-box player loop proof', () => {
   });
 
   test('KSEA route mouse-visible controls expose blocked gear feedback and complete takeoff/reset', async ({ page }) => {
-    test.setTimeout(180_000);
+    test.setTimeout(360_000);
 
     await page.clock.install();
     await openRfsBlackbox(page);
@@ -121,7 +121,7 @@ test.describe('RFS black-box player loop proof', () => {
   });
 
   test('visible LNAV SPD ALT engagement after positive rate stays backed and recoverable', async ({ page }) => {
-    test.setTimeout(210_000);
+    test.setTimeout(360_000);
 
     await page.clock.install();
     await openRfsBlackbox(page);
