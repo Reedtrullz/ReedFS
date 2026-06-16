@@ -20,10 +20,10 @@ Commands run with Node 22 (`source ~/.nvm/nvm.sh && nvm use 22 >/dev/null`):
 - Focused reproduction before fix: `CI=1 VITE_RFS_VISUAL_TEST=0 npx playwright test e2e/rfs-blackbox-player-loop.spec.ts -g "keyboard controls" --workers=1 --reporter=line --timeout=360000` timed out waiting for `Takeoff setup` / `Current takeoff configuration` while the visible app had progressed to `PHASE DESCENT` with EngineStrip still showing throttle/flap/gear state.
 - Focused keyboard proof after fix: `CI=1 VITE_RFS_VISUAL_TEST=0 npx playwright test e2e/rfs-blackbox-player-loop.spec.ts -g "keyboard controls" --workers=1 --reporter=line --timeout=360000` — PASS, `1 passed (1.8m)`.
 - Full player-loop spec: `CI=1 VITE_RFS_VISUAL_TEST=0 npx playwright test e2e/rfs-blackbox-player-loop.spec.ts --workers=1 --reporter=line --timeout=360000` — PASS, `4 passed (3.7m)`.
-- Default E2E: `npm run test:e2e` — PASS, `28 passed (10.8m)`.
-- Local aggregate gate: `npm run check` — PASS, including release/black-box guards, lint, typecheck, `100 passed` Vitest files / `915 passed` tests, production build, and bundle budget.
-- Visual gate: `CI=1 npm run test:visual` — PASS, `6 passed (2.1m)`, visual timing budget OK.
-- Explicit slow full-flight gate: `CI=1 VITE_RFS_VISUAL_TEST=0 npx playwright test e2e/rfs-full-flight-blackbox.spec.ts --workers=1 --reporter=line --timeout=720000 --retries=0` — PASS, `1 passed (4.1m)`. An earlier background attempt exited with `-15` after starting the spec and is classified as an aborted non-result, not pass/fail evidence.
+- Local aggregate gate on final tree: `npm run check` — PASS, including release/black-box guards, lint, typecheck, `100 passed` Vitest files / `915 passed` tests, production build, and bundle budget.
+- Default E2E spec list on final tree against a verified local Vite server: `VITE_RFS_VISUAL_TEST=0 env -u CI ./node_modules/.bin/playwright test e2e/rfs-blackbox-player-loop.spec.ts e2e/rfs-browser-assisted-airborne-mcp.spec.ts e2e/rfs-flight.spec.ts e2e/rfs-responsive-accessibility.spec.ts e2e/rfs-route-descent.spec.ts e2e/rfs-route.spec.ts e2e/rfs-truth-flow.spec.ts --workers=1 --reporter=line` — PASS, `28 passed (13.1m)`. A prior final-tree `npm run test:e2e` attempt is not counted as product proof because the Playwright-owned Vite webServer exited and 27 tests failed at `page.goto('/')` with `ERR_CONNECTION_REFUSED`; no product assertions failed in that run.
+- Visual gate on final tree: `CI=1 npm run test:visual` — PASS, `6 passed (1.1m)`, visual timing budget OK (`total 65587ms`, `max 26946ms`).
+- Explicit slow full-flight gate on final tree: `RFS_FINAL_FULL_FLIGHT=1 npm run test:e2e:full-flight` — PASS, `1 passed (2.6m)`.
 
 ## Proof boundaries / non-claims
 
