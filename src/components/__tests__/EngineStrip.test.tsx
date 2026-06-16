@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { EngineStrip } from '../EngineStrip';
 import { useSimStore } from '../../store/simStore';
 
@@ -35,18 +35,19 @@ describe('EngineStrip', () => {
 
     render(<EngineStrip />);
 
-    expect(screen.getByText('N1 ACT L')).toBeTruthy();
-    expect(screen.getByText('N1 ACT R')).toBeTruthy();
-    expect(screen.getByText('THR CMD')).toBeTruthy();
-    expect(screen.getByText('82%')).toBeTruthy();
-    expect(screen.getByText('FLAPS ACT')).toBeTruthy();
-    expect(screen.getByText('1°')).toBeTruthy();
-    expect(screen.getByText('FLAPS CMD')).toBeTruthy();
-    expect(screen.getByText('5°')).toBeTruthy();
-    expect(screen.getByText('GEAR ACT')).toBeTruthy();
-    expect(screen.getByText('DN')).toBeTruthy();
-    expect(screen.getByText('GEAR CMD')).toBeTruthy();
-    expect(screen.getByText('UP')).toBeTruthy();
+    const strip = screen.getByRole('region', { name: 'Engine, flap, and gear status' });
+    expect(within(strip).getByText('N1 ACT L')).toBeTruthy();
+    expect(within(strip).getByText('N1 ACT R')).toBeTruthy();
+    expect(within(strip).getByText('THR CMD')).toBeTruthy();
+    expect(within(strip).getByText('82%')).toBeTruthy();
+    expect(within(strip).getByText('FLAPS ACT')).toBeTruthy();
+    expect(within(strip).getByText('1°')).toBeTruthy();
+    expect(within(strip).getByText('FLAPS CMD')).toBeTruthy();
+    expect(within(strip).getByText('5°')).toBeTruthy();
+    expect(within(strip).getByText('GEAR ACT')).toBeTruthy();
+    expect(within(strip).getByText('DN')).toBeTruthy();
+    expect(within(strip).getByText('GEAR CMD')).toBeTruthy();
+    expect(within(strip).getByText('UP')).toBeTruthy();
   });
 
   it('shows gear transit instead of pretending partial gear is fully up or down', () => {

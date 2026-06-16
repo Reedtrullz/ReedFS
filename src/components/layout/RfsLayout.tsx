@@ -318,7 +318,7 @@ const layoutCss = `
   .rfs-layout__top-left [data-rfs-panel="takeoff-setup"] {
     flex: 0 0 auto;
     width: min(300px, 100%);
-    max-height: clamp(180px, calc(100vh - 510px), 220px);
+    max-height: clamp(160px, calc(100vh - 520px), 200px);
     overflow: auto;
   }
 }

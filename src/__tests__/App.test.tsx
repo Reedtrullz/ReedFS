@@ -451,16 +451,37 @@ describe('App', () => {
   });
 
   beforeEach(() => {
+    const store = useSimStore.getState();
     vi.clearAllMocks();
     mockReadGamepadActions.mockReturnValue(null);
     window.localStorage.clear();
     mockAudioContexts.length = 0;
-    useSimStore.getState().apState = structuredClone(defaultAppTestApState);
-    useSimStore.getState().status = 'stopped';
-    useSimStore.getState().selectedScenarioId = 'ksea-tutorial';
-    useSimStore.getState().aircraft.position = { lat: 47.45, lon: -122.31, alt: 432 };
-    useSimStore.getState().aircraft.flightPhase = 'PARKED';
-    delete (useSimStore.getState().aircraft as { ground?: unknown }).ground;
+    store.apState = structuredClone(defaultAppTestApState);
+    store.status = 'stopped';
+    store.selectedScenarioId = 'ksea-tutorial';
+    store.aircraft.position = { lat: 47.45, lon: -122.31, alt: 432 };
+    store.aircraft.flightPhase = 'PARKED';
+    store.aircraft.config = {
+      ...store.aircraft.config,
+      flapSetting: 0,
+      gearDown: true,
+      gearPosition: 1,
+    };
+    store.inputs = {
+      ...store.inputs,
+      throttle1: 0,
+      throttle2: 0,
+      flapLever: 0,
+      gearLever: 'DOWN',
+    };
+    store.effectiveControls = {
+      ...store.effectiveControls,
+      throttle1: 0,
+      throttle2: 0,
+      flapLever: 0,
+      gearLever: 'DOWN',
+    };
+    delete (store.aircraft as { ground?: unknown }).ground;
   });
 
   afterEach(() => {
@@ -866,10 +887,38 @@ describe('App', () => {
     );
   });
 
-  it('hides the takeoff setup panel after the aircraft reaches climb so flight overlay clutter drops away', () => {
+  it('keeps the takeoff setup panel visible in climb while gear or flaps still need cleanup', () => {
     const store = useSimStore.getState();
     store.status = 'running';
     store.aircraft.flightPhase = 'CLIMB';
+    store.aircraft.config = {
+      ...store.aircraft.config,
+      flapSetting: 5,
+      gearDown: true,
+      gearPosition: 1,
+    };
+    store.inputs = { ...store.inputs, flapLever: 5, gearLever: 'DOWN' };
+    store.effectiveControls = { ...store.effectiveControls, flapLever: 5, gearLever: 'DOWN' };
+
+    render(<App />);
+
+    expect(screen.getByRole('region', { name: 'Takeoff setup' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Scenario and tutorial' })).toBeTruthy();
+    expect(screen.getByLabelText('Route status')).toBeTruthy();
+  });
+
+  it('hides the takeoff setup panel after clean climb so flight overlay clutter drops away', () => {
+    const store = useSimStore.getState();
+    store.status = 'running';
+    store.aircraft.flightPhase = 'CLIMB';
+    store.aircraft.config = {
+      ...store.aircraft.config,
+      flapSetting: 0,
+      gearDown: false,
+      gearPosition: 0,
+    };
+    store.inputs = { ...store.inputs, flapLever: 0, gearLever: 'UP' };
+    store.effectiveControls = { ...store.effectiveControls, flapLever: 0, gearLever: 'UP' };
 
     render(<App />);
 

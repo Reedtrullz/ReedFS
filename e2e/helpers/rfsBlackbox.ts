@@ -42,6 +42,13 @@ interface VisibleFrameCadenceDriveOptions {
   pollEveryMs?: number;
 }
 
+interface VisibleEngineStripCommandExpectation {
+  throttlePercent?: number;
+  flapCommandDeg?: number;
+  gearCommand?: 'DN' | 'UP';
+  gearActual?: RegExp | 'DN' | 'UP';
+}
+
 function parseRequiredNumber(label: string, text: string, pattern: RegExp): number {
   const match = text.match(pattern);
   if (!match) throw new Error(`Unable to read ${label} from visible text: ${text}`);
@@ -134,6 +141,42 @@ async function readVisibleTakeoffConfigurationText(page: Page): Promise<string> 
     .getByRole('region', { name: 'Takeoff setup' })
     .getByLabel('Current takeoff configuration')
     .textContent())?.replace(/\s+/g, ' ').trim() ?? '';
+}
+
+async function readVisibleEngineStripText(page: Page): Promise<string> {
+  return (await page
+    .getByRole('region', { name: 'Engine, flap, and gear status' })
+    .textContent())?.replace(/\s+/g, ' ').trim() ?? '';
+}
+
+export async function expectVisibleEngineStripCommand(
+  page: Page,
+  expected: VisibleEngineStripCommandExpectation,
+): Promise<string> {
+  const expectedPatterns: RegExp[] = [];
+  if (expected.throttlePercent !== undefined) {
+    expectedPatterns.push(new RegExp(`THR CMD\\s*${expected.throttlePercent}%`));
+  }
+  if (expected.flapCommandDeg !== undefined) {
+    expectedPatterns.push(new RegExp(`FLAPS CMD\\s*${expected.flapCommandDeg}°`));
+  }
+  if (expected.gearCommand !== undefined) {
+    expectedPatterns.push(new RegExp(`GEAR CMD\\s*${expected.gearCommand}`));
+  }
+  if (expected.gearActual !== undefined) {
+    expectedPatterns.push(expected.gearActual instanceof RegExp
+      ? expected.gearActual
+      : new RegExp(`GEAR ACT\\s*${expected.gearActual}`));
+  }
+
+  for (const pattern of expectedPatterns) {
+    await expect.poll(async () => readVisibleEngineStripText(page), {
+      timeout: 15_000,
+      intervals: [250, 500, 1000],
+    }).toMatch(pattern);
+  }
+
+  return readVisibleEngineStripText(page);
 }
 
 function readVisibleFlapLever(text: string): number {
@@ -240,16 +283,17 @@ export async function toggleVisibleGearThroughMouseOnlyControls(page: Page, targ
 }
 
 export async function toggleVisibleGearThroughKeyboardControls(page: Page, target: VisibleGearTarget): Promise<void> {
+  const targetLabel = target === 'DOWN' ? 'DN' : 'UP';
   for (let guard = 0; guard < 8; guard += 1) {
-    const current = readVisibleGearLever(await readVisibleTakeoffConfigurationText(page));
-    if (current === target) return;
+    const stripText = await expectVisibleEngineStripCommand(page, {});
+    if (new RegExp(`GEAR CMD\\s*${targetLabel}`).test(stripText)) return;
     await page.keyboard.press('KeyG');
     await advanceVisibleSimTime(page, 250);
   }
 
-  const finalText = await readVisibleTakeoffConfigurationText(page);
-  if (readVisibleGearLever(finalText) === target) return;
-  throw new Error(`Unable to set visible gear lever to ${target} with keyboard Gear control; current setup text: ${finalText}`);
+  const finalText = await expectVisibleEngineStripCommand(page, {});
+  if (new RegExp(`GEAR CMD\\s*${targetLabel}`).test(finalText)) return;
+  throw new Error(`Unable to set visible gear lever to ${target} with keyboard Gear control; engine strip text: ${finalText}`);
 }
 
 export async function configureLandingAirframeThroughVisibleControls(page: Page, flapTarget: 25 | 30 | 40 = 30): Promise<void> {
@@ -474,15 +518,17 @@ export async function advanceTakeoffThrustThroughVisibleControls(page: Page): Pr
 export async function idleThrustThroughVisibleControls(page: Page): Promise<void> {
   const takeoffSetup = page.getByRole('region', { name: 'Takeoff setup' });
 
-  await clickTakeoffSetupButtonRepeatedly(page, 'Throttle Down', 20);
-  await expect(takeoffSetup.getByText('Throttle 0%')).toBeVisible();
+  if (await takeoffSetup.isVisible()) {
+    await clickTakeoffSetupButtonRepeatedly(page, 'Throttle Down', 20);
+  } else {
+    await holdKey(page, 'ArrowDown', 20);
+  }
+  await expectVisibleEngineStripCommand(page, { throttlePercent: 0 });
 }
 
 export async function cleanUpAirframeThroughVisibleControls(page: Page): Promise<void> {
-  const takeoffSetup = page.getByRole('region', { name: 'Takeoff setup' });
-
   await clickTakeoffSetupButtonRepeatedly(page, 'Flaps Previous', 3);
-  await expect(takeoffSetup.getByText('Flaps 0')).toBeVisible();
+  await expectVisibleEngineStripCommand(page, { flapCommandDeg: 0 });
 }
 
 export async function readVisibleRouteStatus(page: Page): Promise<VisibleRouteStatus> {

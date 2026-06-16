@@ -73,7 +73,7 @@ describe('RfsLayout', () => {
     expect(css).toContain('@media (max-width: 1360px)');
     expect(css).toMatch(/\.rfs-layout__top-left\s*\{[^}]*flex-direction:\s*column;/s);
     expect(css).toMatch(/\[data-rfs-panel="scenario"\]\s*\{[^}]*max-height:\s*clamp\(160px, calc\(100vh - 520px\), 200px\);/s);
-    expect(css).toMatch(/\[data-rfs-panel="takeoff-setup"\]\s*\{[^}]*max-height:\s*clamp\(180px, calc\(100vh - 510px\), 220px\);/s);
+    expect(css).toMatch(/\[data-rfs-panel="takeoff-setup"\]\s*\{[^}]*max-height:\s*clamp\(160px, calc\(100vh - 520px\), 200px\);/s);
     expect(css).toMatch(/\[data-rfs-panel="takeoff-setup"\]\s*\{[^}]*overflow:\s*auto;/s);
   });
 });

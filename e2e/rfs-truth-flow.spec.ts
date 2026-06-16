@@ -93,14 +93,15 @@ test.describe('RFS truth-flow browser proof', () => {
     await openRfs(page);
 
     await page.getByRole('button', { name: 'LOAD PLAN' }).click();
-    await expect(page.getByText(/no default route/i)).toBeVisible();
+    await expect(page.getByRole('status', { name: 'Route load result' })).toContainText(/ENVA→ENGM loaded/i);
+    await expect(page.getByText('ENVA→ENGM', { exact: true })).toBeVisible();
 
     const envaSnapshot = await readTruthSnapshot(page);
     expect(envaSnapshot.selectedScenarioId).toBe('enva-tutorial');
-    expect(envaSnapshot.flightPlanOrigin).toBeNull();
-    expect(envaSnapshot.flightPlanDestination).toBeNull();
-    expect(envaSnapshot.routeName).toBe('NO ROUTE');
-    expect(envaSnapshot.lnavAvailable).toBe(false);
+    expect(envaSnapshot.flightPlanOrigin).toBe('ENVA');
+    expect(envaSnapshot.flightPlanDestination).toBe('ENGM');
+    expect(envaSnapshot.routeName).toBe('ENVA→ENGM');
+    expect(envaSnapshot.lnavAvailable).toBe(true);
     expectFmaOff(envaSnapshot);
 
     await page.getByLabel('Scenario', { exact: true }).selectOption('ksea-tutorial');

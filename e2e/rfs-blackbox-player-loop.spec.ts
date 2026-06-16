@@ -6,6 +6,7 @@ import {
   configureTakeoffAirframeThroughVisibleControls,
   driveVisibleSimUntil,
   holdKey,
+  expectVisibleEngineStripCommand,
   loadKseaRouteThroughVisibleControls,
   openRfsBlackbox,
   readVisibleFlightNumbers,
@@ -58,7 +59,11 @@ test.describe('RFS black-box player loop proof', () => {
 
     await startRollThroughVisibleControls(page);
     await holdKey(page, 'ArrowUp', 20);
-    await expect(currentConfig).toContainText(/Throttle\s+100%/);
+    await expectVisibleEngineStripCommand(page, {
+      throttlePercent: 100,
+      flapCommandDeg: 5,
+      gearCommand: 'DN',
+    });
 
     await driveVisibleSimUntil(page, 'visible takeoff speed for rotation', async () => {
       return (await readVisibleFlightNumbers(page)).iasKt >= 145;
@@ -68,11 +73,13 @@ test.describe('RFS black-box player loop proof', () => {
     });
     await rotateToVisiblePositiveRate(page);
     expect(await waitForVisibleFlightPhase(page, /^(CLIMB|CRUISE)$/)).toMatch(/^(CLIMB|CRUISE)$/);
+    await expect(page.getByRole('region', { name: 'Scenario and tutorial' }).getByText('Positive rate established')).toBeVisible();
 
     await toggleVisibleGearThroughKeyboardControls(page, 'UP');
-    await expect(currentConfig).toContainText(/Gear\s+UP/);
-    await expect(page.getByText(/GEAR CMD\s*UP/).first()).toBeVisible();
-    await expect(page.getByText(/GEAR ACT\s*(?:TRN\s*\d+%|UP)/).first()).toBeVisible();
+    await expectVisibleEngineStripCommand(page, {
+      gearCommand: 'UP',
+      gearActual: /GEAR ACT\s*(?:TRN\s*\d+%|UP)/,
+    });
 
     const resetButton = page.getByRole('button', { name: /^RESET$/ });
     await expect(resetButton).toBeVisible();
@@ -115,7 +122,10 @@ test.describe('RFS black-box player loop proof', () => {
     expect(await waitForVisibleFlightPhase(page, /^(CLIMB|CRUISE)$/)).toMatch(/^(CLIMB|CRUISE)$/);
 
     await toggleVisibleGearThroughMouseOnlyControls(page, 'UP');
-    await expect(currentConfig).toContainText(/Gear\s+UP/);
+    await expectVisibleEngineStripCommand(page, {
+      gearCommand: 'UP',
+      gearActual: /GEAR ACT\s*(?:TRN\s*\d+%|UP)/,
+    });
     await resetThroughVisibleControls(page);
     await expect(page.getByRole('button', { name: /^START ROLL$/ })).toBeVisible();
   });
@@ -137,7 +147,11 @@ test.describe('RFS black-box player loop proof', () => {
 
     await startRollThroughVisibleControls(page);
     await holdKey(page, 'ArrowUp', 20);
-    await expect(currentConfig).toContainText(/Throttle\s+100%/);
+    await expectVisibleEngineStripCommand(page, {
+      throttlePercent: 100,
+      flapCommandDeg: 5,
+      gearCommand: 'DN',
+    });
 
     await driveVisibleSimUntil(page, 'visible takeoff speed for rotation', async () => {
       return (await readVisibleFlightNumbers(page)).iasKt >= 145;
@@ -149,7 +163,9 @@ test.describe('RFS black-box player loop proof', () => {
     expect(await waitForVisibleFlightPhase(page, /^(CLIMB|CRUISE)$/)).toMatch(/^(CLIMB|CRUISE)$/);
 
     await cleanUpAirframeThroughVisibleControls(page);
-    await expect(currentConfig).toContainText(/Flaps\s+0/);
+    await expectVisibleEngineStripCommand(page, {
+      flapCommandDeg: 0,
+    });
     await setVisibleSimRateTarget(page, 1);
 
     await clickVisibleMcpMode(page, 'LNAV');

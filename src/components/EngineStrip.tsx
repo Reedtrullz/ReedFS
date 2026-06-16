@@ -12,7 +12,7 @@ export function EngineStrip() {
   const gearActualColor = gearActualLabel.startsWith('TRN') ? '#f6d365' : vm.gearDownActual ? '#0f0' : '#ff0';
 
   return (
-    <div style={containerStyle}>
+    <div aria-label="Engine, flap, and gear status" role="region" style={containerStyle}>
       <div style={engineBlock}>
         <span style={labelStyle}>N1 ACT L</span>
         <div style={barTrack}>

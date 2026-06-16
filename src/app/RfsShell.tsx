@@ -104,6 +104,11 @@ export function RfsShell() {
   const cycleSimRate = useSimStore((s) => s.cycleSimRate);
   const status = useSimStore((s) => s.status);
   const flightPhase = useSimStore((s) => s.aircraft.flightPhase);
+  const gearLeverCommand = useSimStore((s) => s.inputs.gearLever);
+  const flapLeverCommand = useSimStore((s) => s.inputs.flapLever);
+  const gearDownActual = useSimStore((s) => s.aircraft.config.gearDown);
+  const gearPositionActual = useSimStore((s) => s.aircraft.config.gearPosition);
+  const flapsActual = useSimStore((s) => s.aircraft.config.flapSetting);
   const selectedScenarioId = useSimStore((s) => s.selectedScenarioId);
   const setInput = useSimStore((s) => s.setInput);
   const { activeScenario, metarData } = useScenarioWeather(selectedScenarioId);
@@ -298,7 +303,18 @@ export function RfsShell() {
 
   const showDebugOverlays = shouldShowDebugOverlays(overlayMode);
   const showFlightInstruments = shouldShowFlightInstruments(overlayMode);
-  const showTakeoffSetupPanel = showFlightInstruments && ['PARKED', 'TAXI', 'TAKEOFF'].includes(flightPhase);
+  const normalizedGearPositionActual = Number.isFinite(gearPositionActual)
+    ? gearPositionActual
+    : gearDownActual ? 1 : 0;
+  const cleanupStillNeeded = flightPhase === 'CLIMB' && (
+    gearLeverCommand !== 'UP'
+    || gearDownActual
+    || normalizedGearPositionActual > 0.001
+    || flapLeverCommand > 0
+    || flapsActual > 0
+  );
+  const showTakeoffSetupPanel = showFlightInstruments
+    && (['PARKED', 'TAXI', 'TAKEOFF'].includes(flightPhase) || cleanupStillNeeded);
   const viewerReady = viewerGeneration > 0;
   const audioCaptionNode = audioSettings.captionsEnabled && audioCaption ? (
     <div aria-label="Audio caption" aria-live="polite" role="status" style={audioCaptionStyle}>

@@ -5,6 +5,7 @@ import {
   clickVisibleMcpMode,
   configureScenarioTakeoffThroughVisibleControls,
   driveVisibleSimUntil,
+  expectVisibleEngineStripCommand,
   idleThrustThroughVisibleControls,
   loadSelectedRouteThroughVisibleControls,
   openRfsBlackbox,
@@ -61,9 +62,14 @@ test.describe('RFS full flight black-box acceptance', () => {
     await expect(page.getByRole('region', { name: 'Scenario and tutorial' }).getByText('Positive rate established')).toBeVisible();
 
     await toggleVisibleGearThroughVisibleControls(page, 'UP');
-    await expect(currentConfig).toContainText(/Gear\s+UP/);
+    await expectVisibleEngineStripCommand(page, {
+      gearCommand: 'UP',
+      gearActual: /GEAR ACT\s*(?:TRN\s*\d+%|UP)/,
+    });
     await cleanUpAirframeThroughVisibleControls(page);
-    await expect(currentConfig).toContainText(/Flaps\s+0/);
+    await expectVisibleEngineStripCommand(page, {
+      flapCommandDeg: 0,
+    });
 
     const initialRoute = await readVisibleRouteStatus(page);
     expect(initialRoute.activeLegIndex).toBe(1);
@@ -100,9 +106,12 @@ test.describe('RFS full flight black-box acceptance', () => {
     await expect(page.getByLabel('Route status')).toContainText('NO ROUTE');
     await selectKpdxShortFinalScenarioThroughVisibleControls(page);
     await setVisibleSimRateTarget(page, 16);
-    await expect(currentConfig).toContainText(/Gear\s+DOWN/);
-    await expect(currentConfig).toContainText(/Flaps\s+30/);
-    await expect(currentConfig).toContainText(/Throttle\s+35%/);
+    await expectVisibleEngineStripCommand(page, {
+      throttlePercent: 35,
+      flapCommandDeg: 30,
+      gearCommand: 'DN',
+      gearActual: 'DN',
+    });
 
     await startRollThroughVisibleControls(page);
     await expect(await waitForVisibleFlightPhase(page, /^APPROACH$/)).toBe('APPROACH');
@@ -119,7 +128,9 @@ test.describe('RFS full flight black-box acceptance', () => {
     const landingPhase = approachPhase;
     expect(landingPhase).toMatch(/^(TOUCHDOWN|DEROTATION|ROLLOUT|TAXI)$/);
     await idleThrustThroughVisibleControls(page);
-    await expect(currentConfig).toContainText(/Throttle\s+0%/);
+    await expectVisibleEngineStripCommand(page, {
+      throttlePercent: 0,
+    });
     await page.mouse.click(20, 20);
     await page.keyboard.down('Space');
     try {
@@ -138,10 +149,12 @@ test.describe('RFS full flight black-box acceptance', () => {
     await resetThroughVisibleControls(page);
     await expect(page.getByRole('button', { name: /^START ROLL$/ })).toBeVisible();
     await expect(page.getByLabel('Route status')).toContainText('NO ROUTE');
-    await expect(currentConfig).toContainText(/Flaps\s+30/);
-    await expect(currentConfig).toContainText(/Trim\s+4\.8/);
-    await expect(currentConfig).toContainText(/Throttle\s+35%/);
-    await expect(currentConfig).toContainText(/Gear\s+DOWN/);
+    await expectVisibleEngineStripCommand(page, {
+      throttlePercent: 35,
+      flapCommandDeg: 30,
+      gearCommand: 'DN',
+      gearActual: 'DN',
+    });
     expect(await readVisibleFlightPhase(page)).toBe('APPROACH');
     expect(await readVisibleFmaModes(page)).toEqual({
       thrustActive: 'OFF',
