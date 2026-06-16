@@ -167,7 +167,7 @@ npm run check:deps && npm run check:release && npm run check:blackbox && npm run
 
 Browser proof is split into layers: unit/static gates verify source contracts, seeded/scoped Playwright helpers guard specific physics/guidance states, and manifest-listed black-box specs use visible controls plus visible readbacks only. Seeded proofs are not full-flight/full-route evidence; full-flight claims require a continuous visible-control proof that actually covers that path, plus exact-SHA CI/live verification where applicable.
 
-Use `npm run test:e2e` for the full Playwright browser-proof suite and `npm run test:visual` for the scoped deterministic visual snapshot/timing gate. CI runs both, but only the scoped visual spec is subject to the strict visual timing budget.
+Use `npm run test:e2e` for the CI Playwright browser-proof suite and `npm run test:visual` for the scoped deterministic visual snapshot/timing gate. CI runs both, but only the scoped visual spec is subject to the strict visual timing budget. The intentionally long continuous full-flight black-box acceptance remains separate as `npm run test:e2e:full-flight`; do not claim continuous full-flight proof unless that slow gate also completes successfully for the exact SHA being reported.
 
 Useful targeted commands:
 
@@ -176,6 +176,7 @@ npm run lint:ci
 npm run typecheck
 npm run test
 npm run test:e2e
+npm run test:e2e:full-flight
 npm run test:visual
 npm run test -- src/sim/physics/__tests__/integrate.test.ts
 npm run build

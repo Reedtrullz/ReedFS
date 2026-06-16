@@ -76,6 +76,8 @@ describe('canonical docs posture', () => {
     expect(packageJson.scripts['test:e2e']).toContain('VITE_RFS_VISUAL_TEST=0');
     expect(packageJson.scripts['test:e2e']).toContain('e2e/rfs-truth-flow.spec.ts');
     expect(packageJson.scripts['test:e2e']).not.toContain('e2e/rfs-visual.spec.ts');
+    expect(packageJson.scripts['test:e2e']).not.toContain('e2e/rfs-full-flight-blackbox.spec.ts');
+    expect(packageJson.scripts['test:e2e:full-flight']).toContain('e2e/rfs-full-flight-blackbox.spec.ts');
     expect(packageJson.scripts['test:visual']).toContain('e2e/rfs-visual.spec.ts');
     expect(ciWorkflow).toMatch(/- run: npm run test:e2e\s+- run: npm run test:visual/);
     expect(ciWorkflow).toContain('npm run check:deps');

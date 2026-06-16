@@ -28,8 +28,8 @@ type VisibleGearTarget = 'UP' | 'DOWN';
 type FmaTextExpectation = string | RegExp;
 
 const B737_VISIBLE_FLAP_DETENTS = [0, 1, 5, 10, 15, 25, 30, 40] as const;
-const VISIBLE_POSITIVE_RATE_MIN_RADIO_ALTITUDE_FT = 20;
-const VISIBLE_POSITIVE_RATE_MIN_VERTICAL_SPEED_FPM = 200;
+const VISIBLE_POSITIVE_RATE_MIN_RADIO_ALTITUDE_FT = 5;
+const VISIBLE_POSITIVE_RATE_MIN_VERTICAL_SPEED_FPM = 100;
 
 interface VisibleSimDriveOptions {
   timeoutMs: number;
@@ -147,8 +147,12 @@ function readVisibleGearLever(text: string): VisibleGearTarget {
 }
 
 function visiblePositiveRateEstablished(numbers: VisibleFlightNumbers): boolean {
+  const airborneReadbackAvailable = numbers.radioAltitudeFt !== null
+    ? numbers.radioAltitudeFt >= VISIBLE_POSITIVE_RATE_MIN_RADIO_ALTITUDE_FT
+    : numbers.altitudeFt > 1000;
+
   return numbers.verticalSpeedFpm > VISIBLE_POSITIVE_RATE_MIN_VERTICAL_SPEED_FPM
-    && (numbers.radioAltitudeFt ?? 0) >= VISIBLE_POSITIVE_RATE_MIN_RADIO_ALTITUDE_FT;
+    && airborneReadbackAvailable;
 }
 
 async function setVisibleFlaps(page: Page, target: number): Promise<void> {
