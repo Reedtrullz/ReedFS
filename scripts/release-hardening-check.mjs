@@ -67,6 +67,10 @@ for (const ecosystem of ["npm", "github-actions", "docker"]) {
 }
 check((dependabot.match(/directory:\s*\//g) ?? []).length >= 3, "Dependabot npm/actions/docker updates must target the repository root");
 check((dependabot.match(/interval:\s*weekly/g) ?? []).length >= 3, "Dependabot npm/actions/docker updates must run weekly");
+check(
+  /package-ecosystem:\s*docker[\s\S]*ignore:\s*-\s*dependency-name:\s*node[\s\S]*version-update:semver-major/.test(dependabot),
+  "Dependabot Docker updates must ignore Node semver-major bumps; Node major upgrades require a dedicated LTS/toolchain migration plan"
+);
 
 check(codeql.includes("security-events: write"), "CodeQL workflow must have security-events write permission");
 check(codeql.includes("languages: javascript-typescript"), "CodeQL workflow must analyze JavaScript/TypeScript");
