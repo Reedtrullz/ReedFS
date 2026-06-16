@@ -369,23 +369,50 @@ describe('guidanceState', () => {
     expect(guidance.checklist.map((item) => item.label)).not.toContain('Gear down');
   });
 
-  it('derives approach guidance for airborne approach and descent states with gear down', () => {
-    for (const flightPhase of ['APPROACH', 'DESCENT'] as const) {
-      const aircraft = scenarioAircraft();
-      aircraft.flightPhase = flightPhase;
-      aircraft.ground.weightOnWheels = false;
-      aircraft.ground.aglFt = 250;
-      aircraft.position.alt += 250;
-      aircraft.config.gearDown = true;
-      aircraft.velocity.u = 70;
+  it('derives cruise, descent, and approach guidance as distinct airborne phases', () => {
+    const cruiseAircraft = scenarioAircraft();
+    cruiseAircraft.flightPhase = 'CRUISE';
+    cruiseAircraft.ground.weightOnWheels = false;
+    cruiseAircraft.ground.aglFt = 9_000;
+    cruiseAircraft.position.alt += 9_000;
+    cruiseAircraft.config.gearDown = false;
+    cruiseAircraft.config.gearPosition = 0;
+    cruiseAircraft.velocity.u = 130;
 
-      expect(buildGuidanceState({
-        scenario: KSEA_TUTORIAL_SCENARIO,
-        status: 'running',
-        aircraft,
-        controls: { ...configuredInputs, throttle1: 0.35, throttle2: 0.35, flapLever: 30 },
-      }).phase).toBe('approach');
-    }
+    expect(buildGuidanceState({
+      scenario: KSEA_TUTORIAL_SCENARIO,
+      status: 'running',
+      aircraft: cruiseAircraft,
+      controls: { ...configuredInputs, throttle1: 0.55, throttle2: 0.55, flapLever: 0, gearLever: 'UP' },
+    }).phase).toBe('cruise');
+
+    const descentAircraft = structuredClone(cruiseAircraft);
+    descentAircraft.flightPhase = 'DESCENT';
+    descentAircraft.velocity.w = 6;
+
+    const descentGuidance = buildGuidanceState({
+      scenario: KSEA_TUTORIAL_SCENARIO,
+      status: 'running',
+      aircraft: descentAircraft,
+      controls: { ...configuredInputs, throttle1: 0.35, throttle2: 0.35, flapLever: 5, gearLever: 'UP' },
+    });
+    expect(descentGuidance.phase).toBe('descent');
+    expect(descentGuidance.coachMessage).toMatch(/descent/i);
+
+    const approachAircraft = structuredClone(descentAircraft);
+    approachAircraft.flightPhase = 'APPROACH';
+    approachAircraft.ground.aglFt = 1_800;
+    approachAircraft.config.gearDown = true;
+    approachAircraft.config.gearPosition = 1;
+    approachAircraft.config.flapSetting = 30;
+    approachAircraft.velocity.u = 70;
+
+    expect(buildGuidanceState({
+      scenario: KSEA_TUTORIAL_SCENARIO,
+      status: 'running',
+      aircraft: approachAircraft,
+      controls: { ...configuredInputs, throttle1: 0.35, throttle2: 0.35, flapLever: 30, gearLever: 'DOWN' },
+    }).phase).toBe('approach');
   });
 
   it('derives explicit landing guidance phases for touchdown through stopped rollout', () => {

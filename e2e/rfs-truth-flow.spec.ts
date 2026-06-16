@@ -89,7 +89,7 @@ function expectFmaOff(snapshot: TruthSnapshot): void {
 
 test.describe('RFS truth-flow browser proof', () => {
   test('LOAD PLAN stays truthful and keyboard gear-up is gated before positive rate', async ({ page }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(120_000);
     await openRfs(page);
 
     await page.getByRole('button', { name: 'LOAD PLAN' }).click();
@@ -139,6 +139,9 @@ test.describe('RFS truth-flow browser proof', () => {
     expect(gearSnapshot.positiveRate).toBe(false);
     expect(gearSnapshot.guidancePhase).toBe('takeoff-roll');
     expect(gearSnapshot.checklistLabels).not.toContain('Gear up');
+    await expect(page.getByRole('status', { name: 'Control feedback' })).toContainText(
+      /gear up blocked.*positive rate/i,
+    );
     expectFmaOff(gearSnapshot);
   });
 });

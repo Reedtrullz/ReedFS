@@ -171,13 +171,14 @@ describe('RfsPFD', () => {
     useSimStore.getState().reset();
   });
 
-  it('renders a readable PFD frame with labeled speed, altitude, attitude, and heading sections', () => {
+  it('renders a readable PFD frame with labeled speed, altitude, attitude, heading, and phase sections', () => {
     render(<RfsPFD />);
 
     expect(screen.getByLabelText('Primary flight display')).toBeTruthy();
     expect(screen.getByRole('region', { name: 'Primary flight display' })).toBeTruthy();
     expect(screen.getByLabelText('Airspeed tape')).toBeTruthy();
     expect(screen.getByLabelText('Altitude tape')).toBeTruthy();
+    expect(screen.getByLabelText('PFD flight phase').textContent).toBe('PHASE PARKED');
     expect(screen.getByText('IAS')).toBeTruthy();
     expect(screen.getByText('ALT')).toBeTruthy();
     expect(screen.getByText('ATT')).toBeTruthy();
@@ -309,7 +310,47 @@ describe('RfsPFD', () => {
     expect(screen.getByText('VS BUG +700')).toBeTruthy();
   });
 
-  it('derives FD command bars from a supplied shared target object rather than recomputing route state', () => {
+  it('derives Flight Director command bars from supported supplied shared targets rather than recomputing route state', () => {
+    const aircraft = structuredClone(useSimStore.getState().aircraft);
+    aircraft.position.alt = 9_000;
+    aircraft.velocity.u = 128.6;
+
+    const cue = deriveFlightDirectorCue({
+      enabled: true,
+      lateralMode: 'OFF',
+      verticalMode: 'OFF',
+      currentHeadingDeg: 180,
+      currentRollDeg: 0,
+      currentPitchDeg: 0,
+      currentVerticalSpeedFpm: 0,
+      altitudeFt: 9_000,
+      selectedHeadingDeg: null,
+      selectedAltitudeFt: null,
+      selectedVerticalSpeedFpm: null,
+      aircraft,
+      flightPlan: null,
+      routeStatus: null,
+      guidanceTargets: {
+        truth: {
+          thrustActive: 'OFF',
+          lateralActive: 'HDG_SEL',
+          verticalActive: 'ALT_HOLD',
+          autopilotStatus: 'CMD_A',
+          lastModeChangeTimestamps: { thrust: 0, lateral: 0, vertical: 0 },
+        },
+        lateral: { mode: 'HDG_SEL', targetHeadingRad: 90 * Math.PI / 180 },
+        vertical: { mode: 'ALT_HOLD', targetAltitudeFt: 10_000 },
+        thrust: null,
+      },
+    } as Parameters<typeof deriveFlightDirectorCue>[0] & { guidanceTargets: unknown });
+
+    expect(cue.roll?.mode).toBe('HDG_SEL');
+    expect(cue.roll?.commandDeg).toBeCloseTo(-25.2, 1);
+    expect(cue.pitch?.mode).toBe('ALT_HOLD');
+    expect(cue.pitch?.commandDeg).toBeCloseTo(4, 1);
+  });
+
+  it('does not draw Flight Director command bars from unsupported shared LNAV and VS targets', () => {
     const aircraft = structuredClone(useSimStore.getState().aircraft);
     aircraft.position.alt = 9_000;
     aircraft.velocity.u = 128.6;
@@ -343,15 +384,14 @@ describe('RfsPFD', () => {
       },
     } as Parameters<typeof deriveFlightDirectorCue>[0] & { guidanceTargets: unknown });
 
-    expect(cue.roll?.mode).toBe('LNAV');
-    expect(cue.roll?.commandDeg).toBeCloseTo(-25.2, 1);
-    expect(cue.pitch?.mode).toBe('VS');
-    expect(cue.pitch?.commandDeg).toBeCloseTo(0.105, 3);
+    expect(cue.roll).toBeNull();
+    expect(cue.pitch).toBeNull();
   });
 
   it('shows Flight Director pitch and roll command bars when FD switches and supported AFDS modes exist', () => {
     const aircraft = structuredClone(useSimStore.getState().aircraft);
-    aircraft.position.alt = 9_000;
+    aircraft.position.alt = 9_950;
+    aircraft.velocity.w = 0;
     aircraft.attitude = { phi: 0, theta: 0, psi: 180 * Math.PI / 180 };
     aircraft.quaternion = eulerToQuat(aircraft.attitude.phi, aircraft.attitude.theta, aircraft.attitude.psi);
     const ap = apStateWithModes();
@@ -371,10 +411,10 @@ describe('RfsPFD', () => {
     expect(screen.getByLabelText('Flight director roll bar')).toBeTruthy();
     expect(screen.getByText('FD ROLL +8.4°')).toBeTruthy();
     expect(screen.getByLabelText('Flight director pitch bar')).toBeTruthy();
-    expect(screen.getByText('FD PITCH +4.0°')).toBeTruthy();
+    expect(screen.getByText('FD PITCH +0.2°')).toBeTruthy();
   });
 
-  it('draws Flight Director command bars for backed LNAV and VS modes', () => {
+  it('does not draw Flight Director command bars for unsupported backed LNAV and VS modes', () => {
     setAircraftOnKseaRoute();
     const ap = apStateWithModes();
     ap.truth.lateralActive = 'LNAV';
@@ -388,13 +428,11 @@ describe('RfsPFD', () => {
 
     render(<RfsPFD />);
 
-    expect(screen.getByLabelText('Flight director roll bar')).toBeTruthy();
-    expect(screen.getByTestId('fd-roll-command').getAttribute('data-mode')).toBe('LNAV');
-    expect(screen.getByLabelText('Flight director pitch bar')).toBeTruthy();
-    expect(screen.getByTestId('fd-pitch-command').getAttribute('data-mode')).toBe('VS');
+    expect(screen.queryByLabelText('Flight director roll bar')).toBeNull();
+    expect(screen.queryByLabelText('Flight director pitch bar')).toBeNull();
   });
 
-  it('attenuates the VS Flight Director pitch cue near MCP altitude capture', () => {
+  it('hides the unsupported VS Flight Director pitch cue near MCP altitude capture', () => {
     const aircraft = structuredClone(useSimStore.getState().aircraft);
     aircraft.position.alt = 9_990;
     aircraft.velocity.u = 128.6;
@@ -415,8 +453,7 @@ describe('RfsPFD', () => {
 
     render(<RfsPFD />);
 
-    expect(screen.getByTestId('fd-pitch-command').getAttribute('data-mode')).toBe('VS');
-    expect(screen.getByText('FD PITCH +0.0°')).toBeTruthy();
+    expect(screen.queryByLabelText('Flight director pitch bar')).toBeNull();
   });
 
   it('shows VNAV armed before TOD without drawing a pitch Flight Director command', () => {
@@ -432,11 +469,12 @@ describe('RfsPFD', () => {
 
     render(<RfsPFD />);
 
-    expect(screen.getByText('VNAV')).toBeTruthy();
+    expect(screen.getByLabelText('FMA pitch active').textContent).toBe('OFF');
+    expect(screen.getByRole('status', { name: 'PFD armed vertical mode' }).textContent).toBe('ARMED VNAV');
     expect(screen.queryByLabelText('Flight director pitch bar')).toBeNull();
   });
 
-  it('draws a Flight Director pitch command for backed VNAV path guidance', () => {
+  it('does not draw an unsupported VNAV Flight Director pitch command for route path guidance', () => {
     setAircraftOnKseaRoute();
     const ap = apStateWithModes();
     ap.truth.lateralActive = 'LNAV';
@@ -450,8 +488,7 @@ describe('RfsPFD', () => {
 
     render(<RfsPFD />);
 
-    expect(screen.getByLabelText('Flight director pitch bar')).toBeTruthy();
-    expect(screen.getByTestId('fd-pitch-command').getAttribute('data-mode')).toBe('VNAV_PTH');
+    expect(screen.queryByLabelText('Flight director pitch bar')).toBeNull();
   });
 
   it('does not invent Flight Director bars before MCP/autopilot state exists', () => {
@@ -509,6 +546,29 @@ describe('RfsPFD', () => {
     expect(screen.getByText('LNAV')).toBeTruthy();
     expect(screen.getByText('VNAV_PTH')).toBeTruthy();
     expect(screen.getByText('CMD_A')).toBeTruthy();
+  });
+
+  it('labels CMD_A with PITCH OFF as lateral-only with no pitch authority on the PFD', () => {
+    setAircraftOnKseaRoute();
+    const ap = apStateWithModes();
+    ap.truth.lateralActive = 'LNAV';
+    ap.truth.verticalActive = 'OFF';
+    ap.truth.thrustActive = 'SPEED';
+    ap.boeing.lnav = true;
+    ap.boeing.vnav = false;
+    ap.boeing.altHold = false;
+    ap.boeing.vs = false;
+    ap.boeing.speedMode = true;
+    useSimStore.getState().setApState(ap);
+
+    render(<RfsPFD />);
+
+    expect(screen.getByText('CMD_A')).toBeTruthy();
+    expect(screen.getByText('OFF')).toBeTruthy();
+    expect(screen.getByRole('status', { name: 'Autopilot authority warning' }).textContent).toBe(
+      'AP LATERAL ONLY — NO PITCH AUTHORITY',
+    );
+    expect(screen.queryByLabelText('Flight director pitch bar')).toBeNull();
   });
 
   it('shows N1 as an honest FMA thrust mode when truth state is N1', () => {

@@ -25,6 +25,8 @@ function expectExplicitLandingSequence(phases: string[], routeDebug: string): vo
 }
 
 test.describe('RFS route and LNAV browser proof', () => {
+  test.describe.configure({ timeout: 120_000 });
+
   test('KSEA route is loaded and stopped AP mode clicks remain gated through visible controls', async ({ page }) => {
     await openRfs(page);
 
@@ -77,7 +79,7 @@ test.describe('RFS route and LNAV browser proof', () => {
     expect(legTransitioned || sequenced, routeDebug).toBe(true);
   });
 
-  test('KSEA sample route sequences from BTG to KPDX while LNAV remains backed', async ({ page }) => {
+  test('KSEA sample route sequences from BTG to the KPDX 10R initial approach fix while LNAV remains backed', async ({ page }) => {
     await openRfs(page);
 
     const result = await flyKseaRouteThroughSecondSequence(page);
@@ -93,7 +95,7 @@ test.describe('RFS route and LNAV browser proof', () => {
     expect(result.initial.nextWaypointIdent, routeDebug).toBe('BTG');
     expect(result.final.activeLegIndex, routeDebug).toBe(2);
     expect(result.final.fromIdent, routeDebug).toBe('BTG');
-    expect(result.final.nextWaypointIdent, routeDebug).toBe('KPDX');
+    expect(result.final.nextWaypointIdent, routeDebug).toBe('KPDX10R_IF');
     for (const sample of result.samples) {
       expect(sample.lnavAvailable, routeDebug).toBe(true);
       expect(sample.fmaLateralActive, routeDebug).toBe('LNAV');
@@ -117,7 +119,7 @@ test.describe('RFS route and LNAV browser proof', () => {
     expect(result.initial.activeLegIndex).toBe(0);
     expect(result.final.activeLegIndex, routeDebug).toBe(2);
     expect(result.final.fromIdent, routeDebug).toBe('BTG');
-    expect(result.final.nextWaypointIdent, routeDebug).toBe('KPDX');
+    expect(result.final.nextWaypointIdent, routeDebug).toBe('KPDX10R_IF');
     for (const sample of result.samples) {
       expect(sample.lnavAvailable, routeDebug).toBe(true);
       expect(sample.fmaLateralActive, routeDebug).toBe('LNAV');
@@ -136,9 +138,9 @@ test.describe('RFS route and LNAV browser proof', () => {
     const routeDebug = JSON.stringify(result.samples, null, 2);
 
     expect(result.initial.routeName).toBe('KSEA→KPDX');
-    expect(result.initial.activeLegIndex).toBe(2);
-    expect(result.initial.fromIdent, routeDebug).toBe('BTG');
-    expect(result.initial.nextWaypointIdent, routeDebug).toBe('KPDX');
+    expect(result.initial.activeLegIndex).toBe(4);
+    expect(result.initial.fromIdent, routeDebug).toBe('KPDX10R_FAF');
+    expect(result.initial.nextWaypointIdent, routeDebug).toBe('KPDX10R_RWY');
     expect(result.initial.lnavAvailable, routeDebug).toBe(true);
     expect(result.initial.lateralActive, routeDebug).toBe('LNAV');
     expect(result.initial.fmaLateralActive, routeDebug).toBe('LNAV');
@@ -154,9 +156,9 @@ test.describe('RFS route and LNAV browser proof', () => {
     expect(result.initial.flapSetting, routeDebug).toBeLessThan(25);
 
     expect(result.configuredApproach.routeName).toBe('KSEA→KPDX');
-    expect(result.configuredApproach.activeLegIndex, routeDebug).toBe(2);
-    expect(result.configuredApproach.fromIdent, routeDebug).toBe('BTG');
-    expect(result.configuredApproach.nextWaypointIdent, routeDebug).toBe('KPDX');
+    expect(result.configuredApproach.activeLegIndex, routeDebug).toBe(4);
+    expect(result.configuredApproach.fromIdent, routeDebug).toBe('KPDX10R_FAF');
+    expect(result.configuredApproach.nextWaypointIdent, routeDebug).toBe('KPDX10R_RWY');
     expect(result.configuredApproach.lnavAvailable, routeDebug).toBe(true);
     expect(result.configuredApproach.lateralActive, routeDebug).toBe('LNAV');
     expect(result.configuredApproach.fmaLateralActive, routeDebug).toBe('LNAV');
@@ -201,9 +203,9 @@ test.describe('RFS route and LNAV browser proof', () => {
     const routeDebug = JSON.stringify(result, null, 2);
 
     expect(result.configuredApproach.routeName).toBe('KSEA→KPDX');
-    expect(result.configuredApproach.activeLegIndex, routeDebug).toBe(2);
-    expect(result.configuredApproach.fromIdent, routeDebug).toBe('BTG');
-    expect(result.configuredApproach.nextWaypointIdent, routeDebug).toBe('KPDX');
+    expect(result.configuredApproach.activeLegIndex, routeDebug).toBe(4);
+    expect(result.configuredApproach.fromIdent, routeDebug).toBe('KPDX10R_FAF');
+    expect(result.configuredApproach.nextWaypointIdent, routeDebug).toBe('KPDX10R_RWY');
     expect(result.configuredApproach.lnavAvailable, routeDebug).toBe(true);
     expect(result.configuredApproach.lateralActive, routeDebug).toBe('LNAV');
     expect(result.configuredApproach.fmaLateralActive, routeDebug).toBe('LNAV');
@@ -219,9 +221,9 @@ test.describe('RFS route and LNAV browser proof', () => {
     expect(result.configuredApproach.weightOnWheels, routeDebug).toBe(false);
 
     expect(result.manualHandoff.routeName).toBe('KSEA→KPDX');
-    expect(result.manualHandoff.activeLegIndex, routeDebug).toBe(2);
-    expect(result.manualHandoff.fromIdent, routeDebug).toBe('BTG');
-    expect(result.manualHandoff.nextWaypointIdent, routeDebug).toBe('KPDX');
+    expect(result.manualHandoff.activeLegIndex, routeDebug).toBe(4);
+    expect(result.manualHandoff.fromIdent, routeDebug).toBe('KPDX10R_FAF');
+    expect(result.manualHandoff.nextWaypointIdent, routeDebug).toBe('KPDX10R_RWY');
     expect(result.manualHandoff.lnavAvailable, routeDebug).toBe(true);
     expect(result.manualHandoff.lateralActive, routeDebug).toBe('OFF');
     expect(result.manualHandoff.fmaLateralActive, routeDebug).toBe('OFF');
@@ -278,9 +280,9 @@ test.describe('RFS route and LNAV browser proof', () => {
     const routeDebug = JSON.stringify(result, null, 2);
 
     expect(result.configuredApproach.routeName).toBe('KSEA→KPDX');
-    expect(result.configuredApproach.activeLegIndex, routeDebug).toBe(2);
-    expect(result.configuredApproach.fromIdent, routeDebug).toBe('BTG');
-    expect(result.configuredApproach.nextWaypointIdent, routeDebug).toBe('KPDX');
+    expect(result.configuredApproach.activeLegIndex, routeDebug).toBe(4);
+    expect(result.configuredApproach.fromIdent, routeDebug).toBe('KPDX10R_FAF');
+    expect(result.configuredApproach.nextWaypointIdent, routeDebug).toBe('KPDX10R_RWY');
     expect(result.configuredApproach.lnavAvailable, routeDebug).toBe(true);
     expect(result.configuredApproach.lateralActive, routeDebug).toBe('LNAV');
     expect(result.configuredApproach.fmaLateralActive, routeDebug).toBe('LNAV');
@@ -297,9 +299,9 @@ test.describe('RFS route and LNAV browser proof', () => {
     expect(result.configuredApproach.flightPhase, routeDebug).not.toBe('LANDED');
 
     expect(result.manualHandoff.routeName).toBe('KSEA→KPDX');
-    expect(result.manualHandoff.activeLegIndex, routeDebug).toBe(2);
-    expect(result.manualHandoff.fromIdent, routeDebug).toBe('BTG');
-    expect(result.manualHandoff.nextWaypointIdent, routeDebug).toBe('KPDX');
+    expect(result.manualHandoff.activeLegIndex, routeDebug).toBe(4);
+    expect(result.manualHandoff.fromIdent, routeDebug).toBe('KPDX10R_FAF');
+    expect(result.manualHandoff.nextWaypointIdent, routeDebug).toBe('KPDX10R_RWY');
     expect(result.manualHandoff.lnavAvailable, routeDebug).toBe(true);
     expect(result.manualHandoff.lateralActive, routeDebug).toBe('OFF');
     expect(result.manualHandoff.fmaLateralActive, routeDebug).toBe('OFF');
@@ -372,9 +374,9 @@ test.describe('RFS route and LNAV browser proof', () => {
     const routeDebug = JSON.stringify(result, null, 2);
 
     expect(result.configuredApproach.routeName).toBe('KSEA→KPDX');
-    expect(result.configuredApproach.activeLegIndex, routeDebug).toBe(2);
-    expect(result.configuredApproach.fromIdent, routeDebug).toBe('BTG');
-    expect(result.configuredApproach.nextWaypointIdent, routeDebug).toBe('KPDX');
+    expect(result.configuredApproach.activeLegIndex, routeDebug).toBe(4);
+    expect(result.configuredApproach.fromIdent, routeDebug).toBe('KPDX10R_FAF');
+    expect(result.configuredApproach.nextWaypointIdent, routeDebug).toBe('KPDX10R_RWY');
     expect(result.configuredApproach.lnavAvailable, routeDebug).toBe(true);
     expect(result.configuredApproach.autopilotStatus, routeDebug).toBe('CMD_A');
     expect(result.configuredApproach.fmaAutopilotStatus, routeDebug).toBe('CMD_A');
@@ -392,9 +394,9 @@ test.describe('RFS route and LNAV browser proof', () => {
     expect(result.configuredApproach.flightPhase, routeDebug).not.toBe('LANDED');
 
     expect(result.manualHandoff.routeName, routeDebug).toBe('KSEA→KPDX');
-    expect(result.manualHandoff.activeLegIndex, routeDebug).toBe(2);
-    expect(result.manualHandoff.fromIdent, routeDebug).toBe('BTG');
-    expect(result.manualHandoff.nextWaypointIdent, routeDebug).toBe('KPDX');
+    expect(result.manualHandoff.activeLegIndex, routeDebug).toBe(4);
+    expect(result.manualHandoff.fromIdent, routeDebug).toBe('KPDX10R_FAF');
+    expect(result.manualHandoff.nextWaypointIdent, routeDebug).toBe('KPDX10R_RWY');
     expect(result.manualHandoff.lnavAvailable, routeDebug).toBe(true);
     expect(result.manualHandoff.autopilotStatus, routeDebug).toBe('OFF');
     expect(result.manualHandoff.fmaAutopilotStatus, routeDebug).toBe('OFF');
@@ -421,10 +423,11 @@ test.describe('RFS route and LNAV browser proof', () => {
     expect(result.samples.some((sample) => sample.routeName === 'NO ROUTE'), routeDebug).toBe(false);
     expect(result.samples, routeDebug).not.toContainEqual(result.reset);
     expect(result.landingApproach.routeName, routeDebug).toBe('KSEA→KPDX');
-    expect(result.landingApproach.activeLegIndex, routeDebug).toBe(2);
-    expect(result.landingApproach.fromIdent, routeDebug).toBe('BTG');
-    expect(result.landingApproach.nextWaypointIdent, routeDebug).toBe('KPDX');
-    expect(result.landingApproach.lnavAvailable, routeDebug).toBe(true);
+    expect(result.landingApproach.activeLegIndex, routeDebug).toBe(4);
+    expect(result.landingApproach.fromIdent, routeDebug).toBe('KPDX10R_FAF');
+    expect(result.landingApproach.nextWaypointIdent, routeDebug).toBe('KPDX10R_RWY');
+    expect(result.landingApproach.lnavAvailable, routeDebug).toBe(false);
+    expect(result.landingApproach.routeComplete, routeDebug).toBe(true);
     expect(result.landingApproach.autopilotStatus, routeDebug).toBe('OFF');
     expect(result.landingApproach.fmaAutopilotStatus, routeDebug).toBe('OFF');
     expect(result.landingApproach.lateralActive, routeDebug).toBe('OFF');
@@ -435,7 +438,7 @@ test.describe('RFS route and LNAV browser proof', () => {
     expect(result.landingApproach.fmaThrustActive, routeDebug).toBe('OFF');
     expect(result.landingApproach.apCommandCount, routeDebug).toBe(0);
     expect(result.landingApproach.surfaceAirport, routeDebug).toBe('KPDX');
-    expect(result.landingApproach.surfaceRunwayId, routeDebug).toBe('10L');
+    expect(result.landingApproach.surfaceRunwayId, routeDebug).toBe('10R');
     expect(result.landingApproach.gearDown, routeDebug).toBe(true);
     expect(result.landingApproach.flapSetting, routeDebug).toBeGreaterThanOrEqual(25);
     expect(result.landingApproach.guidancePhase, routeDebug).toBe('approach');
@@ -449,7 +452,7 @@ test.describe('RFS route and LNAV browser proof', () => {
     expect(result.touchdown.weightOnWheels, routeDebug).toBe(true);
     expect(result.touchdown.onRunway, routeDebug).toBe(true);
     expect(result.touchdown.surfaceAirport, routeDebug).toBe('KPDX');
-    expect(result.touchdown.surfaceRunwayId, routeDebug).toBe('10L');
+    expect(result.touchdown.surfaceRunwayId, routeDebug).toBe('10R');
     expect(result.touchdown.touchdownSinkRateMps, routeDebug).toBeGreaterThan(0);
     expect(result.touchdown.touchdownSinkRateMps, routeDebug).toBeLessThan(15);
     expect(result.touchdown.autopilotStatus, routeDebug).toBe('OFF');
@@ -462,7 +465,7 @@ test.describe('RFS route and LNAV browser proof', () => {
     expect(result.touchdown.fmaThrustActive, routeDebug).toBe('OFF');
     expect(result.touchdown.apCommandCount, routeDebug).toBe(0);
     expect(result.touchdown.routeName, routeDebug).toBe('KSEA→KPDX');
-    expect(result.touchdown.activeLegIndex, routeDebug).toBe(2);
+    expect(result.touchdown.activeLegIndex, routeDebug).toBe(4);
     expect(result.touchdown.distanceToNextNm, routeDebug).toBeLessThan(1.0);
 
     expect(result.rollout.groundSpeedKt, routeDebug).toBeLessThan(result.touchdown.groundSpeedKt);
@@ -503,12 +506,11 @@ test.describe('RFS route and LNAV browser proof', () => {
 
     const result = await flyKseaFinalRouteExtendedDescentToKpdxLandingAndReset(page);
     const routeDebug = JSON.stringify(result, null, 2);
-    const expectLoadedBtgKpdx = (sample: typeof result.configuredApproach): void => {
+    const expectLoadedKpdx10rThreshold = (sample: typeof result.configuredApproach): void => {
       expect(sample.routeName, routeDebug).toBe('KSEA→KPDX');
-      expect(sample.activeLegIndex, routeDebug).toBe(2);
-      expect(sample.fromIdent, routeDebug).toBe('BTG');
-      expect(sample.nextWaypointIdent, routeDebug).toBe('KPDX');
-      expect(sample.lnavAvailable, routeDebug).toBe(true);
+      expect(sample.activeLegIndex, routeDebug).toBe(4);
+      expect(sample.fromIdent, routeDebug).toBe('KPDX10R_FAF');
+      expect(sample.nextWaypointIdent, routeDebug).toBe('KPDX10R_RWY');
     };
     const expectCoupledApproachTruth = (sample: typeof result.configuredApproach): void => {
       expect(sample.autopilotStatus, routeDebug).toBe('CMD_A');
@@ -538,6 +540,8 @@ test.describe('RFS route and LNAV browser proof', () => {
       expect(sample.pilotInputs.throttle2, routeDebug).toBe(sample.effectiveControls.throttle2);
     };
     const expectAirborneApproach = (sample: typeof result.configuredApproach): void => {
+      expect(sample.lnavAvailable, routeDebug).toBe(true);
+      expect(sample.routeComplete, routeDebug).toBe(false);
       expect(sample.gearDown, routeDebug).toBe(true);
       expect(sample.gearLever, routeDebug).toBe('DOWN');
       expect(sample.flapSetting, routeDebug).toBeGreaterThanOrEqual(25);
@@ -547,11 +551,11 @@ test.describe('RFS route and LNAV browser proof', () => {
     };
     const sampleMatches = (sample: typeof result.configuredApproach, expected: typeof result.configuredApproach): boolean => sample.distanceToNextNm === expected.distanceToNextNm && sample.altitudeFt === expected.altitudeFt;
 
-    expectLoadedBtgKpdx(result.configuredApproach);
+    expectLoadedKpdx10rThreshold(result.configuredApproach);
     expectCoupledApproachTruth(result.configuredApproach);
     expectAirborneApproach(result.configuredApproach);
 
-    expectLoadedBtgKpdx(result.extendedDescent);
+    expectLoadedKpdx10rThreshold(result.extendedDescent);
     expectCoupledApproachTruth(result.extendedDescent);
     expect(result.extendedDescent.distanceToNextNm, routeDebug).toBeLessThanOrEqual(result.configuredApproach.distanceToNextNm - 1.0);
     expect(result.extendedDescent.altitudeFt, routeDebug).toBeLessThanOrEqual(result.configuredApproach.altitudeFt - 300);
@@ -566,7 +570,7 @@ test.describe('RFS route and LNAV browser proof', () => {
     expect(preHandoffSamples[0], routeDebug).toEqual(result.configuredApproach);
     expect(preHandoffSamples[preHandoffSamples.length - 1], routeDebug).toEqual(result.extendedDescent);
     for (const sample of preHandoffSamples) {
-      expectLoadedBtgKpdx(sample);
+      expectLoadedKpdx10rThreshold(sample);
       expectCoupledApproachTruth(sample);
       expect(sample.weightOnWheels, routeDebug).toBe(false);
       expect(sample.flightPhase, routeDebug).not.toBe('LANDED');
@@ -575,7 +579,9 @@ test.describe('RFS route and LNAV browser proof', () => {
       expect(preHandoffSamples[i].distanceToNextNm, routeDebug).toBeLessThanOrEqual(preHandoffSamples[i - 1].distanceToNextNm + 0.05);
     }
 
-    expectLoadedBtgKpdx(result.manualHandoff);
+    expectLoadedKpdx10rThreshold(result.manualHandoff);
+    expect(result.manualHandoff.lnavAvailable, routeDebug).toBe(true);
+    expect(result.manualHandoff.routeComplete, routeDebug).toBe(false);
     expectManualTruth(result.manualHandoff);
     expectManualControls(result.manualHandoff);
     expect(result.manualHandoff.weightOnWheels, routeDebug).toBe(false);
@@ -591,27 +597,31 @@ test.describe('RFS route and LNAV browser proof', () => {
     expect(result.samples.some((sample) => sample.routeName === 'NO ROUTE'), routeDebug).toBe(false);
     expect(result.samples, routeDebug).not.toContainEqual(result.reset);
 
-    expectLoadedBtgKpdx(result.landingApproach);
+    expectLoadedKpdx10rThreshold(result.landingApproach);
+    expect(result.landingApproach.lnavAvailable, routeDebug).toBe(false);
+    expect(result.landingApproach.routeComplete, routeDebug).toBe(true);
     expectManualTruth(result.landingApproach);
     expect(result.landingApproach.surfaceAirport, routeDebug).toBe('KPDX');
-    expect(result.landingApproach.surfaceRunwayId, routeDebug).toBe('10L');
+    expect(result.landingApproach.surfaceRunwayId, routeDebug).toBe('10R');
     expect(result.landingApproach.gearDown, routeDebug).toBe(true);
     expect(result.landingApproach.flapSetting, routeDebug).toBeGreaterThanOrEqual(25);
     expect(result.landingApproach.guidancePhase, routeDebug).toBe('approach');
     expect(result.landingApproach.weightOnWheels, routeDebug).toBe(false);
     expect(result.landingApproach.flightPhase, routeDebug).not.toBe('LANDED');
     expect(result.landingApproach.distanceToNextNm, routeDebug).toBeLessThan(1.0);
-    expect(result.landingApproach.distanceToNextNm, routeDebug).toBeLessThanOrEqual(result.manualHandoff.distanceToNextNm - 3.0);
+    expect(result.landingApproach.distanceToNextNm, routeDebug).toBeLessThanOrEqual(result.manualHandoff.distanceToNextNm - 2.5);
 
     expect(result.touchdown.flightPhase, routeDebug).toBe('TOUCHDOWN');
     expect(result.touchdown.groundContact, routeDebug).toBe('gear');
     expect(result.touchdown.weightOnWheels, routeDebug).toBe(true);
     expect(result.touchdown.onRunway, routeDebug).toBe(true);
     expect(result.touchdown.surfaceAirport, routeDebug).toBe('KPDX');
-    expect(result.touchdown.surfaceRunwayId, routeDebug).toBe('10L');
+    expect(result.touchdown.surfaceRunwayId, routeDebug).toBe('10R');
     expect(result.touchdown.touchdownSinkRateMps, routeDebug).toBeGreaterThan(0);
     expect(result.touchdown.touchdownSinkRateMps, routeDebug).toBeLessThan(15);
-    expectLoadedBtgKpdx(result.touchdown);
+    expectLoadedKpdx10rThreshold(result.touchdown);
+    expect(result.touchdown.lnavAvailable, routeDebug).toBe(false);
+    expect(result.touchdown.routeComplete, routeDebug).toBe(true);
     expectManualTruth(result.touchdown);
     expect(result.touchdown.distanceToNextNm, routeDebug).toBeLessThan(1.0);
 

@@ -41,6 +41,7 @@ export interface SimStore {
   fixedStepAccumulatorSeconds: number;
   simulationTimeSeconds: number;
   droppedSimulationTimeSeconds: number;
+  simRate: number;
   apState: AutopilotState | null;
   apControllerState: AutopilotControllerState;
   flightPlan: FlightPlan | null;
@@ -49,11 +50,14 @@ export interface SimStore {
   wind: WindInfo | null;
   selectedScenarioId: string;
   guidance: GuidanceState;
+  controlFeedbackMessage: string | null;
   scenarioPersistenceMessage: string | null;
   scenarioSaveSlots: ScenarioSaveSlotMetadata[];
   setInput: (partial: Partial<ControlInputs>) => void;
+  setTakeoffConfig: () => void;
   applyInputActions: (actions: InputActions, dt: number) => void;
   tick: (timestamp: number) => void;
+  cycleSimRate: () => void;
   start: () => void;
   startTakeoffRoll: () => void;
   abortTakeoff: () => void;
@@ -72,6 +76,19 @@ export interface SimStore {
 
 const FIXED_STEP_SECONDS = 1 / 60;
 const MAX_STEPS_PER_FRAME = 16;
+const MAX_ACCELERATED_FRAME_SECONDS = 1;
+const SIM_RATES = [1, 4, 16] as const;
+type SimRate = typeof SIM_RATES[number];
+
+function nextSimRate(current: number): SimRate {
+  const currentIndex = SIM_RATES.findIndex((rate) => rate === current);
+  return SIM_RATES[(currentIndex + 1) % SIM_RATES.length];
+}
+
+function maxStepsPerRenderedFrame(simRate: number): number {
+  if (simRate <= 1) return MAX_STEPS_PER_FRAME;
+  return Math.max(MAX_STEPS_PER_FRAME, Math.ceil(MAX_ACCELERATED_FRAME_SECONDS * Math.max(1, simRate) / FIXED_STEP_SECONDS));
+}
 
 export const useSimStore = create<SimStore>((set, get) => {
   const storeSet = set as SimStoreSet;
@@ -79,6 +96,8 @@ export const useSimStore = create<SimStore>((set, get) => {
   return {
     ...createAircraftSlice(storeSet),
     ...createInputSlice(storeSet),
+    simRate: 1,
+    cycleSimRate: () => set((state) => ({ simRate: nextSimRate(state.simRate) })),
 
     tick: (timestamp: number) => {
       const {
@@ -87,6 +106,7 @@ export const useSimStore = create<SimStore>((set, get) => {
         fixedStepAccumulatorSeconds,
         simulationTimeSeconds,
         droppedSimulationTimeSeconds,
+        simRate,
         aircraft,
         pilotInputs,
         spec,
@@ -104,15 +124,18 @@ export const useSimStore = create<SimStore>((set, get) => {
       const frameDeltaSeconds = lastFrameTime > 0
         ? Math.max(0, (timestamp - lastFrameTime) / 1000)
         : FIXED_STEP_SECONDS;
-      let accumulator = fixedStepAccumulatorSeconds + frameDeltaSeconds;
+      const scaledFrameDeltaSeconds = frameDeltaSeconds * Math.max(1, simRate);
+      let accumulator = fixedStepAccumulatorSeconds + scaledFrameDeltaSeconds;
       let stepCount = Math.floor(accumulator / FIXED_STEP_SECONDS);
       let droppedTime = droppedSimulationTimeSeconds;
 
-      if (stepCount > MAX_STEPS_PER_FRAME) {
-        const executableTime = MAX_STEPS_PER_FRAME * FIXED_STEP_SECONDS;
+      const maxStepsThisFrame = maxStepsPerRenderedFrame(simRate);
+
+      if (stepCount > maxStepsThisFrame) {
+        const executableTime = maxStepsThisFrame * FIXED_STEP_SECONDS;
         droppedTime += accumulator - executableTime;
         accumulator = executableTime;
-        stepCount = MAX_STEPS_PER_FRAME;
+        stepCount = maxStepsThisFrame;
       }
 
       if (stepCount <= 0) {

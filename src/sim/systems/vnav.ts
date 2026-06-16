@@ -21,8 +21,10 @@ export interface VnavOutput {
   altitudeConstraint: boolean;
   targetAltitudeSource?: VnavAltitudeTargetSource;
   captureTargetAltFt?: number;
-  /** Honest vertical mode implied by the current VNAV path lifecycle. */
+  /** Honest vertical mode implied by the current VNAV path lifecycle. Null means no active pitch command. */
   verticalMode: VerticalMode | null;
+  /** Armed-but-not-active vertical mode, e.g. pre-TOD VNAV before an actual path target is commandable. */
+  verticalArmedMode?: Extract<VerticalMode, 'VNAV'>;
   /** True only when the active/future route waypoint has an actionable VNAV altitude and/or speed target. */
   available: boolean;
   unavailableReason: string | null;
@@ -35,6 +37,10 @@ export interface VnavOutput {
   lifecycle: VnavLifecycle;
   targetWaypointIndex?: number;
   targetWaypointIdent?: string;
+  altitudeTargetWaypointIndex?: number;
+  altitudeTargetWaypointIdent?: string;
+  speedTargetWaypointIndex?: number;
+  speedTargetWaypointIdent?: string;
   distanceToConstraintNm?: number;
   todDistanceNm?: number;
   distanceToTodNm?: number;
@@ -130,7 +136,7 @@ function distanceToWaypointM(flightPlan: FlightPlan, nav: NavOutput, targetIndex
   return totalM;
 }
 
-function findVnavTarget(state: AircraftState, flightPlan: FlightPlan, nav: NavOutput): VnavTargetWaypoint | null {
+function findVnavAltitudeTarget(state: AircraftState, flightPlan: FlightPlan, nav: NavOutput): VnavTargetWaypoint | null {
   const activeIndex = activeWaypointIndexFor(flightPlan, nav);
   if (activeIndex === null) return null;
 
@@ -139,12 +145,29 @@ function findVnavTarget(state: AircraftState, flightPlan: FlightPlan, nav: NavOu
     if (waypoint.discontinuity) return null;
 
     const altitudeTarget = resolveAltitudeTarget(state.position.alt, waypoint.altitudeConstraint);
-    const speedTarget = resolveSpeedTarget(waypoint.speedConstraint);
-    if (altitudeTarget === undefined && speedTarget === undefined) continue;
+    if (altitudeTarget === undefined) continue;
 
     const distanceToTargetM = distanceToWaypointM(flightPlan, nav, index);
     if (distanceToTargetM === null) return null;
-    return { waypoint, index, distanceM: distanceToTargetM, altitudeTarget, speedTarget };
+    return { waypoint, index, distanceM: distanceToTargetM, altitudeTarget };
+  }
+  return null;
+}
+
+function findVnavSpeedTarget(flightPlan: FlightPlan, nav: NavOutput): VnavTargetWaypoint | null {
+  const activeIndex = activeWaypointIndexFor(flightPlan, nav);
+  if (activeIndex === null) return null;
+
+  for (let index = activeIndex; index < flightPlan.waypoints.length; index += 1) {
+    const waypoint = flightPlan.waypoints[index];
+    if (waypoint.discontinuity) return null;
+
+    const speedTarget = resolveSpeedTarget(waypoint.speedConstraint);
+    if (speedTarget === undefined) continue;
+
+    const distanceToTargetM = distanceToWaypointM(flightPlan, nav, index);
+    if (distanceToTargetM === null) return null;
+    return { waypoint, index, distanceM: distanceToTargetM, speedTarget };
   }
   return null;
 }
@@ -159,7 +182,8 @@ function requiredVerticalSpeedFpm(state: AircraftState, targetAltFt: number, dis
 
 function lifecycleForAltitudeTarget(state: AircraftState, targetAltFt: number, distanceToConstraintNm: number): {
   lifecycle: VnavLifecycle;
-  verticalMode: VerticalMode;
+  verticalMode: VerticalMode | null;
+  verticalArmedMode?: Extract<VerticalMode, 'VNAV'>;
   todDistanceNm: number;
   distanceToTodNm: number;
 } {
@@ -175,7 +199,7 @@ function lifecycleForAltitudeTarget(state: AircraftState, targetAltFt: number, d
     return { lifecycle: 'ALT_CAPTURE', verticalMode: 'ALT*', todDistanceNm, distanceToTodNm };
   }
   if (altitudeDeltaFt < 0 && distanceToTodNm > VNAV_TOD_CAPTURE_TOLERANCE_NM) {
-    return { lifecycle: 'ARMED', verticalMode: 'VNAV', todDistanceNm, distanceToTodNm };
+    return { lifecycle: 'ARMED', verticalMode: null, verticalArmedMode: 'VNAV', todDistanceNm, distanceToTodNm };
   }
   return { lifecycle: 'PATH', verticalMode: 'VNAV_PTH', todDistanceNm, distanceToTodNm };
 }
@@ -196,35 +220,43 @@ export function computeVNAV(
     return unavailable(state, 'route complete', 'COMPLETE');
   }
 
-  const target = findVnavTarget(state, flightPlan, nav);
-  if (!target) return unavailable(state, 'active or remaining route has no actionable VNAV altitude or speed constraint');
+  const altitudeTarget = findVnavAltitudeTarget(state, flightPlan, nav);
+  const speedTarget = findVnavSpeedTarget(flightPlan, nav);
+  if (!altitudeTarget && !speedTarget) return unavailable(state, 'active or remaining route has no actionable VNAV altitude or speed constraint');
 
-  const hasAltitudeTarget = target.altitudeTarget !== undefined;
-  const hasSpeedTarget = target.speedTarget !== undefined;
-  const distanceToConstraintNm = Math.max(0, target.distanceM / M_PER_NM);
+  const hasAltitudeTarget = altitudeTarget?.altitudeTarget !== undefined;
+  const hasSpeedTarget = speedTarget?.speedTarget !== undefined;
+  const targetForLegacyMetadata = altitudeTarget ?? speedTarget;
+  const distanceToConstraintNm = targetForLegacyMetadata ? Math.max(0, targetForLegacyMetadata.distanceM / M_PER_NM) : undefined;
+  const altitudeDistanceToConstraintNm = altitudeTarget ? Math.max(0, altitudeTarget.distanceM / M_PER_NM) : 0;
   const altitudeLifecycle = hasAltitudeTarget
-    ? lifecycleForAltitudeTarget(state, target.altitudeTarget as number, distanceToConstraintNm)
+    ? lifecycleForAltitudeTarget(state, altitudeTarget.altitudeTarget as number, altitudeDistanceToConstraintNm)
     : { lifecycle: 'SPEED_ONLY' as VnavLifecycle, verticalMode: null, todDistanceNm: 0, distanceToTodNm: 0 };
   const targetVs = hasAltitudeTarget && altitudeLifecycle.lifecycle !== 'ARMED'
-    ? requiredVerticalSpeedFpm(state, target.altitudeTarget as number, target.distanceM)
+    ? requiredVerticalSpeedFpm(state, altitudeTarget.altitudeTarget as number, altitudeTarget.distanceM)
     : 0;
 
   return {
-    targetAlt: target.altitudeTarget ?? state.position.alt,
+    targetAlt: altitudeTarget?.altitudeTarget ?? state.position.alt,
     targetVs,
     altitudeConstraint: hasAltitudeTarget,
     targetAltitudeSource: hasAltitudeTarget ? 'VNAV_CONSTRAINT' : undefined,
-    captureTargetAltFt: target.altitudeTarget,
+    captureTargetAltFt: altitudeTarget?.altitudeTarget,
     verticalMode: altitudeLifecycle.verticalMode,
+    verticalArmedMode: altitudeLifecycle.verticalArmedMode,
     available: true,
     unavailableReason: null,
     speedConstraint: hasSpeedTarget,
-    targetSpeedKt: target.speedTarget,
-    managedSpeedKt: target.speedTarget,
+    targetSpeedKt: speedTarget?.speedTarget,
+    managedSpeedKt: speedTarget?.speedTarget,
     managedSpeedSource: hasSpeedTarget ? 'VNAV_SPEED_CONSTRAINT' : undefined,
     lifecycle: altitudeLifecycle.lifecycle,
-    targetWaypointIndex: target.index,
-    targetWaypointIdent: target.waypoint.ident,
+    targetWaypointIndex: targetForLegacyMetadata?.index,
+    targetWaypointIdent: targetForLegacyMetadata?.waypoint.ident,
+    altitudeTargetWaypointIndex: altitudeTarget?.index,
+    altitudeTargetWaypointIdent: altitudeTarget?.waypoint.ident,
+    speedTargetWaypointIndex: speedTarget?.index,
+    speedTargetWaypointIdent: speedTarget?.waypoint.ident,
     distanceToConstraintNm,
     todDistanceNm: hasAltitudeTarget ? altitudeLifecycle.todDistanceNm : undefined,
     distanceToTodNm: hasAltitudeTarget ? altitudeLifecycle.distanceToTodNm : undefined,

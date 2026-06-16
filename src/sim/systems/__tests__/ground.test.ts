@@ -17,6 +17,8 @@ import { eulerToQuat } from '../../physics/quaternion';
 import { KSEA_RUNWAY_16L } from '../../../viewport/runwayData';
 import { sampleKseaSurface, sampleSupportedAirportSurface } from '../../runwaySurface';
 import { ktToMs } from '../../physics/units';
+import { findPerformanceCardForScenario } from '../../data/performance/b737PerformanceCards';
+import { KSEA_TUTORIAL_SCENARIO } from '../../scenarios';
 
 const DEG_TO_RAD = Math.PI / 180;
 
@@ -147,6 +149,34 @@ describe('applyGroundContact', () => {
     expect(nose?.normalForceN ?? 0).toBeLessThan(contact.normalForceN * 0.03);
     expect(mains.every((station) => station.weightOnWheel && station.normalForceN > 0)).toBe(true);
     expect(contact).toEqual(expect.objectContaining({ tailstrike: false }));
+  });
+
+  it('uses the FDM rotation threshold for main-gear pivot gating', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.position.alt = KSEA_RUNWAY_ALT_FT;
+    state.velocity.u = ktToMs(150);
+    state.attitude.theta = 8 * DEG_TO_RAD;
+    state.quaternion = eulerToQuat(state.attitude.phi, state.attitude.theta, state.attitude.psi);
+    state.config.gearDown = true;
+    const thresholdedGroundModel = {
+      ...B737_800_FDM.ground,
+      rotation: {
+        ...B737_800_FDM.ground.rotation,
+        minimumElevatorInputForLiftoff: -0.8,
+      },
+    };
+
+    const contact = applyGroundContact(
+      state,
+      { ...idle, elevator: -0.5 },
+      1 / 60,
+      KSEA_RUNWAY_ALT_FT,
+      { groundModel: thresholdedGroundModel },
+    );
+    const nose = contact.gearStations.find((station) => station.id === 'nose');
+
+    expect(state.attitude.theta).toBeLessThanOrEqual(3 * DEG_TO_RAD);
+    expect(nose?.normalForceN ?? 0).toBeGreaterThan(0);
   });
 
   it('touches main gear before the nose during a flare with the fuselage reference still above the runway plane', () => {
@@ -846,6 +876,25 @@ describe('applyGroundContact', () => {
     expect(forces.brakeForceN).toBeGreaterThan(forces.rollingFrictionForceN);
     expect(forces.brakeForceN).toBeLessThan(100_000 * (6 / 9.80665));
     expect(forces.accelerationMps2).toBeCloseTo(forces.retardingForceN / 10_000, 8);
+  });
+
+  it('computes rejected-takeoff braking from the scenario performance card without reverse acceleration', () => {
+    const card = findPerformanceCardForScenario(KSEA_TUTORIAL_SCENARIO.id);
+    const state = createInitialState(B737_800_SPEC);
+    state.position.alt = KSEA_RUNWAY_ALT_FT;
+    state.grossWeight = card.grossWeightKg;
+    state.velocity.u = ktToMs(card.rejectedTakeoff.decisionSpeedKt);
+    state.config.gearDown = true;
+    const loadedGearStations = createB737GearStations(state.grossWeight * 9.80665, true);
+    const reject: ControlInputs = { ...idle, brake: 1, spoilers: 1, gearLever: 'DOWN' };
+
+    const forces = computeGroundRollForces(state, reject, loadedGearStations);
+    applyGroundContact(state, reject, 1, KSEA_RUNWAY_ALT_FT, { normalForceN: state.grossWeight * 9.80665 });
+
+    expect(forces.retardingForceN).toBeGreaterThan(0);
+    expect(forces.accelerationMps2).toBeGreaterThan(0);
+    expect(state.velocity.u).toBeGreaterThanOrEqual(0);
+    expect(state.velocity.u).toBeLessThan(ktToMs(card.rejectedTakeoff.decisionSpeedKt));
   });
 
   it('uses side-specific brake controls to create yaw while rolling forward', () => {

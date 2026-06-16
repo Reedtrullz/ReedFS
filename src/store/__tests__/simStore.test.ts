@@ -5,8 +5,9 @@ import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
 import type { FlightPlan } from '@shared/types/fmc';
 import type { AutopilotCommands } from '../../sim/types';
 import { KSEA_RUNWAY_ALT_FT } from '../../sim/systems/ground';
-import { ENVA_TUTORIAL_SCENARIO, KSEA_LIGHT_PATTERN_SCENARIO, KSEA_TUTORIAL_SCENARIO, SCENARIOS } from '../../sim/scenarios';
+import { ENVA_TUTORIAL_SCENARIO, KPDX_10R_SHORT_FINAL_SCENARIO, KSEA_LIGHT_PATTERN_SCENARIO, KSEA_TUTORIAL_SCENARIO, SCENARIOS } from '../../sim/scenarios';
 import { createKseaKpdxFlight } from '../../sim/flightPlanLoader';
+import { computeDerived } from '../../sim/physics/derived';
 import {
   SCENARIO_SAVE_KEY,
   createScenarioSnapshot,
@@ -154,7 +155,7 @@ describe('useSimStore', () => {
 
   it('assembles stable domain slices while preserving the public compatibility API', () => {
     const state = useSimStore.getState();
-    for (const action of ['startTakeoffRoll', 'setInput', 'setApState', 'setFlightPlan', 'reset', 'tick'] as const) {
+    for (const action of ['startTakeoffRoll', 'setInput', 'setTakeoffConfig', 'setApState', 'setFlightPlan', 'reset', 'tick', 'cycleSimRate'] as const) {
       expect(typeof state[action]).toBe('function');
     }
 
@@ -164,6 +165,36 @@ describe('useSimStore', () => {
   });
 
   it('starts stopped', () => expect(useSimStore.getState().status).toBe('stopped'));
+
+  it('cycles visible simulator rate and reset returns it to 1x', () => {
+    const store = useSimStore.getState();
+
+    expect(store.simRate).toBe(1);
+    store.cycleSimRate();
+    expect(useSimStore.getState().simRate).toBe(4);
+    useSimStore.getState().cycleSimRate();
+    expect(useSimStore.getState().simRate).toBe(16);
+    useSimStore.getState().cycleSimRate();
+    expect(useSimStore.getState().simRate).toBe(1);
+    useSimStore.getState().cycleSimRate();
+    useSimStore.getState().reset();
+    expect(useSimStore.getState().simRate).toBe(1);
+  });
+
+  it('lets simulator-rate targets scale the per-frame catch-up budget', () => {
+    useSimStore.getState().cycleSimRate();
+    useSimStore.getState().cycleSimRate();
+    expect(useSimStore.getState().simRate).toBe(16);
+
+    useSimStore.getState().startTakeoffRoll();
+    useSimStore.getState().tick(1000);
+    useSimStore.getState().tick(1100);
+
+    const after = useSimStore.getState();
+    expect(after.simulationTimeSeconds).toBeGreaterThan(1.8);
+    expect(after.simulationTimeSeconds).toBeLessThan(1.9);
+    expect(after.droppedSimulationTimeSeconds).toBe(0);
+  });
 
   it('starts with unified scenario guidance derived from the initial aircraft and controls', () => {
     const state = useSimStore.getState();
@@ -184,6 +215,27 @@ describe('useSimStore', () => {
     useSimStore.getState().setScenario(ENVA_TUTORIAL_SCENARIO.id);
   });
 
+  it('starts the visible KPDX short-final scenario airborne instead of forcing a takeoff roll', () => {
+    useSimStore.getState().setScenario(KPDX_10R_SHORT_FINAL_SCENARIO.id);
+
+    const staged = useSimStore.getState();
+    expect(staged.aircraft.flightPhase).toBe('APPROACH');
+    expect(staged.aircraft.ground.weightOnWheels).toBe(false);
+    const stagedVerticalSpeedFpm = computeDerived(staged.aircraft, staged.wind).vs;
+    expect(stagedVerticalSpeedFpm).toBeGreaterThan(-750);
+    expect(stagedVerticalSpeedFpm).toBeLessThan(-650);
+    expect(staged.inputs.flapLever).toBe(30);
+    expect(staged.inputs.throttle1).toBeCloseTo(KPDX_10R_SHORT_FINAL_SCENARIO.initialAircraft?.throttle ?? 0, 6);
+
+    staged.startTakeoffRoll();
+
+    const started = useSimStore.getState();
+    expect(started.status).toBe('running');
+    expect(started.aircraft.flightPhase).toBe('APPROACH');
+    expect(started.aircraft.ground.weightOnWheels).toBe(false);
+    expect(started.inputs.gearLever).toBe('DOWN');
+    useSimStore.getState().setScenario(ENVA_TUTORIAL_SCENARIO.id);
+  });
   it('separates pilot inputs, AP commands, effective controls, and legacy inputs alias', () => {
     const state = useSimStore.getState();
 
@@ -196,6 +248,52 @@ describe('useSimStore', () => {
     expect(state.inputs).toBe(state.effectiveControls);
   });
   it('start → running', () => { useSimStore.getState().start(); expect(useSimStore.getState().status).toBe('running'); });
+
+  it('preserves configured takeoff flaps and trim when starting the roll', () => {
+    const store = useSimStore.getState();
+    store.setScenario('ksea-tutorial');
+    store.setInput({ flapLever: 5, throttle1: 0, throttle2: 0 });
+    store.startTakeoffRoll();
+    const next = useSimStore.getState();
+    expect(next.aircraft.flightPhase).toBe('TAKEOFF');
+    expect(next.inputs.flapLever).toBe(5);
+    expect(next.aircraft.config.stabilizerTrimUnits).toBeCloseTo(5.0, 1);
+  });
+
+  it('sets active scenario takeoff config without trim click loops', () => {
+    const store = useSimStore.getState();
+    store.setInput({ flapLever: 30, throttle1: 0.65, throttle2: 0.65, gearLever: 'DOWN' });
+    store.applyInputActions({ trimDelta: 1.2 }, 0);
+    useSimStore.getState().setApState(speedAutothrottleOnlyState());
+    useSimStore.setState((state) => {
+      const apCommands: AutopilotCommands = { throttle1: 0.8, throttle2: 0.8 };
+      const effectiveControls = { ...state.pilotInputs, ...apCommands };
+      return { apCommands, effectiveControls, inputs: effectiveControls };
+    });
+
+    useSimStore.getState().setTakeoffConfig();
+
+    const next = useSimStore.getState();
+    expect(next.inputs).toEqual(expect.objectContaining({
+      flapLever: ENVA_TUTORIAL_SCENARIO.flapSetting,
+      gearLever: 'DOWN',
+      throttle1: 0,
+      throttle2: 0,
+    }));
+    expect(next.pilotInputs).toEqual(expect.objectContaining({
+      flapLever: ENVA_TUTORIAL_SCENARIO.flapSetting,
+      gearLever: 'DOWN',
+      throttle1: 0,
+      throttle2: 0,
+    }));
+    expect(next.aircraft.config.stabilizerTrimUnits).toBe(ENVA_TUTORIAL_SCENARIO.stabilizerTrimUnits);
+    expect(next.inputManager.stabilizerTrimUnits).toBe(ENVA_TUTORIAL_SCENARIO.stabilizerTrimUnits);
+    expect(next.inputManager.throttle).toBe(0);
+    expect(next.apState).toBeNull();
+    expect(next.apCommands).toEqual({});
+    expect(next.inputs).toBe(next.effectiveControls);
+  });
+
   it('startTakeoffRoll sets inputs, running status, and TAKEOFF phase', () => {
     useSimStore.getState().startTakeoffRoll();
 
@@ -204,17 +302,21 @@ describe('useSimStore', () => {
     expect(state.inputs).toEqual(expect.objectContaining({
       throttle1: 0,
       throttle2: 0,
-      flapLever: 0,
+      flapLever: ENVA_TUTORIAL_SCENARIO.flapSetting,
       gearLever: 'DOWN',
       brake: 0,
       elevator: 0,
     }));
-    expect(state.pilotInputs).toEqual(expect.objectContaining({ throttle1: 0, throttle2: 0, elevator: 0 }));
+    expect(state.pilotInputs).toEqual(expect.objectContaining({
+      throttle1: 0,
+      throttle2: 0,
+      flapLever: ENVA_TUTORIAL_SCENARIO.flapSetting,
+      elevator: 0,
+    }));
+    expect(state.aircraft.config.stabilizerTrimUnits).toBe(ENVA_TUTORIAL_SCENARIO.stabilizerTrimUnits);
     expect(state.inputs).toBe(state.effectiveControls);
     expect(state.aircraft.flightPhase).toBe('TAKEOFF');
     expect(state.guidance.phase).toBe('takeoff-roll');
-    expect(state.guidance.coachMessage).toMatch(/set flaps 5/i);
-    expect(state.guidance.coachMessage).toMatch(/trim 5\.0/i);
     expect(state.guidance.coachMessage).toMatch(/takeoff thrust/i);
   });
 

@@ -18,6 +18,8 @@ export type GuidancePhase =
   | 'rejected-takeoff'
   | 'positive-rate'
   | 'climb'
+  | 'cruise'
+  | 'descent'
   | 'approach'
   | 'touchdown'
   | 'derotation'
@@ -80,7 +82,9 @@ export function deriveGuidancePhase(
     }
   }
 
-  if (aircraft.flightPhase === 'APPROACH' || aircraft.flightPhase === 'DESCENT') return 'approach';
+  if (aircraft.flightPhase === 'APPROACH') return 'approach';
+  if (aircraft.flightPhase === 'DESCENT') return 'descent';
+  if (aircraft.flightPhase === 'CRUISE') return 'cruise';
 
   const rejectedTakeoff = status === 'running'
     && aircraft.flightPhase === 'TAKEOFF'
@@ -114,6 +118,8 @@ function tutorialStepIndexForPhase(scenario: FlightScenario, phase: GuidancePhas
       case 'rotation':
       case 'positive-rate':
       case 'climb':
+      case 'cruise':
+      case 'descent':
       case 'approach':
       case 'touchdown':
       case 'derotation':

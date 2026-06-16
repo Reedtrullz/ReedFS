@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react';
 import { useSimStore } from '../store/simStore';
 import { THROTTLE_STEP, TRIM_STEP_UNITS } from '../input/keyboardControls';
+import { B737_FLAP_DETENTS } from '../input/flapDetents';
 
 const panelStyle: CSSProperties = {
   position: 'fixed',
@@ -61,20 +62,46 @@ const buttonStyle: CSSProperties = {
   padding: '7px 8px',
 };
 
+const feedbackStyle: CSSProperties = {
+  background: 'rgba(255, 183, 77, 0.16)',
+  border: '1px solid rgba(255, 183, 77, 0.78)',
+  borderRadius: 4,
+  color: '#ffdfad',
+  fontSize: 12,
+  fontWeight: 800,
+  lineHeight: 1.4,
+  marginTop: 10,
+  padding: '7px 8px',
+};
+
 function formatThrottlePercent(throttle1: number, throttle2: number): string {
   return `${Math.round(Math.max(throttle1, throttle2) * 100)}%`;
+}
+
+function previousB737FlapDetent(current: number): number {
+  let previous: number = B737_FLAP_DETENTS[0];
+  for (const detent of B737_FLAP_DETENTS) {
+    if (detent >= current) return previous;
+    previous = detent;
+  }
+  return previous;
 }
 
 export function TakeoffSetupPanel() {
   const inputs = useSimStore((s) => s.inputs);
   const stabilizerTrimUnits = useSimStore((s) => s.aircraft.config.stabilizerTrimUnits);
+  const setInput = useSimStore((s) => s.setInput);
+  const setTakeoffConfig = useSimStore((s) => s.setTakeoffConfig);
   const applyInputActions = useSimStore((s) => s.applyInputActions);
+  const controlFeedbackMessage = useSimStore((s) => s.controlFeedbackMessage);
+  const holdRotate = () => setInput({ elevator: -0.75 });
+  const neutralizeYoke = () => setInput({ elevator: 0 });
 
   return (
     <section aria-label="Takeoff setup" style={panelStyle}>
       <div style={titleStyle}>Takeoff setup</div>
       <div style={{ color: '#ffdfad', fontSize: 11, lineHeight: 1.4, marginTop: 5 }}>
-        Configure the B737 before pressing START ROLL.
+        Set flaps, trim, and throttle before or after START ROLL. START ROLL preserves the configured takeoff setup and clears brakes/AP.
       </div>
 
       <div aria-label="Current takeoff configuration" style={valuesStyle}>
@@ -84,18 +111,50 @@ export function TakeoffSetupPanel() {
         <div style={valueStyle}>Gear {inputs.gearLever}</div>
       </div>
 
+      {controlFeedbackMessage && (
+        <div aria-label="Control feedback" aria-live="polite" role="status" style={feedbackStyle}>
+          {controlFeedbackMessage}
+        </div>
+      )}
+
       <div aria-label="Takeoff setup controls" style={buttonsStyle}>
+        <button style={buttonStyle} type="button" onClick={() => setInput({ flapLever: previousB737FlapDetent(inputs.flapLever) })}>
+          Flaps Previous
+        </button>
         <button style={buttonStyle} type="button" onClick={() => applyInputActions({ flapNext: true }, 0)}>
           Flaps Next
         </button>
+        <button style={buttonStyle} type="button" onClick={() => applyInputActions({ trimDelta: -TRIM_STEP_UNITS }, 0)}>
+          Trim Nose Down
+        </button>
         <button style={buttonStyle} type="button" onClick={() => applyInputActions({ trimDelta: TRIM_STEP_UNITS }, 0)}>
           Trim Nose Up
+        </button>
+        <button style={buttonStyle} type="button" onClick={() => applyInputActions({ throttleDelta: -THROTTLE_STEP }, 0)}>
+          Throttle Down
         </button>
         <button style={buttonStyle} type="button" onClick={() => applyInputActions({ throttleDelta: THROTTLE_STEP }, 0)}>
           Throttle Up
         </button>
         <button style={buttonStyle} type="button" onClick={() => applyInputActions({ gearToggle: true }, 0)}>
           Gear
+        </button>
+        <button
+          style={buttonStyle}
+          type="button"
+          onBlur={neutralizeYoke}
+          onPointerCancel={neutralizeYoke}
+          onPointerDown={holdRotate}
+          onPointerLeave={neutralizeYoke}
+          onPointerUp={neutralizeYoke}
+        >
+          Hold Rotate
+        </button>
+        <button style={buttonStyle} type="button" onClick={neutralizeYoke}>
+          Yoke Neutral
+        </button>
+        <button style={buttonStyle} type="button" onClick={setTakeoffConfig}>
+          Set takeoff config
         </button>
       </div>
     </section>

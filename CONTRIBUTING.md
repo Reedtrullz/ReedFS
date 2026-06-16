@@ -29,11 +29,14 @@ source ~/.nvm/nvm.sh && nvm use 22
 npm run check
 ```
 
-For browser/player changes, also run the visual/e2e suite when practical:
+For browser/player changes, also run the browser and visual suites when practical:
 
 ```bash
+CI=1 npm run test:e2e
 CI=1 npm run test:visual
 ```
+
+The continuous full-flight black-box acceptance is intentionally kept out of the default CI browser gate because it is slow. Run `CI=1 npm run test:e2e:full-flight` only when you need exact-SHA evidence for a continuous full-flight claim, and report timeouts or failures as remaining work instead of claiming success.
 
 If Docker is part of the change, verify a local Docker build when a Docker daemon is available. If the daemon is unavailable, state that explicitly instead of claiming a Docker smoke pass.
 

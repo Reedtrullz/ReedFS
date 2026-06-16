@@ -100,6 +100,8 @@ export function RfsShell() {
   const pause = useSimStore((s) => s.pause);
   const resume = useSimStore((s) => s.resume);
   const reset = useSimStore((s) => s.reset);
+  const simRate = useSimStore((s) => s.simRate);
+  const cycleSimRate = useSimStore((s) => s.cycleSimRate);
   const status = useSimStore((s) => s.status);
   const selectedScenarioId = useSimStore((s) => s.selectedScenarioId);
   const setInput = useSimStore((s) => s.setInput);
@@ -243,8 +245,11 @@ export function RfsShell() {
       setRouteLoadMessage(`No default route is available for ${scenario.name}.`);
       return;
     }
+    const routeGuidance = store.status === 'stopped'
+      ? `confirm flaps ${scenario.flapSetting}, trim ${scenario.stabilizerTrimUnits.toFixed(1)}, idle throttle, then START ROLL.`
+      : 'route guidance is active; use visible MCP LNAV, altitude, and VS/VNAV controls for climb/descent management.';
     setRouteLoadMessage(
-      `${fp.origin}→${fp.destination} route loaded. Takeoff setup reminder: confirm flaps for takeoff, set takeoff trim, keep throttle idle until ready, then press START ROLL.`,
+      `CANNED TRAINING ROUTE ${fp.origin}→${fp.destination} loaded. Route editing is unavailable; synthetic approach fixes are not official procedure data; ${routeGuidance}`,
     );
   };
 
@@ -330,12 +335,12 @@ export function RfsShell() {
         </>
       ) : null}
       debugPanels={showDebugOverlays ? (
-        <Suspense fallback={null}>
-          <Telemetry />
-          <ControlsHelp />
-          <ControlsSettings />
-          <AttitudeIndicator />
-        </Suspense>
+        <>
+          <div data-rfs-debug-panel="telemetry"><Suspense fallback={null}><Telemetry /></Suspense></div>
+          <div data-rfs-debug-panel="help"><Suspense fallback={null}><ControlsHelp /></Suspense></div>
+          <div data-rfs-debug-panel="settings"><Suspense fallback={null}><ControlsSettings /></Suspense></div>
+          <div data-rfs-debug-panel="attitude"><Suspense fallback={null}><AttitudeIndicator /></Suspense></div>
+        </>
       ) : null}
       flightInstruments={showFlightInstruments ? (
         <Suspense fallback={null}>
@@ -364,7 +369,9 @@ export function RfsShell() {
             overlayMode={overlayMode}
             audioEnabled={audioEnabled}
             audioStatus={audioStatus}
+            simRate={simRate}
             routeLoadMessage={routeLoadMessage}
+            onCycleSimRate={cycleSimRate}
             onStartRoll={startTakeoffRoll}
             onAbortTakeoff={abortTakeoff}
             onPause={pause}

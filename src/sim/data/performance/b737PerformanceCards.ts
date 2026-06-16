@@ -95,14 +95,23 @@ export interface B737LandingPerformanceEnvelope {
   ownership: B737PerformanceDataOwnership;
 }
 
+export interface B737RejectedTakeoffPerformanceEnvelope {
+  decisionSpeedKt: number;
+  lowSpeedDistanceM: [number, number];
+  targetLowSpeedKt: number;
+  ownership: B737PerformanceDataOwnership;
+}
+
 export interface B737TakeoffPerformanceCard {
   scenarioId: string;
+  airport: FlightScenario['runway']['airport'];
   runway: string;
   grossWeightKg: number;
   flapSetting: number;
   stabilizerTrimUnits: number;
   assumedTemperatureC: number | null;
   vSpeeds: B737VSpeeds;
+  rejectedTakeoff: B737RejectedTakeoffPerformanceEnvelope;
   cleanClimb: B737CleanClimbEnvelope;
   approach: B737ApproachEnvelope;
   landing: B737LandingPerformanceEnvelope;
@@ -133,6 +142,30 @@ const landingPerformanceOwnership: B737PerformanceDataOwnership = {
   ],
   sourceNote: 'RFS gameplay landing envelope card for automated acceptance only; broad placeholder bounds, not a certified Boeing AFM table.',
 };
+
+const rejectedTakeoffOwnership: B737PerformanceDataOwnership = {
+  label: 'runtime-rejected-takeoff-and-performance-test-card',
+  runtimeConsumers: [],
+  testConsumers: [
+    'src/sim/data/__tests__/performanceCards.test.ts',
+    'src/sim/physics/__tests__/integrate.test.ts',
+    'src/sim/systems/__tests__/ground.test.ts',
+  ],
+  sourceNote: 'RFS gameplay rejected-takeoff envelope card for automated acceptance only; broad placeholder bounds, not a certified Boeing AFM table.',
+};
+
+function rejectedTakeoffPerformanceEnvelope(options: {
+  decisionSpeedKt: number;
+  lowSpeedDistanceM?: [number, number];
+  targetLowSpeedKt?: number;
+}): B737RejectedTakeoffPerformanceEnvelope {
+  return {
+    decisionSpeedKt: options.decisionSpeedKt,
+    lowSpeedDistanceM: options.lowSpeedDistanceM ?? [250, 1_500],
+    targetLowSpeedKt: options.targetLowSpeedKt ?? 6,
+    ownership: rejectedTakeoffOwnership,
+  };
+}
 
 function landingPerformanceEnvelope(options: {
   vrefKt: number;
@@ -334,12 +367,14 @@ export const b737EngineLapseFixtures: B737EngineLapseFixture[] = [
 export const b737PerformanceCards: B737TakeoffPerformanceCard[] = [
   {
     scenarioId: 'enva-tutorial',
+    airport: 'ENVA',
     runway: '09',
     grossWeightKg: 61_913,
     flapSetting: 5,
     stabilizerTrimUnits: 5.0,
     assumedTemperatureC: null,
     vSpeeds: { v1Kt: 141, vrKt: 149, v2Kt: 155 },
+    rejectedTakeoff: rejectedTakeoffPerformanceEnvelope({ decisionSpeedKt: 141 }),
     cleanClimb: {
       altitudeFt: 10_000,
       iasKt: 250,
@@ -365,7 +400,7 @@ export const b737PerformanceCards: B737TakeoffPerformanceCard[] = [
       runtimeConsumers: ['src/sim/takeoffCue.ts', 'src/instruments/RfsPFD.tsx'],
       testConsumers: [
         'src/sim/data/__tests__/performanceCards.test.ts',
-        'src/sim/physics/__tests__/performanceCards.test.ts',
+        'src/sim/physics/__tests__/integrate.test.ts',
       ],
       sourceNote: 'RFS gameplay baseline card; broad envelope guard, not a certified Boeing AFM table.',
     },
@@ -375,12 +410,14 @@ export const b737PerformanceCards: B737TakeoffPerformanceCard[] = [
   },
   {
     scenarioId: 'ksea-tutorial',
+    airport: 'KSEA',
     runway: '16L',
     grossWeightKg: 61_913,
     flapSetting: 5,
     stabilizerTrimUnits: 5.0,
     assumedTemperatureC: null,
     vSpeeds: { v1Kt: 141, vrKt: 149, v2Kt: 155 },
+    rejectedTakeoff: rejectedTakeoffPerformanceEnvelope({ decisionSpeedKt: 141 }),
     cleanClimb: {
       altitudeFt: 10_000,
       iasKt: 250,
@@ -406,7 +443,7 @@ export const b737PerformanceCards: B737TakeoffPerformanceCard[] = [
       runtimeConsumers: ['src/sim/takeoffCue.ts', 'src/instruments/RfsPFD.tsx'],
       testConsumers: [
         'src/sim/data/__tests__/performanceCards.test.ts',
-        'src/sim/physics/__tests__/performanceCards.test.ts',
+        'src/sim/physics/__tests__/integrate.test.ts',
       ],
       sourceNote: 'RFS gameplay baseline card; broad envelope guard, not a certified Boeing AFM table.',
     },
@@ -416,12 +453,14 @@ export const b737PerformanceCards: B737TakeoffPerformanceCard[] = [
   },
   {
     scenarioId: 'ksea-light-pattern',
+    airport: 'KSEA',
     runway: '16L',
     grossWeightKg: 50_413,
     flapSetting: 5,
     stabilizerTrimUnits: 4.5,
     assumedTemperatureC: null,
     vSpeeds: { v1Kt: 129, vrKt: 137, v2Kt: 145 },
+    rejectedTakeoff: rejectedTakeoffPerformanceEnvelope({ decisionSpeedKt: 129, lowSpeedDistanceM: [200, 1_300] }),
     cleanClimb: {
       altitudeFt: 10_000,
       iasKt: 250,
@@ -447,7 +486,7 @@ export const b737PerformanceCards: B737TakeoffPerformanceCard[] = [
       runtimeConsumers: ['src/sim/takeoffCue.ts', 'src/instruments/RfsPFD.tsx'],
       testConsumers: [
         'src/sim/data/__tests__/performanceCards.test.ts',
-        'src/sim/physics/__tests__/performanceCards.test.ts',
+        'src/sim/physics/__tests__/integrate.test.ts',
       ],
       sourceNote: 'RFS gameplay baseline card; broad envelope guard, not a certified Boeing AFM table.',
     },
@@ -457,12 +496,14 @@ export const b737PerformanceCards: B737TakeoffPerformanceCard[] = [
   },
   {
     scenarioId: 'kpdx-tutorial',
+    airport: 'KPDX',
     runway: '10R',
     grossWeightKg: 58_413,
     flapSetting: 5,
     stabilizerTrimUnits: 4.8,
     assumedTemperatureC: null,
     vSpeeds: { v1Kt: 137, vrKt: 145, v2Kt: 152 },
+    rejectedTakeoff: rejectedTakeoffPerformanceEnvelope({ decisionSpeedKt: 137, lowSpeedDistanceM: [250, 1_450] }),
     cleanClimb: {
       altitudeFt: 10_000,
       iasKt: 250,
@@ -488,7 +529,7 @@ export const b737PerformanceCards: B737TakeoffPerformanceCard[] = [
       runtimeConsumers: ['src/sim/takeoffCue.ts', 'src/instruments/RfsPFD.tsx'],
       testConsumers: [
         'src/sim/data/__tests__/performanceCards.test.ts',
-        'src/sim/physics/__tests__/performanceCards.test.ts',
+        'src/sim/physics/__tests__/integrate.test.ts',
       ],
       sourceNote: 'RFS gameplay baseline card for the KPDX tutorial scenario; broad envelope guard, not a certified Boeing AFM table.',
     },
@@ -522,6 +563,7 @@ export function assertPerformanceCardMatchesScenario(
   scenario: FlightScenario,
 ): void {
   assertEqual(card.scenarioId, scenario.id, 'scenario id');
+  assertEqual(card.airport, scenario.runway.airport, 'airport');
   assertEqual(card.runway, scenario.runway.runway, 'runway');
   assertEqual(card.grossWeightKg, scenario.grossWeightKg, 'gross weight');
   assertEqual(card.flapSetting, scenario.flapSetting, 'flap setting');

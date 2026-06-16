@@ -41,6 +41,7 @@ export function createAircraftSlice(set: SimStoreSet): Pick<
   | 'wind'
   | 'selectedScenarioId'
   | 'guidance'
+  | 'controlFeedbackMessage'
   | 'scenarioPersistenceMessage'
   | 'scenarioSaveSlots'
   | 'start'
@@ -82,6 +83,7 @@ export function createAircraftSlice(set: SimStoreSet): Pick<
     wind: cloneWind(ENVA_TUTORIAL_SCENARIO.wind),
     selectedScenarioId: ENVA_TUTORIAL_SCENARIO.id,
     guidance: initialGuidance,
+    controlFeedbackMessage: null,
     scenarioPersistenceMessage: null,
     scenarioSaveSlots: [],
 
@@ -91,21 +93,19 @@ export function createAircraftSlice(set: SimStoreSet): Pick<
         status: 'running',
         lastFrameTime: 0,
         fixedStepAccumulatorSeconds: 0,
+        controlFeedbackMessage: null,
         guidance: syncGuidanceState(s.guidance, scenario, 'running', s.aircraft, s.effectiveControls),
       };
     }),
 
     startTakeoffRoll: () => set((s) => {
       const aircraft = structuredClone(s.aircraft);
-      aircraft.flightPhase = 'TAKEOFF';
-      aircraft.config.flapSetting = 0;
-      aircraft.config.stabilizerTrimUnits = 0;
+      const scenario = scenarioById(s.selectedScenarioId);
+      const startsAirborne = !aircraft.ground.weightOnWheels && aircraft.flightPhase !== 'PARKED';
+      if (!startsAirborne) aircraft.flightPhase = 'TAKEOFF';
       const pilotInputs: ControlInputs = {
         ...s.pilotInputs,
-        throttle1: 0,
-        throttle2: 0,
-        flapLever: 0,
-        gearLever: 'DOWN',
+        gearLever: startsAirborne ? s.pilotInputs.gearLever : 'DOWN',
         brake: 0,
         leftBrake: 0,
         rightBrake: 0,
@@ -113,13 +113,12 @@ export function createAircraftSlice(set: SimStoreSet): Pick<
       };
       const apControllerState = createAutopilotControllerState();
       const controlsSlice = composeControlsSlice(pilotInputs);
-      const scenario = scenarioById(s.selectedScenarioId);
       return {
         aircraft,
         ...controlsSlice,
         inputManager: createInputManagerState({
           ...pilotInputs,
-          stabilizerTrimUnits: 0,
+          stabilizerTrimUnits: aircraft.config.stabilizerTrimUnits,
         }),
         apState: null,
         apControllerState,
@@ -128,6 +127,7 @@ export function createAircraftSlice(set: SimStoreSet): Pick<
         fixedStepAccumulatorSeconds: 0,
         simulationTimeSeconds: 0,
         droppedSimulationTimeSeconds: 0,
+        controlFeedbackMessage: null,
         guidance: syncGuidanceState(s.guidance, scenario, 'running', aircraft, controlsSlice.effectiveControls),
       };
     }),
@@ -162,6 +162,7 @@ export function createAircraftSlice(set: SimStoreSet): Pick<
         status: 'running',
         lastFrameTime: 0,
         fixedStepAccumulatorSeconds: 0,
+        controlFeedbackMessage: null,
         guidance: syncGuidanceState(s.guidance, scenario, 'running', aircraft, controlsSlice.effectiveControls),
       };
     }),
@@ -180,6 +181,7 @@ export function createAircraftSlice(set: SimStoreSet): Pick<
         status: 'running',
         lastFrameTime: 0,
         fixedStepAccumulatorSeconds: 0,
+        controlFeedbackMessage: null,
         guidance: syncGuidanceState(s.guidance, scenario, 'running', s.aircraft, s.effectiveControls),
       };
     }),
@@ -199,12 +201,14 @@ export function createAircraftSlice(set: SimStoreSet): Pick<
         fixedStepAccumulatorSeconds: 0,
         simulationTimeSeconds: 0,
         droppedSimulationTimeSeconds: 0,
+        simRate: 1,
         apState: null,
         apControllerState,
         flightPlan: null,
         activeLegIndex: null,
         routeStatus: createNoRouteStatus(),
         wind: cloneWind(scenario.wind),
+        controlFeedbackMessage: null,
         guidance: buildGuidanceState({
           scenario,
           status: 'stopped',
@@ -236,6 +240,7 @@ export function createAircraftSlice(set: SimStoreSet): Pick<
         activeLegIndex: null,
         routeStatus: createNoRouteStatus(),
         wind: cloneWind(scenario.wind),
+        controlFeedbackMessage: null,
         guidance: buildGuidanceState({
           scenario,
           status: 'stopped',

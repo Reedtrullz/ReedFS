@@ -152,6 +152,79 @@ describe('computeAutopilotCommandsForState effective truth gating', () => {
     expect(commands.throttle2).toBeUndefined();
   });
 
+  it('does not command elevator for lateral-only CMD_A with PITCH OFF', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.position.alt = 5000;
+    s.velocity.u = 128.6;
+    const ap = makeAp('LNAV', 'OFF', 'SPEED');
+    ap.boeing.lnav = true;
+    ap.boeing.speedMode = true;
+    ap.boeing.autothrottleArm = true;
+    const flightPlan = routeWithFutureDescentConstraint();
+    const routeStatus = routeStatusBeforeTod();
+
+    const commands = computeAutopilotCommandsForState(s, ap, flightPlan, 1 / 60, 0, routeStatus);
+
+    expect(commands.aileron).toBeDefined();
+    expect(commands.elevator).toBeUndefined();
+    expect(commands.throttle1).toBeDefined();
+    expect(commands.throttle2).toBe(commands.throttle1);
+  });
+
+  it('commands pitch capture instead of ALT_HOLD while descending below selected altitude', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.position.alt = 9_650;
+    s.velocity.u = 128.6;
+    s.velocity.w = 12;
+    const ap = makeAp('HDG_SEL', 'ALT_HOLD', 'SPEED');
+    ap.boeing.hdgSel = true;
+    ap.boeing.altHold = true;
+    ap.boeing.altitude = 10_000;
+    ap.boeing.speedMode = true;
+    ap.boeing.autothrottleArm = true;
+
+    const truth = deriveEffectiveAutoflightTruth(ap, { aircraft: s, flightPlan: null, routeStatus: createNoRouteStatus() });
+    const commands = computeAutopilotCommandsForState(s, ap, null, 1 / 60, null, createNoRouteStatus());
+
+    expect(truth.verticalActive).toBe('ALT*');
+    expect(commands.elevator).toBeLessThan(0);
+  });
+
+  it('reduces SPEED thrust floor and commands nose down for a selected VS descent', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.flightPhase = 'DESCENT';
+    s.position.alt = 21_500;
+    s.velocity.u = 250;
+    s.velocity.w = -2;
+    s.ground = { ...s.ground, weightOnWheels: false, contact: 'none', onRunway: false, aglFt: 21_500, normalForceN: 0 };
+    const ap = makeAp('HDG_SEL', 'VS', 'SPEED');
+    ap.boeing.hdgSel = true;
+    ap.boeing.vs = true;
+    ap.boeing.verticalSpeed = -1500;
+    ap.boeing.speedMode = true;
+    ap.boeing.autothrottleArm = true;
+    const controller = createAutopilotControllerState();
+    controller.throttleLimited = 0.5;
+    expect(computeDerived(s).ias).toBeGreaterThan(280);
+
+    const { commands } = computeAutopilotCommandsWithControllerState(
+      s,
+      ap,
+      s.attitude.psi,
+      2_000,
+      240,
+      1,
+      -1500,
+      undefined,
+      null,
+      controller,
+    );
+
+    expect(commands.elevator).toBeGreaterThan(0);
+    expect(commands.throttle1).toBeLessThanOrEqual(0.25);
+    expect(commands.throttle2).toBe(commands.throttle1);
+  });
+
   it('keeps VNAV armed before TOD without commanding pitch or falling back to MCP altitude', () => {
     const s = createInitialState(B737_800_SPEC);
     s.position.alt = 30000;
@@ -168,7 +241,8 @@ describe('computeAutopilotCommandsForState effective truth gating', () => {
     const truth = deriveEffectiveAutoflightTruth(ap, { aircraft: s, flightPlan, routeStatus });
     const commands = computeAutopilotCommandsForState(s, ap, flightPlan, 1 / 60, 0, routeStatus);
 
-    expect(truth.verticalActive).toBe('VNAV');
+    expect(truth.verticalActive).toBe('OFF');
+    expect(truth.verticalArmed).toBe('VNAV');
     expect(commands.elevator).toBeUndefined();
   });
 
@@ -746,7 +820,7 @@ describe('resolveAutopilotTargets LNAV', () => {
     expect(targets.targetHeadingRad).toBeCloseTo(Math.PI / 2, 1);
   });
 
-  it('keeps current heading when route status marks LNAV unavailable for a discontinuity', () => {
+  it('keeps current heading when route status marks LNAV unavailable at a discontinuity boundary', () => {
     const s = createInitialState(B737_800_SPEC);
     s.position.lat = 47.1;
     s.position.lon = -122.0;
@@ -756,15 +830,16 @@ describe('resolveAutopilotTargets LNAV', () => {
       origin: 'ORIG',
       destination: 'DEST',
       flightNumber: 'TST456',
-      route: 'ORIG DISCO DEST',
+      route: 'ORIG MID DISCO DEST',
       waypoints: [
         { ident: 'ORIG', lat: 47.0, lon: -122.0, discontinuity: false },
+        { ident: 'MID', lat: 47.1, lon: -122.0, discontinuity: false },
         { ident: 'DISCO', discontinuity: true },
         { ident: 'DEST', lat: 47.1, lon: -121.9, discontinuity: false },
       ],
     };
 
-    const targets = resolveAutopilotTargets(s, ap, fp, 1);
+    const targets = resolveAutopilotTargets(s, ap, fp, 0);
 
     expect(targets.targetHeadingRad).toBeCloseTo(s.attitude.psi, 12);
   });

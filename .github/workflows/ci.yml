@@ -48,6 +48,7 @@ jobs:
       - run: npm ci --legacy-peer-deps
       - run: npm run check:deps
       - run: npm run check:release
+      - run: npm run check:blackbox
       - run: npm run lint:ci
       - run: npm run typecheck
       - run: npm run test
@@ -58,6 +59,7 @@ jobs:
       - run: npm run check:bundle
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
       - run: npm run test:visual
 
   docker-smoke:

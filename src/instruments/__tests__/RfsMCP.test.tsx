@@ -72,6 +72,32 @@ describe('RfsMCP', () => {
     expect(screen.getByRole('button', { name: 'FD L' }).getAttribute('aria-pressed')).toBe('true');
   });
 
+  it('labels Flight Director switch-only state as non-commanding until a supported mode is selected', () => {
+    setAirborneRuntime();
+    render(
+      <>
+        <RfsMCP />
+        <RfsPFD />
+      </>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'FD L' }));
+
+    expect(screen.getByText('FD guidance unavailable until supported mode selected')).toBeTruthy();
+    expect(screen.queryByLabelText('Flight director roll bar')).toBeNull();
+    expect(screen.queryByLabelText('Flight director pitch bar')).toBeNull();
+    const fdOnlyAp = useSimStore.getState().apState;
+    expect(fdOnlyAp?.boeing.cmdA).toBe(false);
+    expect(fdOnlyAp?.truth.autopilotStatus).toBe('OFF');
+    expect(fdOnlyAp?.truth.lateralActive).toBe('OFF');
+    expect(fdOnlyAp?.truth.verticalActive).toBe('OFF');
+
+    fireEvent.click(screen.getByRole('button', { name: 'HDG' }));
+
+    expect(screen.queryByText('FD guidance unavailable until supported mode selected')).toBeNull();
+    expect(screen.getByLabelText('Flight director roll bar')).toBeTruthy();
+  });
+
   it('marks parked MCP mode buttons unavailable with visible reasons and no active truth', () => {
     render(<RfsMCP />);
 
@@ -88,6 +114,77 @@ describe('RfsMCP', () => {
 
     const ap = useSimStore.getState().apState;
     expect(ap).toBeNull();
+  });
+
+  it('allows takeoff N1 while keeping AP lateral and vertical modes unavailable on the roll', () => {
+    useSimStore.getState().startTakeoffRoll();
+    render(<RfsMCP />);
+
+    const n1 = screen.getByRole('button', { name: 'N1' });
+    expect(n1).toHaveAttribute('aria-disabled', 'false');
+    expect(n1).not.toHaveProperty('disabled', true);
+    for (const name of ['LNAV', 'ALT', 'VS']) {
+      const button = screen.getByRole('button', { name });
+      expect(button).toHaveAttribute('aria-disabled', 'true');
+      expect(button.getAttribute('title')).toMatch(/airborne|route|unavailable/i);
+    }
+
+    fireEvent.click(n1);
+
+    const ap = useSimStore.getState().apState;
+    expect(ap?.truth.autopilotStatus).toBe('OFF');
+    expect(ap?.truth.lateralActive).toBe('OFF');
+    expect(ap?.truth.verticalActive).toBe('OFF');
+    expect(ap?.truth.thrustActive).toBe('N1');
+    expect(ap?.boeing.cmdA).toBe(false);
+    expect(ap?.boeing.autothrottleArm).toBe(true);
+    expect(ap?.boeing.n1).toBe(true);
+  });
+
+  it('labels CMD_A LNAV/SPEED with PITCH OFF as lateral-only on the MCP', () => {
+    setVnavBackedKseaRoute();
+    const ap = createDefaultAutopilotState();
+    ap.truth.autopilotStatus = 'CMD_A';
+    ap.truth.lateralActive = 'LNAV';
+    ap.truth.verticalActive = 'OFF';
+    ap.truth.thrustActive = 'SPEED';
+    ap.boeing.cmdA = true;
+    ap.boeing.lnav = true;
+    ap.boeing.speedMode = true;
+    ap.boeing.vnav = false;
+    ap.boeing.altHold = false;
+    ap.boeing.vs = false;
+    useSimStore.getState().setApState(ap);
+
+    render(<RfsMCP />);
+
+    expect(screen.getByRole('status', { name: 'Autopilot authority warning' })).toHaveTextContent(
+      'AP lateral only — no pitch authority',
+    );
+  });
+
+  it('keeps unsupported LOC/APP/G_S/LVL_CHG controls unavailable with a visible reason', () => {
+    setAirborneRuntime();
+    const ap = createDefaultAutopilotState();
+    ap.truth.autopilotStatus = 'CMD_A';
+    ap.truth.lateralActive = 'LOC';
+    ap.truth.verticalActive = 'G_S';
+    ap.boeing.cmdA = true;
+    ap.boeing.vorLoc = true;
+    ap.boeing.app = true;
+    ap.boeing.lvlChg = true;
+    useSimStore.getState().setApState(ap);
+
+    render(<RfsMCP />);
+
+    expect(screen.getByRole('status', { name: 'Unsupported MCP mode warning' })).toHaveTextContent(
+      'LOC/APP/G/S/LVL CHG unavailable — guidance targets not implemented',
+    );
+    for (const unsupportedButton of ['LOC', 'APP', 'G/S', 'LVL CHG']) {
+      expect(screen.queryByRole('button', { name: unsupportedButton })).toBeNull();
+    }
+    expect(screen.getByRole('button', { name: 'HDG' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: 'ALT' })).toHaveAttribute('aria-pressed', 'false');
   });
 
   it('toggles FD switches independently without clearing active MCP modes', () => {
@@ -136,12 +233,18 @@ describe('RfsMCP', () => {
 
   it('first SPD click creates A/T-only state and honestly engages SPEED without CMD A', () => {
     setAirborneRuntime();
+    const aircraft = structuredClone(useSimStore.getState().aircraft);
+    aircraft.velocity = { u: ktToMs(149), v: 0, w: 0 };
+    useSimStore.setState({ aircraft, wind: null });
+    const expectedSpeed = Math.round(Math.max(0, computeDerived(aircraft).ias));
     render(
       <>
         <RfsMCP />
         <RfsPFD />
       </>,
     );
+
+    expect(screen.getByText(`SPD ${expectedSpeed}`)).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: 'SPD' }));
 
@@ -151,6 +254,7 @@ describe('RfsMCP', () => {
     expect(ap?.boeing.cmdA).toBe(false);
     expect(ap?.truth.thrustActive).toBe('SPEED');
     expect(ap?.boeing.speedMode).toBe(true);
+    expect(ap?.boeing.speed).toBe(expectedSpeed);
     expect(screen.getByText('SPEED')).toBeTruthy();
   });
 
@@ -240,6 +344,31 @@ describe('RfsMCP', () => {
     expect(screen.getByText(`SPD ${expectedSpeed + 5}`)).toBeTruthy();
   });
 
+  it('shows route managed speed until the player edits selected speed intervention', () => {
+    setVnavBackedKseaRoute();
+    const ap = createDefaultAutopilotState();
+    ap.truth.autopilotStatus = 'CMD_A';
+    ap.truth.lateralActive = 'LNAV';
+    ap.truth.verticalActive = 'VNAV';
+    ap.truth.thrustActive = 'SPEED';
+    ap.boeing.cmdA = true;
+    ap.boeing.lnav = true;
+    ap.boeing.vnav = true;
+    ap.boeing.speedMode = true;
+    ap.boeing.speed = null;
+    useSimStore.getState().setApState(ap);
+
+    render(<RfsMCP />);
+
+    expect(screen.getByText('MAN SPD 280')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'SPD +5' }));
+
+    const edited = useSimStore.getState().apState;
+    expect(edited?.boeing.speed).toBe(285);
+    expect(screen.getByText('SPD 285')).toBeTruthy();
+  });
+
   it('edits selected MCP heading altitude and vertical-speed targets from current aircraft state', () => {
     const aircraft = structuredClone(useSimStore.getState().aircraft);
     aircraft.position.alt = 12_432;
@@ -292,7 +421,8 @@ describe('RfsMCP', () => {
     expect(ap?.boeing.vs).toBe(false);
 
     const effective = deriveEffectiveAutoflightTruth(ap, state);
-    expect(effective.verticalActive).toBe('VNAV');
+    expect(effective.verticalActive).toBe('OFF');
+    expect(effective.verticalArmed).toBe('VNAV');
     expect(vnav).toHaveStyle({ background: '#0a0' });
   });
 

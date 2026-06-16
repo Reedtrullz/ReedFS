@@ -14,6 +14,7 @@ import readme from '../../../README.md?raw';
 import security from '../../../SECURITY.md?raw';
 import architecture from '../../../docs/architecture.md?raw';
 import physicsInvariants from '../../../docs/physics-invariants.md?raw';
+import roadmap from '../../../docs/roadmap.md?raw';
 import packageJson from '../../../package.json';
 
 const automationFiles = import.meta.glob('../../../.github/{dependabot.yml,workflows/codeql.yml}', {
@@ -41,17 +42,63 @@ describe('canonical docs posture', () => {
     expect(architecture).toMatch(/no SharedArrayBuffer\/COOP\/COEP dependency is introduced/i);
   });
 
+  it('keeps worker physics documented as experimental and synchronous-store default-off', () => {
+    expect(readme).toMatch(/production still defaults to the main-thread adapter/i);
+    expect(readme).toMatch(/current `simStore\.tick\(\)` path remains synchronous/i);
+    expect(architecture).toMatch(/sync `step\(\)` still falls back to main-thread physics until the frame scheduler becomes async-aware/i);
+    expect(roadmap).toMatch(/experimental browser-Worker runtime remains default-off/i);
+    expect(roadmap).toMatch(/`simStore\.tick\(\)` remains synchronous/i);
+    expect(roadmap).toMatch(/async scheduler\/store bridge plan is required before default-on/i);
+  });
+
+  it('records rendering, weather, audio, immersion, and PWA disposition without snapshot overclaims', () => {
+    expect(readme).toMatch(/Rendering\/weather\/audio\/immersion disposition/i);
+    expect(roadmap).toMatch(/2026-06-16 rendering\/weather\/audio\/immersion disposition/i);
+    for (const requiredDisposition of [
+      /Cockpit\/interior: partial/i,
+      /Weather\/atmosphere: partial/i,
+      /Audio: partial/i,
+      /Scene loading\/error states: partial/i,
+      /PWA: deferred/i,
+      /Visual snapshots are not proof of audio, weather, PWA, or error-state behavior/i,
+    ]) {
+      expect(readme).toMatch(requiredDisposition);
+      expect(roadmap).toMatch(requiredDisposition);
+    }
+  });
+
   it('documents the narrowed integrate signature and same-tick config ordering', () => {
     expect(physicsInvariants).toMatch(/applyPilotConfiguration\(\)/);
     expect(physicsInvariants).toMatch(/accepts only aircraft, effective controls, spec, timestep, and optional wind/i);
   });
 
   it('keeps CI aligned with local dependency checks and PR Docker smoke', () => {
+    expect(packageJson.scripts['test:e2e']).toContain('VITE_RFS_VISUAL_TEST=0');
+    expect(packageJson.scripts['test:e2e']).toContain('e2e/rfs-truth-flow.spec.ts');
+    expect(packageJson.scripts['test:e2e']).not.toContain('e2e/rfs-visual.spec.ts');
+    expect(packageJson.scripts['test:e2e']).not.toContain('e2e/rfs-full-flight-blackbox.spec.ts');
+    expect(packageJson.scripts['test:e2e:full-flight']).toContain('e2e/rfs-full-flight-blackbox.spec.ts');
+    expect(packageJson.scripts['test:visual']).toContain('e2e/rfs-visual.spec.ts');
+    expect(ciWorkflow).toMatch(/- run: npm run test:e2e\s+- run: npm run test:visual/);
     expect(ciWorkflow).toContain('npm run check:deps');
     expect(ciWorkflow).toContain('push: false');
     expect(ciWorkflow).toContain('load: true');
     expect(ciWorkflow).toContain('curl -fsS http://localhost:3005/');
     expect(ciWorkflow).toContain('curl -fsS http://localhost:3005/rfs-version.json');
+  });
+
+  it('keeps black-box guard in local, CI, and README gates', () => {
+    const expectedCheckChain =
+      'npm run check:deps && npm run check:release && npm run check:blackbox && npm run lint:ci && npm run typecheck && npm run test && npm run build && npm run check:bundle';
+    expect(packageJson.scripts.check).toBe(expectedCheckChain);
+    expect(readme).toContain(expectedCheckChain);
+
+    const testJobStart = ciWorkflow.indexOf('  test:\n');
+    const dockerSmokeStart = ciWorkflow.indexOf('\n  docker-smoke:', testJobStart);
+    const testJob = ciWorkflow.slice(testJobStart, dockerSmokeStart);
+    expect(testJob).toMatch(
+      /- run: npm run check:release\s+- run: npm run check:blackbox\s+- run: npm run lint:ci/,
+    );
   });
 
   it('makes deployment rollback failures fatal and publicly verifiable', () => {
@@ -194,6 +241,12 @@ describe('canonical docs posture', () => {
     expect(readme).toMatch(/Contributing/i);
     expect(readme).toMatch(/Security/i);
     expect(readme).toMatch(/License/i);
+    expect(readme).toMatch(/CI\/CD\]\(https:\/\/github\.com\/Reedtrullz\/ReedFS\/actions\/workflows\/ci\.yml\/badge\.svg\?branch=master/i);
+    expect(readme).toMatch(/Repository governance status/i);
+    expect(readme).toMatch(/strict required status checks: `secret-scan`, `test`, `publish`, `deploy`/i);
+    expect(readme).toMatch(/not yet complete/i);
+    expect(readme).toMatch(/GitHub About description, homepage, and topics are still blank/i);
+    expect(readme).toMatch(/No code of conduct is currently published/i);
   });
 
   it('serves immutable post-push image digest provenance in release metadata', () => {

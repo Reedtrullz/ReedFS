@@ -1,7 +1,6 @@
 import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
 import type { AircraftState } from '../sim/types';
 import type { WindInfo } from '../sim/weather';
-import { computeDerived } from '../sim/physics/derived';
 import { quatToEuler } from '../sim/physics/quaternion';
 
 function clamp(value: number, min: number, max: number): number {
@@ -75,13 +74,12 @@ export function createDefaultAutopilotStateFromAircraft(
   aircraft: AircraftState,
   wind: WindInfo | null = null,
 ): AutopilotState {
+  void wind;
   const ap = createDefaultAutopilotState();
   const headingDeg = quatToEuler(aircraft.quaternion).psi * 180 / Math.PI;
-  const ias = Math.max(0, computeDerived(aircraft, wind).ias);
 
   ap.boeing.heading = wrapHeadingDeg(headingDeg);
   ap.boeing.altitude = clamp(Math.round(aircraft.position.alt / 100) * 100, 0, 41000);
-  ap.boeing.speed = clamp(Math.round(ias), 100, 340);
 
   return ap;
 }

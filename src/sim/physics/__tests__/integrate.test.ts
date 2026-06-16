@@ -10,8 +10,11 @@ import { GROUND_CONTACT_EPSILON_FT, KSEA_RUNWAY_ALT_FT } from '../../systems/gro
 import { computeHeldKeyInputs } from '../../../input/keyboardControls';
 import { runFixedStepScenario, takeoffRollInputs } from '../../__tests__/scenarioHelpers';
 import { createAircraftStateForScenario, KSEA_TUTORIAL_SCENARIO } from '../../scenarios';
+import { findPerformanceCardForScenario } from '../../data/performance/b737PerformanceCards';
 import { KPDX_RUNWAY_10R, KSEA_RUNWAY_16L, type RunwayReference } from '../../../viewport/runwayData';
 import { bodyToNed } from '../frames';
+
+const FPM_TO_MPS = 0.00508;
 
 const idle: ControlInputs = {
   elevator: 0, aileron: 0, rudder: 0,
@@ -34,6 +37,10 @@ function runwayHeadingDeltaRad(state: ReturnType<typeof createInitialState>): nu
 
 function degToRad(deg: number): number {
   return deg * Math.PI / 180;
+}
+
+function isStoppedPhase(phase: string): boolean {
+  return phase === 'STOPPED';
 }
 
 function offsetPositionMeters(
@@ -192,6 +199,28 @@ describe('integrate', () => {
     expect(state.ground.weightOnWheels).toBe(false);
     expect(state.position.alt).toBeGreaterThan(KSEA_RUNWAY_ALT_FT);
     expect(state.ground).toEqual(expect.objectContaining({ tailstrike: false }));
+  });
+
+  it('does not lift off below the scenario performance-card rotate envelope', () => {
+    const card = findPerformanceCardForScenario(KSEA_TUTORIAL_SCENARIO.id);
+    const state = createAircraftStateForScenario(B737_800_SPEC, KSEA_TUTORIAL_SCENARIO);
+    const rotateToleranceKt = card.vSpeeds.v2Kt - card.vSpeeds.vrKt;
+    state.flightPhase = 'TAKEOFF';
+    state.position = ksea16LPositionMeters(400, 0, KSEA_RUNWAY_ALT_FT);
+    setRunwayHeading(state);
+    state.velocity.u = ktToMs(card.vSpeeds.vrKt - rotateToleranceKt);
+    state.velocity.v = 0;
+    state.velocity.w = 0;
+    state.config.flapSetting = card.flapSetting;
+    state.config.gearDown = true;
+    setAttitude(state, { ...state.attitude, theta: degToRad(card.initialClimbPitchDeg) });
+
+    integrate(state, takeoffRollInputs({ elevator: -1, flapLever: card.flapSetting }), B737_800_SPEC, 1 / 120);
+
+    expect(computeDerived(state).ias).toBeLessThan(card.vSpeeds.vrKt);
+    expect(state.ground.weightOnWheels).toBe(true);
+    expect(state.flightPhase).toBe('TAKEOFF');
+    expect(state.position.alt).toBeLessThanOrEqual(KSEA_RUNWAY_ALT_FT + GROUND_CONTACT_EPSILON_FT);
   });
 
   it('takeoff trim creates a stronger hands-off nose-up pitch tendency than zero trim', () => {
@@ -617,6 +646,62 @@ describe('integrate', () => {
     expect(brakedDistanceM).toBeLessThan(coastingDistanceM - 100);
   });
 
+  it('decelerates monotonically through a performance-card rollout without reverse acceleration', () => {
+    const card = findPerformanceCardForScenario(KSEA_TUTORIAL_SCENARIO.id);
+    const state = createAircraftStateForScenario(B737_800_SPEC, KSEA_TUTORIAL_SCENARIO);
+    state.flightPhase = 'ROLLOUT';
+    state.position = ksea16LPositionMeters(card.landing.touchdownZoneDistanceM[1], 0, KSEA_RUNWAY_ALT_FT);
+    setRunwayHeading(state);
+    state.velocity.u = ktToMs(card.landing.targetApproachIasKt);
+    state.velocity.v = 0;
+    state.velocity.w = 0;
+    state.config.gearDown = true;
+    state.config.flapSetting = card.approach.flapSetting;
+    const braking: ControlInputs = { ...idle, flapLever: card.approach.flapSetting, gearLever: 'DOWN', spoilers: 1, brake: 1 };
+    let previousGroundspeedKt = computeDerived(state).gs;
+
+    for (let i = 0; i < 10 * 120; i += 1) {
+      integrate(state, braking, B737_800_SPEC, 1 / 120);
+      const currentGroundspeedKt = computeDerived(state).gs;
+      expect(currentGroundspeedKt).toBeLessThanOrEqual(previousGroundspeedKt + 0.01);
+      expect(state.velocity.u).toBeGreaterThanOrEqual(0);
+      previousGroundspeedKt = currentGroundspeedKt;
+    }
+
+    expect(previousGroundspeedKt).toBeLessThan(card.landing.targetApproachIasKt / 2);
+  });
+
+  it('brakes a rejected takeoff to declared low-speed bounds before the runway end', () => {
+    const card = findPerformanceCardForScenario(KSEA_TUTORIAL_SCENARIO.id);
+    const state = createAircraftStateForScenario(B737_800_SPEC, KSEA_TUTORIAL_SCENARIO);
+    state.flightPhase = 'TAKEOFF';
+    state.position = ksea16LPositionMeters(0, 0, KSEA_RUNWAY_ALT_FT);
+    setRunwayHeading(state);
+    state.velocity.u = 0;
+    state.config.gearDown = true;
+    state.config.flapSetting = card.flapSetting;
+    const takeoff = takeoffRollInputs({ flapLever: card.flapSetting });
+
+    for (let i = 0; i < 90 * 120 && computeDerived(state).ias < card.rejectedTakeoff.decisionSpeedKt; i += 1) {
+      integrate(state, takeoff, B737_800_SPEC, 1 / 120);
+    }
+
+    expect(computeDerived(state).ias).toBeGreaterThanOrEqual(card.rejectedTakeoff.decisionSpeedKt);
+    expect(state.ground.weightOnWheels).toBe(true);
+    const rejectStartAlongTrackM = ksea16LRunwayCoordinatesM(state).alongTrackM;
+    const reject: ControlInputs = { ...idle, flapLever: card.flapSetting, gearLever: 'DOWN', spoilers: 1, brake: 1 };
+    for (let i = 0; i < 60 * 120 && computeDerived(state).gs > card.rejectedTakeoff.targetLowSpeedKt; i += 1) {
+      integrate(state, reject, B737_800_SPEC, 1 / 120);
+    }
+
+    const rejectedLowSpeedDistanceM = ksea16LRunwayCoordinatesM(state).alongTrackM - rejectStartAlongTrackM;
+    expect(rejectedLowSpeedDistanceM).toBeGreaterThanOrEqual(card.rejectedTakeoff.lowSpeedDistanceM[0]);
+    expect(rejectedLowSpeedDistanceM).toBeLessThanOrEqual(card.rejectedTakeoff.lowSpeedDistanceM[1]);
+    expect(ksea16LRunwayCoordinatesM(state).alongTrackM).toBeLessThan(KSEA_RUNWAY_16L.lengthM);
+    expect(computeDerived(state).gs).toBeLessThanOrEqual(card.rejectedTakeoff.targetLowSpeedKt);
+    expect(state.velocity.u).toBeGreaterThanOrEqual(0);
+  });
+
   it('keeps full-throttle takeoff roll on the runway before rotation speed', () => {
     const s = createInitialState(B737_800_SPEC);
     s.position = ksea16LPositionMeters(200, 0, KSEA_RUNWAY_ALT_FT);
@@ -788,6 +873,73 @@ describe('integrate', () => {
     expect(Math.abs(derived.vs)).toBeLessThan(300);
   });
 
+  it('keeps touchdown and stopping metrics inside the scenario landing performance card', () => {
+    const card = findPerformanceCardForScenario(KSEA_TUTORIAL_SCENARIO.id);
+    const state = createAircraftStateForScenario(B737_800_SPEC, KSEA_TUTORIAL_SCENARIO);
+    const approachPitchRad = degToRad(card.landing.glidepathDeg);
+    const approachSinkRateMps = card.landing.sinkRateFpm[0] * FPM_TO_MPS;
+    const speedAdditiveKt = card.landing.targetApproachIasKt - card.landing.vrefKt;
+    setAttitude(state, { phi: 0, theta: approachPitchRad, psi: ksea16LHeadingRad() });
+    state.flightPhase = 'APPROACH';
+    state.position = ksea16LPositionMeters(card.landing.touchdownZoneDistanceM[0], 0, KSEA_RUNWAY_ALT_FT + 2);
+    state.ground = {
+      ...state.ground,
+      aglFt: 2,
+      weightOnWheels: false,
+      normalForceN: 0,
+      lastTouchdownSinkRateMps: 0,
+      onRunway: false,
+      contact: 'none',
+      gearStations: createB737GearStations(0, false),
+    };
+    state.config.gearDown = true;
+    state.config.flapSetting = card.approach.flapSetting;
+    state.velocity.u = ktToMs(card.landing.targetApproachIasKt);
+    state.velocity.v = 0;
+    state.velocity.w = (approachSinkRateMps + Math.sin(approachPitchRad) * state.velocity.u) / Math.cos(approachPitchRad);
+
+    const rollout: ControlInputs = {
+      ...idle,
+      flapLever: card.approach.flapSetting,
+      gearLever: 'DOWN',
+      spoilers: 1,
+      brake: 1,
+    };
+    let touchdownIasKt: number | null = null;
+    let touchdownSinkRateMps: number | null = null;
+    let touchdownAlongTrackM: number | null = null;
+    let previousGroundspeedKt = computeDerived(state).gs;
+
+    for (let i = 0; i < 45 * 120; i += 1) {
+      const wasAirborne = !state.ground.weightOnWheels;
+      integrate(state, rollout, B737_800_SPEC, 1 / 120);
+      const derived = computeDerived(state);
+      if (state.ground.weightOnWheels) {
+        expect(derived.gs).toBeLessThanOrEqual(previousGroundspeedKt + speedAdditiveKt);
+        expect(state.velocity.u).toBeGreaterThanOrEqual(0);
+      }
+      previousGroundspeedKt = derived.gs;
+      if (touchdownIasKt === null && wasAirborne && state.ground.weightOnWheels) {
+        touchdownIasKt = derived.ias;
+        touchdownSinkRateMps = state.ground.lastTouchdownSinkRateMps;
+        touchdownAlongTrackM = ksea16LRunwayCoordinatesM(state).alongTrackM;
+      }
+      if (isStoppedPhase(state.flightPhase)) break;
+    }
+
+    expect(touchdownIasKt).not.toBeNull();
+    expect(touchdownIasKt as number).toBeGreaterThanOrEqual(card.landing.vrefKt - speedAdditiveKt);
+    expect(touchdownIasKt as number).toBeLessThanOrEqual(card.landing.targetApproachIasKt + speedAdditiveKt);
+    expect(touchdownSinkRateMps as number).toBeGreaterThanOrEqual(card.landing.touchdownSinkRateMps[0]);
+    expect(touchdownSinkRateMps as number).toBeLessThanOrEqual(card.landing.touchdownSinkRateMps[1]);
+    expect(touchdownAlongTrackM as number).toBeGreaterThanOrEqual(card.landing.touchdownZoneDistanceM[0]);
+    expect(touchdownAlongTrackM as number).toBeLessThanOrEqual(card.landing.touchdownZoneDistanceM[1]);
+    const stoppingDistanceM = ksea16LRunwayCoordinatesM(state).alongTrackM - (touchdownAlongTrackM as number);
+    expect(stoppingDistanceM).toBeGreaterThanOrEqual(card.landing.stoppingDistanceM[0]);
+    expect(stoppingDistanceM).toBeLessThanOrEqual(card.landing.stoppingDistanceM[1]);
+    expect(state.flightPhase).toBe('STOPPED');
+  });
+
   it('records explicit touchdown, derotation, rollout, and stopped phases during a landing stop', () => {
     const state = createInitialState(B737_800_SPEC);
     const approachPitchRad = 4 * Math.PI / 180;
@@ -822,7 +974,7 @@ describe('integrate', () => {
     for (let i = 0; i < 35 * 120; i += 1) {
       integrate(state, brakingRollout, B737_800_SPEC, 1 / 120);
       if (observedPhases.at(-1) !== state.flightPhase) observedPhases.push(state.flightPhase);
-      if ((state.flightPhase as string) === 'STOPPED') break;
+      if (isStoppedPhase(state.flightPhase)) break;
     }
 
     expect(observedPhases).toEqual(expect.arrayContaining(['TOUCHDOWN', 'DEROTATION', 'ROLLOUT', 'STOPPED']));

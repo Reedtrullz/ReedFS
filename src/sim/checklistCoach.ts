@@ -10,6 +10,8 @@ type GuidanceChecklistPhase =
   | 'rejected-takeoff'
   | 'positive-rate'
   | 'climb'
+  | 'cruise'
+  | 'descent'
   | 'approach'
   | 'touchdown'
   | 'derotation'
@@ -71,6 +73,40 @@ export function buildGuidanceChecklist(
   controls: ControlInputs,
   phase: GuidanceChecklistPhase,
 ): ChecklistItem[] {
+  if (phase === 'cruise') {
+    return [
+      {
+        id: 'cruise-configuration',
+        label: 'Cruise configuration',
+        complete: controls.gearLever === 'UP' && !aircraft.config.gearDown && aircraft.config.flapSetting <= 1,
+        detail: 'Keep gear up and clean configuration in cruise',
+      },
+      {
+        id: 'route-monitoring',
+        label: 'Route monitoring',
+        complete: true,
+        detail: 'Monitor route progress and prepare for descent when VNAV/path targets require it',
+      },
+    ];
+  }
+
+  if (phase === 'descent') {
+    return [
+      {
+        id: 'descent-established',
+        label: 'Descent established',
+        complete: aircraft.velocity.w > 0 || aircraft.flightPhase === 'DESCENT',
+        detail: 'Follow the route descent path toward the approach fix',
+      },
+      {
+        id: 'approach-setup-planned',
+        label: 'Approach setup planned',
+        complete: controls.gearLever === 'DOWN' || controls.flapLever >= 5,
+        detail: 'Plan gear and landing flap configuration before final approach',
+      },
+    ];
+  }
+
   if (phase === 'approach') {
     return [
       {
@@ -296,8 +332,16 @@ export function coachMessageForState(
     return 'Landed and stopped: keep brakes set and use RESET for a clean playable state.';
   }
 
-  if ((aircraft.flightPhase === 'APPROACH' || aircraft.flightPhase === 'DESCENT') && !aircraft.ground.weightOnWheels) {
-    return 'Approach: gear down, landing flaps set, stabilize descent, and prepare for touchdown rollout.';
+  if (aircraft.flightPhase === 'APPROACH' && !aircraft.ground.weightOnWheels) {
+    return 'Approach: gear down, landing flaps set, stabilize final, and prepare for touchdown rollout.';
+  }
+
+  if (aircraft.flightPhase === 'DESCENT' && !aircraft.ground.weightOnWheels) {
+    return 'Descent: follow the route descent path, plan approach configuration, and prepare for final.';
+  }
+
+  if (aircraft.flightPhase === 'CRUISE' && !aircraft.ground.weightOnWheels) {
+    return 'Cruise: monitor route progress, manage speed and altitude, and prepare for descent when the path requires it.';
   }
 
   if (aircraft.ground.weightOnWheels && scenario) {

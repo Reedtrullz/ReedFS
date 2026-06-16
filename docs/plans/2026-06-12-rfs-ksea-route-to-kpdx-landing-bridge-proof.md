@@ -2,6 +2,8 @@
 
 > **For Hermes:** Use `subagent-driven-development` for the implementation slice, but keep tasks serialized because they touch the same Playwright helper/spec/docs and would race on the same files. This is not a GPT-5.5 swarm candidate: there are fewer than three independent implementation tracks, no isolated worktree benefit, and the core edit is tightly coupled in `e2e/helpers/rfsRoute.ts`.
 
+> **Status note, 2026-06-15:** This plan originally targeted a KPDX 10L short-final bridge. The current KSEA→KPDX route/landing proof is aligned on KPDX 10R; any remaining 10L wording in this dated plan is historical context, not a current-state claim.
+
 ## Goal
 
 Close the next proof gap between two already-scoped browser proofs:

@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react';
+import type { ApproachHandoff } from '../sim/systems/navigation';
 import { useSimStore } from '../store/simStore';
 
 const panelStyle: CSSProperties = {
@@ -32,12 +33,23 @@ const routeNameStyle: CSSProperties = {
   marginTop: 5,
 };
 
+const routeSourceStyle: CSSProperties = {
+  border: '1px solid rgba(255,216,74,0.45)',
+  borderRadius: 4,
+  color: '#ffd84a',
+  fontSize: 10,
+  fontWeight: 800,
+  lineHeight: 1.25,
+  marginTop: 6,
+  padding: '4px 6px',
+};
+
 const rowStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'baseline',
   justifyContent: 'space-between',
   gap: 10,
-  marginTop: 7,
+  marginTop: 5,
 };
 
 const valueStyle: CSSProperties = {
@@ -64,6 +76,48 @@ function formatEtaMinutes(minutes: number | null): string | null {
     : null;
 }
 
+function approachHandoffText(routeStatus: { approachHandoff: ApproachHandoff; nextWaypointIdent: string | null }): string | null {
+  switch (routeStatus.approachHandoff) {
+    case 'final':
+      return `Final ${routeStatus.nextWaypointIdent ?? 'approach fix'}`;
+    case 'threshold':
+      return `Threshold ${routeStatus.nextWaypointIdent ?? 'runway'}`;
+    default:
+      return null;
+  }
+}
+
+function isLoadedRoute(routeStatus: { routeName: string; routeValid: boolean }): boolean {
+  return routeStatus.routeValid && routeStatus.routeName !== 'NO ROUTE';
+}
+
+function RouteSourceReadback({ routeName }: { routeName: string }) {
+  const syntheticApproach = routeName === 'KSEA→KPDX';
+  return (
+    <div style={routeSourceStyle}>
+      <div>CANNED TRAINING ROUTE</div>
+      <div style={{ color: '#ffefb8', fontWeight: 700 }}>Route editing unavailable</div>
+      <div style={{ color: '#ffefb8', fontWeight: 700, marginTop: 2 }}>
+        RFMS adapter seam only — no CDU/EXEC route edit UI
+      </div>
+      {syntheticApproach && (
+        <div style={{ color: '#ffefb8', fontWeight: 700, marginTop: 2 }}>
+          Synthetic training approach — not official procedure data
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ApproachHandoffReadback({ text }: { text: string }) {
+  return (
+    <div style={{ color: '#7dffb2', fontSize: 12, lineHeight: 1.45, marginTop: 10 }}>
+      <div style={labelStyle}>Approach handoff</div>
+      <div style={{ color: '#e8f8ff', fontSize: 14, fontWeight: 900, marginTop: 4 }}>{text}</div>
+    </div>
+  );
+}
+
 export function RouteStatus() {
   const routeStatus = useSimStore((s) => s.routeStatus);
   const distanceText = formatDistanceNm(routeStatus.distanceToNextNm);
@@ -76,13 +130,17 @@ export function RouteStatus() {
     ? `${routeStatus.fromIdent} → ${routeStatus.nextWaypointIdent}`
     : routeStatus.nextWaypointIdent;
   const unavailableReason = routeStatus.lnavUnavailableReason ?? 'unknown route status';
+  const handoffText = approachHandoffText(routeStatus);
 
   return (
     <section aria-label="Route status" aria-live="polite" style={panelStyle}>
       <div style={labelStyle}>Route status</div>
       <div style={routeNameStyle}>{routeStatus.routeName}</div>
+      {isLoadedRoute(routeStatus) && <RouteSourceReadback routeName={routeStatus.routeName} />}
 
-      {routeStatus.routeComplete ? (
+      {routeStatus.routeComplete && handoffText ? (
+        <ApproachHandoffReadback text={handoffText} />
+      ) : routeStatus.routeComplete ? (
         <div style={{ color: '#7dffb2', fontSize: 12, lineHeight: 1.45, marginTop: 10 }}>
           Arrived — route complete
         </div>
@@ -97,6 +155,7 @@ export function RouteStatus() {
               {activeLegText}
             </div>
           )}
+          {handoffText && <ApproachHandoffReadback text={handoffText} />}
           {distanceText && (
             <div style={rowStyle}>
               <span style={labelStyle}>DTG</span>

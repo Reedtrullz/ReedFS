@@ -1,0 +1,7 @@
+{
+  "entrypoints": [
+    "e2e/rfs-blackbox-player-loop.spec.ts",
+    "e2e/rfs-route-descent.spec.ts",
+    "e2e/rfs-full-flight-blackbox.spec.ts"
+  ]
+}

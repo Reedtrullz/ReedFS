@@ -18,10 +18,13 @@ export interface NavOutput {
   waypointReached: boolean;
 }
 
+export type ApproachHandoff = 'none' | 'final' | 'threshold' | 'complete';
+
 export interface RouteStatusSnapshot {
   routeName: string;
   routeValid: boolean;
   routeComplete: boolean;
+  approachHandoff: ApproachHandoff;
   lnavAvailable: boolean;
   lnavUnavailableReason: string | null;
   activeLegIndex: number | null;
@@ -61,6 +64,7 @@ interface RouteLeg {
   toWaypointIndex: number;
   fromIdent: string | null;
   toIdent: string;
+  toLegType: string | null;
   fromLat: number | null;
   fromLon: number | null;
   toLat: number;
@@ -71,6 +75,7 @@ interface RouteValidationResult {
   routeName: string;
   legs: RouteLeg[];
   unavailableReason: string | null;
+  discontinuityBoundaryReason: string | null;
 }
 
 type SequencingReason = 'capture' | 'passed' | 'turnAnticipation' | null;
@@ -106,8 +111,11 @@ function routeNameFor(flightPlan: FlightPlan | null | undefined): string {
   return `${origin}→${destination}`;
 }
 
+function discontinuityReason(waypoint: FlightPlanWaypoint, index: number): string {
+  return `route discontinuity at waypoint ${waypoint.ident || index}`;
+}
+
 function waypointCoordReason(waypoint: FlightPlanWaypoint, index: number): string | null {
-  if (waypoint.discontinuity) return `route discontinuity at waypoint ${waypoint.ident || index}`;
   if (!isFiniteNumber(waypoint.lat) || !isFiniteNumber(waypoint.lon)) {
     return `missing coordinates for waypoint ${waypoint.ident || index}`;
   }
@@ -116,16 +124,37 @@ function waypointCoordReason(waypoint: FlightPlanWaypoint, index: number): strin
 
 function validateAndBuildLegs(flightPlan: FlightPlan | null | undefined): RouteValidationResult {
   const routeName = routeNameFor(flightPlan);
-  if (!flightPlan) return { routeName, legs: [], unavailableReason: 'no flight plan loaded' };
-  if (flightPlan.waypoints.length === 0) return { routeName, legs: [], unavailableReason: 'flight plan has no waypoints' };
-
-  for (let index = 0; index < flightPlan.waypoints.length; index++) {
-    const reason = waypointCoordReason(flightPlan.waypoints[index], index);
-    if (reason) return { routeName, legs: [], unavailableReason: reason };
+  if (!flightPlan) {
+    return { routeName, legs: [], unavailableReason: 'no flight plan loaded', discontinuityBoundaryReason: null };
+  }
+  if (flightPlan.waypoints.length === 0) {
+    return { routeName, legs: [], unavailableReason: 'flight plan has no waypoints', discontinuityBoundaryReason: null };
   }
 
-  if (flightPlan.waypoints.length === 1) {
-    const only = flightPlan.waypoints[0];
+  const firstDiscontinuityIndex = flightPlan.waypoints.findIndex((waypoint) => waypoint.discontinuity);
+  const discontinuityBoundaryReason = firstDiscontinuityIndex >= 0
+    ? discontinuityReason(flightPlan.waypoints[firstDiscontinuityIndex], firstDiscontinuityIndex)
+    : null;
+  const usableWaypoints = firstDiscontinuityIndex >= 0
+    ? flightPlan.waypoints.slice(0, firstDiscontinuityIndex)
+    : flightPlan.waypoints;
+
+  for (let index = 0; index < usableWaypoints.length; index++) {
+    const reason = waypointCoordReason(usableWaypoints[index], index);
+    if (reason) return { routeName, legs: [], unavailableReason: reason, discontinuityBoundaryReason: null };
+  }
+
+  if (usableWaypoints.length === 0) {
+    return {
+      routeName,
+      legs: [],
+      unavailableReason: discontinuityBoundaryReason ?? 'flight plan has no usable legs',
+      discontinuityBoundaryReason: null,
+    };
+  }
+
+  if (usableWaypoints.length === 1) {
+    const only = usableWaypoints[0];
     return {
       routeName,
       legs: [{
@@ -134,25 +163,28 @@ function validateAndBuildLegs(flightPlan: FlightPlan | null | undefined): RouteV
         toWaypointIndex: 0,
         fromIdent: null,
         toIdent: only.ident,
+        toLegType: only.legType ?? null,
         fromLat: null,
         fromLon: null,
         toLat: only.lat as number,
         toLon: only.lon as number,
       }],
       unavailableReason: null,
+      discontinuityBoundaryReason,
     };
   }
 
   const legs: RouteLeg[] = [];
-  for (let waypointIndex = 1; waypointIndex < flightPlan.waypoints.length; waypointIndex++) {
-    const from = flightPlan.waypoints[waypointIndex - 1];
-    const to = flightPlan.waypoints[waypointIndex];
+  for (let waypointIndex = 1; waypointIndex < usableWaypoints.length; waypointIndex++) {
+    const from = usableWaypoints[waypointIndex - 1];
+    const to = usableWaypoints[waypointIndex];
     legs.push({
       legIndex: legs.length,
       fromWaypointIndex: waypointIndex - 1,
       toWaypointIndex: waypointIndex,
       fromIdent: from.ident,
       toIdent: to.ident,
+      toLegType: to.legType ?? null,
       fromLat: from.lat as number,
       fromLon: from.lon as number,
       toLat: to.lat as number,
@@ -164,6 +196,7 @@ function validateAndBuildLegs(flightPlan: FlightPlan | null | undefined): RouteV
     routeName,
     legs,
     unavailableReason: legs.length > 0 ? null : 'flight plan has no usable legs',
+    discontinuityBoundaryReason,
   };
 }
 
@@ -286,6 +319,14 @@ function sequencingReasonForLeg(
   return distanceToWaypointM <= boundedLeadM ? 'turnAnticipation' : null;
 }
 
+function approachHandoffForLeg(leg: RouteLeg, routeComplete: boolean): ApproachHandoff {
+  const toIdent = leg.toIdent.toUpperCase();
+  const toLegType = leg.toLegType?.toUpperCase() ?? null;
+  if (toLegType === 'RW' || toIdent.endsWith('_RWY')) return 'threshold';
+  if (toIdent.endsWith('_FAF')) return 'final';
+  return routeComplete ? 'complete' : 'none';
+}
+
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
@@ -298,6 +339,7 @@ export function createNoRouteStatus(
     routeName: routeNameFor(flightPlan),
     routeValid: false,
     routeComplete: false,
+    approachHandoff: 'none',
     lnavAvailable: false,
     lnavUnavailableReason: reason,
     activeLegIndex: null,
@@ -435,7 +477,7 @@ export function computeRouteStatus(
   const turnAnticipationDistanceM = computeTurnAnticipationDistanceM(speedMps, turnAngleRad);
   const turnAnticipationDistanceNm = turnAnticipationDistanceM === null ? null : turnAnticipationDistanceM / M_PER_NM;
   const waypointReached = distanceToNextM <= captureRadiusM;
-  const routeComplete = legIndex === legs.length - 1
+  const reachedSegmentEnd = legIndex === legs.length - 1
     && sequencingReasonForLeg(
       state,
       leg,
@@ -443,13 +485,22 @@ export function computeRouteStatus(
       captureRadiusM,
       turnAnticipationEnabled,
     ) !== null;
+  const blockedByDiscontinuity = reachedSegmentEnd && route.discontinuityBoundaryReason !== null;
+  const routeComplete = reachedSegmentEnd && !blockedByDiscontinuity;
+  const approachHandoff = approachHandoffForLeg(leg, routeComplete);
+  const lnavUnavailableReason = routeComplete
+    ? 'route complete'
+    : blockedByDiscontinuity
+      ? route.discontinuityBoundaryReason
+      : null;
 
   return {
     routeName: route.routeName,
     routeValid: true,
     routeComplete,
-    lnavAvailable: !routeComplete,
-    lnavUnavailableReason: routeComplete ? 'route complete' : null,
+    approachHandoff,
+    lnavAvailable: lnavUnavailableReason === null,
+    lnavUnavailableReason,
     activeLegIndex: leg.legIndex,
     activeLegCount: legs.length,
     fromWaypointIndex: leg.fromWaypointIndex,

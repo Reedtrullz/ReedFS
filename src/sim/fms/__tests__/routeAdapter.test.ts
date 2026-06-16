@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createDirectFlight, createKseaKpdxFlight, createKseaKpdxRouteSource } from '../../flightPlanLoader';
+import { B737_800_SPEC, createInitialState } from '../../types';
+import { computeRouteStatus } from '../../systems/navigation';
 import {
   createRouteEditSession,
   createRouteSourceFromFlightPlan,
@@ -11,6 +13,8 @@ import {
 } from '../routeAdapter';
 
 const waypointIdents = (plan: { waypoints: Array<{ ident: string }> }): string[] => plan.waypoints.map((waypoint) => waypoint.ident);
+const kseaKpdxIdents = (): string[] => waypointIdents(createKseaKpdxFlight());
+const kpdxApproachTail = (): string[] => kseaKpdxIdents().slice(3);
 
 describe('RFMS route adapter seam', () => {
   it('wraps the canned KSEA route as an adapter source without changing the shared FlightPlan shape', () => {
@@ -29,22 +33,22 @@ describe('RFMS route adapter seam', () => {
 
     const direct = directToWaypoint(session, 'BTG');
 
-    expect(waypointIdents(direct.active)).toEqual(['KSEA', 'OLM', 'BTG', 'KPDX']);
+    expect(waypointIdents(direct.active)).toEqual(kseaKpdxIdents());
     expect(direct.pendingOperations).toEqual([{ type: 'DIRECT_TO', ident: 'BTG', fromIndex: 0 }]);
     expect(direct.draft).not.toBeNull();
-    expect(waypointIdents(direct.draft!)).toEqual(['KSEA', 'BTG', 'KPDX']);
-    expect(draftOrActiveFlightPlan(direct).route).toBe('KSEA DIRECT TO BTG KPDX');
+    expect(waypointIdents(direct.draft!)).toEqual(['KSEA', 'BTG', ...kpdxApproachTail()]);
+    expect(draftOrActiveFlightPlan(direct).route).toBe(`KSEA DIRECT TO BTG ${kpdxApproachTail().join(' ')}`);
 
     const undone = undoRouteDraftOperation(direct);
     expect(undone.draft).toBeNull();
     expect(undone.pendingOperations).toEqual([]);
-    expect(waypointIdents(undone.active)).toEqual(['KSEA', 'OLM', 'BTG', 'KPDX']);
+    expect(waypointIdents(undone.active)).toEqual(kseaKpdxIdents());
 
     const executed = executeRouteDraft(direct);
     expect(executed.draft).toBeNull();
     expect(executed.pendingOperations).toEqual([]);
-    expect(waypointIdents(executed.active)).toEqual(['KSEA', 'BTG', 'KPDX']);
-    expect(executed.active.route).toBe('KSEA DIRECT TO BTG KPDX');
+    expect(waypointIdents(executed.active)).toEqual(['KSEA', 'BTG', ...kpdxApproachTail()]);
+    expect(executed.active.route).toBe(`KSEA DIRECT TO BTG ${kpdxApproachTail().join(' ')}`);
   });
 
   it('stages route discontinuities as explicit unresolved legs until EXEC', () => {
@@ -54,7 +58,7 @@ describe('RFMS route adapter seam', () => {
 
     expect(edited.active.waypoints.some((waypoint) => waypoint.discontinuity)).toBe(false);
     expect(edited.pendingOperations).toEqual([{ type: 'INSERT_DISCONTINUITY', afterIndex: 1 }]);
-    expect(waypointIdents(edited.draft!)).toEqual(['KSEA', 'OLM', 'DISCONTINUITY', 'BTG', 'KPDX']);
+    expect(waypointIdents(edited.draft!)).toEqual(['KSEA', 'OLM', 'DISCONTINUITY', 'BTG', ...kpdxApproachTail()]);
     const discontinuity = edited.draft!.waypoints[2];
     expect(discontinuity.discontinuity).toBe(true);
     expect(discontinuity.coordinateSource).toBe('UNRESOLVED');
@@ -63,7 +67,20 @@ describe('RFMS route adapter seam', () => {
 
     const executed = executeRouteDraft(edited);
     expect(executed.active.waypoints[2]).toEqual(discontinuity);
-    expect(executed.active.route).toBe('KSEA OLM DISCONTINUITY BTG KPDX');
+    expect(executed.active.route).toBe(`KSEA OLM DISCONTINUITY BTG ${kpdxApproachTail().join(' ')}`);
+
+    const aircraft = createInitialState(B737_800_SPEC);
+    aircraft.position = {
+      lat: executed.active.waypoints[0].lat!,
+      lon: executed.active.waypoints[0].lon!,
+      alt: 432,
+    };
+    aircraft.velocity.u = 100;
+    const status = computeRouteStatus(aircraft, executed.active, 0);
+    expect(status.routeValid).toBe(true);
+    expect(status.lnavAvailable).toBe(true);
+    expect(status.nextWaypointIdent).toBe('OLM');
+    expect(status.lnavUnavailableReason).toBeNull();
   });
 
   it('wraps arbitrary FlightPlan sources so canned routes are not the whole FMS boundary', () => {

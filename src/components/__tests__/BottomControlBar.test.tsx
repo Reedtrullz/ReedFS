@@ -12,6 +12,8 @@ function defaultProps(overrides: Partial<BottomControlBarProps> = {}): BottomCon
     audioEnabled: false,
     audioStatus: 'off',
     routeLoadMessage: null,
+    simRate: 1,
+    onCycleSimRate: vi.fn(),
     onStartRoll: vi.fn(),
     onAbortTakeoff: vi.fn(),
     onPause: vi.fn(),
@@ -38,6 +40,7 @@ describe('BottomControlBar', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'START ROLL' }));
     fireEvent.click(screen.getByRole('button', { name: 'RESET' }));
+    fireEvent.click(screen.getByRole('button', { name: /Cycle simulator rate/ }));
     fireEvent.click(screen.getByRole('button', { name: 'CAM: CHASE' }));
     fireEvent.click(screen.getByRole('button', { name: 'OVL: FLIGHT' }));
     fireEvent.click(screen.getByRole('button', { name: 'AUDIO: OFF' }));
@@ -45,11 +48,13 @@ describe('BottomControlBar', () => {
 
     expect(props.onStartRoll).toHaveBeenCalledTimes(1);
     expect(props.onReset).toHaveBeenCalledTimes(1);
+    expect(props.onCycleSimRate).toHaveBeenCalledTimes(1);
     expect(props.onNextCameraMode).toHaveBeenCalledTimes(1);
     expect(props.onNextOverlayMode).toHaveBeenCalledTimes(1);
     expect(props.onToggleAudio).toHaveBeenCalledTimes(1);
     expect(props.onLoadPlan).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('button', { name: 'OVL: FLIGHT' }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByRole('button', { name: /Cycle simulator rate/ }).textContent).toBe('SIM RATE TARGET: 1X');
     expect(screen.getByRole('button', { name: 'AUDIO: OFF' }).getAttribute('aria-pressed')).toBe('false');
   });
 

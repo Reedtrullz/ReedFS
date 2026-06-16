@@ -2,10 +2,14 @@ import { describe, expect, it } from 'vitest';
 import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
 import type { FlightPlan } from '@shared/types/fmc';
 import { createInitialState, B737_800_SPEC } from '../../types';
-import { computeRouteStatus, routeStatusToNavOutput } from '../navigation';
+import { computeRouteStatus, createNoRouteStatus, routeStatusToNavOutput } from '../navigation';
 import { computeVNAV } from '../vnav';
 import { resolveAutopilotTargets } from '../autopilot';
-import { resolveGuidanceTargets } from '../guidanceTargets';
+import {
+  hasFlightDirectorGuidanceTarget,
+  resolveFlightDirectorGuidanceTargets,
+  resolveGuidanceTargets,
+} from '../guidanceTargets';
 
 function apState(): AutopilotState {
   return {
@@ -114,6 +118,56 @@ describe('resolveGuidanceTargets', () => {
     expect(shared.thrust?.targetSpeedKt).toBe(legacy.targetSpeedKt);
   });
 
+  it('reports computed VNAV_PTH target truth even when a raw VNAV truth override is supplied', () => {
+    const aircraft = aircraftAtRoute();
+    const ap = apState();
+    const flightPlan = routeWithVnavPathConstraint();
+    const routeStatus = computeRouteStatus(aircraft, flightPlan, 0);
+
+    const shared = resolveGuidanceTargets({
+      aircraft,
+      apState: ap,
+      flightPlan,
+      routeStatus,
+      truthOverride: ap.truth,
+    });
+
+    expect(shared.truth.verticalActive).toBe('VNAV');
+    expect(shared.vertical?.mode).toBe('VNAV_PTH');
+    expect(shared.vertical?.targetAltitudeFt).toBe(10_000);
+    expect(shared.vertical?.targetVerticalSpeedFpm).toBeGreaterThan(0);
+  });
+
+  it('uses route managed speed when selected speed intervention is absent', () => {
+    const aircraft = aircraftAtRoute();
+    const ap = apState();
+    ap.boeing.speed = null;
+    ap.truth.thrustActive = 'SPEED';
+    ap.boeing.speedMode = true;
+    const flightPlan = routeWithVnavPathConstraint();
+    const routeStatus = computeRouteStatus(aircraft, flightPlan, 0);
+
+    const shared = resolveGuidanceTargets({ aircraft, apState: ap, flightPlan, routeStatus });
+
+    expect(shared.thrust?.mode).toBe('SPEED');
+    expect(shared.thrust?.targetSpeedKt).toBe(220);
+  });
+
+  it('uses selected speed intervention over route managed speed only when selected speed is explicit', () => {
+    const aircraft = aircraftAtRoute();
+    const ap = apState();
+    ap.boeing.speed = 250;
+    ap.truth.thrustActive = 'SPEED';
+    ap.boeing.speedMode = true;
+    const flightPlan = routeWithVnavPathConstraint();
+    const routeStatus = computeRouteStatus(aircraft, flightPlan, 0);
+
+    const shared = resolveGuidanceTargets({ aircraft, apState: ap, flightPlan, routeStatus });
+
+    expect(shared.thrust?.mode).toBe('SPEED');
+    expect(shared.thrust?.targetSpeedKt).toBe(250);
+  });
+
   it('does not clamp an out-of-range active leg into a valid AP/FD route target without a route-status override', () => {
     const aircraft = aircraftAtRoute();
     const ap = apState();
@@ -153,5 +207,89 @@ describe('resolveGuidanceTargets', () => {
     expect(shared.lateral).toBeNull();
     expect(shared.vertical).toBeNull();
     expect(shared.thrust).toBeNull();
+  });
+
+  it('keeps lateral-only CMD_A from exposing any vertical AP target', () => {
+    const aircraft = aircraftAtRoute();
+    const ap = apState();
+    ap.truth.lateralActive = 'LNAV';
+    ap.truth.verticalActive = 'OFF';
+    ap.truth.thrustActive = 'SPEED';
+    ap.boeing.lnav = true;
+    ap.boeing.vnav = false;
+    ap.boeing.altHold = false;
+    ap.boeing.vs = false;
+    ap.boeing.speedMode = true;
+    const flightPlan = routeWithVnavPathConstraint();
+    const routeStatus = computeRouteStatus(aircraft, flightPlan, 0);
+
+    const shared = resolveGuidanceTargets({ aircraft, apState: ap, flightPlan, routeStatus });
+
+    expect(shared.truth.autopilotStatus).toBe('CMD_A');
+    expect(shared.truth.lateralActive).toBe('LNAV');
+    expect(shared.truth.verticalActive).toBe('OFF');
+    expect(shared.lateral?.mode).toBe('LNAV');
+    expect(shared.thrust?.mode).toBe('SPEED');
+    expect(shared.vertical).toBeNull();
+  });
+
+  it('exposes selected-altitude ALT* capture targets before ALT_HOLD is stabilized', () => {
+    const aircraft = aircraftAtRoute();
+    aircraft.position.alt = 9_650;
+    aircraft.velocity.w = 12;
+    const ap = apState();
+    ap.truth.verticalActive = 'ALT_HOLD';
+    ap.boeing.vnav = false;
+    ap.boeing.altHold = true;
+    ap.boeing.altitude = 10_000;
+
+    const shared = resolveGuidanceTargets({ aircraft, apState: ap, flightPlan: null, routeStatus: createNoRouteStatus() });
+
+    expect(shared.truth.verticalActive).toBe('ALT*');
+    expect(shared.vertical?.mode).toBe('ALT*');
+    expect(shared.vertical?.targetAltitudeFt).toBe(10_000);
+    expect(shared.vertical?.targetVerticalSpeedFpm).toBeGreaterThan(0);
+  });
+
+  it('filters shared guidance down to finite supported Flight Director targets', () => {
+    const sharedTargets = {
+      truth: {
+        thrustActive: 'OFF' as const,
+        lateralActive: 'HDG_SEL' as const,
+        verticalActive: 'ALT_HOLD' as const,
+        autopilotStatus: 'CMD_A' as const,
+        lastModeChangeTimestamps: { thrust: 0, lateral: 0, vertical: 0 },
+      },
+      lateral: { mode: 'HDG_SEL' as const, targetHeadingRad: Math.PI / 2 },
+      vertical: { mode: 'ALT_HOLD' as const, targetAltitudeFt: 12_000 },
+      thrust: null,
+    };
+
+    const shared = resolveFlightDirectorGuidanceTargets(sharedTargets);
+
+    expect(shared.lateral).toEqual({ mode: 'HDG_SEL', targetHeadingRad: Math.PI / 2 });
+    expect(shared.vertical).toEqual({ mode: 'ALT_HOLD', targetAltitudeFt: 12_000 });
+    expect(hasFlightDirectorGuidanceTarget(sharedTargets)).toBe(true);
+  });
+
+  it('does not expose malformed or unsupported Flight Director targets as command guidance', () => {
+    const unsupportedTargets = {
+      truth: {
+        thrustActive: 'OFF' as const,
+        lateralActive: 'LNAV' as const,
+        verticalActive: 'VS' as const,
+        autopilotStatus: 'CMD_A' as const,
+        lastModeChangeTimestamps: { thrust: 0, lateral: 0, vertical: 0 },
+      },
+      lateral: { mode: 'LNAV' as const, targetHeadingRad: Number.NaN },
+      vertical: { mode: 'ALT_HOLD' as const },
+      thrust: null,
+    };
+
+    const malformed = resolveFlightDirectorGuidanceTargets(unsupportedTargets);
+
+    expect(malformed.lateral).toBeNull();
+    expect(malformed.vertical).toBeNull();
+    expect(hasFlightDirectorGuidanceTarget(unsupportedTargets)).toBe(false);
   });
 });

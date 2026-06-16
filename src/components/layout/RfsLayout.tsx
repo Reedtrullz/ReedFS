@@ -53,7 +53,7 @@ export function RfsLayout({
       )}
 
       {debugPanels && (
-        <div className="rfs-layout__debug" data-rfs-panel="debug">
+        <div className="rfs-layout__debug" data-rfs-zone="debug" data-rfs-panel="debug" role="region" aria-label="Debug overlays">
           {debugPanels}
         </div>
       )}
@@ -107,13 +107,19 @@ const layoutCss = `
   z-index: 0;
 }
 
+.rfs-layout .cesium-viewer-bottom,
+.rfs-layout .cesium-widget-credits {
+  z-index: 120;
+}
+
 .rfs-layout [data-rfs-panel] {
   box-sizing: border-box;
   pointer-events: auto;
   z-index: 170;
 }
 
-.rfs-layout [data-rfs-panel] > * {
+.rfs-layout [data-rfs-panel] > *,
+.rfs-layout [data-rfs-debug-panel] > * {
   position: static !important;
   top: auto !important;
   right: auto !important;
@@ -137,14 +143,14 @@ const layoutCss = `
 }
 
 .rfs-layout__top-left [data-rfs-panel="scenario"] {
-  flex: 0 1 min(330px, 25vw);
-  width: min(330px, 25vw);
+  flex: 0 1 clamp(280px, 24vw, 330px);
+  width: clamp(280px, 24vw, 330px);
   max-height: min(560px, calc(100vh - 380px));
   overflow: auto;
 }
 
 .rfs-layout__top-left [data-rfs-panel="takeoff-setup"] {
-  flex: 0 1 300px;
+  flex: 0 0 300px;
   width: min(300px, 32vw);
 }
 
@@ -186,10 +192,15 @@ const layoutCss = `
   width: 100% !important;
 }
 
+.rfs-layout__debug [data-rfs-debug-panel] {
+  box-sizing: border-box;
+  width: 100%;
+}
+
 .rfs-layout__bottom-right {
   position: absolute;
   right: 14px;
-  bottom: 48px;
+  bottom: 32px;
   width: min(74vw, 760px);
   display: grid;
   gap: 10px;
@@ -200,7 +211,7 @@ const layoutCss = `
 
 .rfs-layout__instrument-row {
   display: flex;
-  flex-direction: row-reverse;
+  flex-direction: row;
   align-items: flex-end;
   justify-content: flex-end;
   gap: 12px;
@@ -213,7 +224,7 @@ const layoutCss = `
 }
 
 .rfs-layout__instrument-row [data-rfs-panel="mcp"] {
-  width: 220px;
+  width: 252px;
 }
 
 .rfs-layout__instrument-row [data-rfs-panel="pfd"] > *,
@@ -271,6 +282,10 @@ const layoutCss = `
 }
 
 @media (max-width: 1279px) {
+  .rfs-layout__instrument-row [data-rfs-panel="pfd"] {
+    width: min(430px, 42vw);
+  }
+
   .rfs-layout__debug {
     top: 254px;
     left: 356px;
@@ -282,7 +297,29 @@ const layoutCss = `
 
 @media (min-width: 1280px) {
   .rfs-layout__controls {
-    width: 360px;
+    width: 440px;
+  }
+}
+
+@media (max-width: 1360px) {
+  .rfs-layout__top-left {
+    right: auto;
+    width: min(330px, calc(100vw - 300px));
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .rfs-layout__top-left [data-rfs-panel="scenario"] {
+    flex: 0 1 auto;
+    width: 100%;
+    max-height: clamp(160px, calc(100vh - 520px), 200px);
+  }
+
+  .rfs-layout__top-left [data-rfs-panel="takeoff-setup"] {
+    flex: 0 0 auto;
+    width: min(300px, 100%);
+    max-height: clamp(180px, calc(100vh - 510px), 220px);
+    overflow: auto;
   }
 }
 

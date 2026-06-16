@@ -9,6 +9,12 @@ import {
   type McpModeAvailability,
   type McpModeAvailabilityState,
 } from '../store/selectors';
+import { hasFlightDirectorGuidanceTarget, resolveGuidanceTargets } from '../sim/systems/guidanceTargets';
+import {
+  deriveEffectiveAutoflightTruth,
+  hasUnsupportedAutoflightModeRequest,
+  isAutoflightLateralOnly,
+} from '../sim/systems/effectiveAutoflightTruth';
 
 export { mcpModeAvailability };
 export type { EnabledMcpMode, McpModeAvailability, McpModeAvailabilityState };
@@ -47,6 +53,14 @@ const targetDisplayStyle: React.CSSProperties = {
   textAlign: 'center',
 };
 
+const advisoryStyle: React.CSSProperties = {
+  color: '#f6d365',
+  fontFamily: 'monospace',
+  fontSize: 10,
+  marginBottom: 4,
+  maxWidth: 220,
+};
+
 type McpTarget = 'speed' | 'heading' | 'altitude' | 'verticalSpeed';
 
 function clamp(value: number, min: number, max: number): number {
@@ -81,9 +95,9 @@ function formatVerticalSpeed(value: number): string {
   return value > 0 ? `+${value}` : `${value}`;
 }
 
-function applyMcpTargetDelta(apState: AutopilotState, target: McpTarget, delta: number): void {
+function applyMcpTargetDelta(apState: AutopilotState, target: McpTarget, delta: number, speedBaseKt = selectedSpeedKt(apState)): void {
   if (target === 'speed') {
-    apState.boeing.speed = clamp(selectedSpeedKt(apState) + delta, 100, 340);
+    apState.boeing.speed = clamp(Math.round(speedBaseKt) + delta, 100, 340);
   } else if (target === 'heading') {
     apState.boeing.heading = wrapHeadingDeg(selectedHeadingDeg(apState) + delta);
   } else if (target === 'altitude') {
@@ -104,19 +118,41 @@ export function RfsMCP() {
     displayedLatActive,
     modeAvailability,
     unavailableSummary,
-    speedTarget,
+    speedTargetLabel,
     headingTarget,
     altitudeTarget,
     verticalSpeedTarget,
   } = useSimStore(selectMcpViewModel);
+  const fdGuidanceUnavailable = useSimStore((s) => {
+    if (!s.apState?.boeing.fdLeft && !s.apState?.boeing.fdRight) return false;
+    const sharedTargets = resolveGuidanceTargets({
+      aircraft: s.aircraft,
+      apState: s.apState,
+      flightPlan: s.flightPlan,
+      routeStatus: s.routeStatus,
+      activeLegIndex: s.activeLegIndex,
+      wind: s.wind,
+    });
+    return !hasFlightDirectorGuidanceTarget(sharedTargets);
+  });
+  const lateralOnlyAuthority = useSimStore((s) => isAutoflightLateralOnly(deriveEffectiveAutoflightTruth(s.apState, {
+    aircraft: s.aircraft,
+    flightPlan: s.flightPlan,
+    routeStatus: s.routeStatus,
+  })));
+  const unsupportedModeRequested = useSimStore((s) => hasUnsupportedAutoflightModeRequest(s.apState));
 
   const toggleMode = (mode: EnabledMcpMode) => {
     const state = useSimStore.getState();
-    const availability = selectMcpViewModel(state).modeAvailability[mode];
+    const viewModel = selectMcpViewModel(state);
+    const availability = viewModel.modeAvailability[mode];
     if (!availability.available) return;
     const current = state.apState;
     const next = structuredClone(current ?? createDefaultAutopilotStateFromAircraft(state.aircraft, state.wind));
     applyMcpMode(next, mode);
+    if (mode === 'SPEED' && next.boeing.speed === null && !viewModel.speedTargetManaged) {
+      next.boeing.speed = viewModel.speedTarget;
+    }
     state.setApState(next);
   };
 
@@ -132,7 +168,7 @@ export function RfsMCP() {
     const state = useSimStore.getState();
     const current = state.apState;
     const next = structuredClone(current ?? createDefaultAutopilotStateFromAircraft(state.aircraft, state.wind));
-    applyMcpTargetDelta(next, target, delta);
+    applyMcpTargetDelta(next, target, delta, selectMcpViewModel(state).speedTarget);
     state.setApState(next);
   };
 
@@ -163,8 +199,23 @@ export function RfsMCP() {
         MCP
       </div>
       {unavailableSummary && (
-        <div role="status" style={{ color: '#f6d365', fontFamily: 'monospace', fontSize: 10, marginBottom: 4, maxWidth: 220 }}>
+        <div role="status" style={advisoryStyle}>
           MCP modes unavailable: {unavailableSummary}
+        </div>
+      )}
+      {unsupportedModeRequested && (
+        <div role="status" aria-label="Unsupported MCP mode warning" style={advisoryStyle}>
+          LOC/APP/G/S/LVL CHG unavailable — guidance targets not implemented
+        </div>
+      )}
+      {fdGuidanceUnavailable && (
+        <div role="status" style={advisoryStyle}>
+          FD guidance unavailable until supported mode selected
+        </div>
+      )}
+      {lateralOnlyAuthority && (
+        <div role="status" aria-label="Autopilot authority warning" style={advisoryStyle}>
+          AP lateral only — no pitch authority
         </div>
       )}
       <div aria-label="Flight Director switches" style={{ marginBottom: 4 }}>
@@ -188,7 +239,7 @@ export function RfsMCP() {
       <div aria-label="MCP selected targets" style={{ marginBottom: 4 }}>
         <div>
           <button aria-label="SPD -5" onClick={() => editTarget('speed', -5)} style={targetButtonStyle}>-</button>
-          <span style={targetDisplayStyle}>SPD {speedTarget}</span>
+          <span style={targetDisplayStyle}>{speedTargetLabel}</span>
           <button aria-label="SPD +5" onClick={() => editTarget('speed', 5)} style={targetButtonStyle}>+</button>
         </div>
         <div>

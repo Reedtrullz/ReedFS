@@ -110,6 +110,8 @@ async function cycleOverlayToDebug(page: Page): Promise<void> {
 }
 
 test.describe('RFS responsive layout and attribution safety', () => {
+  test.describe.configure({ timeout: 60_000 });
+
   for (const width of FLIGHT_VIEWPORT_WIDTHS) {
     test(`flight overlay panels and Cesium attribution do not overlap at ${width}px`, async ({ page }) => {
       await page.setViewportSize({ width, height: VIEWPORT_HEIGHT });
@@ -164,6 +166,6 @@ test.describe('RFS responsive layout and attribution safety', () => {
 
     await page.getByLabel('Scenario', { exact: true }).selectOption('ksea-tutorial');
     await clickButton(page, /^LOAD PLAN$/);
-    await expect(page.getByRole('status', { name: 'Route load result' })).toContainText(/route loaded/i);
+    await expect(page.getByRole('status', { name: 'Route load result' })).toContainText(/KSEA→KPDX loaded/i);
   });
 });

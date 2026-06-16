@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+  KPDX_TUTORIAL_SCENARIO,
   KSEA_LIGHT_PATTERN_SCENARIO,
   KSEA_TUTORIAL_SCENARIO,
   SCENARIOS,
   createAircraftStateForScenario,
 } from '../scenarios';
 import { B737_800_SPEC, createInitialState } from '../types';
+import { KSEA_KPDX_APPROACH_CONTRACT } from '../flightPlanLoader';
 import { updateFuel } from '../systems/fuel';
 
 function scenarioGrossWeight(scenario: typeof KSEA_TUTORIAL_SCENARIO): number {
@@ -37,15 +39,28 @@ describe('flight scenarios', () => {
     expect(kpdxScenario?.weather.cloudSeed).not.toBe(KSEA_TUTORIAL_SCENARIO.weather.cloudSeed);
   });
 
-  it('keeps each scenario weather station, fallback pressure/temperature, and cloud anchor aligned with its runway', () => {
+  it('keeps the KPDX tutorial scenario tied to the KSEA route runway contract', () => {
+    expect(KPDX_TUTORIAL_SCENARIO.id).toBe(KSEA_KPDX_APPROACH_CONTRACT.destinationScenarioId);
+    expect(KPDX_TUTORIAL_SCENARIO.runway.airport).toBe(KSEA_KPDX_APPROACH_CONTRACT.destinationAirport);
+    expect(KPDX_TUTORIAL_SCENARIO.runway.runway).toBe(KSEA_KPDX_APPROACH_CONTRACT.runway);
+    expect(KPDX_TUTORIAL_SCENARIO.runway.approach?.runwayId).toBe(KSEA_KPDX_APPROACH_CONTRACT.runway);
+    expect(KPDX_TUTORIAL_SCENARIO.runway.approach?.thresholdIdent).toBe(KSEA_KPDX_APPROACH_CONTRACT.thresholdIdent);
+  });
+
+  it('keeps each scenario weather station, fallback pressure/temperature, and cloud anchor aligned with its authored start state', () => {
     for (const scenario of SCENARIOS) {
       expect(scenario.weather.stationIcao).toBe(scenario.runway.airport);
       expect(scenario.weather.qnhHpa).toBeGreaterThan(850);
       expect(scenario.weather.qnhHpa).toBeLessThan(1100);
       expect(scenario.weather.surfaceTemperatureC).toBeGreaterThan(-60);
       expect(scenario.weather.surfaceTemperatureC).toBeLessThan(60);
-      expect(scenario.weather.cloudAnchor.lat).toBeCloseTo(scenario.position.lat, 1);
-      expect(scenario.weather.cloudAnchor.lon).toBeCloseTo(scenario.position.lon, 1);
+      if (scenario.initialAircraft?.weightOnWheels === false) {
+        expect(scenario.weather.cloudAnchor.lat).toBeTypeOf('number');
+        expect(scenario.weather.cloudAnchor.lon).toBeTypeOf('number');
+      } else {
+        expect(scenario.weather.cloudAnchor.lat).toBeCloseTo(scenario.position.lat, 1);
+        expect(scenario.weather.cloudAnchor.lon).toBeCloseTo(scenario.position.lon, 1);
+      }
     }
   });
 
@@ -64,7 +79,12 @@ describe('flight scenarios', () => {
       expect(state.cg).toBe(scenario.cgPercent);
       expect(state.config.stabilizerTrimUnits).toBe(scenario.stabilizerTrimUnits);
       expect(state.ground.groundAltFt).toBe(scenario.runway.elevationFt);
-      expect(state.ground.normalForceN).toBeCloseTo(state.grossWeight * 9.80665, 6);
+      if (scenario.initialAircraft?.weightOnWheels === false) {
+        expect(state.ground.weightOnWheels).toBe(false);
+        expect(state.ground.normalForceN).toBe(0);
+      } else {
+        expect(state.ground.normalForceN).toBeCloseTo(state.grossWeight * 9.80665, 6);
+      }
     }
   });
 
