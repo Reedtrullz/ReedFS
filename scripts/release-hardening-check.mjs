@@ -54,7 +54,7 @@ const requiredActions = [
   ["gitleaks/gitleaks-action", "e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e"],
   ["github/codeql-action/init", "8aad20d150bbac5944a9f9d289da16a4b0d87c1e"],
   ["github/codeql-action/analyze", "8aad20d150bbac5944a9f9d289da16a4b0d87c1e"],
-  ["aquasecurity/trivy-action", "57a97c7e7821a5776cebc9bb87c984fa69cba8f1"],
+  ["aquasecurity/trivy-action", "ed142fd0673e97e23eac54620cfb913e5ce36c25"],
 ];
 for (const [action, sha] of requiredActions) {
   check(allWorkflowYaml.includes(`uses: ${action}@${sha}`), `workflow must pin ${action} to ${sha}`);
@@ -67,12 +67,16 @@ for (const ecosystem of ["npm", "github-actions", "docker"]) {
 }
 check((dependabot.match(/directory:\s*\//g) ?? []).length >= 3, "Dependabot npm/actions/docker updates must target the repository root");
 check((dependabot.match(/interval:\s*weekly/g) ?? []).length >= 3, "Dependabot npm/actions/docker updates must run weekly");
+check(
+  /package-ecosystem:\s*docker[\s\S]*ignore:\s*-\s*dependency-name:\s*node[\s\S]*version-update:semver-major/.test(dependabot),
+  "Dependabot Docker updates must ignore Node semver-major bumps; Node major upgrades require a dedicated LTS/toolchain migration plan"
+);
 
 check(codeql.includes("security-events: write"), "CodeQL workflow must have security-events write permission");
 check(codeql.includes("languages: javascript-typescript"), "CodeQL workflow must analyze JavaScript/TypeScript");
 check(codeql.includes("build-mode: none"), "CodeQL workflow must use no-build analysis for JS/TS");
 
-check(ci.includes("aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1"), "docker-smoke job must run pinned Trivy image scan");
+check(ci.includes("aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25"), "docker-smoke job must run pinned Trivy image scan");
 check(ci.includes("image-ref: rfs:pr-smoke-${{ github.sha }}"), "Trivy scan must inspect the PR-safe smoke image");
 check(ci.includes("severity: HIGH,CRITICAL") && ci.includes("exit-code: '1'"), "Trivy scan must fail on HIGH/CRITICAL vulnerabilities");
 
@@ -104,7 +108,7 @@ check(ci.includes("PREVIOUS_PUBLIC_COMMIT"), "deploy rollback must capture the p
 check(ci.includes("Rollback public version check failed") && ci.includes("$PREVIOUS_PUBLIC_COMMIT"), "deploy rollback must verify the previous public /rfs-version.json commit after rollback");
 check(ci.includes('docker logs --tail=50 rfs_canary') && ci.includes('docker rm -f rfs_canary'), "deploy canary failures must print logs and clean up the canary container");
 
-check(dockerfile.includes("node:22-alpine@sha256:968df39aedcea65eeb078fb336ed7191baf48f972b4479711397108be0966920"), "Dockerfile must pin node:22-alpine by digest");
+check(dockerfile.includes("node:22-alpine@sha256:e58326d0d441090181ac150dc2078d3e2cf6a0d42e809aebba3ef5880935ffdd"), "Dockerfile must pin node:22-alpine by digest");
 check(dockerfile.includes("nginx:alpine@sha256:8b1e78743a03dbb2c95171cc58639fef29abc8816598e27fb910ed2e621e589a"), "Dockerfile must pin nginx:alpine by digest");
 check(dockerfile.includes("RUN apk upgrade --no-cache libcrypto3 libssl3 libxml2"), "Dockerfile must refresh fixed Alpine TLS/XML packages after the pinned nginx base image");
 check(dockerfile.includes("COPY scripts/bootstrap-rfms-shared.mjs") && dockerfile.includes("RUN node scripts/bootstrap-rfms-shared.mjs") && bootstrapRfmsShared.includes("810fc9652da431eaf8978b85bf4af131605559b5"), "Dockerfile must bootstrap the audited RFMS/RFMC commit");
