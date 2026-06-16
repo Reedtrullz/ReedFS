@@ -108,7 +108,7 @@ check(ci.includes("PREVIOUS_PUBLIC_COMMIT"), "deploy rollback must capture the p
 check(ci.includes("Rollback public version check failed") && ci.includes("$PREVIOUS_PUBLIC_COMMIT"), "deploy rollback must verify the previous public /rfs-version.json commit after rollback");
 check(ci.includes('docker logs --tail=50 rfs_canary') && ci.includes('docker rm -f rfs_canary'), "deploy canary failures must print logs and clean up the canary container");
 
-check(dockerfile.includes("node:22-alpine@sha256:968df39aedcea65eeb078fb336ed7191baf48f972b4479711397108be0966920"), "Dockerfile must pin node:22-alpine by digest");
+check(dockerfile.includes("node:22-alpine@sha256:e58326d0d441090181ac150dc2078d3e2cf6a0d42e809aebba3ef5880935ffdd"), "Dockerfile must pin node:22-alpine by digest");
 check(dockerfile.includes("nginx:alpine@sha256:8b1e78743a03dbb2c95171cc58639fef29abc8816598e27fb910ed2e621e589a"), "Dockerfile must pin nginx:alpine by digest");
 check(dockerfile.includes("RUN apk upgrade --no-cache libcrypto3 libssl3 libxml2"), "Dockerfile must refresh fixed Alpine TLS/XML packages after the pinned nginx base image");
 check(dockerfile.includes("COPY scripts/bootstrap-rfms-shared.mjs") && dockerfile.includes("RUN node scripts/bootstrap-rfms-shared.mjs") && bootstrapRfmsShared.includes("810fc9652da431eaf8978b85bf4af131605559b5"), "Dockerfile must bootstrap the audited RFMS/RFMC commit");
