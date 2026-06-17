@@ -93,6 +93,25 @@ describe('RouteStatus', () => {
     expect(screen.getByText(/not official procedure data/i)).toBeTruthy();
   });
 
+  it('labels ENVA→ENGM as a canned synthetic approach training route', () => {
+    useSimStore.setState({
+      routeStatus: routeStatus({
+        routeName: 'ENVA→ENGM',
+        activeLegIndex: 0,
+        activeLegCount: 6,
+        fromIdent: 'ENVA',
+        nextWaypointIdent: 'ENVA09_CLB',
+      }),
+    });
+
+    render(<RouteStatus />);
+
+    expect(screen.getByText('ENVA→ENGM')).toBeTruthy();
+    expect(screen.getByText(/CANNED TRAINING ROUTE/i)).toBeTruthy();
+    expect(screen.getByText(/synthetic training approach/i)).toBeTruthy();
+    expect(screen.getByText(/not official procedure data/i)).toBeTruthy();
+  });
+
   it('keeps pilot-facing leg display coherent if route feedback has an inconsistent leg count', () => {
     useSimStore.setState({
       routeStatus: routeStatus({

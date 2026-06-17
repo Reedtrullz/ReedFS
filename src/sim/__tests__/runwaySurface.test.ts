@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { KPDX_RUNWAY_10R, KSEA_RUNWAY_16L, type RunwayReference } from '../../viewport/runwayData';
-import { KSEA_TUTORIAL_SCENARIO } from '../scenarios';
+import { ENGM_RUNWAY_19R, KPDX_RUNWAY_10R, KSEA_RUNWAY_16L, type RunwayReference } from '../../viewport/runwayData';
+import { ENGM_19R_SHORT_FINAL_SCENARIO, KSEA_TUTORIAL_SCENARIO } from '../scenarios';
 import { createInitialState, B737_800_SPEC, type GeoPosition } from '../types';
 import { OFF_RUNWAY_FRICTION_SCALE, sampleKseaSurface, sampleSupportedAirportSurface } from '../runwaySurface';
 
@@ -102,6 +102,24 @@ describe('sampleKseaSurface', () => {
 });
 
 describe('sampleSupportedAirportSurface', () => {
+  it('classifies an ENGM runway 19R threshold position as prepared runway for ENVA arrivals', () => {
+    const sample = sampleSupportedAirportSurface(geoPositionForRunwayStart(ENGM_RUNWAY_19R));
+
+    expect(sample.kind).toBe('runway');
+    expect(sample.onRunway).toBe(true);
+    expect(sample.airport).toBe('ENGM');
+    expect(sample.runwayId).toBe('19R');
+    expect(sample.groundAltFt).toBe(ENGM_RUNWAY_19R.elevationFt);
+  });
+
+  it('classifies the ENGM 19R short-final scenario touchdown surface as prepared runway fallback-compatible', () => {
+    const sample = sampleSupportedAirportSurface(ENGM_19R_SHORT_FINAL_SCENARIO.position);
+
+    expect(sample.airport).toBe('ENGM');
+    expect(sample.groundAltFt).toBe(ENGM_RUNWAY_19R.elevationFt);
+    expect(sample.kind).not.toBe('unsupportedTerrain');
+  });
+
   it('classifies a KPDX runway threshold position as prepared runway', () => {
     const sample = sampleSupportedAirportSurface(geoPositionForRunwayStart(KPDX_RUNWAY_10R));
 

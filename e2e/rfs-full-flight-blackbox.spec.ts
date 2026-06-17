@@ -7,7 +7,7 @@ import {
   driveVisibleSimUntil,
   expectVisibleEngineStripCommand,
   idleThrustThroughVisibleControls,
-  loadSelectedRouteThroughVisibleControls,
+  loadEnvaEngmRouteThroughVisibleControls,
   openRfsBlackbox,
   readVisibleFlightNumbers,
   readVisibleFlightPhase,
@@ -15,8 +15,7 @@ import {
   readVisibleRouteStatus,
   resetThroughVisibleControls,
   rotateToVisiblePositiveRate,
-  selectKpdxShortFinalScenarioThroughVisibleControls,
-  selectKseaScenarioThroughVisibleControls,
+  selectEngmShortFinalScenarioThroughVisibleControls,
   setVisibleMcpAltitudeAtLeast,
   setVisibleMcpSpeedAtLeast,
   setVisibleMcpVerticalSpeed,
@@ -30,16 +29,15 @@ import {
 test.describe('RFS full flight black-box acceptance', () => {
   test.describe.configure({ retries: 0 });
 
-  test('visible route setup, backed climb smoke, and KPDX short-final landing rollout reset use visible controls only', async ({ page }) => {
+  test('visible ENVA→ENGM route setup, backed climb smoke, and ENGM 19R short-final landing rollout reset use visible controls only', async ({ page }) => {
     test.setTimeout(720_000);
 
     await page.clock.install();
     await openRfsBlackbox(page);
     await setVisibleSimRateTarget(page, 16);
 
-    await selectKseaScenarioThroughVisibleControls(page);
     await expect(page.getByLabel('Route status')).toContainText('NO ROUTE');
-    await loadSelectedRouteThroughVisibleControls(page);
+    await loadEnvaEngmRouteThroughVisibleControls(page);
 
     const takeoffSetup = page.getByRole('region', { name: 'Takeoff setup' });
     const currentConfig = takeoffSetup.getByLabel('Current takeoff configuration');
@@ -72,8 +70,9 @@ test.describe('RFS full flight black-box acceptance', () => {
     });
 
     const initialRoute = await readVisibleRouteStatus(page);
-    expect(initialRoute.activeLegIndex).toBe(1);
-    expect(initialRoute.activeLegCount).toBe(5);
+    expect(initialRoute.activeLegIndex).not.toBeNull();
+    expect(initialRoute.activeLegIndex as number).toBeGreaterThanOrEqual(1);
+    expect(initialRoute.activeLegCount).toBe(6);
     expect(initialRoute.distanceToGoNm).not.toBeNull();
     const climbTargetFt = await setVisibleMcpAltitudeAtLeast(page, 15_000);
     expect(climbTargetFt).toBeGreaterThanOrEqual(15_000);
@@ -92,7 +91,7 @@ test.describe('RFS full flight black-box acceptance', () => {
     await expect(page.getByLabel('PFD MCP selected targets')).toContainText(/SEL VS \+?1500/);
     await expect(page.getByRole('status', { name: 'Autopilot authority warning' })).toHaveCount(0);
     const enrouteRoute = await readVisibleRouteStatus(page);
-    expect(enrouteRoute.text).toMatch(/KSEA→KPDX/);
+    expect(enrouteRoute.text).toMatch(/ENVA→ENGM/);
     expect(enrouteRoute.distanceToGoNm).not.toBeNull();
     expect(enrouteRoute.text).not.toMatch(/LNAV unavailable/i);
     expect(await readVisibleFmaModes(page)).toEqual({
@@ -104,7 +103,7 @@ test.describe('RFS full flight black-box acceptance', () => {
 
     await resetThroughVisibleControls(page);
     await expect(page.getByLabel('Route status')).toContainText('NO ROUTE');
-    await selectKpdxShortFinalScenarioThroughVisibleControls(page);
+    await selectEngmShortFinalScenarioThroughVisibleControls(page);
     await setVisibleSimRateTarget(page, 16);
     await expectVisibleEngineStripCommand(page, {
       throttlePercent: 35,

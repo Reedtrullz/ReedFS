@@ -91,6 +91,31 @@ export async function selectKseaScenarioThroughVisibleControls(page: Page): Prom
   await page.getByLabel('Scenario', { exact: true }).selectOption('ksea-tutorial');
 }
 
+export interface VisibleRouteLoadExpectation {
+  routeName: string;
+  legText: RegExp;
+  activeLegCount: number;
+}
+
+const KSEA_ROUTE_LOAD_EXPECTATION: VisibleRouteLoadExpectation = {
+  routeName: 'KSEA→KPDX',
+  legText: /KSEA\s+→\s+OLM/,
+  activeLegCount: 5,
+};
+
+const ENVA_ENGM_ROUTE_LOAD_EXPECTATION: VisibleRouteLoadExpectation = {
+  routeName: 'ENVA→ENGM',
+  legText: /ENVA\s+→\s+ENVA09_CLB/,
+  activeLegCount: 6,
+};
+
+export async function selectEngmShortFinalScenarioThroughVisibleControls(page: Page): Promise<void> {
+  await page.getByLabel('Scenario', { exact: true }).selectOption('engm-19r-short-final');
+  const scenarioPanel = page.getByRole('region', { name: 'Scenario and tutorial' });
+  await expect(scenarioPanel).toContainText('ENGM 19R Short Final');
+  await expect(scenarioPanel).toContainText(/Synthetic ENGM 19R fixture; not official procedure data/i);
+}
+
 export async function selectKpdxShortFinalScenarioThroughVisibleControls(page: Page): Promise<void> {
   await page.getByLabel('Scenario', { exact: true }).selectOption('kpdx-10r-short-final');
   const scenarioPanel = page.getByRole('region', { name: 'Scenario and tutorial' });
@@ -98,7 +123,10 @@ export async function selectKpdxShortFinalScenarioThroughVisibleControls(page: P
   await expect(scenarioPanel).toContainText(/synthetic KPDX 10R final approach fixture; not official procedure data/i);
 }
 
-export async function loadSelectedRouteThroughVisibleControls(page: Page): Promise<void> {
+export async function loadSelectedRouteThroughVisibleControls(
+  page: Page,
+  expectation: VisibleRouteLoadExpectation = KSEA_ROUTE_LOAD_EXPECTATION,
+): Promise<void> {
   const loadPlanButton = page.getByRole('button', { name: /^LOAD PLAN$/ });
   await expect(loadPlanButton).toBeVisible();
   // After long page.clock.runFor() advances, Chromium's rAF can leave actionability
@@ -107,14 +135,18 @@ export async function loadSelectedRouteThroughVisibleControls(page: Page): Promi
   await activateAlreadyVisibleControl(loadPlanButton);
 
   const routeStatus = page.getByLabel('Route status');
-  await expect(routeStatus.getByText('KSEA→KPDX')).toBeVisible();
-  await expect(routeStatus.getByText(/LEG\s+1\/5/)).toBeVisible();
-  await expect(routeStatus.getByText('KSEA → OLM')).toBeVisible();
+  await expect(routeStatus.getByText(expectation.routeName)).toBeVisible();
+  await expect(routeStatus.getByText(new RegExp(`LEG\\s+1\\/${expectation.activeLegCount}`))).toBeVisible();
+  await expect(routeStatus.getByText(expectation.legText)).toBeVisible();
+}
+
+export async function loadEnvaEngmRouteThroughVisibleControls(page: Page): Promise<void> {
+  await loadSelectedRouteThroughVisibleControls(page, ENVA_ENGM_ROUTE_LOAD_EXPECTATION);
 }
 
 export async function loadKseaRouteThroughVisibleControls(page: Page): Promise<void> {
   await selectKseaScenarioThroughVisibleControls(page);
-  await loadSelectedRouteThroughVisibleControls(page);
+  await loadSelectedRouteThroughVisibleControls(page, KSEA_ROUTE_LOAD_EXPECTATION);
 }
 
 export async function startRollThroughVisibleControls(page: Page): Promise<void> {

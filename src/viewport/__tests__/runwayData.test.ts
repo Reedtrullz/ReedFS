@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ENGM_RUNWAY_19R,
+  ENGM_RUNWAY_19R_APPROACH,
+  ENGM_RUNWAYS,
   ENVA_RUNWAYS,
   KPDX_RUNWAY_10R,
   KPDX_RUNWAY_10R_APPROACH,
@@ -49,8 +52,24 @@ describe('runwayData', () => {
     expect(KPDX_RUNWAYS.map((runway) => runway.oppositeId)).toEqual(['28R', '28L', '21']);
   });
 
-  it('exports ENVA, KSEA and KPDX references as supported runways', () => {
-    expect(SUPPORTED_RUNWAYS).toEqual([...ENVA_RUNWAYS, ...KSEA_RUNWAYS, ...KPDX_RUNWAYS]);
+  it('exports ENVA, ENGM, KSEA and KPDX references as supported runways', () => {
+    expect(SUPPORTED_RUNWAYS).toEqual([...ENVA_RUNWAYS, ...ENGM_RUNWAYS, ...KSEA_RUNWAYS, ...KPDX_RUNWAYS]);
+  });
+
+  it('adds the ENGM runway 19R catalog for ENVA arrivals and opposite-id lookup', () => {
+    expect(ENGM_RUNWAYS).toEqual([ENGM_RUNWAY_19R]);
+    expect(ENGM_RUNWAY_19R).toMatchObject({
+      airport: 'ENGM',
+      id: '19R',
+      oppositeId: '01L',
+      label: '19R/01L',
+      headingDeg: 192,
+      elevationFt: 676,
+      lengthM: 3600,
+      widthM: 45,
+    });
+    expect(runwayByAirportAndId('ENGM', '19R')).toBe(ENGM_RUNWAY_19R);
+    expect(runwayByAirportAndId('ENGM', '01L')).toBe(ENGM_RUNWAY_19R);
   });
 
   it('finds KPDX 10R by primary and opposite runway ids', () => {
@@ -59,6 +78,28 @@ describe('runwayData', () => {
     expect(kpdx10R).toBeDefined();
     expect(runwayByAirportAndId('KPDX', '10R')).toBe(kpdx10R);
     expect(runwayByAirportAndId('KPDX', '28L')).toBe(kpdx10R);
+  });
+
+  it('exports synthetic ENGM 19R approach points tied to the destination runway threshold and final course', () => {
+    const approach = ENGM_RUNWAY_19R_APPROACH;
+
+    expect(approach).toMatchObject({
+      airport: 'ENGM',
+      runwayId: '19R',
+      coordinateSource: 'synthetic',
+      sourceNote: expect.stringMatching(/synthetic.*fixture.*not official procedure/i),
+    });
+    expect(approach.initialApproachFix.ident).toBe('ENGM19R_IF');
+    expect(approach.finalApproachFix.ident).toBe('ENGM19R_FAF');
+    expect(approach.threshold.ident).toBe('ENGM19R_RWY');
+    expect(approach.threshold.point).toEqual(ENGM_RUNWAY_19R.start);
+    expect(approach.initialApproachFix.point.altFt).toBe(3000);
+    expect(approach.finalApproachFix.point.altFt).toBe(ENGM_RUNWAY_19R.elevationFt + 1500);
+
+    expect(distanceNm(approach.threshold.point, approach.finalApproachFix.point)).toBeCloseTo(5, 1);
+    expect(distanceNm(approach.threshold.point, approach.initialApproachFix.point)).toBeCloseTo(12, 1);
+    expect(bearingDeg(approach.finalApproachFix.point, approach.threshold.point)).toBeCloseTo(ENGM_RUNWAY_19R.headingDeg, 0);
+    expect(bearingDeg(approach.initialApproachFix.point, approach.threshold.point)).toBeCloseTo(ENGM_RUNWAY_19R.headingDeg, 0);
   });
 
   it('exports synthetic KPDX 10R approach points tied to the runway threshold and final course', () => {

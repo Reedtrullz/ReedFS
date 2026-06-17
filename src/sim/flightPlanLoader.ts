@@ -2,6 +2,7 @@ import type { FlightPlan, FlightPlanWaypoint } from '@shared/types/fmc';
 import { createRouteSourceFromFlightPlan, type RouteSource } from './fms/routeAdapter';
 import type { FlightScenario } from './scenarios';
 import {
+  ENGM_RUNWAY_19R_APPROACH,
   ENVA_RUNWAY_09,
   KPDX_RUNWAY_10R_APPROACH,
   type RunwayApproachFixReference,
@@ -110,11 +111,21 @@ export function createKseaKpdxFlight(): FlightPlan {
 }
 
 export function createEnvaEngmFlight(): FlightPlan {
+  const approach = ENGM_RUNWAY_19R_APPROACH;
+
   return {
     origin: 'ENVA',
     destination: 'ENGM',
     flightNumber: 'RFS009',
-    route: 'ENVA ENVA09_CLB RFS_DOVRE RFS_MJOSA ENGM',
+    route: [
+      'ENVA',
+      'ENVA09_CLB',
+      'RFS_DOVRE',
+      'RFS_MJOSA',
+      approach.initialApproachFix.ident,
+      approach.finalApproachFix.ident,
+      approach.threshold.ident,
+    ].join(' '),
     waypoints: [
       {
         ident: 'ENVA',
@@ -150,10 +161,9 @@ export function createEnvaEngmFlight(): FlightPlan {
         altitudeConstraint: { type: 'AT_OR_ABOVE', altitude: 10000 },
         speedConstraint: { type: 'AT_OR_BELOW', speed: 280 },
       },
-      {
-        ...airportWaypoint('ENGM'),
-        altitudeConstraint: { type: 'AT_OR_ABOVE', altitude: 10000 },
-      },
+      approachFixWaypoint(approach.initialApproachFix, 'IF'),
+      approachFixWaypoint(approach.finalApproachFix, 'TF'),
+      thresholdWaypoint(approach.threshold),
     ],
   };
 }

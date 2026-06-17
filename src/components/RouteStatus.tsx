@@ -92,7 +92,7 @@ function isLoadedRoute(routeStatus: { routeName: string; routeValid: boolean }):
 }
 
 function RouteSourceReadback({ routeName }: { routeName: string }) {
-  const syntheticApproach = routeName === 'KSEA→KPDX';
+  const syntheticApproach = routeName === 'KSEA→KPDX' || routeName === 'ENVA→ENGM';
   return (
     <div style={routeSourceStyle}>
       <div>CANNED TRAINING ROUTE</div>

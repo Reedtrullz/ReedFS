@@ -6,8 +6,8 @@ import {
   createKseaKpdxRouteSource,
   KSEA_KPDX_APPROACH_CONTRACT,
 } from '../flightPlanLoader';
-import { ENVA_TUTORIAL_SCENARIO, KPDX_TUTORIAL_SCENARIO } from '../scenarios';
-import { KPDX_RUNWAY_10R_APPROACH } from '../../viewport/runwayData';
+import { ENGM_19R_SHORT_FINAL_SCENARIO, ENVA_TUTORIAL_SCENARIO, KPDX_TUTORIAL_SCENARIO } from '../scenarios';
+import { ENGM_RUNWAY_19R_APPROACH, KPDX_RUNWAY_10R_APPROACH } from '../../viewport/runwayData';
 
 describe('flightPlanLoader', () => {
   it('adds synthetic KPDX 10R approach, final and runway-threshold semantics to the KSEA route', () => {
@@ -79,24 +79,57 @@ describe('flightPlanLoader', () => {
     expect(source.limitations.join(' ')).toMatch(/not official procedure/i);
   });
 
-  it('provides an ENVA to ENGM route for the default tutorial scenario', () => {
+  it('provides an ENVA to ENGM route with synthetic ENGM 19R approach/runway semantics for the default tutorial scenario', () => {
     const route = createEnvaEngmFlight();
+    const approach = ENGM_RUNWAY_19R_APPROACH;
 
     expect(route.origin).toBe('ENVA');
     expect(route.destination).toBe('ENGM');
-    expect(route.route).toBe('ENVA ENVA09_CLB RFS_DOVRE RFS_MJOSA ENGM');
-    expect(route.waypoints).toHaveLength(5);
+    expect(ENGM_19R_SHORT_FINAL_SCENARIO.runway.approach).toEqual({
+      runwayId: approach.runwayId,
+      finalApproachFixIdent: approach.finalApproachFix.ident,
+      thresholdIdent: approach.threshold.ident,
+      coordinateSource: 'synthetic',
+    });
+    expect(route.route).toBe('ENVA ENVA09_CLB RFS_DOVRE RFS_MJOSA ENGM19R_IF ENGM19R_FAF ENGM19R_RWY');
+    expect(route.waypoints.map((waypoint) => waypoint.ident)).toEqual([
+      'ENVA',
+      'ENVA09_CLB',
+      'RFS_DOVRE',
+      'RFS_MJOSA',
+      approach.initialApproachFix.ident,
+      approach.finalApproachFix.ident,
+      approach.threshold.ident,
+    ]);
     expect(route.waypoints.every((waypoint) => waypoint.coordinateSource === 'synthetic')).toBe(true);
     expect(route.waypoints[1]).toMatchObject({
       ident: 'ENVA09_CLB',
       altitudeConstraint: { type: 'AT_OR_ABOVE', altitude: 3000 },
       speedConstraint: { type: 'AT_OR_BELOW', speed: 250 },
     });
+    expect(route.waypoints.at(-3)).toMatchObject({
+      ident: approach.initialApproachFix.ident,
+      lat: approach.initialApproachFix.point.lat,
+      lon: approach.initialApproachFix.point.lon,
+      legType: 'IF',
+      altitudeConstraint: { type: 'AT', altitude: approach.initialApproachFix.point.altFt },
+      speedConstraint: { type: 'AT_OR_BELOW', speed: approach.initialApproachFix.speedKt },
+    });
+    expect(route.waypoints.at(-2)).toMatchObject({
+      ident: approach.finalApproachFix.ident,
+      lat: approach.finalApproachFix.point.lat,
+      lon: approach.finalApproachFix.point.lon,
+      legType: 'TF',
+      altitudeConstraint: { type: 'AT', altitude: approach.finalApproachFix.point.altFt },
+      speedConstraint: { type: 'AT_OR_BELOW', speed: approach.finalApproachFix.speedKt },
+    });
     expect(route.waypoints.at(-1)).toMatchObject({
-      ident: 'ENGM',
-      lat: 60.1939,
-      lon: 11.1004,
-      altitudeConstraint: { type: 'AT_OR_ABOVE', altitude: 10000 },
+      ident: approach.threshold.ident,
+      lat: approach.threshold.point.lat,
+      lon: approach.threshold.point.lon,
+      legType: 'RW',
+      altitudeConstraint: { type: 'AT', altitude: approach.threshold.point.altFt },
+      speedConstraint: { type: 'AT_OR_BELOW', speed: approach.threshold.speedKt },
     });
 
     expect(createDefaultFlightForScenario(ENVA_TUTORIAL_SCENARIO)).toEqual(route);

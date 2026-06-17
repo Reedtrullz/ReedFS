@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { ENVA_TUTORIAL_SCENARIO, KPDX_TUTORIAL_SCENARIO, KSEA_LIGHT_PATTERN_SCENARIO, KSEA_TUTORIAL_SCENARIO, SCENARIOS } from '../../scenarios';
-import { createKseaKpdxFlight, KSEA_KPDX_APPROACH_CONTRACT } from '../../flightPlanLoader';
-import { KPDX_RUNWAY_10R_APPROACH } from '../../../viewport/runwayData';
+import { ENGM_19R_SHORT_FINAL_SCENARIO, ENVA_TUTORIAL_SCENARIO, KPDX_TUTORIAL_SCENARIO, KSEA_LIGHT_PATTERN_SCENARIO, KSEA_TUTORIAL_SCENARIO, SCENARIOS } from '../../scenarios';
+import { createEnvaEngmFlight, createKseaKpdxFlight, KSEA_KPDX_APPROACH_CONTRACT } from '../../flightPlanLoader';
+import { ENGM_RUNWAY_19R_APPROACH, KPDX_RUNWAY_10R_APPROACH } from '../../../viewport/runwayData';
 import {
   assertPerformanceCardMatchesScenario,
   b737PerformanceCards,
@@ -105,6 +105,27 @@ describe('B737 performance-card scenario assertions', () => {
     expect(finalApproach?.speedConstraint).toEqual({ type: 'AT_OR_BELOW', speed: card.approach.iasKt });
     expect(threshold?.altitudeConstraint).toEqual({ type: 'AT', altitude: KPDX_TUTORIAL_SCENARIO.runway.elevationFt });
     expect(threshold?.speedConstraint).toEqual({ type: 'AT_OR_BELOW', speed: card.landing.targetApproachIasKt });
+  });
+
+  it('keeps ENVA route approach targets aligned with the ENGM runway scenario', () => {
+    const route = createEnvaEngmFlight();
+    const approach = ENGM_RUNWAY_19R_APPROACH;
+    const finalApproach = route.waypoints.find((waypoint) => waypoint.ident === approach.finalApproachFix.ident);
+    const threshold = route.waypoints.find((waypoint) => waypoint.ident === approach.threshold.ident);
+
+    expect(ENGM_19R_SHORT_FINAL_SCENARIO.runway.airport).toBe('ENGM');
+    expect(ENGM_19R_SHORT_FINAL_SCENARIO.runway.runway).toBe(approach.runwayId);
+    expect(ENGM_19R_SHORT_FINAL_SCENARIO.runway.approach?.finalApproachFixIdent).toBe(approach.finalApproachFix.ident);
+    expect(ENGM_19R_SHORT_FINAL_SCENARIO.runway.approach?.thresholdIdent).toBe(approach.threshold.ident);
+    expect(route.route).toContain(approach.threshold.ident);
+    expect(route.destination).toBe('ENGM');
+    expect(finalApproach?.altitudeConstraint).toEqual({
+      type: 'AT',
+      altitude: approach.finalApproachFix.point.altFt,
+    });
+    expect(finalApproach?.speedConstraint).toEqual({ type: 'AT_OR_BELOW', speed: approach.finalApproachFix.speedKt });
+    expect(threshold?.altitudeConstraint).toEqual({ type: 'AT', altitude: ENGM_19R_SHORT_FINAL_SCENARIO.runway.elevationFt });
+    expect(threshold?.speedConstraint).toEqual({ type: 'AT_OR_BELOW', speed: approach.threshold.speedKt });
   });
 
   it.each(b737PerformanceCards)('labels $scenarioId performance-card ownership and runtime/test consumers', (card) => {

@@ -2,7 +2,7 @@ import type { AircraftSpec, AircraftState, FlightPhase, FuelState, GeoPosition }
 import { createB737GearStations, createInitialState } from './types';
 import { eulerToQuat } from './physics/quaternion';
 import type { WindInfo, ScenarioWeatherMetadata } from './weather';
-import { ENVA_RUNWAY_09, KPDX_RUNWAY_10R, KPDX_RUNWAY_10R_APPROACH, KSEA_RUNWAY_16L } from '../viewport/runwayData';
+import { ENGM_RUNWAY_19R, ENGM_RUNWAY_19R_APPROACH, ENVA_RUNWAY_09, KPDX_RUNWAY_10R, KPDX_RUNWAY_10R_APPROACH, KSEA_RUNWAY_16L } from '../viewport/runwayData';
 
 export interface ScenarioFuelLoad {
   centerTank: number;
@@ -118,6 +118,72 @@ export const ENVA_TUTORIAL_SCENARIO: FlightScenario = {
       id: 'rotate-positive-rate',
       title: 'Rotate and clean up',
       body: 'At VR, ease back to about 10° pitch. After positive rate, retract gear and climb out before cleaning flaps.',
+    },
+  ],
+};
+
+export const ENGM_19R_SHORT_FINAL_SCENARIO: FlightScenario = {
+  id: 'engm-19r-short-final',
+  name: 'ENGM 19R Short Final',
+  description: 'Synthetic ENGM 19R fixture; not official procedure data.',
+  position: {
+    lat: ENGM_RUNWAY_19R_APPROACH.finalApproachFix.point.lat,
+    lon: ENGM_RUNWAY_19R_APPROACH.finalApproachFix.point.lon,
+    alt: ENGM_RUNWAY_19R_APPROACH.finalApproachFix.point.altFt,
+  },
+  runway: {
+    airport: ENGM_RUNWAY_19R.airport,
+    runway: ENGM_RUNWAY_19R.id,
+    elevationFt: ENGM_RUNWAY_19R.elevationFt,
+    headingDeg: ENGM_RUNWAY_19R.headingDeg,
+    approach: {
+      runwayId: ENGM_RUNWAY_19R_APPROACH.runwayId,
+      finalApproachFixIdent: ENGM_RUNWAY_19R_APPROACH.finalApproachFix.ident,
+      thresholdIdent: ENGM_RUNWAY_19R_APPROACH.threshold.ident,
+      coordinateSource: ENGM_RUNWAY_19R_APPROACH.coordinateSource,
+    },
+  },
+  fuel: { centerTank: 4_000, leftTank: 2_000, rightTank: 2_000, totalFuel: 8_000 },
+  zeroFuelWeightKg: 49_913,
+  grossWeightKg: 57_913,
+  payloadWeightKg: 8_500,
+  cgPercent: 25,
+  stabilizerTrimUnits: 4.8,
+  flapSetting: 30,
+  initialAircraft: {
+    flightPhase: 'APPROACH',
+    airspeedKt: ENGM_RUNWAY_19R_APPROACH.finalApproachFix.speedKt,
+    verticalSpeedFpm: -700,
+    pitchDeg: 2.5,
+    throttle: 0.35,
+    weightOnWheels: false,
+  },
+  wind: { dir: 190, speed: 4, gustSeed: 1901 },
+  weather: scenarioWeather({
+    stationIcao: 'ENGM',
+    surfaceTemperatureC: 6,
+    qnhHpa: 1015,
+    visibilityM: 9999,
+    clouds: [{ cover: 'SCT', base: 3_500 }],
+    cloudSeed: 1901,
+    gustSeed: 1901,
+    cloudAnchor: { lat: ENGM_RUNWAY_19R.start.lat, lon: ENGM_RUNWAY_19R.start.lon },
+  }),
+  tutorialSteps: [
+    {
+      id: 'engm-short-final-configured',
+      title: 'Configured on ENGM 19R',
+      body: 'Gear down, flaps 30, landing thrust set; runway ahead.',
+    },
+    {
+      id: 'engm-flare-touchdown',
+      title: 'Flare and touchdown',
+      body: 'Use small pitch corrections and settle onto runway 19R.',
+    },
+    {
+      id: 'engm-rollout-stop',
+      title: 'Roll out and stop',
+      body: 'Hold brakes after touchdown, confirm decel, then reset.',
     },
   ],
 };
@@ -334,6 +400,7 @@ export const KPDX_10R_SHORT_FINAL_SCENARIO: FlightScenario = {
 
 export const SCENARIOS: FlightScenario[] = [
   ENVA_TUTORIAL_SCENARIO,
+  ENGM_19R_SHORT_FINAL_SCENARIO,
   KSEA_TUTORIAL_SCENARIO,
   KSEA_LIGHT_PATTERN_SCENARIO,
   KPDX_TUTORIAL_SCENARIO,

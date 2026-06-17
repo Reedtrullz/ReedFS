@@ -4,7 +4,7 @@ export interface RunwayGeoPoint {
   altFt: number;
 }
 
-export type SupportedAirport = 'ENVA' | 'KSEA' | 'KPDX';
+export type SupportedAirport = 'ENVA' | 'ENGM' | 'KSEA' | 'KPDX';
 
 const FT_TO_M = 0.3048;
 const M_PER_NM = 1852;
@@ -101,6 +101,23 @@ export const ENVA_RUNWAY_09: RunwayReference = {
   widthM: 45,
 };
 
+// ── ENGM (Oslo Gardermoen) ─────────────────────────────────────────────
+// Synthetic training runway for the ENVA→ENGM browser route proof. SkyVector
+// lists 01L/19R as 3,600 m x 45 m, headings 012°/192°, with 19R at
+// N60°12.96' / E11°5.50' and TDZE/elevation 676 ft. We model the 19R
+// arrival direction because the canned ENVA route arrives from the north.
+export const ENGM_RUNWAY_19R: RunwayReference = {
+  airport: 'ENGM',
+  id: '19R',
+  oppositeId: '01L',
+  label: '19R/01L',
+  start: { lat: 60.216, lon: 11.091667, altFt: 676 },
+  headingDeg: 192,
+  elevationFt: 676,
+  lengthM: 3600,
+  widthM: 45,
+};
+
 // ── KSEA (Seattle-Tacoma) ──────────────────────────────────────────────
 export const KSEA_RUNWAY_16L: RunwayReference = {
   airport: 'KSEA',
@@ -174,6 +191,30 @@ export const KPDX_RUNWAY_03: RunwayReference = {
   widthM: 150 * FT_TO_M,
 };
 
+export const ENGM_RUNWAY_19R_APPROACH: RunwayApproachReference = {
+  airport: ENGM_RUNWAY_19R.airport,
+  runwayId: ENGM_RUNWAY_19R.id,
+  coordinateSource: 'synthetic',
+  sourceNote: 'Synthetic RFS ENVA→ENGM fixture; not official procedure data.',
+  initialApproachFix: {
+    ident: 'ENGM19R_IF',
+    point: pointFromRunwayThreshold(ENGM_RUNWAY_19R, 12, 3000),
+    distanceNmFromThreshold: 12,
+    speedKt: 210,
+  },
+  finalApproachFix: {
+    ident: 'ENGM19R_FAF',
+    point: pointFromRunwayThreshold(ENGM_RUNWAY_19R, 5, ENGM_RUNWAY_19R.elevationFt + 1500),
+    distanceNmFromThreshold: 5,
+    speedKt: 140,
+  },
+  threshold: {
+    ident: 'ENGM19R_RWY',
+    point: { ...ENGM_RUNWAY_19R.start },
+    speedKt: 140,
+  },
+};
+
 export const KPDX_RUNWAY_10R_APPROACH: RunwayApproachReference = {
   airport: KPDX_RUNWAY_10R.airport,
   runwayId: KPDX_RUNWAY_10R.id,
@@ -199,9 +240,10 @@ export const KPDX_RUNWAY_10R_APPROACH: RunwayApproachReference = {
 };
 
 export const ENVA_RUNWAYS: RunwayReference[] = [ENVA_RUNWAY_09];
+export const ENGM_RUNWAYS: RunwayReference[] = [ENGM_RUNWAY_19R];
 export const KSEA_RUNWAYS: RunwayReference[] = [KSEA_RUNWAY_16L, KSEA_RUNWAY_16C, KSEA_RUNWAY_16R];
 export const KPDX_RUNWAYS: RunwayReference[] = [KPDX_RUNWAY_10L, KPDX_RUNWAY_10R, KPDX_RUNWAY_03];
-export const SUPPORTED_RUNWAYS: RunwayReference[] = [...ENVA_RUNWAYS, ...KSEA_RUNWAYS, ...KPDX_RUNWAYS];
+export const SUPPORTED_RUNWAYS: RunwayReference[] = [...ENVA_RUNWAYS, ...ENGM_RUNWAYS, ...KSEA_RUNWAYS, ...KPDX_RUNWAYS];
 
 export function runwayByAirportAndId(airport: string, runwayId: string): RunwayReference | undefined {
   return SUPPORTED_RUNWAYS.find(

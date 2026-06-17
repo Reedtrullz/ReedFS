@@ -572,7 +572,10 @@ describe('App', () => {
     expect(mockSetFlightPlan).toHaveBeenCalledTimes(1);
     expect(mockSetFlightPlan).toHaveBeenCalledWith(expect.objectContaining({ origin: 'ENVA', destination: 'ENGM' }));
     expect(mockSetApState).not.toHaveBeenCalled();
-    expect(screen.getByRole('status', { name: 'Route load result' }).textContent).toMatch(/ENVA→ENGM/);
+    const routeLoadResult = screen.getByRole('status', { name: 'Route load result' }).textContent;
+    expect(routeLoadResult).toBe(
+      'CANNED TRAINING ROUTE ENVA→ENGM loaded. Route editing is unavailable; synthetic approach fixes are not official procedure data; confirm flaps 5, trim 5.0, idle throttle, then START ROLL.',
+    );
     expect(screen.queryByText(/no default route/i)).toBeNull();
   });
 

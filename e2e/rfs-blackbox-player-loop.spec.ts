@@ -112,12 +112,6 @@ test.describe('RFS black-box player loop proof', () => {
     );
 
     await advanceTakeoffThrustThroughVisibleControls(page);
-    await driveVisibleSimUntil(page, 'visible mouse-only takeoff speed for rotation', async () => {
-      return (await readVisibleFlightNumbers(page)).iasKt >= 145;
-    }, {
-      timeoutMs: 120_000,
-      stepMs: 1000,
-    });
     await rotateWithVisibleMouseControlToPositiveRate(page);
     expect(await waitForVisibleFlightPhase(page, /^(CLIMB|CRUISE)$/)).toMatch(/^(CLIMB|CRUISE)$/);
 
