@@ -1,4 +1,4 @@
-FROM node:22-alpine@sha256:e58326d0d441090181ac150dc2078d3e2cf6a0d42e809aebba3ef5880935ffdd AS builder
+FROM node:22-alpine@sha256:ab07539e0988b63558ff621f5fbe1077054c39d9809112974fb79993949d41cd AS builder
 
 ARG RFS_COMMIT_SHA=unknown
 ARG RFS_IMAGE_REF=unknown
@@ -23,7 +23,7 @@ ENV RFS_COMMIT_SHA=${RFS_COMMIT_SHA} \
   VITE_CESIUM_ION_TOKEN=${VITE_CESIUM_ION_TOKEN}
 RUN npm run build
 
-FROM nginx:alpine@sha256:8b1e78743a03dbb2c95171cc58639fef29abc8816598e27fb910ed2e621e589a
+FROM nginx:alpine@sha256:20316569d8f81a160065d7d2a5eeffc7ca97d79022462ee255fd23fa103a6b5c
 RUN apk upgrade --no-cache libcrypto3 libssl3 libxml2
 ARG RFS_COMMIT_SHA=unknown
 ARG RFS_IMAGE_REF=unknown
