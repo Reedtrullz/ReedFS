@@ -46,7 +46,7 @@ check(packageJson.scripts?.["bootstrap:check"] === "node scripts/bootstrap-rfms-
 
 const allWorkflowYaml = `${ci}\n${codeql}`;
 const requiredActions = [
-  ["actions/checkout", "df4cb1c069e1874edd31b4311f1884172cec0e10"],
+  ["actions/checkout", "9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0"],
   ["actions/setup-node", "48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e"],
   ["docker/login-action", "650006c6eb7dba73a995cc03b0b2d7f5ca915bee"],
   ["docker/build-push-action", "f9f3042f7e2789586610d6e8b85c8f03e5195baf"],
@@ -108,9 +108,9 @@ check(ci.includes("PREVIOUS_PUBLIC_COMMIT"), "deploy rollback must capture the p
 check(ci.includes("Rollback public version check failed") && ci.includes("$PREVIOUS_PUBLIC_COMMIT"), "deploy rollback must verify the previous public /rfs-version.json commit after rollback");
 check(ci.includes('docker logs --tail=50 rfs_canary') && ci.includes('docker rm -f rfs_canary'), "deploy canary failures must print logs and clean up the canary container");
 
-check(dockerfile.includes("node:22-alpine@sha256:e58326d0d441090181ac150dc2078d3e2cf6a0d42e809aebba3ef5880935ffdd"), "Dockerfile must pin node:22-alpine by digest");
-check(dockerfile.includes("nginx:alpine@sha256:8b1e78743a03dbb2c95171cc58639fef29abc8816598e27fb910ed2e621e589a"), "Dockerfile must pin nginx:alpine by digest");
-check(dockerfile.includes("RUN apk upgrade --no-cache libcrypto3 libssl3 libxml2"), "Dockerfile must refresh fixed Alpine TLS/XML packages after the pinned nginx base image");
+check(dockerfile.includes("node:22-alpine@sha256:ab07539e0988b63558ff621f5fbe1077054c39d9809112974fb79993949d41cd"), "Dockerfile must pin node:22-alpine by digest");
+check(dockerfile.includes("nginx:alpine@sha256:20316569d8f81a160065d7d2a5eeffc7ca97d79022462ee255fd23fa103a6b5c"), "Dockerfile must pin nginx:alpine by digest");
+check(dockerfile.includes("RUN apk upgrade --no-cache libcrypto3 libssl3 libxml2 libexpat"), "Dockerfile must refresh fixed Alpine TLS/XML packages after the pinned nginx base image");
 check(dockerfile.includes("COPY scripts/bootstrap-rfms-shared.mjs") && dockerfile.includes("RUN node scripts/bootstrap-rfms-shared.mjs") && bootstrapRfmsShared.includes("810fc9652da431eaf8978b85bf4af131605559b5"), "Dockerfile must bootstrap the audited RFMS/RFMC commit");
 check(dockerfile.includes("npm ci --legacy-peer-deps"), "Dockerfile must use npm ci --legacy-peer-deps");
 check(dockerfile.includes("RFS_COMMIT_SHA") && dockerfile.includes("RFS_IMAGE_REF"), "Dockerfile must pass release metadata into the build");
