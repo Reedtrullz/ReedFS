@@ -110,7 +110,7 @@ check(ci.includes('docker logs --tail=50 rfs_canary') && ci.includes('docker rm 
 
 check(dockerfile.includes("node:22-alpine@sha256:ab07539e0988b63558ff621f5fbe1077054c39d9809112974fb79993949d41cd"), "Dockerfile must pin node:22-alpine by digest");
 check(dockerfile.includes("nginx:alpine@sha256:20316569d8f81a160065d7d2a5eeffc7ca97d79022462ee255fd23fa103a6b5c"), "Dockerfile must pin nginx:alpine by digest");
-check(dockerfile.includes("RUN apk upgrade --no-cache libcrypto3 libssl3 libxml2"), "Dockerfile must refresh fixed Alpine TLS/XML packages after the pinned nginx base image");
+check(dockerfile.includes("RUN apk upgrade --no-cache libcrypto3 libssl3 libxml2 libexpat"), "Dockerfile must refresh fixed Alpine TLS/XML packages after the pinned nginx base image");
 check(dockerfile.includes("COPY scripts/bootstrap-rfms-shared.mjs") && dockerfile.includes("RUN node scripts/bootstrap-rfms-shared.mjs") && bootstrapRfmsShared.includes("810fc9652da431eaf8978b85bf4af131605559b5"), "Dockerfile must bootstrap the audited RFMS/RFMC commit");
 check(dockerfile.includes("npm ci --legacy-peer-deps"), "Dockerfile must use npm ci --legacy-peer-deps");
 check(dockerfile.includes("RFS_COMMIT_SHA") && dockerfile.includes("RFS_IMAGE_REF"), "Dockerfile must pass release metadata into the build");
