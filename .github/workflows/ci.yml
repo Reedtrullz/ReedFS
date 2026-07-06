@@ -154,7 +154,7 @@ jobs:
         run: echo "image_ref=ghcr.io/reedtrullz/rfs:sha-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
       - name: Log in to GHCR
         # docker/login-action@v4
-        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
