@@ -9,8 +9,8 @@ import { fileURLToPath, URL } from 'node:url';
 const DIST_DIR = fileURLToPath(new URL('../dist/assets/', import.meta.url));
 
 const BUDGETS = {
-  // Current baseline after Task 39: app raw 278.9 KiB / gzip 90.0 KiB.
-  app: { rawBytes: 325 * 1024, gzipBytes: 105 * 1024, required: true },
+  // Current baseline after Norway source-backed runways plus arbitrary runway-pair route builder: app raw 351.0 KiB / gzip 111.5 KiB.
+  app: { rawBytes: 356 * 1024, gzipBytes: 112 * 1024, required: true },
   // React/Zustand framework chunk baseline: raw 182.4 KiB / gzip 56.7 KiB.
   vendorReact: { rawBytes: 205 * 1024, gzipBytes: 65 * 1024, required: true },
   // Generic vendor chunk baseline: raw 3.5 KiB / gzip 1.5 KiB.

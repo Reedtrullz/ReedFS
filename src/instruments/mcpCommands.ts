@@ -11,6 +11,9 @@ function clearBoeingModeFlags(apState: AutopilotState): void {
   apState.boeing.vs = false;
   apState.boeing.speedMode = false;
   apState.boeing.n1 = false;
+  apState.boeing.vorLoc = false;
+  apState.boeing.app = false;
+  apState.boeing.lvlChg = false;
 }
 
 export function toggleFlightDirectorSwitch(apState: AutopilotState, side: FlightDirectorSide): void {
@@ -41,8 +44,23 @@ export function applyMcpMode(apState: AutopilotState, mode: EnabledMcpMode): voi
     return;
   }
 
+  if (mode === 'APP') {
+    clearBoeingModeFlags(apState);
+    apState.truth.autopilotStatus = 'CMD_AB';
+    apState.truth.lateralActive = 'APP';
+    apState.truth.verticalActive = 'G_S';
+    apState.truth.thrustActive = 'SPEED';
+    apState.boeing.cmdA = true;
+    apState.boeing.cmdB = true;
+    apState.boeing.app = true;
+    apState.boeing.speedMode = true;
+    apState.boeing.autothrottleArm = true;
+    return;
+  }
+
   apState.truth.autopilotStatus = 'CMD_A';
   apState.boeing.cmdA = true;
+  apState.boeing.cmdB = false;
 
   if (mode === 'HDG_SEL' || mode === 'LNAV') {
     const lateral: LateralMode = mode;

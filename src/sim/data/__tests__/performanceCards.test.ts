@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ENVA_TUTORIAL_SCENARIO, KPDX_TUTORIAL_SCENARIO, KSEA_LIGHT_PATTERN_SCENARIO, KSEA_TUTORIAL_SCENARIO, SCENARIOS } from '../../scenarios';
-import { createKseaKpdxFlight, KSEA_KPDX_APPROACH_CONTRACT } from '../../flightPlanLoader';
-import { KPDX_RUNWAY_10R_APPROACH } from '../../../viewport/runwayData';
+import { createEnvaEngmFlight, createKseaKpdxFlight, ENVA_ENGM_APPROACH_CONTRACT, KSEA_KPDX_APPROACH_CONTRACT } from '../../flightPlanLoader';
+import { ENGM_AUTOLAND_APPROACH, KPDX_RUNWAY_10R_APPROACH } from '../../../viewport/runwayData';
 import {
   assertPerformanceCardMatchesScenario,
   b737PerformanceCards,
@@ -104,6 +104,30 @@ describe('B737 performance-card scenario assertions', () => {
     });
     expect(finalApproach?.speedConstraint).toEqual({ type: 'AT_OR_BELOW', speed: card.approach.iasKt });
     expect(threshold?.altitudeConstraint).toEqual({ type: 'AT', altitude: KPDX_TUTORIAL_SCENARIO.runway.elevationFt });
+    expect(threshold?.speedConstraint).toEqual({ type: 'AT_OR_BELOW', speed: card.landing.targetApproachIasKt });
+  });
+
+  it('keeps ENVA route approach targets aligned with the ENGM autoland fixture and ENVA performance card', () => {
+    const card = findPerformanceCardForScenario(ENVA_ENGM_APPROACH_CONTRACT.originScenarioId);
+    const route = createEnvaEngmFlight();
+    const approach = ENGM_AUTOLAND_APPROACH;
+    const finalApproach = route.waypoints.find((waypoint) => waypoint.ident === approach.finalApproachFix.ident);
+    const threshold = route.waypoints.find((waypoint) => waypoint.ident === approach.threshold.ident);
+
+    expect(ENVA_ENGM_APPROACH_CONTRACT.originScenarioId).toBe(ENVA_TUTORIAL_SCENARIO.id);
+    expect(ENVA_ENGM_APPROACH_CONTRACT.runway).toBe('19R');
+    expect(route.destination).toBe(ENVA_ENGM_APPROACH_CONTRACT.destinationAirport);
+    expect(route.route).toContain(ENGM_AUTOLAND_APPROACH.threshold.ident);
+    expect(approach.coordinateSource).toBe('synthetic');
+    expect(approach.sourceNote).toMatch(/not official procedure/i);
+    expect(threshold?.ident).toBe(ENVA_ENGM_APPROACH_CONTRACT.thresholdIdent);
+    expect(threshold?.ident).toMatch(new RegExp(`${route.destination}${ENVA_ENGM_APPROACH_CONTRACT.runway}_RWY`));
+    expect(finalApproach?.altitudeConstraint).toEqual({
+      type: 'AT',
+      altitude: approach.threshold.point.altFt + card.approach.heightAglFt,
+    });
+    expect(finalApproach?.speedConstraint).toEqual({ type: 'AT_OR_BELOW', speed: card.approach.iasKt });
+    expect(threshold?.altitudeConstraint).toEqual({ type: 'AT', altitude: ENGM_AUTOLAND_APPROACH.threshold.point.altFt });
     expect(threshold?.speedConstraint).toEqual({ type: 'AT_OR_BELOW', speed: card.landing.targetApproachIasKt });
   });
 

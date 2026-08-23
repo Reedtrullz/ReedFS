@@ -4,7 +4,7 @@ import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
 import type { FlightPlan } from '@shared/types/fmc';
 import { RfsPFD, deriveFlightDirectorCue } from '../RfsPFD';
 import { useSimStore } from '../../store/simStore';
-import { computeRouteStatus } from '../../sim/systems/navigation';
+import { computeRouteStatus, createNoRouteStatus } from '../../sim/systems/navigation';
 import { eulerToQuat } from '../../sim/physics/quaternion';
 import { KSEA_TUTORIAL_SCENARIO } from '../../sim/scenarios';
 
@@ -164,6 +164,86 @@ function setAircraftOnKseaRoute() {
   const flightPlan = routeWithAltitudeConstraint();
   const routeStatus = computeRouteStatus(aircraft, flightPlan, 0);
   useSimStore.setState({ aircraft, flightPlan, activeLegIndex: 0, routeStatus });
+}
+
+function envaEngmSyntheticAutolandRoute(): FlightPlan {
+  return {
+    origin: 'ENVA',
+    destination: 'ENGM',
+    flightNumber: 'RFS190',
+    route: 'ENVA ENGM19R_IF ENGM19R_FAF ENGM19R_RWY',
+    waypoints: [
+      { ident: 'ENVA', lat: 63.4583, lon: 10.9101, coordinateSource: 'synthetic', discontinuity: false },
+      { ident: 'ENGM19R_IF', lat: 60.395, lon: 11.0, coordinateSource: 'synthetic', discontinuity: false, legType: 'IF', altitudeConstraint: { type: 'AT', altitude: 3000 }, speedConstraint: { type: 'AT_OR_BELOW', speed: 210 } },
+      { ident: 'ENGM19R_FAF', lat: 60.278, lon: 11.055, coordinateSource: 'synthetic', discontinuity: false, legType: 'TF', altitudeConstraint: { type: 'AT', altitude: 2200 }, speedConstraint: { type: 'AT_OR_BELOW', speed: 150 } },
+      { ident: 'ENGM19R_RWY', lat: 60.1939, lon: 11.1004, coordinateSource: 'synthetic', discontinuity: false, legType: 'RW', altitudeConstraint: { type: 'AT', altitude: 681 }, speedConstraint: { type: 'AT_OR_BELOW', speed: 138 } },
+    ],
+  };
+}
+
+function setAircraftOnEngmAutolandFinal(aglFt = 40) {
+  const aircraft = structuredClone(useSimStore.getState().aircraft);
+  aircraft.position.lat = 60.224;
+  aircraft.position.lon = 11.084;
+  aircraft.position.alt = 681 + aglFt;
+  aircraft.velocity.u = 72;
+  aircraft.velocity.v = 0;
+  aircraft.velocity.w = 0;
+  aircraft.attitude = { phi: 0, theta: 0, psi: 190 * Math.PI / 180 };
+  aircraft.quaternion = eulerToQuat(aircraft.attitude.phi, aircraft.attitude.theta, aircraft.attitude.psi);
+  aircraft.ground = {
+    ...aircraft.ground,
+    weightOnWheels: false,
+    aglFt,
+    groundAltFt: 681,
+    contact: 'none',
+    onRunway: false,
+  };
+  aircraft.flightPhase = 'APPROACH';
+  const flightPlan = envaEngmSyntheticAutolandRoute();
+  const routeStatus = {
+    ...createNoRouteStatus(flightPlan),
+    routeName: 'ENVA→ENGM',
+    routeValid: true,
+    routeComplete: false,
+    approachHandoff: 'threshold' as const,
+    lnavAvailable: true,
+    lnavUnavailableReason: null,
+    activeLegIndex: 2,
+    activeLegCount: 3,
+    fromWaypointIndex: 2,
+    toWaypointIndex: 3,
+    fromIdent: 'ENGM19R_FAF',
+    nextWaypointIdent: 'ENGM19R_RWY',
+    distanceToNextM: 2 * M_PER_NM,
+    distanceToNextNm: 2,
+    desiredTrackRad: 190 * Math.PI / 180,
+    desiredTrackDegTrue: 190,
+    crossTrackErrorM: 0,
+    alongTrackM: 0,
+    legLengthM: 5 * M_PER_NM,
+    waypointReached: false,
+    sequenced: false,
+  };
+  useSimStore.setState({ aircraft, flightPlan, activeLegIndex: 2, routeStatus });
+}
+
+function appAutolandAp(): AutopilotState {
+  const ap = apStateWithModes();
+  ap.truth.autopilotStatus = 'CMD_AB';
+  ap.truth.lateralActive = 'APP';
+  ap.truth.verticalActive = 'G_S';
+  ap.truth.thrustActive = 'SPEED';
+  ap.boeing.cmdA = true;
+  ap.boeing.cmdB = true;
+  ap.boeing.app = true;
+  ap.boeing.lnav = false;
+  ap.boeing.vnav = false;
+  ap.boeing.speedMode = true;
+  ap.boeing.speed = null;
+  ap.boeing.fdLeft = true;
+  ap.boeing.fdRight = true;
+  return ap;
 }
 
 describe('RfsPFD', () => {
@@ -546,6 +626,31 @@ describe('RfsPFD', () => {
     expect(screen.getByText('LNAV')).toBeTruthy();
     expect(screen.getByText('VNAV_PTH')).toBeTruthy();
     expect(screen.getByText('CMD_A')).toBeTruthy();
+  });
+
+  it('shows backed APP, G_S, and CMD_AB FMA truth with APP/G_S flight director cues on synthetic autoland final', () => {
+    setAircraftOnEngmAutolandFinal(40);
+    useSimStore.getState().setApState(appAutolandAp());
+
+    render(<RfsPFD />);
+
+    expect(screen.getByLabelText('FMA thr active').textContent).toBe('SPEED');
+    expect(screen.getByLabelText('FMA roll active').textContent).toBe('APP');
+    expect(screen.getByLabelText('FMA pitch active').textContent).toBe('G_S');
+    expect(screen.getByLabelText('FMA ap active').textContent).toBe('CMD_AB');
+    expect(screen.getByLabelText('Flight director roll bar').getAttribute('data-mode')).toBe('APP');
+    expect(screen.getByLabelText('Flight director pitch bar').getAttribute('data-mode')).toBe('G_S');
+  });
+
+  it('annunciates RETARD on the PFD near synthetic autoland touchdown', () => {
+    setAircraftOnEngmAutolandFinal(24);
+    useSimStore.getState().setApState(appAutolandAp());
+
+    render(<RfsPFD />);
+
+    expect(screen.getByLabelText('FMA thr active').textContent).toBe('RETARD');
+    expect(screen.getByLabelText('FMA roll active').textContent).toBe('APP');
+    expect(screen.getByLabelText('FMA pitch active').textContent).toBe('G_S');
   });
 
   it('labels CMD_A with PITCH OFF as lateral-only with no pitch authority on the PFD', () => {

@@ -62,6 +62,105 @@ function routeStatusBeforeTod(): RouteStatusSnapshot {
   };
 }
 
+function envaEngmSyntheticAutolandRoute(): FlightPlan {
+  return {
+    origin: 'ENVA',
+    destination: 'ENGM',
+    flightNumber: 'RFS190',
+    route: 'ENVA ENGM19R_IF ENGM19R_FAF ENGM19R_RWY',
+    waypoints: [
+      { ident: 'ENVA', lat: 63.4583, lon: 10.9101, coordinateSource: 'synthetic', discontinuity: false },
+      {
+        ident: 'ENGM19R_IF',
+        lat: 60.395,
+        lon: 11.0,
+        coordinateSource: 'synthetic',
+        discontinuity: false,
+        legType: 'IF',
+        altitudeConstraint: { type: 'AT', altitude: 3000 },
+        speedConstraint: { type: 'AT_OR_BELOW', speed: 210 },
+      },
+      {
+        ident: 'ENGM19R_FAF',
+        lat: 60.278,
+        lon: 11.055,
+        coordinateSource: 'synthetic',
+        discontinuity: false,
+        legType: 'TF',
+        altitudeConstraint: { type: 'AT', altitude: 2200 },
+        speedConstraint: { type: 'AT_OR_BELOW', speed: 150 },
+      },
+      {
+        ident: 'ENGM19R_RWY',
+        lat: 60.1939,
+        lon: 11.1004,
+        coordinateSource: 'synthetic',
+        discontinuity: false,
+        legType: 'RW',
+        altitudeConstraint: { type: 'AT', altitude: 681 },
+        speedConstraint: { type: 'AT_OR_BELOW', speed: 138 },
+      },
+    ],
+  };
+}
+
+function aircraftOnEngmFinal(altitudeFt = 1600, aglFt = 920) {
+  const aircraft = createInitialState(B737_800_SPEC);
+  aircraft.position.lat = 60.224;
+  aircraft.position.lon = 11.084;
+  aircraft.position.alt = altitudeFt;
+  aircraft.velocity.u = 72;
+  aircraft.ground = {
+    ...aircraft.ground,
+    weightOnWheels: false,
+    aglFt,
+    groundAltFt: 681,
+    contact: 'none',
+    onRunway: false,
+  };
+  aircraft.flightPhase = 'APPROACH';
+  return aircraft;
+}
+
+function engmFinalRouteStatus(): RouteStatusSnapshot {
+  return {
+    ...createNoRouteStatus(envaEngmSyntheticAutolandRoute()),
+    routeName: 'ENVA→ENGM',
+    routeValid: true,
+    routeComplete: false,
+    approachHandoff: 'threshold',
+    lnavAvailable: true,
+    lnavUnavailableReason: null,
+    activeLegIndex: 2,
+    activeLegCount: 3,
+    fromWaypointIndex: 2,
+    toWaypointIndex: 3,
+    fromIdent: 'ENGM19R_FAF',
+    nextWaypointIdent: 'ENGM19R_RWY',
+    distanceToNextM: 2 * M_PER_NM,
+    distanceToNextNm: 2,
+    desiredTrackRad: 190 * Math.PI / 180,
+    desiredTrackDegTrue: 190,
+    crossTrackErrorM: 0,
+    alongTrackM: 0,
+    legLengthM: 5 * M_PER_NM,
+    waypointReached: false,
+    sequenced: false,
+  };
+}
+
+function appAutolandAp(): AutopilotState {
+  const ap = makeAp('APP', 'G_S', 'SPEED');
+  ap.truth.autopilotStatus = 'CMD_AB';
+  ap.boeing.cmdA = true;
+  ap.boeing.cmdB = true;
+  ap.boeing.app = true;
+  ap.boeing.speedMode = true;
+  ap.boeing.autothrottleArm = true;
+  ap.boeing.speed = null;
+  return ap;
+}
+
 function makeAp(lateral: LateralMode, vertical: VerticalMode, thrust: ThrustMode): AutopilotState {
   return {
     boeing: { courseL:0,courseR:0,speed:null,mach:null,heading:0,altitude:0,verticalSpeed:null,
@@ -278,6 +377,46 @@ describe('computeAutopilotCommandsForState effective truth gating', () => {
     const commands = computeAutopilotCommandsForState(s, ap, null, 1 / 60, null, createNoRouteStatus());
 
     expect(commands.elevator).toBeUndefined();
+  });
+
+  it('commands APP roll, G_S pitch, and SPEED thrust for a backed synthetic ENVA to ENGM autoland route', () => {
+    const s = aircraftOnEngmFinal();
+    const ap = appAutolandAp();
+    const flightPlan = envaEngmSyntheticAutolandRoute();
+    const routeStatus = engmFinalRouteStatus();
+
+    const commands = computeAutopilotCommandsForState(s, ap, flightPlan, 1, 2, routeStatus);
+
+    expect(commands.aileron).toBeDefined();
+    expect(commands.elevator).toBeGreaterThan(0);
+    expect(commands.throttle1).toBeDefined();
+    expect(commands.throttle2).toBe(commands.throttle1);
+  });
+
+  it('commands a flare-like nose-up elevator and idle RETARD thrust near touchdown', () => {
+    const s = aircraftOnEngmFinal(712, 31);
+    const ap = appAutolandAp();
+    const flightPlan = envaEngmSyntheticAutolandRoute();
+    const routeStatus = engmFinalRouteStatus();
+
+    const commands = computeAutopilotCommandsForState(s, ap, flightPlan, 1, 2, routeStatus);
+
+    expect(commands.elevator).toBeLessThan(0);
+    expect(commands.throttle1).toBe(0);
+    expect(commands.throttle2).toBe(0);
+  });
+
+  it('does not command APP or G_S axes without compatible synthetic approach metadata', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.velocity.u = 128.6;
+    s.ground = { ...s.ground, weightOnWheels: false, aglFt: 1000, contact: 'none', onRunway: false };
+    const ap = appAutolandAp();
+
+    const commands = computeAutopilotCommandsForState(s, ap, null, 1 / 60, null, createNoRouteStatus());
+
+    expect(commands.aileron).toBeUndefined();
+    expect(commands.elevator).toBeUndefined();
+    expect(commands.throttle1).toBeDefined();
   });
 });
 

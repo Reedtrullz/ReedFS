@@ -123,15 +123,16 @@ function hasVerticalGuidance(truth: AutoflightTruthState): boolean {
     || truth.verticalActive === 'VS'
     || truth.verticalActive === 'VNAV'
     || truth.verticalActive === 'VNAV_PTH'
-    || truth.verticalActive === 'ALT*';
+    || truth.verticalActive === 'ALT*'
+    || truth.verticalActive === 'G_S';
 }
 
 function hasLateralGuidance(truth: AutoflightTruthState): boolean {
-  return truth.lateralActive === 'HDG_SEL' || truth.lateralActive === 'LNAV';
+  return truth.lateralActive === 'HDG_SEL' || truth.lateralActive === 'LNAV' || truth.lateralActive === 'APP';
 }
 
 function hasThrustGuidance(truth: AutoflightTruthState): boolean {
-  return truth.thrustActive === 'SPEED' || truth.thrustActive === 'N1';
+  return truth.thrustActive === 'SPEED' || truth.thrustActive === 'N1' || truth.thrustActive === 'RETARD';
 }
 
 export function computeN1TargetPercent(state: AircraftState): number {
@@ -146,6 +147,8 @@ interface Targets {
   targetSpeedKt: number;
   targetVerticalSpeedFpm?: number;
   targetN1Percent?: number;
+  targetPitchDeg?: number;
+  targetThrottle?: number;
 }
 
 export function resolveAutopilotTargets(
@@ -174,6 +177,8 @@ export function resolveAutopilotTargets(
     targetSpeedKt: shared.thrust?.targetSpeedKt ?? finiteOrUndefined(ap.boeing.speed) ?? 250,
     targetVerticalSpeedFpm: shared.vertical?.targetVerticalSpeedFpm,
     targetN1Percent: shared.thrust?.targetN1Percent,
+    targetPitchDeg: shared.vertical?.targetPitchDeg,
+    targetThrottle: shared.thrust?.targetThrottle,
   };
 }
 
@@ -231,6 +236,8 @@ export function computeAutopilotCommands(
   targetVerticalSpeedFpm?: number,
   targetN1Percent?: number,
   wind: WindInfo | null = null,
+  targetPitchDeg?: number,
+  targetThrottle?: number,
 ): AutopilotCommands {
   return computeAutopilotCommandsWithControllerState(
     state,
@@ -242,6 +249,9 @@ export function computeAutopilotCommands(
     targetVerticalSpeedFpm,
     targetN1Percent,
     wind,
+    undefined,
+    targetPitchDeg,
+    targetThrottle,
   ).commands;
 }
 
@@ -256,6 +266,8 @@ export function computeAutopilotCommandsWithControllerState(
   targetN1Percent?: number,
   wind: WindInfo | null = null,
   controllerState: AutopilotControllerState = createAutopilotControllerState(),
+  targetPitchDeg?: number,
+  targetThrottle?: number,
 ): AutopilotCommandResult {
   const t = ap.truth;
   const autopilotEngaged = isAutopilotEngaged(ap);
@@ -278,6 +290,14 @@ export function computeAutopilotCommandsWithControllerState(
     } else if (t.verticalActive === 'VNAV' || t.verticalActive === 'VNAV_PTH' || t.verticalActive === 'ALT*') {
       const vs = finiteOrUndefined(targetVerticalSpeedFpm);
       if (vs !== undefined) pitchTargetDeg = vsToPitch(nextControllerState, vs, state, dt);
+    } else if (t.verticalActive === 'G_S') {
+      const flarePitchTargetDeg = finiteOrUndefined(targetPitchDeg);
+      const vs = finiteOrUndefined(targetVerticalSpeedFpm);
+      if (flarePitchTargetDeg !== undefined) {
+        pitchTargetDeg = flarePitchTargetDeg;
+      } else if (vs !== undefined) {
+        pitchTargetDeg = vsToPitch(nextControllerState, vs, state, dt);
+      }
     }
 
     if (pitchTargetDeg !== undefined) {
@@ -289,7 +309,7 @@ export function computeAutopilotCommandsWithControllerState(
   // ── Bank target ──
   if (autopilotEngaged && hasLateralGuidance(t)) {
     let bankTargetDeg = 0; // default: wings level
-    if (t.lateralActive === 'HDG_SEL' || t.lateralActive === 'LNAV') {
+    if (t.lateralActive === 'HDG_SEL' || t.lateralActive === 'LNAV' || t.lateralActive === 'APP') {
       bankTargetDeg = headingToBank(targetHeadingRad, state);
     }
     cmd.aileron = bankHold(nextControllerState, bankTargetDeg, state, dt);
@@ -350,6 +370,11 @@ export function computeAutopilotCommandsWithControllerState(
     const correction = clamp((targetN1Percent - avgN1) * 0.01, -0.15, 0.15);
     cmd.throttle1 = clamp01(base + correction);
     cmd.throttle2 = cmd.throttle1;
+  } else if (t.thrustActive === 'RETARD' && ap.boeing.autothrottleArm) {
+    const idleThrottle = clamp01(finiteOrUndefined(targetThrottle) ?? 0);
+    nextControllerState.throttleLimited = idleThrottle;
+    cmd.throttle1 = idleThrottle;
+    cmd.throttle2 = idleThrottle;
   }
 
   return { commands: cmd, controllerState: nextControllerState };
@@ -414,6 +439,8 @@ export function computeAutopilotCommandsForStateWithControllerState(
     tgts.targetN1Percent,
     wind,
     nextControllerState,
+    tgts.targetPitchDeg,
+    tgts.targetThrottle,
   );
 }
 

@@ -14,6 +14,10 @@ function check(condition, message) {
   if (!condition) failures.push(message);
 }
 
+function countMatches(source, pattern) {
+  return source.match(pattern) ?? [];
+}
+
 function dockerignoreHasLine(pattern) {
   return dockerignore.split(/\r?\n/).some((line) => line.trim() === pattern);
 }
@@ -190,6 +194,25 @@ check(playbook.includes("image_ref") && playbook.includes("ghcr.io/reedtrullz/rf
 check(playbook.includes("https://{{ public_domain }}/") && playbook.includes("rfs-version.json"), "Ansible deploy must verify public domain and version metadata");
 check(playbook.includes("previous_image") && playbook.includes("Rollback"), "Ansible deploy must include a rollback path");
 check(playbook.includes("existing_prod.container.Image | default(existing_prod.container.Config.Image"), "Ansible rollback must prefer the previous image ID over Config.Image");
+check(playbook.includes("host_port: '3005'"), "Ansible production host port must stay aligned with public proxy port 3005");
+check(playbook.includes("canary_host_port: '3004'"), "Ansible canary host port must stay aligned with canary port 3004");
+check(playbook.includes("container_port: '8080'"), "Ansible deploy must target the hardened nginx container port 8080");
+check(countMatches(playbook, /127\.0\.0\.1:\{\{ (?:canary_)?host_port \}\}:\{\{ container_port \}\}/g).length >= 3, "Ansible canary, production, and rollback must bind localhost host ports to container port 8080");
+check(countMatches(playbook, /user:\s*'101:101'/g).length >= 3, "Ansible canary, production, and rollback must run as UID/GID 101:101");
+check(countMatches(playbook, /read_only:\s*true/g).length >= 3, "Ansible canary, production, and rollback must use read_only containers");
+check(countMatches(playbook, /cap_drop:\s*\n\s+- ALL/g).length >= 3, "Ansible canary, production, and rollback must drop all Linux capabilities");
+check(countMatches(playbook, /security_opts:\s*\n\s+- no-new-privileges/g).length >= 3, "Ansible canary, production, and rollback must set no-new-privileges");
+for (const tmpfsMount of [
+  "/var/cache/nginx:rw,noexec,nosuid,size=16m,uid=101,gid=101,mode=755",
+  "/var/run:rw,noexec,nosuid,size=4m,uid=101,gid=101,mode=755",
+  "/tmp:rw,noexec,nosuid,size=16m,uid=101,gid=101,mode=1777",
+]) {
+  check(countMatches(playbook, new RegExp(tmpfsMount.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")).length >= 3, `Ansible canary, production, and rollback must mount tmpfs ${tmpfsMount}`);
+}
+check(countMatches(playbook, /pids_limit:\s*128/g).length >= 3, "Ansible canary, production, and rollback must set pids_limit 128");
+check(countMatches(playbook, /memory:\s*'256m'/g).length >= 3, "Ansible canary, production, and rollback must set 256m memory limit");
+check(countMatches(playbook, /cpus:\s*1\.0/g).length >= 3, "Ansible canary, production, and rollback must set 1.0 CPU limit");
+check(countMatches(playbook, /log_driver:\s*'json-file'/g).length >= 3, "Ansible canary, production, and rollback must use json-file logs");
 
 check(existsSync(resolve(root, "scripts/write-version-metadata.mjs")), "release metadata generator script must exist");
 check(packageJson.scripts?.build === "tsc -b && vite build && node scripts/write-version-metadata.mjs dist/rfs-version.json", "build must write release metadata into dist after Vite build");

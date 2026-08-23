@@ -26,6 +26,7 @@ import { ScenarioPanel } from '../components/ScenarioPanel';
 import { RouteStatus } from '../components/RouteStatus';
 import { SceneStatus } from '../components/SceneStatus';
 import { TakeoffSetupPanel } from '../components/TakeoffSetupPanel';
+import { RouteBuilderPanel } from '../components/RouteBuilderPanel';
 import { BottomControlBar, type AudioUiStatus } from '../components/BottomControlBar';
 import { AudioSettings } from '../components/AudioSettings';
 import { RfsLayout } from '../components/layout/RfsLayout';
@@ -249,7 +250,7 @@ export function RfsShell() {
       ? `confirm flaps ${scenario.flapSetting}, trim ${scenario.stabilizerTrimUnits.toFixed(1)}, idle throttle, then START ROLL.`
       : 'route guidance is active; use visible MCP LNAV, altitude, and VS/VNAV controls for climb/descent management.';
     setRouteLoadMessage(
-      `CANNED TRAINING ROUTE ${fp.origin}→${fp.destination} loaded. Route editing is unavailable; synthetic approach fixes are not official procedure data; ${routeGuidance}`,
+      `DEFAULT TRAINING ROUTE ${fp.origin}→${fp.destination} loaded. Use the runway route panel for arbitrary supported runway pairs; synthetic approach fixes are not official procedure data; ${routeGuidance}`,
     );
   };
 
@@ -350,6 +351,7 @@ export function RfsShell() {
       ) : null}
       sceneStatus={<SceneStatus policy={cesiumScenePolicy} />}
       scenarioPanel={showFlightInstruments ? <ScenarioPanel /> : null}
+      routeBuilderPanel={showFlightInstruments ? <RouteBuilderPanel onRouteLoad={setRouteLoadMessage} /> : null}
       routeStatus={showFlightInstruments ? <RouteStatus /> : null}
       takeoffSetupPanel={showFlightInstruments ? <TakeoffSetupPanel /> : null}
       engineStrip={<EngineStrip />}

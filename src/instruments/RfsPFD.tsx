@@ -8,6 +8,12 @@ import {
   selectPfdFlightPlan,
   selectPfdFmaArmedVerticalText,
   selectPfdFmaText,
+  selectPfdGroundAglFt,
+  selectPfdGroundAltFt,
+  selectPfdGroundContact,
+  selectPfdGroundNormalForceN,
+  selectPfdGroundOnRunway,
+  selectPfdGroundWeightOnWheels,
   selectPfdHasMcpTargets,
   selectPfdHeadingDeg,
   selectPfdIas,
@@ -147,7 +153,7 @@ function finiteNumber(value: number | null | undefined): number | null {
   return Number.isFinite(value) ? (value as number) : null;
 }
 
-type FlightDirectorMode = 'HDG_SEL' | 'ALT_HOLD';
+type FlightDirectorMode = 'HDG_SEL' | 'APP' | 'ALT_HOLD' | 'G_S';
 
 interface FlightDirectorAxisCue {
   commandDeg: number;
@@ -187,6 +193,10 @@ function pitchCommandForAltitudeTarget(targetAltitudeFt: number, altitudeFt: num
   return clampValue(targetPitchDeg - currentPitchDeg, -10, 10);
 }
 
+function pitchCommandForPitchTarget(targetPitchDeg: number, currentPitchDeg: number): number {
+  return clampValue(targetPitchDeg - currentPitchDeg, -10, 10);
+}
+
 export function deriveFlightDirectorCue(input: FlightDirectorCueInput): FlightDirectorCue {
   if (!input.enabled) return { roll: null, pitch: null };
 
@@ -217,6 +227,11 @@ export function deriveFlightDirectorCue(input: FlightDirectorCueInput): FlightDi
     if (target?.mode === 'ALT_HOLD' && Number.isFinite(target.targetAltitudeFt)) {
       pitch = {
         commandDeg: pitchCommandForAltitudeTarget(target.targetAltitudeFt as number, input.altitudeFt, input.currentPitchDeg),
+        mode: target.mode,
+      };
+    } else if (target?.mode === 'G_S' && Number.isFinite(target.targetPitchDeg)) {
+      pitch = {
+        commandDeg: pitchCommandForPitchTarget(target.targetPitchDeg as number, input.currentPitchDeg),
         mode: target.mode,
       };
     }
@@ -484,6 +499,12 @@ export function RfsPFD() {
   const roll = useSimStore(selectPfdRollDeg);
   const hdg = useSimStore(selectPfdHeadingDeg);
   const radioAltitude = useSimStore(selectPfdRadioAltitude);
+  const groundAglFt = useSimStore(selectPfdGroundAglFt);
+  const groundAltFt = useSimStore(selectPfdGroundAltFt);
+  const groundWeightOnWheels = useSimStore(selectPfdGroundWeightOnWheels);
+  const groundNormalForceN = useSimStore(selectPfdGroundNormalForceN);
+  const groundOnRunway = useSimStore(selectPfdGroundOnRunway);
+  const groundContact = useSimStore(selectPfdGroundContact);
   const thrustMode = useFmaText('thrustActive');
   const lateralMode = useFmaText('lateralActive');
   const verticalMode = useFmaText('verticalActive');
@@ -506,8 +527,19 @@ export function RfsPFD() {
   const aircraftForVnav = {
     position: { lat: latitude, lon: longitude, alt: altitude },
     velocity: { u: velocityU, v: velocityV, w: velocityW },
+    ground: {
+      aglFt: groundAglFt,
+      groundAltFt,
+      weightOnWheels: groundWeightOnWheels,
+      normalForceN: groundNormalForceN,
+      lastTouchdownSinkRateMps: 0,
+      onRunway: groundOnRunway,
+      contact: groundContact,
+      tailstrike: false,
+      gearStations: [],
+    },
     flightPhase,
-  } as AircraftState;
+  } as unknown as AircraftState;
   const sharedGuidanceTargets = resolveGuidanceTargets({
     aircraft: aircraftForVnav,
     apState: apStateForGuidance,

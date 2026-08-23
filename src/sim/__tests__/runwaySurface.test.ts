@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { KPDX_RUNWAY_10R, KSEA_RUNWAY_16L, type RunwayReference } from '../../viewport/runwayData';
+import { ENGM_AUTOLAND_RUNWAY, KPDX_RUNWAY_10R, KSEA_RUNWAY_16L, NORWAY_RUNWAYS, type RunwayReference } from '../../viewport/runwayData';
 import { KSEA_TUTORIAL_SCENARIO } from '../scenarios';
 import { createInitialState, B737_800_SPEC, type GeoPosition } from '../types';
-import { OFF_RUNWAY_FRICTION_SCALE, sampleKseaSurface, sampleSupportedAirportSurface } from '../runwaySurface';
+import {
+  OFF_RUNWAY_FRICTION_SCALE,
+  isPositionOnPreparedRunwayFootprint,
+  sampleKseaSurface,
+  sampleSupportedAirportSurface,
+} from '../runwaySurface';
 
 function offsetPositionMeters(
   position: { lat: number; lon: number; altFt?: number; alt?: number },
@@ -24,6 +29,15 @@ function geoPositionForRunwayStart(runway: RunwayReference): GeoPosition {
     lon: runway.start.lon,
     alt: runway.elevationFt,
   };
+}
+
+function geoPositionAlongRunway(runway: RunwayReference, alongTrackM: number, lateralOffsetM = 0): GeoPosition {
+  const headingRad = runway.headingDeg * Math.PI / 180;
+  return offsetPositionMeters(
+    runway.start,
+    Math.cos(headingRad) * alongTrackM - Math.sin(headingRad) * lateralOffsetM,
+    Math.sin(headingRad) * alongTrackM + Math.cos(headingRad) * lateralOffsetM,
+  );
 }
 
 describe('sampleKseaSurface', () => {
@@ -102,6 +116,42 @@ describe('sampleKseaSurface', () => {
 });
 
 describe('sampleSupportedAirportSurface', () => {
+  it('classifies every supported Norwegian runway threshold and midpoint as prepared runway', () => {
+    for (const runway of NORWAY_RUNWAYS) {
+      const threshold = sampleSupportedAirportSurface(geoPositionForRunwayStart(runway));
+      const midpoint = sampleSupportedAirportSurface(geoPositionAlongRunway(runway, runway.lengthM / 2));
+
+      expect(isPositionOnPreparedRunwayFootprint(geoPositionForRunwayStart(runway), 0, 3, [runway])).toBe(true);
+      expect(isPositionOnPreparedRunwayFootprint(geoPositionAlongRunway(runway, runway.lengthM / 2), 0, 3, [runway])).toBe(true);
+      expect(threshold.kind, `${runway.airport} ${runway.id} threshold`).toBe('runway');
+      expect(threshold.onRunway, `${runway.airport} ${runway.id} threshold`).toBe(true);
+      expect(threshold.airport).toBe(runway.airport);
+      expect(threshold.groundAltFt).toBe(runway.elevationFt);
+      if (threshold.runwayId === runway.id) {
+        expect(Math.abs(threshold.lateralOffsetM ?? 999)).toBeLessThan(3);
+      }
+
+      expect(midpoint.kind, `${runway.airport} ${runway.id} midpoint`).toBe('runway');
+      expect(midpoint.onRunway, `${runway.airport} ${runway.id} midpoint`).toBe(true);
+      expect(midpoint.airport).toBe(runway.airport);
+      if (midpoint.runwayId === runway.id) {
+        expect(midpoint.alongTrackM ?? 0).toBeGreaterThan(runway.lengthM * 0.45);
+        expect(midpoint.alongTrackM ?? 0).toBeLessThan(runway.lengthM * 0.55);
+        expect(Math.abs(midpoint.lateralOffsetM ?? 999)).toBeLessThan(3);
+      }
+    }
+  });
+
+  it('classifies the selected ENGM autoland threshold as prepared runway', () => {
+    const sample = sampleSupportedAirportSurface(geoPositionForRunwayStart(ENGM_AUTOLAND_RUNWAY));
+
+    expect(sample.kind).toBe('runway');
+    expect(sample.onRunway).toBe(true);
+    expect(sample.airport).toBe('ENGM');
+    expect(sample.runwayId).toBe('19R');
+    expect(sample.groundAltFt).toBe(ENGM_AUTOLAND_RUNWAY.elevationFt);
+  });
+
   it('classifies a KPDX runway threshold position as prepared runway', () => {
     const sample = sampleSupportedAirportSurface(geoPositionForRunwayStart(KPDX_RUNWAY_10R));
 
@@ -127,6 +177,21 @@ describe('sampleSupportedAirportSurface', () => {
     expect(sample.onRunway).toBe(false);
     expect(sample.runwayId).toBeUndefined();
     expect(sample.groundAltFt).toBe(KPDX_RUNWAY_10R.elevationFt);
+    expect(sample.frictionScale).toEqual(OFF_RUNWAY_FRICTION_SCALE);
+  });
+
+  it('uses source-backed Norway runway fallback elevation near a laterally off-runway point', () => {
+    const enbr = NORWAY_RUNWAYS.find((runway) => runway.airport === 'ENBR' && runway.id === '17');
+    expect(enbr).toBeDefined();
+    const offRunwayPosition = geoPositionAlongRunway(enbr!, enbr!.lengthM / 2, enbr!.widthM / 2 + 60);
+
+    const sample = sampleSupportedAirportSurface(offRunwayPosition);
+
+    expect(sample.kind).toBe('offRunway');
+    expect(sample.onRunway).toBe(false);
+    expect(sample.runwayId).toBeUndefined();
+    expect(sample.airport).toBe('ENBR');
+    expect(sample.groundAltFt).toBe(enbr!.elevationFt);
     expect(sample.frictionScale).toEqual(OFF_RUNWAY_FRICTION_SCALE);
   });
 

@@ -7,6 +7,7 @@ export interface RfsLayoutProps {
   flightInstruments?: ReactNode;
   sceneStatus?: ReactNode;
   scenarioPanel?: ReactNode;
+  routeBuilderPanel?: ReactNode;
   routeStatus?: ReactNode;
   takeoffSetupPanel?: ReactNode;
   engineStrip?: ReactNode;
@@ -22,6 +23,7 @@ export function RfsLayout({
   flightInstruments,
   sceneStatus,
   scenarioPanel,
+  routeBuilderPanel,
   routeStatus,
   takeoffSetupPanel,
   engineStrip,
@@ -38,9 +40,10 @@ export function RfsLayout({
         {sceneLayers}
       </div>
 
-      {(scenarioPanel || takeoffSetupPanel) && (
+      {(scenarioPanel || routeBuilderPanel || takeoffSetupPanel) && (
         <div className="rfs-layout__top-left" data-rfs-zone="top-left">
           {scenarioPanel && <div data-rfs-panel="scenario">{scenarioPanel}</div>}
+          {routeBuilderPanel && <div data-rfs-panel="route-builder">{routeBuilderPanel}</div>}
           {takeoffSetupPanel && <div data-rfs-panel="takeoff-setup">{takeoffSetupPanel}</div>}
         </div>
       )}
@@ -155,6 +158,7 @@ const layoutCss = `
 }
 
 .rfs-layout__top-left [data-rfs-panel="scenario"] > *,
+.rfs-layout__top-left [data-rfs-panel="route-builder"] > *,
 .rfs-layout__top-left [data-rfs-panel="takeoff-setup"] > * {
   width: 100% !important;
 }
@@ -312,13 +316,20 @@ const layoutCss = `
   .rfs-layout__top-left [data-rfs-panel="scenario"] {
     flex: 0 1 auto;
     width: 100%;
-    max-height: clamp(160px, calc(100vh - 520px), 200px);
+    max-height: clamp(130px, calc(100vh - 560px), 180px);
+  }
+
+  .rfs-layout__top-left [data-rfs-panel="route-builder"] {
+    flex: 0 1 auto;
+    width: 100%;
+    max-height: clamp(112px, calc(100vh - 570px), 160px);
+    overflow: auto;
   }
 
   .rfs-layout__top-left [data-rfs-panel="takeoff-setup"] {
     flex: 0 0 auto;
     width: min(300px, 100%);
-    max-height: clamp(180px, calc(100vh - 510px), 220px);
+    max-height: clamp(150px, calc(100vh - 560px), 200px);
     overflow: auto;
   }
 }
@@ -332,6 +343,109 @@ const layoutCss = `
 @media (min-width: 1800px) {
   .rfs-layout__controls {
     width: 720px;
+  }
+}
+
+@media (max-width: 1100px), (max-height: 760px) {
+  .rfs-layout__top-left {
+    top: 8px;
+    left: 8px;
+    right: auto;
+    width: clamp(272px, 31vw, 284px);
+    max-height: calc(100vh - 256px);
+    flex-direction: column;
+    gap: 8px;
+    overflow: hidden;
+  }
+
+  .rfs-layout__top-left [data-rfs-panel="scenario"] {
+    flex: 0 1 auto;
+    width: 100%;
+    max-height: clamp(80px, calc(100vh - 632px), 118px);
+    overflow: auto;
+  }
+
+  .rfs-layout__top-left [data-rfs-panel="route-builder"] {
+    flex: 0 1 auto;
+    width: 100%;
+    max-height: clamp(112px, calc(100vh - 590px), 132px);
+    overflow: auto;
+  }
+
+  .rfs-layout__top-left [data-rfs-panel="takeoff-setup"] {
+    flex: 0 1 auto;
+    width: 100%;
+    max-height: clamp(122px, calc(100vh - 600px), 150px);
+    overflow: auto;
+  }
+
+  .rfs-layout__top-right {
+    top: 8px;
+    right: 8px;
+    width: 240px;
+    max-height: clamp(122px, calc(100vh - 560px), 190px);
+    gap: 8px;
+    overflow: auto;
+  }
+
+  .rfs-layout__top-right [data-rfs-panel] {
+    max-height: clamp(122px, calc(100vh - 560px), 190px);
+    overflow: auto;
+  }
+
+  .rfs-layout__debug {
+    top: 8px;
+    left: calc(8px + clamp(272px, 31vw, 284px) + 8px);
+    width: max(220px, calc(100vw - clamp(272px, 31vw, 284px) - 512px));
+    min-width: 0;
+    max-width: calc(100vw - clamp(272px, 31vw, 284px) - 512px);
+    height: 132px;
+  }
+
+  .rfs-layout__bottom-right {
+    right: 8px;
+    bottom: 32px;
+    width: min(65vw, 592px);
+    gap: 8px;
+  }
+
+  .rfs-layout__instrument-row {
+    gap: 8px;
+  }
+
+  .rfs-layout__instrument-row [data-rfs-panel="pfd"] {
+    width: min(360px, calc(100vw - 540px));
+    min-width: 332px;
+  }
+
+  .rfs-layout__instrument-row [data-rfs-panel="mcp"] {
+    width: 216px;
+  }
+
+  .rfs-layout [data-rfs-panel="engine"] > * {
+    gap: 6px !important;
+    padding: 6px 8px !important;
+  }
+
+  .rfs-layout__controls {
+    left: 8px;
+    bottom: 32px;
+    width: clamp(260px, calc(100vw - 620px), 280px);
+    gap: 6px;
+  }
+
+  .rfs-layout__controls > * {
+    gap: 6px !important;
+  }
+
+  .rfs-layout__watermark {
+    left: 8px;
+    bottom: 168px;
+  }
+
+  .rfs-layout__fps {
+    left: 8px;
+    top: calc(100vh - 198px);
   }
 }
 `;

@@ -67,7 +67,7 @@ describe('TakeoffSetupPanel', () => {
     render(<TakeoffSetupPanel />);
 
     fireEvent.pointerDown(screen.getByRole('button', { name: /Hold Rotate/i }));
-    expect(useSimStore.getState().inputs.elevator).toBeCloseTo(-0.75, 5);
+    expect(useSimStore.getState().inputs.elevator).toBeCloseTo(-1, 5);
 
     fireEvent.pointerUp(screen.getByRole('button', { name: /Hold Rotate/i }));
     expect(useSimStore.getState().inputs.elevator).toBe(0);

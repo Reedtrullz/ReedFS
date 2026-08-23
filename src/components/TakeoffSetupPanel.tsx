@@ -94,7 +94,7 @@ export function TakeoffSetupPanel() {
   const setTakeoffConfig = useSimStore((s) => s.setTakeoffConfig);
   const applyInputActions = useSimStore((s) => s.applyInputActions);
   const controlFeedbackMessage = useSimStore((s) => s.controlFeedbackMessage);
-  const holdRotate = () => setInput({ elevator: -0.75 });
+  const holdRotate = () => setInput({ elevator: -1 });
   const neutralizeYoke = () => setInput({ elevator: 0 });
 
   return (

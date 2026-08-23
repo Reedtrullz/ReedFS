@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ENVA_TUTORIAL_SCENARIO,
   KPDX_TUTORIAL_SCENARIO,
   KSEA_LIGHT_PATTERN_SCENARIO,
   KSEA_TUTORIAL_SCENARIO,
@@ -7,7 +8,7 @@ import {
   createAircraftStateForScenario,
 } from '../scenarios';
 import { B737_800_SPEC, createInitialState } from '../types';
-import { KSEA_KPDX_APPROACH_CONTRACT } from '../flightPlanLoader';
+import { ENVA_ENGM_APPROACH_CONTRACT, KSEA_KPDX_APPROACH_CONTRACT } from '../flightPlanLoader';
 import { updateFuel } from '../systems/fuel';
 
 function scenarioGrossWeight(scenario: typeof KSEA_TUTORIAL_SCENARIO): number {
@@ -45,6 +46,15 @@ describe('flight scenarios', () => {
     expect(KPDX_TUTORIAL_SCENARIO.runway.runway).toBe(KSEA_KPDX_APPROACH_CONTRACT.runway);
     expect(KPDX_TUTORIAL_SCENARIO.runway.approach?.runwayId).toBe(KSEA_KPDX_APPROACH_CONTRACT.runway);
     expect(KPDX_TUTORIAL_SCENARIO.runway.approach?.thresholdIdent).toBe(KSEA_KPDX_APPROACH_CONTRACT.thresholdIdent);
+  });
+
+  it('keeps the ENVA tutorial scenario tied to the ENVA-to-ENGM route origin contract', () => {
+    expect(ENVA_TUTORIAL_SCENARIO.id).toBe(ENVA_ENGM_APPROACH_CONTRACT.originScenarioId);
+    expect(ENVA_TUTORIAL_SCENARIO.runway.airport).toBe(ENVA_ENGM_APPROACH_CONTRACT.originAirport);
+    expect(ENVA_ENGM_APPROACH_CONTRACT.destinationAirport).toBe('ENGM');
+    expect(ENVA_ENGM_APPROACH_CONTRACT.runway).toBe('19R');
+    expect(ENVA_ENGM_APPROACH_CONTRACT.coordinateSource).toBe('synthetic');
+    expect(ENVA_ENGM_APPROACH_CONTRACT.sourceNote).toMatch(/not official procedure/i);
   });
 
   it('keeps each scenario weather station, fallback pressure/temperature, and cloud anchor aligned with its authored start state', () => {

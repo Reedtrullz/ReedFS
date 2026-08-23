@@ -140,7 +140,11 @@ export function RfsMCP() {
     flightPlan: s.flightPlan,
     routeStatus: s.routeStatus,
   })));
-  const unsupportedModeRequested = useSimStore((s) => hasUnsupportedAutoflightModeRequest(s.apState));
+  const unsupportedModeRequested = useSimStore((s) => hasUnsupportedAutoflightModeRequest(s.apState, {
+    aircraft: s.aircraft,
+    flightPlan: s.flightPlan,
+    routeStatus: s.routeStatus,
+  }));
 
   const toggleMode = (mode: EnabledMcpMode) => {
     const state = useSimStore.getState();
@@ -205,7 +209,7 @@ export function RfsMCP() {
       )}
       {unsupportedModeRequested && (
         <div role="status" aria-label="Unsupported MCP mode warning" style={advisoryStyle}>
-          LOC/APP/G/S/LVL CHG unavailable — guidance targets not implemented
+          LOC/APP/G/S/LVL CHG unavailable — compatible synthetic approach required
         </div>
       )}
       {fdGuidanceUnavailable && (
@@ -278,6 +282,16 @@ export function RfsMCP() {
           style={modeButtonStyle('LNAV', displayedLatActive === 'LNAV')}
         >
           LNAV
+        </button>
+        <button
+          aria-disabled={!modeAvailability.APP.available}
+          aria-pressed={displayedLatActive === 'APP'}
+          disabled={!modeAvailability.APP.available}
+          title={modeTitle('APP', 'Engage APP autoland')}
+          onClick={() => toggleMode('APP')}
+          style={modeButtonStyle('APP', displayedLatActive === 'APP')}
+        >
+          APP
         </button>
       </div>
       <div>

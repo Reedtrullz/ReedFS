@@ -12,10 +12,11 @@ import { routeStatusToNavOutput, type RouteStatusSnapshot } from './navigation';
 import { computeVNAV, type VnavOutput } from './vnav';
 
 const VNAV_FAMILY = new Set<VerticalMode>(['VNAV', 'VNAV_PTH', 'ALT*']);
-const UNSUPPORTED_LATERAL_MODES = new Set<LateralMode>(['VOR_LOC', 'LOC', 'APP']);
-const UNSUPPORTED_VERTICAL_MODES = new Set<VerticalMode>(['LVL_CHG', 'G_S']);
+const UNSUPPORTED_LATERAL_MODES = new Set<LateralMode>(['VOR_LOC', 'LOC']);
+const UNSUPPORTED_VERTICAL_MODES = new Set<VerticalMode>(['LVL_CHG']);
 const ALT_HOLD_CAPTURE_MAX_ERROR_FT = 80;
 const ALT_HOLD_CAPTURE_MAX_ABS_VS_FPM = 300;
+const RETARD_ARM_RADIO_ALT_FT = 35;
 
 export interface AltitudeHoldCaptureInput {
   altitudeErrorFt: number;
@@ -92,6 +93,131 @@ export interface EffectiveAutoflightTruthContext {
   routeStatus?: RouteStatusSnapshot | null;
 }
 
+export interface SyntheticApproachWaypoint {
+  ident: string;
+  lat: number;
+  lon: number;
+  altitudeFt: number;
+  speedKt?: number;
+}
+
+export interface SyntheticApproachProfile {
+  finalApproachFix: SyntheticApproachWaypoint;
+  threshold: SyntheticApproachWaypoint;
+  finalApproachFixIndex: number;
+  thresholdIndex: number;
+  approachHandoff: RouteStatusSnapshot['approachHandoff'];
+}
+
+function finiteNumber(value: number | null | undefined): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function waypointAltitudeFt(waypoint: FlightPlan['waypoints'][number]): number | null {
+  const constrainedAltitude = finiteNumber(waypoint.altitudeConstraint?.altitude);
+  return constrainedAltitude;
+}
+
+function waypointSpeedKt(waypoint: FlightPlan['waypoints'][number]): number | undefined {
+  return finiteNumber(waypoint.speedConstraint?.speed) ?? undefined;
+}
+
+function syntheticApproachWaypoint(
+  waypoint: FlightPlan['waypoints'][number],
+): SyntheticApproachWaypoint | null {
+  const lat = finiteNumber(waypoint.lat);
+  const lon = finiteNumber(waypoint.lon);
+  const altitudeFt = waypointAltitudeFt(waypoint);
+  if (waypoint.coordinateSource !== 'synthetic' || lat === null || lon === null || altitudeFt === null) return null;
+  return {
+    ident: waypoint.ident,
+    lat,
+    lon,
+    altitudeFt,
+    speedKt: waypointSpeedKt(waypoint),
+  };
+}
+
+function isSyntheticThresholdWaypoint(waypoint: FlightPlan['waypoints'][number]): boolean {
+  const ident = waypoint.ident.toUpperCase();
+  const legType = waypoint.legType?.toUpperCase();
+  return waypoint.coordinateSource === 'synthetic' && (legType === 'RW' || ident.endsWith('_RWY'));
+}
+
+function isSyntheticFinalApproachFix(waypoint: FlightPlan['waypoints'][number]): boolean {
+  const ident = waypoint.ident.toUpperCase();
+  return waypoint.coordinateSource === 'synthetic' && ident.endsWith('_FAF');
+}
+
+function aircraftIsAirborne(aircraft: AircraftState | null | undefined): boolean {
+  if (!aircraft) return false;
+  return !aircraft.ground.weightOnWheels && aircraft.ground.contact !== 'gear';
+}
+
+function aircraftCanBackSyntheticApproach(aircraft: AircraftState | null | undefined): boolean {
+  if (aircraftIsAirborne(aircraft)) return true;
+  return aircraft?.flightPhase === 'TOUCHDOWN'
+    || aircraft?.flightPhase === 'DEROTATION'
+    || aircraft?.flightPhase === 'ROLLOUT';
+}
+
+function routeIsUsableForAutoland(routeStatus: RouteStatusSnapshot | null | undefined): boolean {
+  return Boolean(routeStatus?.routeValid && !routeStatus.routeComplete && routeStatus.lnavAvailable);
+}
+
+export function resolveSyntheticApproachProfile(
+  context: EffectiveAutoflightTruthContext = {},
+): SyntheticApproachProfile | null {
+  const flightPlan = context.flightPlan;
+  const routeStatus = context.routeStatus;
+  if (!flightPlan?.waypoints.length || !aircraftCanBackSyntheticApproach(context.aircraft) || !routeIsUsableForAutoland(routeStatus)) {
+    return null;
+  }
+
+  const thresholdIndex = flightPlan.waypoints.findIndex(isSyntheticThresholdWaypoint);
+  if (thresholdIndex <= 0) return null;
+
+  let finalApproachFixIndex = -1;
+  for (let index = thresholdIndex - 1; index >= 0; index -= 1) {
+    if (isSyntheticFinalApproachFix(flightPlan.waypoints[index])) {
+      finalApproachFixIndex = index;
+      break;
+    }
+  }
+  if (finalApproachFixIndex < 0) return null;
+
+  const threshold = syntheticApproachWaypoint(flightPlan.waypoints[thresholdIndex]);
+  const finalApproachFix = syntheticApproachWaypoint(flightPlan.waypoints[finalApproachFixIndex]);
+  if (!threshold || !finalApproachFix) return null;
+
+  return {
+    finalApproachFix,
+    threshold,
+    finalApproachFixIndex,
+    thresholdIndex,
+    approachHandoff: routeStatus?.approachHandoff ?? 'none',
+  };
+}
+
+export function hasSyntheticApproachAutolandCapability(
+  context: EffectiveAutoflightTruthContext = {},
+): boolean {
+  return resolveSyntheticApproachProfile(context) !== null;
+}
+
+function approachModeIsBacked(ap: AutopilotState, context: EffectiveAutoflightTruthContext): boolean {
+  return ap.truth.autopilotStatus === 'CMD_AB'
+    && ap.boeing.cmdA
+    && ap.boeing.cmdB
+    && ap.boeing.app
+    && hasSyntheticApproachAutolandCapability(context);
+}
+
+function retardWindowIsActive(context: EffectiveAutoflightTruthContext): boolean {
+  const radioAltitudeFt = finiteNumber(context.aircraft?.ground.aglFt);
+  return radioAltitudeFt !== null && radioAltitudeFt <= RETARD_ARM_RADIO_ALT_FT;
+}
+
 export function offAutoflightTruth(apState: AutopilotState | null | undefined): AutoflightTruthState {
   return {
     lateralActive: 'OFF',
@@ -109,10 +235,17 @@ export function isAutoflightLateralOnly(truth: AutoflightTruthState): boolean {
   return Boolean((truth as ManagedAltitudeCaptureTruth).lateralOnly);
 }
 
-export function hasUnsupportedAutoflightModeRequest(apState: AutopilotState | null | undefined): boolean {
+export function hasUnsupportedAutoflightModeRequest(
+  apState: AutopilotState | null | undefined,
+  context: EffectiveAutoflightTruthContext = {},
+): boolean {
   if (!apState) return false;
+  const approachBacked = approachModeIsBacked(apState, context);
   return UNSUPPORTED_LATERAL_MODES.has(apState.truth.lateralActive)
-    || UNSUPPORTED_VERTICAL_MODES.has(apState.truth.verticalActive);
+    || UNSUPPORTED_VERTICAL_MODES.has(apState.truth.verticalActive)
+    || (apState.truth.lateralActive === 'APP' && !approachBacked)
+    || (apState.truth.verticalActive === 'G_S' && !approachBacked)
+    || (apState.truth.thrustActive === 'RETARD' && (!approachBacked || !retardWindowIsActive(context)));
 }
 
 function autopilotStatusIsBacked(ap: AutopilotState): boolean {
@@ -147,18 +280,28 @@ export function effectiveAutopilotIsEngaged(
   return deriveEffectiveAutoflightTruth(apState, context).autopilotStatus !== 'OFF';
 }
 
-function deriveThrustMode(ap: AutopilotState): ThrustMode {
+function deriveThrustMode(ap: AutopilotState, context: EffectiveAutoflightTruthContext): ThrustMode {
   if (!ap.boeing.autothrottleArm) return 'OFF';
+  const approachBacked = approachModeIsBacked(ap, context);
+  if (approachBacked && (ap.truth.verticalActive === 'G_S' || ap.truth.lateralActive === 'APP') && retardWindowIsActive(context)) {
+    return 'RETARD';
+  }
+  if (ap.truth.thrustActive === 'RETARD') return approachBacked && retardWindowIsActive(context) ? 'RETARD' : 'OFF';
   if (ap.truth.thrustActive === 'SPEED') return ap.boeing.speedMode ? 'SPEED' : 'OFF';
   if (ap.truth.thrustActive === 'N1') return ap.boeing.n1 ? 'N1' : 'OFF';
   return 'OFF';
 }
 
-function deriveLateralMode(ap: AutopilotState, routeStatus: RouteStatusSnapshot | null | undefined): LateralMode {
+function deriveLateralMode(
+  ap: AutopilotState,
+  routeStatus: RouteStatusSnapshot | null | undefined,
+  context: EffectiveAutoflightTruthContext,
+): LateralMode {
   if (ap.truth.lateralActive === 'HDG_SEL') return ap.boeing.hdgSel ? 'HDG_SEL' : 'OFF';
   if (ap.truth.lateralActive === 'LNAV') {
     return ap.boeing.lnav && routeStatus?.lnavAvailable ? 'LNAV' : 'OFF';
   }
+  if (ap.truth.lateralActive === 'APP') return approachModeIsBacked(ap, context) ? 'APP' : 'OFF';
   return 'OFF';
 }
 
@@ -184,11 +327,13 @@ function deriveVerticalMode(
   ap: AutopilotState,
   vnav: VnavOutput | null,
   aircraft: AircraftState | null | undefined,
+  context: EffectiveAutoflightTruthContext,
 ): VerticalMode {
   if (ap.truth.verticalActive === 'ALT_HOLD') {
     return ap.boeing.altHold ? altitudeHoldCaptureMode(aircraft, ap.boeing.altitude) : 'OFF';
   }
   if (ap.truth.verticalActive === 'VS') return ap.boeing.vs ? 'VS' : 'OFF';
+  if (ap.truth.verticalActive === 'G_S') return approachModeIsBacked(ap, context) ? 'G_S' : 'OFF';
   if (VNAV_FAMILY.has(ap.truth.verticalActive)) return deriveVnavMode(vnav, aircraft);
   return 'OFF';
 }
@@ -210,7 +355,7 @@ export function deriveEffectiveAutoflightTruth(
   if (!apState) return offAutoflightTruth(apState);
 
   const backedAp = autopilotStatusIsBacked(apState);
-  const thrustActive = deriveThrustMode(apState);
+  const thrustActive = deriveThrustMode(apState, context);
   if (!backedAp) {
     return {
       ...offAutoflightTruth(apState),
@@ -219,9 +364,9 @@ export function deriveEffectiveAutoflightTruth(
   }
 
   const vnav = VNAV_FAMILY.has(apState.truth.verticalActive) ? resolveVnavOutput(apState, context) : null;
-  const verticalActive = deriveVerticalMode(apState, vnav, context.aircraft);
+  const verticalActive = deriveVerticalMode(apState, vnav, context.aircraft, context);
   const verticalArmed = deriveVerticalArmedMode(apState, vnav, verticalActive);
-  const lateralActive = deriveLateralMode(apState, context.routeStatus);
+  const lateralActive = deriveLateralMode(apState, context.routeStatus, context);
   const lateralOnly = lateralActive !== 'OFF' && verticalActive === 'OFF';
   const baseTruth = omitManagedAltitudeCaptureMetadata(apState.truth);
 

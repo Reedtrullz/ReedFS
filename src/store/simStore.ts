@@ -3,6 +3,7 @@ import type { AircraftState, AutopilotCommands, ControlInputs, AircraftSpec } fr
 import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
 import type { FlightPlan } from '@shared/types/fmc';
 import type { WindInfo } from '../sim/weather';
+import type { RunwayReference } from '../viewport/runwayData';
 import type { GuidanceState } from '../sim/guidanceState';
 import { composeControlsSlice } from '../sim/simulationStep';
 import { getSimulationRuntime } from '../sim/simulationRuntime';
@@ -68,6 +69,7 @@ export interface SimStore {
   setTutorialStep: (stepIndex: number) => void;
   setApState: (ap: AutopilotState | null) => void;
   setFlightPlan: (fp: FlightPlan | null) => void;
+  setFlightPlanAtRunway: (fp: FlightPlan, originRunway: RunwayReference) => void;
   setWind: (w: WindInfo | null) => void;
   saveScenarioState: (storage?: ScenarioPersistenceStorage, options?: ScenarioSaveOptions) => void;
   loadScenarioState: (storage?: ScenarioPersistenceStorage, slotId?: string) => void;
@@ -77,7 +79,7 @@ export interface SimStore {
 const FIXED_STEP_SECONDS = 1 / 60;
 const MAX_STEPS_PER_FRAME = 16;
 const MAX_ACCELERATED_FRAME_SECONDS = 1;
-const SIM_RATES = [1, 4, 16] as const;
+const SIM_RATES = [1, 4, 16, 64] as const;
 type SimRate = typeof SIM_RATES[number];
 
 function nextSimRate(current: number): SimRate {
