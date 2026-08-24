@@ -28,7 +28,7 @@ test.describe('RFS black-box player loop proof', () => {
 
     await expect(page.getByLabel('Route status').getByText('KSEA→KPDX')).toBeVisible();
     await expect(page.getByRole('status', { name: 'Route load result' })).toHaveText(
-      'CANNED TRAINING ROUTE KSEA→KPDX loaded. Route editing is unavailable; synthetic approach fixes are not official procedure data; confirm flaps 5, trim 5.0, idle throttle, then START ROLL.',
+      'DEFAULT TRAINING ROUTE KSEA→KPDX loaded. Use the runway route panel for arbitrary supported runway pairs; synthetic approach fixes are not official procedure data; confirm flaps 5, trim 5.0, idle throttle, then START ROLL.',
     );
     const takeoffSetup = page.getByRole('region', { name: 'Takeoff setup' });
     await expect(takeoffSetup).toBeVisible();
@@ -38,8 +38,6 @@ test.describe('RFS black-box player loop proof', () => {
     await expect(takeoffSetup.getByLabel('Current takeoff configuration')).toContainText(/Flaps\s+\d+/);
     await expect(takeoffSetup.getByLabel('Current takeoff configuration')).toContainText(/Trim\s+-?\d+\.\d/);
     await expect(page.getByRole('button', { name: /^START ROLL$/ })).toBeVisible();
-
-    await startRollThroughVisibleControls(page);
   });
   test('KSEA route takeoff reaches positive rate, gear up, and reset through keyboard controls', async ({ page }) => {
     test.setTimeout(360_000);

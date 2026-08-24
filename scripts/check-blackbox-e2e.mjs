@@ -15,6 +15,9 @@ const importLikePattern = new RegExp(
   String.raw`(?:import|export)\s+(?:type\s+)?(?:[^'";]*?\s+from\s+)?['"]([^'"]+)['"]|import${jsTrivia}\(${jsTrivia}['"]([^'"]+)['"]${jsTrivia}\)`,
   'g',
 );
+const fullFlightEntrypoint = 'e2e/rfs-full-flight-blackbox.spec.ts';
+const fullFlightFinalResetMarker = 'Final reset section: continuous ENVA-to-ENGM proof already reached STOPPED.';
+const fullFlightAllowedScenarioCall = 'selectEnvaScenarioThroughVisibleControls';
 
 const forbiddenPatterns = [
   { label: 'Zustand sim store access', pattern: /\buseSimStore\b/ },
@@ -27,6 +30,14 @@ const forbiddenPatterns = [
   { label: 'page.evaluate use', pattern: /\bpage\.evaluate\s*\(/ },
   { label: 'non-literal dynamic import', pattern: new RegExp(String.raw`\bimport${jsTrivia}\(${jsTrivia}(?!['"])`) },
   { label: 'CommonJS require', pattern: new RegExp(String.raw`\brequire${jsTrivia}\(`) },
+];
+
+const fullFlightForbiddenPatterns = [
+  { label: 'KPDX short-final scenario helper', pattern: /\bselectKpdxShortFinalScenarioThroughVisibleControls\b/ },
+  { label: 'KPDX short-final scenario id', pattern: /kpdx-10r-short-final/i },
+  { label: 'KPDX short-final visible scenario', pattern: /KPDX\s+10R\s+Short\s+Final|KPDX\s+short-final/i },
+  { label: 'split KSEA climb scenario helper', pattern: /\bselectKseaScenarioThroughVisibleControls\b/ },
+  { label: 'direct scenario selectOption in full-flight proof', pattern: /\.selectOption\s*\(/ },
 ];
 
 const extensions = ['', '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'];
@@ -218,6 +229,66 @@ function assertBlackboxImportSurface(filePath, fromFile, specifier) {
   return assertBlackboxRealPath(filePath, fromFile, specifier);
 }
 
+function lineNumberForIndex(source, index) {
+  return source.slice(0, index).split('\n').length;
+}
+
+function findPatternIndex(source, pattern) {
+  const match = pattern.exec(source);
+  pattern.lastIndex = 0;
+  return match ? match.index : -1;
+}
+
+function assertFullFlightEntrypointRules(repoPath, source) {
+  if (repoPath !== fullFlightEntrypoint) return;
+
+  for (const { label, pattern } of fullFlightForbiddenPatterns) {
+    const match = pattern.exec(source);
+    pattern.lastIndex = 0;
+    if (match) {
+      failures.push(`${repoPath}:${lineNumberForIndex(source, match.index)} contains forbidden ${label}`);
+    }
+  }
+
+  const scenarioCalls = [...source.matchAll(/\bselect[A-Za-z0-9]*ScenarioThroughVisibleControls\s*\(/g)]
+    .map((match) => ({ name: match[0].replace(/\s*\($/, ''), index: match.index ?? 0 }));
+  if (scenarioCalls.length !== 1 || scenarioCalls[0]?.name !== fullFlightAllowedScenarioCall) {
+    const details = scenarioCalls.length > 0
+      ? scenarioCalls.map((call) => `${call.name}@${lineNumberForIndex(source, call.index)}`).join(', ')
+      : 'none';
+    failures.push(`${repoPath} must select only ENVA once before the continuous proof; found ${details}`);
+  }
+
+  const resetMatches = [...source.matchAll(/\bresetThroughVisibleControls\s*\(/g)]
+    .map((match) => ({ index: match.index ?? 0 }));
+  if (resetMatches.length !== 1) {
+    failures.push(`${repoPath} must call resetThroughVisibleControls exactly once in the final reset section; found ${resetMatches.length}`);
+  }
+
+  const markerIndex = source.indexOf(fullFlightFinalResetMarker);
+  if (markerIndex === -1) {
+    failures.push(`${repoPath} must mark its final reset section with "${fullFlightFinalResetMarker}"`);
+  }
+
+  const stoppedAssertionIndex = findPatternIndex(
+    source,
+    /expect\s*\(\s*await\s+readVisibleFlightPhase\s*\(\s*page\s*\)\s*\)\.toBe\s*\(\s*['"]STOPPED['"]\s*\)/,
+  );
+  if (stoppedAssertionIndex === -1) {
+    failures.push(`${repoPath} must visibly assert STOPPED before the final reset section`);
+  }
+
+  if (markerIndex !== -1 && stoppedAssertionIndex !== -1 && markerIndex < stoppedAssertionIndex) {
+    failures.push(`${repoPath} places the final reset section before the visible STOPPED assertion`);
+  }
+
+  for (const resetMatch of resetMatches) {
+    if (markerIndex === -1 || resetMatch.index < markerIndex) {
+      failures.push(`${repoPath}:${lineNumberForIndex(source, resetMatch.index)} calls resetThroughVisibleControls before the final reset section`);
+    }
+  }
+}
+
 function scanFile(filePath, entrypoint) {
   if (visited.has(filePath)) return;
   visited.add(filePath);
@@ -242,6 +313,8 @@ function scanFile(filePath, entrypoint) {
       failures.push(`${repoPath}:${line} contains forbidden ${label}`);
     }
   }
+
+  assertFullFlightEntrypointRules(repoPath, source);
 
   importLikePattern.lastIndex = 0;
   for (const match of source.matchAll(importLikePattern)) {

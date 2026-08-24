@@ -7,10 +7,11 @@ import { createDefaultAutopilotState } from '../defaultAutopilotState';
 import { useSimStore } from '../../store/simStore';
 import { eulerToQuat } from '../../sim/physics/quaternion';
 import { createKseaKpdxFlight } from '../../sim/flightPlanLoader';
-import { computeRouteStatus } from '../../sim/systems/navigation';
+import { computeRouteStatus, createNoRouteStatus } from '../../sim/systems/navigation';
 import { deriveEffectiveAutoflightTruth } from '../../sim/systems/effectiveAutoflightTruth';
 import { computeDerived } from '../../sim/physics/derived';
 import { ktToMs } from '../../sim/physics/units';
+import type { FlightPlan } from '@shared/types/fmc';
 
 function setAirborneRuntime(): void {
   const aircraft = structuredClone(useSimStore.getState().aircraft);
@@ -42,6 +43,65 @@ function setVnavBackedKseaRoute(): void {
     activeLegIndex: routeStatus.activeLegIndex,
     routeStatus,
   });
+}
+
+function envaEngmSyntheticAutolandRoute(): FlightPlan {
+  return {
+    origin: 'ENVA',
+    destination: 'ENGM',
+    flightNumber: 'RFS190',
+    route: 'ENVA ENGM19R_IF ENGM19R_FAF ENGM19R_RWY',
+    waypoints: [
+      { ident: 'ENVA', lat: 63.4583, lon: 10.9101, coordinateSource: 'synthetic', discontinuity: false },
+      { ident: 'ENGM19R_IF', lat: 60.395, lon: 11.0, coordinateSource: 'synthetic', discontinuity: false, legType: 'IF', altitudeConstraint: { type: 'AT', altitude: 3000 }, speedConstraint: { type: 'AT_OR_BELOW', speed: 210 } },
+      { ident: 'ENGM19R_FAF', lat: 60.278, lon: 11.055, coordinateSource: 'synthetic', discontinuity: false, legType: 'TF', altitudeConstraint: { type: 'AT', altitude: 2200 }, speedConstraint: { type: 'AT_OR_BELOW', speed: 150 } },
+      { ident: 'ENGM19R_RWY', lat: 60.1939, lon: 11.1004, coordinateSource: 'synthetic', discontinuity: false, legType: 'RW', altitudeConstraint: { type: 'AT', altitude: 681 }, speedConstraint: { type: 'AT_OR_BELOW', speed: 138 } },
+    ],
+  };
+}
+
+function setEngmAutolandRoute(aglFt = 920): void {
+  setAirborneRuntime();
+  const aircraft = structuredClone(useSimStore.getState().aircraft);
+  aircraft.position.lat = 60.224;
+  aircraft.position.lon = 11.084;
+  aircraft.position.alt = 681 + aglFt;
+  aircraft.velocity.u = 72;
+  aircraft.ground = {
+    ...aircraft.ground,
+    weightOnWheels: false,
+    aglFt,
+    groundAltFt: 681,
+    contact: 'none',
+    onRunway: false,
+  };
+  aircraft.flightPhase = 'APPROACH';
+  const flightPlan = envaEngmSyntheticAutolandRoute();
+  const routeStatus = {
+    ...createNoRouteStatus(flightPlan),
+    routeName: 'ENVA→ENGM',
+    routeValid: true,
+    routeComplete: false,
+    approachHandoff: 'threshold' as const,
+    lnavAvailable: true,
+    lnavUnavailableReason: null,
+    activeLegIndex: 2,
+    activeLegCount: 3,
+    fromWaypointIndex: 2,
+    toWaypointIndex: 3,
+    fromIdent: 'ENGM19R_FAF',
+    nextWaypointIdent: 'ENGM19R_RWY',
+    distanceToNextM: 2 * 1852,
+    distanceToNextNm: 2,
+    desiredTrackRad: 190 * Math.PI / 180,
+    desiredTrackDegTrue: 190,
+    crossTrackErrorM: 0,
+    alongTrackM: 0,
+    legLengthM: 5 * 1852,
+    waypointReached: false,
+    sequenced: false,
+  };
+  useSimStore.setState({ aircraft, flightPlan, activeLegIndex: 2, routeStatus });
 }
 
 describe('RfsMCP', () => {
@@ -178,11 +238,12 @@ describe('RfsMCP', () => {
     render(<RfsMCP />);
 
     expect(screen.getByRole('status', { name: 'Unsupported MCP mode warning' })).toHaveTextContent(
-      'LOC/APP/G/S/LVL CHG unavailable — guidance targets not implemented',
+      'LOC/APP/G/S/LVL CHG unavailable — compatible synthetic approach required',
     );
-    for (const unsupportedButton of ['LOC', 'APP', 'G/S', 'LVL CHG']) {
+    for (const unsupportedButton of ['LOC', 'G/S', 'LVL CHG']) {
       expect(screen.queryByRole('button', { name: unsupportedButton })).toBeNull();
     }
+    expect(screen.getByRole('button', { name: 'APP' })).toHaveAttribute('aria-disabled', 'true');
     expect(screen.getByRole('button', { name: 'HDG' })).toHaveAttribute('aria-pressed', 'false');
     expect(screen.getByRole('button', { name: 'ALT' })).toHaveAttribute('aria-pressed', 'false');
   });
@@ -436,6 +497,53 @@ describe('RfsMCP', () => {
     fireEvent.click(lnav);
 
     expect(useSimStore.getState().apState).toBeNull();
+  });
+
+  it('keeps APP disabled and fail-closed when no compatible synthetic approach route is available', () => {
+    setAirborneRuntime();
+    render(<RfsMCP />);
+
+    const app = screen.getByRole('button', { name: 'APP' });
+    expect(app).toHaveProperty('disabled', true);
+    expect(app.getAttribute('title')).toMatch(/compatible synthetic approach/i);
+
+    fireEvent.click(app);
+
+    expect(useSimStore.getState().apState).toBeNull();
+  });
+
+  it('engages APP as dual-channel CMD_AB with G_S and autothrottle support on a synthetic ENVA to ENGM route', () => {
+    setEngmAutolandRoute();
+    render(
+      <>
+        <RfsMCP />
+        <RfsPFD />
+      </>,
+    );
+
+    const app = screen.getByRole('button', { name: 'APP' });
+    expect(app).toHaveAttribute('aria-disabled', 'false');
+
+    fireEvent.click(app);
+
+    const state = useSimStore.getState();
+    const ap = state.apState;
+    expect(ap?.truth.autopilotStatus).toBe('CMD_AB');
+    expect(ap?.truth.lateralActive).toBe('APP');
+    expect(ap?.truth.verticalActive).toBe('G_S');
+    expect(ap?.truth.thrustActive).toBe('SPEED');
+    expect(ap?.boeing.cmdA).toBe(true);
+    expect(ap?.boeing.cmdB).toBe(true);
+    expect(ap?.boeing.app).toBe(true);
+    expect(ap?.boeing.speedMode).toBe(true);
+
+    const effective = deriveEffectiveAutoflightTruth(ap, state);
+    expect(effective.autopilotStatus).toBe('CMD_AB');
+    expect(effective.lateralActive).toBe('APP');
+    expect(effective.verticalActive).toBe('G_S');
+    expect(screen.getByLabelText('FMA roll active')).toHaveTextContent('APP');
+    expect(screen.getByLabelText('FMA pitch active')).toHaveTextContent('G_S');
+    expect(screen.getByLabelText('FMA ap active')).toHaveTextContent('CMD_AB');
   });
 
   it('first LNAV click creates AP state when route guidance is available and the aircraft is airborne', () => {

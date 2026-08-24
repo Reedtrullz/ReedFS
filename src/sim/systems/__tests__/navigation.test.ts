@@ -8,6 +8,8 @@ import {
 } from '../navigation';
 import { createInitialState, B737_800_SPEC } from '../../types';
 import type { FlightPlan } from '@shared/types/fmc';
+import { createRunwayToRunwayFlightWithRunways } from '../../flightPlanLoader';
+import { createAircraftStateForRunway } from '../../scenarios';
 import { KPDX_RUNWAY_10R_APPROACH } from '../../../viewport/runwayData';
 
 function makeState(lat: number, lon: number, speedMps = 100) {
@@ -557,6 +559,38 @@ describe('computeRouteStatus', () => {
     expect(status.activeLegIndex).toBe(1);
     expect(status.fromIdent).toBe('MID');
     expect(status.nextWaypointIdent).toBe('DEST');
+  });
+
+  it('accepts a generated runway-pair route from the selected runway threshold and hands off at the destination runway', () => {
+    const { flightPlan, runways } = createRunwayToRunwayFlightWithRunways({
+      originAirport: 'ENBR',
+      originRunway: '17',
+      destinationAirport: 'ENSB',
+      destinationRunway: '09',
+    });
+    const aircraft = createAircraftStateForRunway(B737_800_SPEC, runways.originRunway);
+    aircraft.velocity.u = 80;
+
+    const initialStatus = computeRouteStatus(aircraft, flightPlan, 0);
+
+    expect(initialStatus.routeName).toBe('ENBR→ENSB');
+    expect(initialStatus.routeValid).toBe(true);
+    expect(initialStatus.lnavAvailable).toBe(true);
+    expect(initialStatus.activeLegIndex).toBe(0);
+    expect(initialStatus.fromIdent).toBe('ENBR17_DEP');
+    expect(initialStatus.nextWaypointIdent).toBe('ENBR17_CLB');
+    expect(Number.isFinite(initialStatus.distanceToNextNm)).toBe(true);
+    expect(Number.isFinite(initialStatus.desiredTrackDegTrue)).toBe(true);
+    expect(routeStatusToNavOutput(initialStatus)).not.toBeNull();
+
+    const destinationAircraft = makeState(runways.destinationRunway.start.lat, runways.destinationRunway.start.lon, 72);
+    const finalStatus = computeRouteStatus(destinationAircraft, flightPlan, flightPlan.waypoints.length - 2, { captureRadiusM: 100 });
+
+    expect(finalStatus.routeComplete).toBe(true);
+    expect(finalStatus.approachHandoff).toBe('threshold');
+    expect(finalStatus.nextWaypointIdent).toBe('ENSB09_RWY');
+    expect(finalStatus.lnavAvailable).toBe(false);
+    expect(routeStatusToNavOutput(finalStatus)).toBeNull();
   });
 
   it('marks LNAV unavailable when the aircraft is not near the loaded route', () => {

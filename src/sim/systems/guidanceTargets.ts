@@ -19,23 +19,27 @@ import {
   deriveEffectiveAutoflightTruth,
   offAutoflightTruth,
   type ManagedAltitudeCaptureTruth,
+  resolveSyntheticApproachProfile,
+  type SyntheticApproachProfile,
 } from './effectiveAutoflightTruth';
 
 export interface LateralGuidanceTarget {
-  mode: Extract<LateralMode, 'HDG_SEL' | 'LNAV'>;
+  mode: Extract<LateralMode, 'HDG_SEL' | 'LNAV' | 'APP'>;
   targetHeadingRad: number;
 }
 
 export interface VerticalGuidanceTarget {
-  mode: Extract<VerticalMode, 'ALT_HOLD' | 'VS' | 'VNAV' | 'VNAV_PTH' | 'ALT*'>;
+  mode: Extract<VerticalMode, 'ALT_HOLD' | 'VS' | 'VNAV' | 'VNAV_PTH' | 'ALT*' | 'G_S'>;
   targetAltitudeFt?: number;
   targetVerticalSpeedFpm?: number;
+  targetPitchDeg?: number;
 }
 
 export interface ThrustGuidanceTarget {
-  mode: Extract<ThrustMode, 'SPEED' | 'N1'>;
+  mode: Extract<ThrustMode, 'SPEED' | 'N1' | 'RETARD'>;
   targetSpeedKt?: number;
   targetN1Percent?: number;
+  targetThrottle?: number;
 }
 
 export interface SharedGuidanceTargets {
@@ -46,13 +50,14 @@ export interface SharedGuidanceTargets {
 }
 
 export interface FlightDirectorLateralGuidanceTarget {
-  mode: 'HDG_SEL';
+  mode: 'HDG_SEL' | 'APP';
   targetHeadingRad: number;
 }
 
 export interface FlightDirectorVerticalGuidanceTarget {
-  mode: 'ALT_HOLD';
-  targetAltitudeFt: number;
+  mode: 'ALT_HOLD' | 'G_S';
+  targetAltitudeFt?: number;
+  targetPitchDeg?: number;
 }
 
 export interface FlightDirectorGuidanceTargets {
@@ -61,11 +66,13 @@ export interface FlightDirectorGuidanceTargets {
 }
 
 export function resolveFlightDirectorGuidanceTargets(targets: SharedGuidanceTargets): FlightDirectorGuidanceTargets {
-  const lateral: FlightDirectorLateralGuidanceTarget | null = targets.lateral?.mode === 'HDG_SEL' && Number.isFinite(targets.lateral.targetHeadingRad)
-    ? { mode: 'HDG_SEL', targetHeadingRad: targets.lateral.targetHeadingRad }
+  const lateral: FlightDirectorLateralGuidanceTarget | null = (targets.lateral?.mode === 'HDG_SEL' || targets.lateral?.mode === 'APP') && Number.isFinite(targets.lateral.targetHeadingRad)
+    ? { mode: targets.lateral.mode, targetHeadingRad: targets.lateral.targetHeadingRad }
     : null;
   const vertical: FlightDirectorVerticalGuidanceTarget | null = targets.vertical?.mode === 'ALT_HOLD' && Number.isFinite(targets.vertical.targetAltitudeFt)
     ? { mode: 'ALT_HOLD', targetAltitudeFt: targets.vertical.targetAltitudeFt as number }
+    : targets.vertical?.mode === 'G_S' && Number.isFinite(targets.vertical.targetPitchDeg)
+      ? { mode: 'G_S', targetPitchDeg: targets.vertical.targetPitchDeg as number }
     : null;
   return { lateral, vertical };
 }
@@ -91,6 +98,71 @@ function finiteOrUndefined(value: number | null | undefined): number | undefined
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
+}
+
+const EARTH_RADIUS_M = 6371000;
+const M_TO_FT = 3.280839895;
+const MPS_TO_FPM = 196.850394;
+const GLIDESLOPE_DEG = 3;
+const GLIDESLOPE_RAD = GLIDESLOPE_DEG * Math.PI / 180;
+const FLARE_RADIO_ALT_FT = 50;
+
+function toRad(deg: number): number {
+  return deg * Math.PI / 180;
+}
+
+function normalizeRad(rad: number): number {
+  const twoPi = Math.PI * 2;
+  return ((rad % twoPi) + twoPi) % twoPi;
+}
+
+function distanceM(fromLat: number, fromLon: number, toLat: number, toLon: number): number {
+  const meanLat = toRad((fromLat + toLat) / 2);
+  const dLat = toRad(toLat - fromLat);
+  const dLon = toRad(toLon - fromLon);
+  const x = dLon * Math.cos(meanLat);
+  const y = dLat;
+  return Math.hypot(x, y) * EARTH_RADIUS_M;
+}
+
+function bearingRad(fromLat: number, fromLon: number, toLat: number, toLon: number): number {
+  const meanLat = toRad((fromLat + toLat) / 2);
+  const dLat = toRad(toLat - fromLat);
+  const dLon = toRad(toLon - fromLon);
+  return normalizeRad(Math.atan2(dLon * Math.cos(meanLat), dLat));
+}
+
+function horizontalSpeedMps(aircraft: AircraftState): number {
+  return Math.hypot(aircraft.velocity.u, aircraft.velocity.v);
+}
+
+function syntheticGlidepathTarget(
+  aircraft: AircraftState,
+  profile: SyntheticApproachProfile,
+): Pick<VerticalGuidanceTarget, 'targetAltitudeFt' | 'targetVerticalSpeedFpm' | 'targetPitchDeg'> {
+  const radioAltitudeFt = finiteOrUndefined(aircraft.ground?.aglFt);
+  if (radioAltitudeFt !== undefined && radioAltitudeFt <= FLARE_RADIO_ALT_FT) {
+    const flareProgress = 1 - clamp(radioAltitudeFt / FLARE_RADIO_ALT_FT, 0, 1);
+    return {
+      targetAltitudeFt: profile.threshold.altitudeFt,
+      targetPitchDeg: 2.5 + flareProgress * 2,
+      targetVerticalSpeedFpm: -250,
+    };
+  }
+
+  const distanceToThresholdM = distanceM(
+    aircraft.position.lat,
+    aircraft.position.lon,
+    profile.threshold.lat,
+    profile.threshold.lon,
+  );
+  const pathAltitudeFt = profile.threshold.altitudeFt + distanceToThresholdM * M_TO_FT * Math.tan(GLIDESLOPE_RAD);
+  const basePathVsFpm = -horizontalSpeedMps(aircraft) * MPS_TO_FPM * Math.tan(GLIDESLOPE_RAD);
+  const pathErrorFt = pathAltitudeFt - aircraft.position.alt;
+  return {
+    targetAltitudeFt: pathAltitudeFt,
+    targetVerticalSpeedFpm: clamp(basePathVsFpm + clamp(pathErrorFt * 3, -900, 900), -1_600, 300),
+  };
 }
 
 function autopilotStatusIsEngaged(truth: AutoflightTruthState): boolean {
@@ -160,6 +232,7 @@ function resolveLateralTarget(
   input: ResolveGuidanceTargetsInput,
   truth: AutoflightTruthState,
   nav: NavOutput | null,
+  approachProfile: SyntheticApproachProfile | null,
 ): LateralGuidanceTarget | null {
   if (!autopilotStatusIsEngaged(truth)) return null;
   if (truth.lateralActive === 'HDG_SEL') {
@@ -169,6 +242,17 @@ function resolveLateralTarget(
   if (truth.lateralActive === 'LNAV' && nav) {
     return { mode: 'LNAV', targetHeadingRad: nav.desiredTrack };
   }
+  if (truth.lateralActive === 'APP' && approachProfile) {
+    return {
+      mode: 'APP',
+      targetHeadingRad: nav?.desiredTrack ?? bearingRad(
+        input.aircraft.position.lat,
+        input.aircraft.position.lon,
+        approachProfile.threshold.lat,
+        approachProfile.threshold.lon,
+      ),
+    };
+  }
   return null;
 }
 
@@ -176,6 +260,7 @@ function resolveVerticalTarget(
   input: ResolveGuidanceTargetsInput,
   truth: AutoflightTruthState,
   nav: NavOutput | null,
+  approachProfile: SyntheticApproachProfile | null,
 ): VerticalGuidanceTarget | null {
   if (!autopilotStatusIsEngaged(truth)) return null;
   if (truth.verticalActive === 'ALT_HOLD') {
@@ -216,6 +301,12 @@ function resolveVerticalTarget(
       targetVerticalSpeedFpm: vnav.targetVs,
     };
   }
+  if (truth.verticalActive === 'G_S' && approachProfile) {
+    return {
+      mode: 'G_S',
+      ...syntheticGlidepathTarget(input.aircraft, approachProfile),
+    };
+  }
   return null;
 }
 
@@ -223,10 +314,17 @@ function resolveThrustTarget(
   input: ResolveGuidanceTargetsInput,
   truth: AutoflightTruthState,
   nav: NavOutput | null,
+  approachProfile: SyntheticApproachProfile | null,
 ): ThrustGuidanceTarget | null {
+  if (truth.thrustActive === 'RETARD') {
+    return { mode: 'RETARD', targetThrottle: 0 };
+  }
   if (truth.thrustActive === 'SPEED') {
     const selectedSpeed = finiteOrUndefined(input.apState?.boeing.speed);
     let routeManagedSpeed = managedSpeedKt(truth);
+    if (routeManagedSpeed === undefined && selectedSpeed === undefined && truth.verticalActive === 'G_S' && approachProfile) {
+      routeManagedSpeed = approachProfile.threshold.speedKt ?? approachProfile.finalApproachFix.speedKt;
+    }
     if (routeManagedSpeed === undefined
       && selectedSpeed === undefined
       && input.flightPlan
@@ -256,11 +354,16 @@ export function resolveGuidanceTargets(input: ResolveGuidanceTargetsInput): Shar
     })
     : offAutoflightTruth(input.apState));
   const nav = navOutputFor(routeStatus);
+  const approachProfile = resolveSyntheticApproachProfile({
+    aircraft: input.aircraft,
+    flightPlan: input.flightPlan ?? null,
+    routeStatus,
+  });
 
   return {
     truth,
-    lateral: resolveLateralTarget(input, truth, nav),
-    vertical: resolveVerticalTarget(input, truth, nav),
-    thrust: resolveThrustTarget(input, truth, nav),
+    lateral: resolveLateralTarget(input, truth, nav, approachProfile),
+    vertical: resolveVerticalTarget(input, truth, nav, approachProfile),
+    thrust: resolveThrustTarget(input, truth, nav, approachProfile),
   };
 }

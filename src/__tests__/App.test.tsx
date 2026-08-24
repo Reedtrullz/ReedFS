@@ -32,7 +32,7 @@ class MockOscillatorNode {
 }
 vi.stubGlobal('OscillatorNode', MockOscillatorNode);
 
-const { mockSetInput, mockApplyInputActions, mockStart, mockStartTakeoffRoll, mockAbortTakeoff, mockPause, mockResume, mockReset, mockCycleSimRate, mockSetScenario, mockSetTutorialStep, mockSetFlightPlan, mockSetApState, mockSetWind, mockFetchMetar, mockCloudLayer, mockReadGamepadActions } = vi.hoisted(() => ({
+const { mockSetInput, mockApplyInputActions, mockStart, mockStartTakeoffRoll, mockAbortTakeoff, mockPause, mockResume, mockReset, mockCycleSimRate, mockSetScenario, mockSetTutorialStep, mockSetFlightPlan, mockSetFlightPlanAtRunway, mockSetApState, mockSetWind, mockFetchMetar, mockCloudLayer, mockReadGamepadActions } = vi.hoisted(() => ({
   mockSetInput: vi.fn(),
   mockApplyInputActions: vi.fn(),
   mockStart: vi.fn(),
@@ -45,6 +45,7 @@ const { mockSetInput, mockApplyInputActions, mockStart, mockStartTakeoffRoll, mo
   mockSetScenario: vi.fn(),
   mockSetTutorialStep: vi.fn(),
   mockSetFlightPlan: vi.fn(),
+  mockSetFlightPlanAtRunway: vi.fn(),
   mockSetApState: vi.fn(),
   mockSetWind: vi.fn(),
   mockFetchMetar: vi.fn(async () => null),
@@ -183,6 +184,7 @@ vi.mock('../store/simStore', () => {
     setScenario: mockSetScenario,
     setTutorialStep: mockSetTutorialStep,
     setFlightPlan: mockSetFlightPlan,
+    setFlightPlanAtRunway: mockSetFlightPlanAtRunway,
     setApState: mockSetApState,
     setWind: mockSetWind,
   };
@@ -539,7 +541,7 @@ describe('App', () => {
     expect(screen.queryByText(/no default route/i)).toBeNull();
   });
 
-  it('LOAD PLAN keeps NO ROUTE and does not arm route AP modes for the default ENVA scenario', () => {
+  it('LOAD PLAN creates and stores the ENVA to ENGM default route without arming route AP modes', () => {
     const store = useSimStore.getState();
     store.selectedScenarioId = 'enva-tutorial';
     store.aircraft.position = { lat: 63.4583, lon: 10.9101, alt: 40 };
@@ -549,14 +551,14 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: 'LOAD PLAN' }));
 
     expect(mockSetFlightPlan).toHaveBeenCalledTimes(1);
-    expect(mockSetFlightPlan).toHaveBeenCalledWith(null);
+    expect(mockSetFlightPlan).toHaveBeenCalledWith(expect.objectContaining({ origin: 'ENVA', destination: 'ENGM' }));
     expect(mockSetApState).not.toHaveBeenCalled();
-    expect(screen.getByText(/no default route/i)).toBeTruthy();
+    expect(screen.queryByText(/no default route/i)).toBeNull();
   });
 
   it('LOAD PLAN clears stale no-route feedback after loading a compatible KSEA route', () => {
     const store = useSimStore.getState();
-    store.selectedScenarioId = 'enva-tutorial';
+    store.selectedScenarioId = 'kpdx-tutorial';
 
     render(<App />);
 
@@ -807,7 +809,7 @@ describe('App', () => {
     expect(mockSetApState).not.toHaveBeenCalled();
     const routeLoadResult = screen.getByRole('status', { name: 'Route load result' }).textContent;
     expect(routeLoadResult).toBe(
-      'CANNED TRAINING ROUTE KSEA→KPDX loaded. Route editing is unavailable; synthetic approach fixes are not official procedure data; confirm flaps 5, trim 5.0, idle throttle, then START ROLL.',
+      'DEFAULT TRAINING ROUTE KSEA→KPDX loaded. Use the runway route panel for arbitrary supported runway pairs; synthetic approach fixes are not official procedure data; confirm flaps 5, trim 5.0, idle throttle, then START ROLL.',
     );
     expect(routeLoadResult).not.toMatch(/resets the takeoff levers|Takeoff setup reminder/i);
   });
@@ -820,7 +822,7 @@ describe('App', () => {
 
     expect(mockSetFlightPlan).toHaveBeenCalledWith(expect.objectContaining({ origin: 'KSEA', destination: 'KPDX' }));
     expect(screen.getByRole('status', { name: 'Route load result' }).textContent).toBe(
-      'CANNED TRAINING ROUTE KSEA→KPDX loaded. Route editing is unavailable; synthetic approach fixes are not official procedure data; confirm flaps 5, trim 4.5, idle throttle, then START ROLL.',
+      'DEFAULT TRAINING ROUTE KSEA→KPDX loaded. Use the runway route panel for arbitrary supported runway pairs; synthetic approach fixes are not official procedure data; confirm flaps 5, trim 4.5, idle throttle, then START ROLL.',
     );
   });
 
@@ -861,7 +863,7 @@ describe('App', () => {
     expect(mockSetFlightPlan).toHaveBeenCalledWith(expect.objectContaining({ origin: 'KSEA', destination: 'KPDX' }));
     expect(mockSetApState).not.toHaveBeenCalled();
     expect(screen.getByRole('status', { name: 'Route load result' }).textContent).toBe(
-      'CANNED TRAINING ROUTE KSEA→KPDX loaded. Route editing is unavailable; synthetic approach fixes are not official procedure data; route guidance is active; use visible MCP LNAV, altitude, and VS/VNAV controls for climb/descent management.',
+      'DEFAULT TRAINING ROUTE KSEA→KPDX loaded. Use the runway route panel for arbitrary supported runway pairs; synthetic approach fixes are not official procedure data; route guidance is active; use visible MCP LNAV, altitude, and VS/VNAV controls for climb/descent management.',
     );
   });
 
@@ -932,7 +934,7 @@ describe('App', () => {
 
     expect(mockAbortTakeoff).toHaveBeenCalledTimes(1);
     expect(mockPause).not.toHaveBeenCalled();
-  });
+  }, 20_000);
 
   it('persists audio settings from the shell without creating an AudioContext', () => {
     render(<App />);

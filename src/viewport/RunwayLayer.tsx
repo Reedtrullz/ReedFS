@@ -31,6 +31,18 @@ function forwardRightVectors(headingDeg: number) {
 }
 
 function pointAlongRunway(runway: RunwayReference, alongM: number, lateralM = 0): RunwayGeoPoint {
+  if (runway.end) {
+    const t = runway.lengthM > 0 ? Math.max(0, Math.min(1, alongM / runway.lengthM)) : 0;
+    const center = {
+      lat: runway.start.lat + (runway.end.lat - runway.start.lat) * t,
+      lon: runway.start.lon + (runway.end.lon - runway.start.lon) * t,
+      altFt: runway.start.altFt + (runway.end.altFt - runway.start.altFt) * t,
+    };
+    if (lateralM === 0) return center;
+    const { right } = forwardRightVectors(runway.headingDeg);
+    return offsetPoint(center, right.north * lateralM, right.east * lateralM);
+  }
+
   const { forward, right } = forwardRightVectors(runway.headingDeg);
   return offsetPoint(
     runway.start,

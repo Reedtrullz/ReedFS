@@ -93,6 +93,110 @@ function aircraftAtRoute() {
   return aircraft;
 }
 
+function envaEngmSyntheticAutolandRoute(): FlightPlan {
+  return {
+    origin: 'ENVA',
+    destination: 'ENGM',
+    flightNumber: 'RFS190',
+    route: 'ENVA ENGM19R_IF ENGM19R_FAF ENGM19R_RWY',
+    waypoints: [
+      { ident: 'ENVA', lat: 63.4583, lon: 10.9101, coordinateSource: 'synthetic', discontinuity: false },
+      {
+        ident: 'ENGM19R_IF',
+        lat: 60.395,
+        lon: 11.0,
+        coordinateSource: 'synthetic',
+        discontinuity: false,
+        legType: 'IF',
+        altitudeConstraint: { type: 'AT', altitude: 3000 },
+        speedConstraint: { type: 'AT_OR_BELOW', speed: 210 },
+      },
+      {
+        ident: 'ENGM19R_FAF',
+        lat: 60.278,
+        lon: 11.055,
+        coordinateSource: 'synthetic',
+        discontinuity: false,
+        legType: 'TF',
+        altitudeConstraint: { type: 'AT', altitude: 2200 },
+        speedConstraint: { type: 'AT_OR_BELOW', speed: 150 },
+      },
+      {
+        ident: 'ENGM19R_RWY',
+        lat: 60.1939,
+        lon: 11.1004,
+        coordinateSource: 'synthetic',
+        discontinuity: false,
+        legType: 'RW',
+        altitudeConstraint: { type: 'AT', altitude: 681 },
+        speedConstraint: { type: 'AT_OR_BELOW', speed: 138 },
+      },
+    ],
+  };
+}
+
+function aircraftOnEngmFinal(altitudeFt = 1600, aglFt = 920) {
+  const aircraft = createInitialState(B737_800_SPEC);
+  aircraft.position.lat = 60.224;
+  aircraft.position.lon = 11.084;
+  aircraft.position.alt = altitudeFt;
+  aircraft.velocity.u = 72;
+  aircraft.ground = {
+    ...aircraft.ground,
+    weightOnWheels: false,
+    aglFt,
+    groundAltFt: 681,
+    contact: 'none',
+    onRunway: false,
+  };
+  aircraft.flightPhase = 'APPROACH';
+  return aircraft;
+}
+
+function engmFinalRouteStatus() {
+  return {
+    ...createNoRouteStatus(envaEngmSyntheticAutolandRoute()),
+    routeName: 'ENVA→ENGM',
+    routeValid: true,
+    routeComplete: false,
+    approachHandoff: 'threshold' as const,
+    lnavAvailable: true,
+    lnavUnavailableReason: null,
+    activeLegIndex: 2,
+    activeLegCount: 3,
+    fromWaypointIndex: 2,
+    toWaypointIndex: 3,
+    fromIdent: 'ENGM19R_FAF',
+    nextWaypointIdent: 'ENGM19R_RWY',
+    distanceToNextM: 2 * 1852,
+    distanceToNextNm: 2,
+    desiredTrackRad: 190 * Math.PI / 180,
+    desiredTrackDegTrue: 190,
+    crossTrackErrorM: 0,
+    alongTrackM: 0,
+    legLengthM: 5 * 1852,
+    waypointReached: false,
+    sequenced: false,
+  };
+}
+
+function appAutolandAp(): AutopilotState {
+  const ap = apState();
+  ap.truth.autopilotStatus = 'CMD_AB';
+  ap.truth.lateralActive = 'APP';
+  ap.truth.verticalActive = 'G_S';
+  ap.truth.thrustActive = 'SPEED';
+  ap.boeing.cmdA = true;
+  ap.boeing.cmdB = true;
+  ap.boeing.app = true;
+  ap.boeing.lnav = false;
+  ap.boeing.vnav = false;
+  ap.boeing.speed = null;
+  ap.boeing.speedMode = true;
+  ap.boeing.autothrottleArm = true;
+  return ap;
+}
+
 describe('resolveGuidanceTargets', () => {
   it('produces the same backed target values consumed by the AP target resolver', () => {
     const aircraft = aircraftAtRoute();
@@ -207,6 +311,52 @@ describe('resolveGuidanceTargets', () => {
     expect(shared.lateral).toBeNull();
     expect(shared.vertical).toBeNull();
     expect(shared.thrust).toBeNull();
+  });
+
+  it('resolves APP and G_S targets for a backed synthetic ENVA to ENGM autoland route', () => {
+    const aircraft = aircraftOnEngmFinal();
+    const ap = appAutolandAp();
+    const flightPlan = envaEngmSyntheticAutolandRoute();
+    const routeStatus = engmFinalRouteStatus();
+
+    const shared = resolveGuidanceTargets({ aircraft, apState: ap, flightPlan, routeStatus });
+
+    expect(shared.truth.autopilotStatus).toBe('CMD_AB');
+    expect(shared.truth.lateralActive).toBe('APP');
+    expect(shared.truth.verticalActive).toBe('G_S');
+    expect(shared.lateral?.mode).toBe('APP');
+    expect(shared.lateral?.targetHeadingRad).toBeCloseTo(190 * Math.PI / 180, 8);
+    expect(shared.vertical?.mode).toBe('G_S');
+    expect(shared.vertical?.targetAltitudeFt).toBeGreaterThan(1000);
+    expect(shared.vertical?.targetVerticalSpeedFpm).toBeLessThan(0);
+    expect(shared.thrust?.mode).toBe('SPEED');
+    expect(shared.thrust?.targetSpeedKt).toBe(138);
+  });
+
+  it('transitions G_S into a flare-like pitch target below 50 ft radio altitude', () => {
+    const aircraft = aircraftOnEngmFinal(715, 34);
+    const ap = appAutolandAp();
+    const flightPlan = envaEngmSyntheticAutolandRoute();
+    const routeStatus = engmFinalRouteStatus();
+
+    const shared = resolveGuidanceTargets({ aircraft, apState: ap, flightPlan, routeStatus });
+
+    expect(shared.truth.verticalActive).toBe('G_S');
+    expect(shared.vertical?.mode).toBe('G_S');
+    expect(shared.vertical?.targetPitchDeg).toBeGreaterThan(2.5);
+    expect(shared.vertical?.targetPitchDeg).toBeLessThanOrEqual(4.5);
+  });
+
+  it('resolves RETARD as an idle thrust target near touchdown', () => {
+    const aircraft = aircraftOnEngmFinal(705, 24);
+    const ap = appAutolandAp();
+    const flightPlan = envaEngmSyntheticAutolandRoute();
+    const routeStatus = engmFinalRouteStatus();
+
+    const shared = resolveGuidanceTargets({ aircraft, apState: ap, flightPlan, routeStatus });
+
+    expect(shared.truth.thrustActive).toBe('RETARD');
+    expect(shared.thrust).toEqual({ mode: 'RETARD', targetThrottle: 0 });
   });
 
   it('keeps lateral-only CMD_A from exposing any vertical AP target', () => {

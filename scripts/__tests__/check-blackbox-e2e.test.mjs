@@ -23,6 +23,27 @@ function writeManifest(fixtureRoot, entrypoints) {
   );
 }
 
+function writeFullFlightHelper(fixtureRoot) {
+  fs.mkdirSync(path.join(fixtureRoot, 'e2e', 'helpers'), { recursive: true });
+  fs.writeFileSync(
+    path.join(fixtureRoot, 'e2e', 'helpers', 'rfsBlackbox.ts'),
+    [
+      'export async function readVisibleFlightPhase() { return "STOPPED"; }',
+      'export async function resetThroughVisibleControls() {}',
+      'export async function selectEnvaScenarioThroughVisibleControls() {}',
+      'export async function selectKseaScenarioThroughVisibleControls() {}',
+      'export async function selectKpdxShortFinalScenarioThroughVisibleControls() {}',
+      '',
+    ].join('\n'),
+  );
+}
+
+function writeFullFlightSpec(fixtureRoot, source) {
+  writeFullFlightHelper(fixtureRoot);
+  fs.writeFileSync(path.join(fixtureRoot, 'e2e', 'rfs-full-flight-blackbox.spec.ts'), source);
+  writeManifest(fixtureRoot, ['e2e/rfs-full-flight-blackbox.spec.ts']);
+}
+
 function runChecker(fixtureRoot, manifest = 'e2e/blackbox-manifest.json') {
   return spawnSync(process.execPath, [checkerPath, '--repo-root', fixtureRoot, '--manifest', manifest], {
     cwd: process.cwd(),
@@ -114,5 +135,69 @@ describe('check-blackbox-e2e', () => {
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain('comment-require-entry.spec.ts');
     expect(result.stderr).toContain('CommonJS require');
+  });
+
+  it('rejects full-flight specs that import the KPDX short-final scenario helper', () => {
+    const fixtureRoot = makeTempRepo();
+    writeFullFlightSpec(
+      fixtureRoot,
+      [
+        "import { readVisibleFlightPhase, resetThroughVisibleControls, selectEnvaScenarioThroughVisibleControls, selectKpdxShortFinalScenarioThroughVisibleControls } from './helpers/rfsBlackbox';",
+        "await selectEnvaScenarioThroughVisibleControls(page);",
+        "expect(await readVisibleFlightPhase(page)).toBe('STOPPED');",
+        '// Final reset section: continuous ENVA-to-ENGM proof already reached STOPPED.',
+        'await resetThroughVisibleControls(page);',
+        'void selectKpdxShortFinalScenarioThroughVisibleControls;',
+        '',
+      ].join('\n'),
+    );
+
+    const result = runChecker(fixtureRoot);
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('rfs-full-flight-blackbox.spec.ts');
+    expect(result.stderr).toContain('KPDX short-final scenario helper');
+  });
+
+  it('rejects full-flight specs that reset before the final STOPPED reset section', () => {
+    const fixtureRoot = makeTempRepo();
+    writeFullFlightSpec(
+      fixtureRoot,
+      [
+        "import { readVisibleFlightPhase, resetThroughVisibleControls, selectEnvaScenarioThroughVisibleControls } from './helpers/rfsBlackbox';",
+        "await selectEnvaScenarioThroughVisibleControls(page);",
+        'await resetThroughVisibleControls(page);',
+        "expect(await readVisibleFlightPhase(page)).toBe('STOPPED');",
+        '// Final reset section: continuous ENVA-to-ENGM proof already reached STOPPED.',
+        '',
+      ].join('\n'),
+    );
+
+    const result = runChecker(fixtureRoot);
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('calls resetThroughVisibleControls before the final reset section');
+  });
+
+  it('rejects full-flight specs that switch scenarios mid-proof', () => {
+    const fixtureRoot = makeTempRepo();
+    writeFullFlightSpec(
+      fixtureRoot,
+      [
+        "import { readVisibleFlightPhase, resetThroughVisibleControls, selectEnvaScenarioThroughVisibleControls, selectKseaScenarioThroughVisibleControls } from './helpers/rfsBlackbox';",
+        "await selectEnvaScenarioThroughVisibleControls(page);",
+        "await selectKseaScenarioThroughVisibleControls(page);",
+        "expect(await readVisibleFlightPhase(page)).toBe('STOPPED');",
+        '// Final reset section: continuous ENVA-to-ENGM proof already reached STOPPED.',
+        'await resetThroughVisibleControls(page);',
+        '',
+      ].join('\n'),
+    );
+
+    const result = runChecker(fixtureRoot);
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('split KSEA climb scenario helper');
+    expect(result.stderr).toContain('must select only ENVA once');
   });
 });

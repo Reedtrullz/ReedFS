@@ -23,13 +23,33 @@ export interface VisibleFmaModes {
   autopilotStatus: string;
 }
 
-type VisibleMcpModeButton = 'LNAV' | 'SPD' | 'ALT' | 'VS' | 'VNAV';
+export interface VisibleRouteLoadExpectation {
+  routeName: string;
+  activeLegCount: number;
+  firstLeg: FmaTextExpectation;
+}
+
+export interface VisibleAutolandFmaModes {
+  raw: VisibleFmaModes;
+  appActive: boolean;
+  glideSlopeActive: boolean;
+  dualChannelAutopilotActive: boolean;
+  retardActive: boolean;
+}
+
+type VisibleMcpModeButton = 'LNAV' | 'SPD' | 'ALT' | 'VS' | 'VNAV' | 'APP';
 type VisibleGearTarget = 'UP' | 'DOWN';
 type FmaTextExpectation = string | RegExp;
 
 const B737_VISIBLE_FLAP_DETENTS = [0, 1, 5, 10, 15, 25, 30, 40] as const;
 const VISIBLE_POSITIVE_RATE_MIN_RADIO_ALTITUDE_FT = 5;
 const VISIBLE_POSITIVE_RATE_MIN_VERTICAL_SPEED_FPM = 100;
+const KSEA_ROUTE_EXPECTATION: VisibleRouteLoadExpectation = {
+  routeName: 'KSEA→KPDX',
+  activeLegCount: 5,
+  firstLeg: 'KSEA → OLM',
+};
+const REAL_TIME_VISIBLE_SIM_PAGES = new WeakSet<Page>();
 
 interface VisibleSimDriveOptions {
   timeoutMs: number;
@@ -84,6 +104,12 @@ export async function selectKseaScenarioThroughVisibleControls(page: Page): Prom
   await page.getByLabel('Scenario', { exact: true }).selectOption('ksea-tutorial');
 }
 
+export async function selectEnvaScenarioThroughVisibleControls(page: Page): Promise<void> {
+  await page.getByLabel('Scenario', { exact: true }).selectOption('enva-tutorial');
+  const scenarioPanel = page.getByRole('region', { name: 'Scenario and tutorial' });
+  await expect(scenarioPanel).toContainText('ENVA Tutorial Takeoff');
+}
+
 export async function selectKpdxShortFinalScenarioThroughVisibleControls(page: Page): Promise<void> {
   await page.getByLabel('Scenario', { exact: true }).selectOption('kpdx-10r-short-final');
   const scenarioPanel = page.getByRole('region', { name: 'Scenario and tutorial' });
@@ -91,7 +117,10 @@ export async function selectKpdxShortFinalScenarioThroughVisibleControls(page: P
   await expect(scenarioPanel).toContainText(/synthetic KPDX 10R final approach fixture; not official procedure data/i);
 }
 
-export async function loadSelectedRouteThroughVisibleControls(page: Page): Promise<void> {
+export async function loadSelectedRouteThroughVisibleControls(
+  page: Page,
+  expected: VisibleRouteLoadExpectation = KSEA_ROUTE_EXPECTATION,
+): Promise<void> {
   const loadPlanButton = page.getByRole('button', { name: /^LOAD PLAN$/ });
   await expect(loadPlanButton).toBeVisible();
   // After long page.clock.runFor() advances, Chromium's rAF can leave actionability
@@ -100,9 +129,9 @@ export async function loadSelectedRouteThroughVisibleControls(page: Page): Promi
   await activateAlreadyVisibleControl(loadPlanButton);
 
   const routeStatus = page.getByLabel('Route status');
-  await expect(routeStatus.getByText('KSEA→KPDX')).toBeVisible();
-  await expect(routeStatus.getByText(/LEG\s+1\/5/)).toBeVisible();
-  await expect(routeStatus.getByText('KSEA → OLM')).toBeVisible();
+  await expect(routeStatus.getByText(expected.routeName)).toBeVisible();
+  await expect(routeStatus.getByText(new RegExp(`LEG\\s+1/${expected.activeLegCount}`))).toBeVisible();
+  await expect(routeStatus.getByText(expected.firstLeg)).toBeVisible();
 }
 
 export async function loadKseaRouteThroughVisibleControls(page: Page): Promise<void> {
@@ -174,7 +203,7 @@ async function setVisibleFlaps(page: Page, target: number): Promise<void> {
   throw new Error(`Unable to set visible flap lever to ${target}; current setup text: ${await readVisibleTakeoffConfigurationText(page)}`);
 }
 
-export async function setVisibleSimRateTarget(page: Page, target: 1 | 4 | 16): Promise<void> {
+export async function setVisibleSimRateTarget(page: Page, target: 1 | 4 | 16 | 64): Promise<void> {
   const button = page.getByRole('button', { name: /Cycle simulator rate/ });
   await expect(button).toBeVisible();
 
@@ -185,6 +214,10 @@ export async function setVisibleSimRateTarget(page: Page, target: 1 | 4 | 16): P
   }
 
   throw new Error(`Unable to set visible simulator rate target to ${target}X.`);
+}
+
+export function useRealTimeVisibleSim(page: Page): void {
+  REAL_TIME_VISIBLE_SIM_PAGES.add(page);
 }
 
 export async function configureScenarioTakeoffThroughVisibleControls(page: Page): Promise<void> {
@@ -299,6 +332,10 @@ export async function holdKey(page: Page, key: string, countOrDurationUnits: num
 }
 
 export async function advanceVisibleSimTime(page: Page, milliseconds: number): Promise<void> {
+  if (REAL_TIME_VISIBLE_SIM_PAGES.has(page)) {
+    await page.waitForTimeout(milliseconds);
+    return;
+  }
   await page.clock.runFor(milliseconds);
 }
 
@@ -363,18 +400,26 @@ export async function rotateToVisiblePositiveRate(page: Page): Promise<void> {
 
 export async function rotateWithVisibleMouseControlToPositiveRate(page: Page): Promise<void> {
   const rotateButton = page.getByRole('region', { name: 'Takeoff setup' }).getByRole('button', { name: /^Hold Rotate$/ });
+  const neutralButton = page.getByRole('region', { name: 'Takeoff setup' }).getByRole('button', { name: /^Yoke Neutral$/ });
   await expect(rotateButton).toBeVisible();
-  await rotateButton.dispatchEvent('pointerdown', { pointerType: 'mouse', button: 0, buttons: 1 });
+  let holdingRotate = false;
   try {
     await driveVisibleSimUntil(page, 'positive rate while holding visible mouse rotate control', async () => {
       const numbers = await readVisibleFlightNumbers(page);
+      if (!holdingRotate && !visiblePositiveRateEstablished(numbers) && numbers.iasKt >= 135) {
+        await rotateButton.dispatchEvent('pointerdown', { pointerType: 'mouse', button: 0 });
+        holdingRotate = true;
+      }
       return visiblePositiveRateEstablished(numbers);
     }, {
       timeoutMs: 45_000,
       stepMs: 350,
     });
   } finally {
-    await rotateButton.dispatchEvent('pointerup', { pointerType: 'mouse', button: 0, buttons: 0 });
+    if (holdingRotate) {
+      await rotateButton.dispatchEvent('pointerup', { pointerType: 'mouse', button: 0 });
+    }
+    await activateAlreadyVisibleControl(neutralButton);
   }
 }
 
@@ -414,12 +459,36 @@ export async function clickVisibleMcpMode(page: Page, mode: VisibleMcpModeButton
   await activateAlreadyVisibleControl(button);
 }
 
+export async function clickVisibleAppModeWhenAvailable(page: Page): Promise<boolean> {
+  const mcp = page.getByRole('region', { name: 'Mode control panel' });
+  await expect(mcp).toBeVisible();
+
+  const button = mcp.getByRole('button', { name: /^APP$/ });
+  if (await button.count() === 0) return false;
+  if (!await button.isVisible()) return false;
+  if (!await button.isEnabled()) return false;
+
+  await activateAlreadyVisibleControl(button);
+  return true;
+}
+
 export async function readVisibleFmaModes(page: Page): Promise<VisibleFmaModes> {
   return {
     thrustActive: await readRequiredVisibleText(page, 'FMA thr active'),
     lateralActive: await readRequiredVisibleText(page, 'FMA roll active'),
     verticalActive: await readRequiredVisibleText(page, 'FMA pitch active'),
     autopilotStatus: await readRequiredVisibleText(page, 'FMA ap active'),
+  };
+}
+
+export async function readVisibleAutolandFmaModes(page: Page): Promise<VisibleAutolandFmaModes> {
+  const raw = await readVisibleFmaModes(page);
+  return {
+    raw,
+    appActive: raw.lateralActive === 'APP',
+    glideSlopeActive: raw.verticalActive === 'G_S',
+    dualChannelAutopilotActive: raw.autopilotStatus === 'CMD_AB',
+    retardActive: raw.thrustActive === 'RETARD',
   };
 }
 
@@ -486,8 +555,14 @@ export async function cleanUpAirframeThroughVisibleControls(page: Page): Promise
 }
 
 export async function readVisibleRouteStatus(page: Page): Promise<VisibleRouteStatus> {
-  const text = (await page.getByLabel('Route status').textContent())?.replace(/\s+/g, ' ').trim() ?? '';
-  const activeLeg = text.match(/([A-Z0-9]+\s+→\s+[A-Z0-9_]+)/)?.[1] ?? null;
+  const rawText = await page.getByLabel('Route status').textContent() ?? '';
+  const text = rawText
+    .replace(/(LEG\s+\d+\/\d+)/g, '$1 ')
+    .replace(/(DTG|TRK|ETA)/g, ' $1 ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const activeLegMatch = text.match(/LEG\s+\d+\/\d+\s*([A-Z0-9_]+)\s+→\s+([A-Z0-9_]+)/);
+  const activeLeg = activeLegMatch ? `${activeLegMatch[1]} → ${activeLegMatch[2]}` : null;
   const legMatch = text.match(/LEG\s+(\d+)\/(\d+)/);
   const activeLegIndex = legMatch ? Number(legMatch[1]) : null;
   const activeLegCount = legMatch ? Number(legMatch[2]) : null;
@@ -648,7 +723,9 @@ export async function readVisibleFlightNumbers(page: Page): Promise<VisibleFligh
   if (!airspeedText || !altitudeText || !attitudeText) throw new Error('Primary flight display text was not available.');
 
   const radioAltitude = pfd.getByLabel('Radio altitude');
-  const radioAltitudeText = await radioAltitude.count() > 0 ? await radioAltitude.textContent() : null;
+  const radioAltitudeText = await radioAltitude.count() > 0
+    ? await radioAltitude.textContent({ timeout: 1_000 }).catch(() => null)
+    : null;
 
   return {
     iasKt: parseRequiredNumber('IAS', airspeedText, /IAS\s*(\d+)\s*KT/),

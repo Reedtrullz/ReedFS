@@ -3,7 +3,10 @@ import type { SimStore } from './simStore';
 import { computeDerived } from '../sim/physics/derived';
 import { quatToEuler } from '../sim/physics/quaternion';
 import { deriveDisplayFmaTruth } from '../sim/systems/fmaTruth';
-import { deriveEffectiveAutoflightTruth } from '../sim/systems/effectiveAutoflightTruth';
+import {
+  deriveEffectiveAutoflightTruth,
+  hasSyntheticApproachAutolandCapability,
+} from '../sim/systems/effectiveAutoflightTruth';
 import { takeoffCueText } from '../sim/takeoffCue';
 import { createDefaultAutopilotState, createDefaultAutopilotStateFromAircraft } from '../instruments/defaultAutopilotState';
 
@@ -61,6 +64,12 @@ export const selectPfdLongitude = (s: SimStore) => s.aircraft.position.lon;
 export const selectPfdVelocityU = (s: SimStore) => s.aircraft.velocity.u;
 export const selectPfdVelocityV = (s: SimStore) => s.aircraft.velocity.v;
 export const selectPfdVelocityW = (s: SimStore) => s.aircraft.velocity.w;
+export const selectPfdGroundAglFt = (s: SimStore) => s.aircraft.ground.aglFt;
+export const selectPfdGroundAltFt = (s: SimStore) => s.aircraft.ground.groundAltFt;
+export const selectPfdGroundWeightOnWheels = (s: SimStore) => s.aircraft.ground.weightOnWheels;
+export const selectPfdGroundNormalForceN = (s: SimStore) => s.aircraft.ground.normalForceN;
+export const selectPfdGroundOnRunway = (s: SimStore) => s.aircraft.ground.onRunway;
+export const selectPfdGroundContact = (s: SimStore) => s.aircraft.ground.contact;
 export const selectPfdVerticalSpeed = (s: SimStore) => computeDerived(s.aircraft, s.wind).vs;
 export const selectPfdPitchDeg = (s: SimStore) => (quatToEuler(s.aircraft.quaternion).theta * 180) / Math.PI;
 export const selectPfdRollDeg = (s: SimStore) => (quatToEuler(s.aircraft.quaternion).phi * 180) / Math.PI;
@@ -115,7 +124,7 @@ export function selectPfdManagedSpeedKt(s: SimStore): number | null {
 
 // ── MCP view model ──────────────────────────────────────────────────────
 
-export type EnabledMcpMode = 'HDG_SEL' | 'LNAV' | 'VNAV' | 'ALT_HOLD' | 'VS' | 'SPEED' | 'N1' | 'OFF';
+export type EnabledMcpMode = 'HDG_SEL' | 'LNAV' | 'APP' | 'VNAV' | 'ALT_HOLD' | 'VS' | 'SPEED' | 'N1' | 'OFF';
 
 export interface McpModeAvailability {
   available: boolean;
@@ -129,6 +138,8 @@ export interface McpModeAvailabilityState {
   lnavAvailable: boolean;
   lnavUnavailableReason: string | null;
   vnavBackedMode: VerticalMode;
+  approachAutolandAvailable: boolean;
+  approachAutolandUnavailableReason: string | null;
 }
 
 const VNAV_DISPLAY_MODES = new Set<VerticalMode>(['VNAV', 'VNAV_PTH', 'ALT*', 'ALT_HOLD']);
@@ -179,7 +190,10 @@ export function mcpModeAvailability(state: McpModeAvailabilityState, mode: Enabl
   const vnavReason = mode === 'VNAV' && state.vnavBackedMode === 'OFF'
     ? 'VNAV unavailable: no active altitude constraint'
     : null;
-  const reasons = [thrustReason, guidanceReason, routeReason, vnavReason].filter((reason): reason is string => Boolean(reason));
+  const approachReason = mode === 'APP' && !state.approachAutolandAvailable
+    ? state.approachAutolandUnavailableReason ?? 'APP unavailable: compatible synthetic approach required'
+    : null;
+  const reasons = [thrustReason, guidanceReason, routeReason, vnavReason, approachReason].filter((reason): reason is string => Boolean(reason));
   return {
     available: reasons.length === 0,
     reason: reasons.length > 0 ? reasons.join('; ') : null,
@@ -221,6 +235,11 @@ export function selectMcpViewModel(s: SimStore): McpViewModel {
     flightPlan: s.flightPlan,
     routeStatus: s.routeStatus,
   });
+  const approachAutolandAvailable = hasSyntheticApproachAutolandCapability({
+    aircraft: s.aircraft,
+    flightPlan: s.flightPlan,
+    routeStatus: s.routeStatus,
+  });
   const vnavAvailable = backedVnavMode !== 'OFF';
   const vnavActive = Boolean(s.apState?.boeing.vnav)
     && (VNAV_DISPLAY_MODES.has(vertActive) || effectiveTruth.verticalArmed === 'VNAV');
@@ -234,10 +253,15 @@ export function selectMcpViewModel(s: SimStore): McpViewModel {
     lnavAvailable,
     lnavUnavailableReason: s.routeStatus.lnavUnavailableReason,
     vnavBackedMode: backedVnavMode,
+    approachAutolandAvailable,
+    approachAutolandUnavailableReason: approachAutolandAvailable
+      ? null
+      : 'APP unavailable: compatible synthetic approach required',
   };
   const modeAvailability: Record<EnabledMcpMode, McpModeAvailability> = {
     HDG_SEL: mcpModeAvailability(availabilityState, 'HDG_SEL'),
     LNAV: mcpModeAvailability(availabilityState, 'LNAV'),
+    APP: mcpModeAvailability(availabilityState, 'APP'),
     VNAV: mcpModeAvailability(availabilityState, 'VNAV'),
     ALT_HOLD: mcpModeAvailability(availabilityState, 'ALT_HOLD'),
     VS: mcpModeAvailability(availabilityState, 'VS'),
@@ -245,7 +269,7 @@ export function selectMcpViewModel(s: SimStore): McpViewModel {
     N1: mcpModeAvailability(availabilityState, 'N1'),
     OFF: mcpModeAvailability(availabilityState, 'OFF'),
   };
-  const unavailableSummary = [modeAvailability.SPEED, modeAvailability.VS, modeAvailability.N1, modeAvailability.LNAV]
+  const unavailableSummary = [modeAvailability.SPEED, modeAvailability.VS, modeAvailability.N1, modeAvailability.LNAV, modeAvailability.APP]
     .find((availability) => !availability.available)?.reason ?? null;
 
   const selectedSpeed = finiteNumber(displayApState.boeing.speed);

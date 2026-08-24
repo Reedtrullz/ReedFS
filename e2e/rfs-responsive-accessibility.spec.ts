@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { clickButton, openRfs } from './helpers/rfsPage';
+import { openRfs } from './helpers/rfsPage';
 
 type Box = {
   name: string;
@@ -11,25 +11,19 @@ type Box = {
   height: number;
 };
 
-const FLIGHT_VIEWPORT_WIDTHS = [1024, 1280, 1440, 1920] as const;
-const VIEWPORT_HEIGHT = 900;
+const FLIGHT_VIEWPORTS = [
+  { width: 900, height: 700 },
+  { width: 1024, height: 700 },
+  { width: 1280, height: 720 },
+  { width: 1280, height: 900 },
+  { width: 1440, height: 900 },
+  { width: 1920, height: 1080 },
+] as const;
+const DEBUG_VIEWPORTS = [
+  { width: 1024, height: 700 },
+  { width: 1280, height: 720 },
+] as const;
 const MIN_PANEL_GAP_PX = 2;
-
-async function panelBox(page: Page, panel: string): Promise<Box> {
-  const locator = page.locator(`[data-rfs-panel="${panel}"]`);
-  await expect(locator, `RFS panel ${panel}`).toBeVisible();
-  const box = await locator.boundingBox();
-  expect(box, `RFS panel ${panel} bounding box`).not.toBeNull();
-  return {
-    name: panel,
-    left: box!.x,
-    top: box!.y,
-    right: box!.x + box!.width,
-    bottom: box!.y + box!.height,
-    width: box!.width,
-    height: box!.height,
-  };
-}
 
 async function visibleCesiumCreditBoxes(page: Page): Promise<Box[]> {
   return page.evaluate(() => {
@@ -67,6 +61,49 @@ async function visibleCesiumCreditBoxes(page: Page): Promise<Box[]> {
   });
 }
 
+async function panelBoxes(page: Page, requiredPanels: string[], optionalPanels: string[] = []): Promise<Box[]> {
+  const result = await page.evaluate(({ requiredPanels: required, optionalPanels: optional }) => {
+    function collect(name: string): Box | null {
+      const node = document.querySelector<HTMLElement>(`[data-rfs-panel="${name}"]`);
+      if (!node) return null;
+      const style = window.getComputedStyle(node);
+      const rect = node.getBoundingClientRect();
+      if (
+        style.display === 'none'
+        || style.visibility === 'hidden'
+        || Number(style.opacity) === 0
+        || rect.width <= 0
+        || rect.height <= 0
+      ) {
+        return null;
+      }
+      return {
+        name,
+        left: rect.left,
+        top: rect.top,
+        right: rect.right,
+        bottom: rect.bottom,
+        width: rect.width,
+        height: rect.height,
+      };
+    }
+
+    return {
+      required: required.map((name) => ({ name, box: collect(name) })),
+      optional: optional.map(collect).filter((box): box is Box => box !== null),
+    };
+  }, { requiredPanels, optionalPanels });
+
+  for (const { name, box } of result.required) {
+    expect(box, `RFS panel ${name} bounding box`).not.toBeNull();
+  }
+
+  return [
+    ...result.required.map(({ box }) => box as Box),
+    ...result.optional,
+  ];
+}
+
 function overlapPixels(a: Box, b: Box): { x: number; y: number } {
   return {
     x: Math.min(a.right, b.right) - Math.max(a.left, b.left),
@@ -89,15 +126,11 @@ function expectNoOverlap(boxes: Box[]): void {
 }
 
 async function flightModeBoxes(page: Page): Promise<Box[]> {
-  const boxes = await Promise.all([
-    panelBox(page, 'scenario'),
-    panelBox(page, 'takeoff-setup'),
-    panelBox(page, 'route'),
-    panelBox(page, 'pfd'),
-    panelBox(page, 'mcp'),
-    panelBox(page, 'engine'),
-    panelBox(page, 'controls'),
-  ]);
+  const boxes = await panelBoxes(
+    page,
+    ['scenario', 'route-builder', 'takeoff-setup', 'route', 'pfd', 'mcp', 'engine', 'controls'],
+    ['scene-status'],
+  );
   const creditBoxes = await visibleCesiumCreditBoxes(page);
   expect(creditBoxes.length, 'visible Cesium attribution/credit boxes').toBeGreaterThan(0);
   return [...boxes, ...creditBoxes];
@@ -109,41 +142,27 @@ async function cycleOverlayToDebug(page: Page): Promise<void> {
   await expect(page.getByRole('button', { name: /OVL: DEBUG/i })).toBeVisible();
 }
 
+async function clickResponsiveControl(page: Page, name: string | RegExp): Promise<void> {
+  await page.getByRole('button', { name }).click();
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+}
+
+async function configureTakeoffAndLoadRoute(page: Page): Promise<void> {
+  await clickResponsiveControl(page, /^Set takeoff config$/i);
+  await clickResponsiveControl(page, /^LOAD PLAN$/i);
+  await expect(page.getByRole('status', { name: 'Route load result' })).toContainText(/loaded/i);
+}
+
+async function setViewportAndSettle(page: Page, viewport: { width: number; height: number }): Promise<void> {
+  await page.setViewportSize(viewport);
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+}
+
 test.describe('RFS responsive layout and attribution safety', () => {
-  test.describe.configure({ timeout: 60_000 });
+  test.describe.configure({ timeout: 120_000 });
 
-  for (const width of FLIGHT_VIEWPORT_WIDTHS) {
-    test(`flight overlay panels and Cesium attribution do not overlap at ${width}px`, async ({ page }) => {
-      await page.setViewportSize({ width, height: VIEWPORT_HEIGHT });
-      await openRfs(page);
-      await clickButton(page, /LOAD PLAN/i);
-
-      expectNoOverlap(await flightModeBoxes(page));
-    });
-  }
-
-  for (const width of [1024, 1280] as const) {
-    test(`debug overlay remains inside the responsive layout and avoids primary panels at ${width}px`, async ({ page }) => {
-      await page.setViewportSize({ width, height: VIEWPORT_HEIGHT });
-      await openRfs(page);
-      await cycleOverlayToDebug(page);
-      await expect(page.locator('[data-rfs-panel="debug"]')).toBeVisible();
-
-      const boxes = await Promise.all([
-        panelBox(page, 'debug'),
-        panelBox(page, 'scenario'),
-        panelBox(page, 'takeoff-setup'),
-        panelBox(page, 'route'),
-        panelBox(page, 'pfd'),
-        panelBox(page, 'mcp'),
-        panelBox(page, 'controls'),
-      ]);
-      expectNoOverlap([...boxes, ...(await visibleCesiumCreditBoxes(page))]);
-    });
-  }
-
-  test('landmarks expose named simulator regions, button states, and live status', async ({ page }) => {
-    await page.setViewportSize({ width: 1280, height: VIEWPORT_HEIGHT });
+  test('flight overlay panels, debug panels, and Cesium attribution stay clear across responsive route-loaded states', async ({ page }) => {
+    await setViewportAndSettle(page, { width: 1280, height: 900 });
     await openRfs(page);
 
     await expect(page.getByRole('main', { name: /reed flight simulator/i })).toBeVisible();
@@ -165,7 +184,25 @@ test.describe('RFS responsive layout and attribution safety', () => {
     await expect(page.getByLabel('Route status')).toHaveAttribute('aria-live', 'polite');
 
     await page.getByLabel('Scenario', { exact: true }).selectOption('ksea-tutorial');
-    await clickButton(page, /^LOAD PLAN$/);
+    await clickResponsiveControl(page, /^LOAD PLAN$/);
     await expect(page.getByRole('status', { name: 'Route load result' })).toContainText(/KSEA→KPDX loaded/i);
+
+    await page.getByLabel('Scenario', { exact: true }).selectOption('enva-tutorial');
+    await configureTakeoffAndLoadRoute(page);
+    await expect(page.getByRole('status', { name: 'Route load result' })).toContainText(/ENVA→ENGM loaded/i);
+
+    for (const viewport of FLIGHT_VIEWPORTS) {
+      await setViewportAndSettle(page, viewport);
+      expectNoOverlap(await flightModeBoxes(page));
+    }
+
+    await cycleOverlayToDebug(page);
+    await expect(page.locator('[data-rfs-panel="debug"]')).toBeVisible();
+
+    for (const viewport of DEBUG_VIEWPORTS) {
+      await setViewportAndSettle(page, viewport);
+      const boxes = await panelBoxes(page, ['debug', 'scenario', 'route-builder', 'takeoff-setup', 'route', 'pfd', 'mcp', 'controls']);
+      expectNoOverlap([...boxes, ...(await visibleCesiumCreditBoxes(page))]);
+    }
   });
 });

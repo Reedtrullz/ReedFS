@@ -53,7 +53,7 @@ test.describe('RFS visible route descent proof', () => {
 
     await loadSelectedRouteThroughVisibleControls(page);
     await expect(page.getByRole('status', { name: 'Route load result' })).toHaveText(
-      'CANNED TRAINING ROUTE KSEA→KPDX loaded. Route editing is unavailable; synthetic approach fixes are not official procedure data; route guidance is active; use visible MCP LNAV, altitude, and VS/VNAV controls for climb/descent management.',
+      'DEFAULT TRAINING ROUTE KSEA→KPDX loaded. Use the runway route panel for arbitrary supported runway pairs; synthetic approach fixes are not official procedure data; route guidance is active; use visible MCP LNAV, altitude, and VS/VNAV controls for climb/descent management.',
     );
     const initialRoute = await readVisibleRouteStatus(page);
     expect(initialRoute.distanceToGoNm).not.toBeNull();

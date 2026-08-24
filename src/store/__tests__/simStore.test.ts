@@ -6,7 +6,7 @@ import type { FlightPlan } from '@shared/types/fmc';
 import type { AutopilotCommands } from '../../sim/types';
 import { KSEA_RUNWAY_ALT_FT } from '../../sim/systems/ground';
 import { ENVA_TUTORIAL_SCENARIO, KPDX_10R_SHORT_FINAL_SCENARIO, KSEA_LIGHT_PATTERN_SCENARIO, KSEA_TUTORIAL_SCENARIO, SCENARIOS } from '../../sim/scenarios';
-import { createKseaKpdxFlight } from '../../sim/flightPlanLoader';
+import { createKseaKpdxFlight, createRunwayToRunwayFlightWithRunways } from '../../sim/flightPlanLoader';
 import { computeDerived } from '../../sim/physics/derived';
 import {
   SCENARIO_SAVE_KEY,
@@ -155,7 +155,7 @@ describe('useSimStore', () => {
 
   it('assembles stable domain slices while preserving the public compatibility API', () => {
     const state = useSimStore.getState();
-    for (const action of ['startTakeoffRoll', 'setInput', 'setTakeoffConfig', 'setApState', 'setFlightPlan', 'reset', 'tick', 'cycleSimRate'] as const) {
+    for (const action of ['startTakeoffRoll', 'setInput', 'setTakeoffConfig', 'setApState', 'setFlightPlan', 'setFlightPlanAtRunway', 'reset', 'tick', 'cycleSimRate'] as const) {
       expect(typeof state[action]).toBe('function');
     }
 
@@ -174,6 +174,8 @@ describe('useSimStore', () => {
     expect(useSimStore.getState().simRate).toBe(4);
     useSimStore.getState().cycleSimRate();
     expect(useSimStore.getState().simRate).toBe(16);
+    useSimStore.getState().cycleSimRate();
+    expect(useSimStore.getState().simRate).toBe(64);
     useSimStore.getState().cycleSimRate();
     expect(useSimStore.getState().simRate).toBe(1);
     useSimStore.getState().cycleSimRate();
@@ -678,6 +680,36 @@ describe('useSimStore', () => {
     expect(state.routeStatus.routeName).toBe('KSEA→KPDX');
     expect(state.routeStatus.lnavAvailable).toBe(false);
     expect(state.routeStatus.lnavUnavailableReason).toMatch(/route.*not compatible.*current aircraft position/i);
+  });
+
+  it('loads an arbitrary runway-pair route at the selected origin runway so LNAV is immediately compatible', () => {
+    useSimStore.getState().setScenario(ENVA_TUTORIAL_SCENARIO.id);
+    const { flightPlan, runways } = createRunwayToRunwayFlightWithRunways({
+      originAirport: 'ENBR',
+      originRunway: '17',
+      destinationAirport: 'ENSB',
+      destinationRunway: '09',
+    });
+
+    useSimStore.getState().setFlightPlanAtRunway(flightPlan, runways.originRunway);
+
+    const state = useSimStore.getState();
+    expect(state.flightPlan).toBe(flightPlan);
+    expect(state.status).toBe('stopped');
+    expect(state.apState).toBeNull();
+    expect(state.apCommands).toEqual({});
+    expect(state.selectedScenarioId).toBe(ENVA_TUTORIAL_SCENARIO.id);
+    expect(state.aircraft.position.lat).toBe(runways.originRunway.start.lat);
+    expect(state.aircraft.position.lon).toBe(runways.originRunway.start.lon);
+    expect(state.aircraft.position.alt).toBe(runways.originRunway.elevationFt);
+    expect(state.aircraft.config.flapSetting).toBe(5);
+    expect(state.pilotInputs.flapLever).toBe(5);
+    expect(state.wind).toEqual(expect.objectContaining({ dir: Math.round(runways.originRunway.headingDeg), speed: 0 }));
+    expect(state.activeLegIndex).toBe(0);
+    expect(state.routeStatus.routeName).toBe('ENBR→ENSB');
+    expect(state.routeStatus.lnavAvailable).toBe(true);
+    expect(state.routeStatus.fromIdent).toBe('ENBR17_DEP');
+    expect(state.routeStatus.nextWaypointIdent).toBe('ENBR17_CLB');
   });
 
   it('setFlightPlan clears stale LNAV aileron commands when clearing the route', () => {
