@@ -1,5 +1,7 @@
 # RFS Enhancement Roadmap
 
+> **Historical snapshot (2026-06-15).** The review links below describe the dirty `review/2026-06-14-meaningful-use-round3` tree that was audited in June. The current preserved checkout is `audit/preserve-runway-autoflight-2026-08-23` at `d8e0015b29d13dea3de0a6f66b4e4fdee5da701d`; treat the June counts and completion language as historical until checks are rerun on that branch. No CI, deployment, live-runtime, or manual-acceptance claim is implied.
+
 This roadmap lists the enhancements that remain after the foundation stabilization and first gameplay/usability productization pass. It is ordered by dependency and risk: deepen gear/tire physics and guidance proof, then worker timing, visual regression/release hardening, data quality, and immersion.
 
 Latest comprehensive remaining-work audit, remediation closeout, and next implementation plan:
