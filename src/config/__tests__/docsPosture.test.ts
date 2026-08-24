@@ -128,7 +128,10 @@ describe('canonical docs posture', () => {
       expect(ciWorkflow).toContain(requiredFlag);
     }
     expect(ciWorkflow).toContain('127.0.0.1:3005:8080');
-    expect(ciWorkflow).toContain('127.0.0.1:3004:8080');
+    expect(ciWorkflow).toContain('127.0.0.1::8080');
+    expect(ciWorkflow).toContain('docker port rfs_canary 8080/tcp');
+    expect(ciWorkflow).toContain('if [ -z "$CANARY_PORT" ]');
+    expect(ciWorkflow).not.toContain('127.0.0.1:3004:8080');
   });
 
   it('keeps local artifacts and secrets out of Docker build contexts without excluding build inputs', () => {
@@ -255,7 +258,7 @@ describe('canonical docs posture', () => {
     expect(ciWorkflow).toContain('"imageDigest": "$EXPECTED_IMAGE_DIGEST"');
     expect(ciWorkflow).toContain('-v "$VERSION_METADATA_PATH:/usr/share/nginx/html/rfs-version.json:ro"');
     expect(ciWorkflow).toContain('grep -F "$EXPECTED_IMAGE_DIGEST"');
-    expect(ciWorkflow).toContain('if ! CANARY_VERSION_JSON="$(curl -fsS http://localhost:3004/rfs-version.json)"');
+    expect(ciWorkflow).toContain('if ! CANARY_VERSION_JSON="$(curl -fsS "$CANARY_BASE_URL/rfs-version.json")"');
     expect(ciWorkflow).toContain('if ! PUBLIC_VERSION_JSON="$(curl -fsS https://fly.reidar.tech/rfs-version.json)"');
     expect(ciWorkflow).not.toContain('RFS_IMAGE_DIGEST=${{ steps.build.outputs.digest }}');
     expect(releaseMetadataScript).toContain('RFS_REQUIRE_IMAGE_DIGEST');
