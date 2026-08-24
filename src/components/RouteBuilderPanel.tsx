@@ -72,18 +72,18 @@ export function RouteBuilderPanel({ onRouteLoad }: RouteBuilderPanelProps) {
 
   return (
     <section aria-label="Runway route builder" style={panelStyle}>
-      <div style={titleStyle}>Runway route</div>
+      <div style={titleStyle}>Custom runway route</div>
       <label style={labelStyle}>
-        Origin
-        <select aria-label="Origin runway" value={originKey} onChange={(event) => setOriginSelection(event.target.value)} style={selectStyle}>
+        Custom origin
+        <select aria-label="Custom origin runway" value={originKey} onChange={(event) => setOriginSelection(event.target.value)} style={selectStyle}>
           {RUNWAY_DIRECTION_OPTIONS.map((option) => (
             <option key={option.key} value={option.key}>{option.label}</option>
           ))}
         </select>
       </label>
       <label style={labelStyle}>
-        Destination
-        <select aria-label="Destination runway" value={destinationKey} onChange={(event) => setDestinationSelection(event.target.value)} style={selectStyle}>
+        Custom destination
+        <select aria-label="Custom destination runway" value={destinationKey} onChange={(event) => setDestinationSelection(event.target.value)} style={selectStyle}>
           {RUNWAY_DIRECTION_OPTIONS.map((option) => (
             <option key={option.key} value={option.key}>{option.label}</option>
           ))}

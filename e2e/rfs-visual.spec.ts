@@ -43,6 +43,9 @@ test.describe('RFS deterministic visual states', () => {
     await clickButton(page, /LOAD PLAN/i);
     await expect(page.getByLabel('Route status')).toContainText('KSEA→KPDX');
     await expect(page.getByLabel('Route status')).toContainText(/KSEA\s+→\s+OLM/);
+    await expect(page.getByRole('region', { name: 'Runway route builder' })).toContainText('Custom runway route');
+    await expect(page.getByLabel('Custom origin runway')).toHaveValue('ENVA:09');
+    await expect(page.getByLabel('Custom destination runway')).toHaveValue('ENGM:19R');
     await expectPrimaryPanelsDoNotCriticallyOverlap(page);
     await expectVisualSnapshot(page, 'route-loaded.png');
   });

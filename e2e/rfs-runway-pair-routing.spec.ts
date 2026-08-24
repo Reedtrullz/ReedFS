@@ -16,8 +16,8 @@ test.describe('runway-pair route builder', () => {
     await expect(page.getByRole('region', { name: 'Runway route builder' })).toBeVisible();
 
     for (const [origin, destination, routeName, activeLeg] of ROUTE_SAMPLES) {
-      await page.getByLabel('Origin runway').selectOption(origin);
-      await page.getByLabel('Destination runway').selectOption(destination);
+      await page.getByLabel('Custom origin runway').selectOption(origin);
+      await page.getByLabel('Custom destination runway').selectOption(destination);
       await page.getByRole('button', { name: /^Load Route$/ }).click();
 
       await expect(page.getByRole('status', { name: 'Generated route result' })).toHaveText(`${origin.replace(':', ' ')} → ${destination.replace(':', ' ')}`);

@@ -18,8 +18,8 @@ describe('RouteBuilderPanel', () => {
 
     render(<RouteBuilderPanel onRouteLoad={onRouteLoad} />);
 
-    fireEvent.change(screen.getByLabelText('Origin runway'), { target: { value: 'ENBR:17' } });
-    fireEvent.change(screen.getByLabelText('Destination runway'), { target: { value: 'ENSB:09' } });
+    fireEvent.change(screen.getByLabelText('Custom origin runway'), { target: { value: 'ENBR:17' } });
+    fireEvent.change(screen.getByLabelText('Custom destination runway'), { target: { value: 'ENSB:09' } });
     fireEvent.click(screen.getByRole('button', { name: /load route/i }));
 
     expect(loadSpy).toHaveBeenCalledTimes(1);
@@ -41,8 +41,8 @@ describe('RouteBuilderPanel', () => {
   it('disables loading the exact same runway endpoint as both origin and destination', () => {
     render(<RouteBuilderPanel />);
 
-    fireEvent.change(screen.getByLabelText('Origin runway'), { target: { value: 'ENBR:17' } });
-    fireEvent.change(screen.getByLabelText('Destination runway'), { target: { value: 'ENBR:17' } });
+    fireEvent.change(screen.getByLabelText('Custom origin runway'), { target: { value: 'ENBR:17' } });
+    fireEvent.change(screen.getByLabelText('Custom destination runway'), { target: { value: 'ENBR:17' } });
 
     expect((screen.getByRole('button', { name: /load route/i }) as HTMLButtonElement).disabled).toBe(true);
   });
