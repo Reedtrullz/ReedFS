@@ -91,14 +91,18 @@ function isLoadedRoute(routeStatus: { routeName: string; routeValid: boolean }):
   return routeStatus.routeValid && routeStatus.routeName !== 'NO ROUTE';
 }
 
-function RouteSourceReadback({ routeName }: { routeName: string }) {
-  const syntheticApproach = routeName === 'KSEA→KPDX';
+function RouteSourceReadback({ routeName, generated }: { routeName: string; generated: boolean }) {
+  const syntheticApproach = routeName === 'KSEA→KPDX' || routeName === 'ENVA→ENGM';
   return (
     <div style={routeSourceStyle}>
-      <div>CANNED TRAINING ROUTE</div>
-      <div style={{ color: '#ffefb8', fontWeight: 700 }}>Route editing unavailable</div>
+      <div>{generated ? 'GENERATED TRAINING ROUTE' : 'DEFAULT TRAINING ROUTE'}</div>
+      <div style={{ color: '#ffefb8', fontWeight: 700 }}>
+        {generated ? 'Runway-pair route builder' : 'Scenario default route'}
+      </div>
       <div style={{ color: '#ffefb8', fontWeight: 700, marginTop: 2 }}>
-        RFMS adapter seam only — no CDU/EXEC route edit UI
+        {generated
+          ? 'LNAV/VNAV/SPD constraints are generated from runway geometry'
+          : 'RFMS adapter seam only — no CDU/EXEC route edit UI'}
       </div>
       {syntheticApproach && (
         <div style={{ color: '#ffefb8', fontWeight: 700, marginTop: 2 }}>
@@ -120,6 +124,7 @@ function ApproachHandoffReadback({ text }: { text: string }) {
 
 export function RouteStatus() {
   const routeStatus = useSimStore((s) => s.routeStatus);
+  const flightPlan = useSimStore((s) => s.flightPlan);
   const distanceText = formatDistanceNm(routeStatus.distanceToNextNm);
   const trackText = formatTrackDeg(routeStatus.desiredTrackDegTrue);
   const etaText = formatEtaMinutes(routeStatus.etaMinutes);
@@ -131,12 +136,13 @@ export function RouteStatus() {
     : routeStatus.nextWaypointIdent;
   const unavailableReason = routeStatus.lnavUnavailableReason ?? 'unknown route status';
   const handoffText = approachHandoffText(routeStatus);
+  const generatedRoute = Boolean(flightPlan?.waypoints.some((waypoint) => waypoint.coordinateSource === 'manual'));
 
   return (
     <section aria-label="Route status" aria-live="polite" style={panelStyle}>
       <div style={labelStyle}>Route status</div>
       <div style={routeNameStyle}>{routeStatus.routeName}</div>
-      {isLoadedRoute(routeStatus) && <RouteSourceReadback routeName={routeStatus.routeName} />}
+      {isLoadedRoute(routeStatus) && <RouteSourceReadback routeName={routeStatus.routeName} generated={generatedRoute} />}
 
       {routeStatus.routeComplete && handoffText ? (
         <ApproachHandoffReadback text={handoffText} />

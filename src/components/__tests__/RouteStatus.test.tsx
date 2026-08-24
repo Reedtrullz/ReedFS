@@ -3,6 +3,7 @@ import { cleanup, render, screen } from '@testing-library/react';
 import { RouteStatus } from '../RouteStatus';
 import { useSimStore } from '../../store/simStore';
 import type { RouteStatusSnapshot } from '../../sim/systems/navigation';
+import type { FlightPlan } from '@shared/types/fmc';
 
 function routeStatus(overrides: Partial<RouteStatusSnapshot> = {}): RouteStatusSnapshot {
   return {
@@ -80,17 +81,47 @@ describe('RouteStatus', () => {
     expect(useSimStore.getState().routeStatus.activeLegIndex).toBe(7);
   });
 
-  it('labels the current loaded route as a canned training route instead of a full route editor flow', () => {
+  it('labels the current loaded route as a default training route instead of a full route editor flow', () => {
     useSimStore.setState({ routeStatus: routeStatus() });
 
     render(<RouteStatus />);
 
-    expect(screen.getByText(/CANNED TRAINING ROUTE/i)).toBeTruthy();
-    expect(screen.getByText(/route editing unavailable/i)).toBeTruthy();
+    expect(screen.getByText(/DEFAULT TRAINING ROUTE/i)).toBeTruthy();
+    expect(screen.getByText(/Scenario default route/i)).toBeTruthy();
     expect(screen.getByText(/RFMS adapter seam only/i)).toBeTruthy();
     expect(screen.getByText(/no CDU\/EXEC route edit UI/i)).toBeTruthy();
     expect(screen.getByText(/synthetic training approach/i)).toBeTruthy();
     expect(screen.getByText(/not official procedure data/i)).toBeTruthy();
+  });
+
+  it('labels generated runway-pair routes with the training and non-official route-builder boundary', () => {
+    const generatedPlan: FlightPlan = {
+      origin: 'ENBR',
+      destination: 'ENSB',
+      flightNumber: 'RFSANY',
+      route: 'ENBR17_DEP ENBR17_CLB ENSB09_RWY',
+      waypoints: [
+        { ident: 'ENBR17_DEP', lat: 60.0, lon: 5.0, coordinateSource: 'manual', discontinuity: false },
+        { ident: 'ENBR17_CLB', lat: 60.1, lon: 5.0, coordinateSource: 'manual', discontinuity: false },
+        { ident: 'ENSB09_RWY', lat: 78.2, lon: 15.5, coordinateSource: 'manual', discontinuity: false, legType: 'RW' },
+      ],
+    };
+    useSimStore.setState({
+      flightPlan: generatedPlan,
+      routeStatus: routeStatus({
+        routeName: 'ENBR→ENSB',
+        fromIdent: 'ENBR17_DEP',
+        nextWaypointIdent: 'ENBR17_CLB',
+      }),
+    });
+
+    render(<RouteStatus />);
+
+    expect(screen.getByText(/GENERATED TRAINING ROUTE/i)).toBeTruthy();
+    expect(screen.getByText(/Runway-pair route builder/i)).toBeTruthy();
+    expect(screen.getByText(/LNAV\/VNAV\/SPD constraints are generated from runway geometry/i)).toBeTruthy();
+    expect(screen.queryByText(/RFMS adapter seam only/i)).toBeNull();
+    expect(screen.queryByText(/synthetic training approach/i)).toBeNull();
   });
 
   it('keeps pilot-facing leg display coherent if route feedback has an inconsistent leg count', () => {

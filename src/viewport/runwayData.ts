@@ -1,14 +1,23 @@
+import {
+  NORWAY_AIRPORT_IDENTS,
+  NORWAY_RUNWAY_ROWS,
+  NORWAY_RUNWAY_SOURCE,
+  NORWAY_RUNWAY_SOURCE_NOTE,
+  type NorwayRunwayRow,
+} from './norwayRunwayData.generated';
+
 export interface RunwayGeoPoint {
   lat: number;
   lon: number;
   altFt: number;
 }
 
-export type SupportedAirport = 'ENVA' | 'KSEA' | 'KPDX';
+export type SupportedAirport = string;
 
 const FT_TO_M = 0.3048;
 const M_PER_NM = 1852;
 const EARTH_RADIUS_M = 6371000;
+const METERS_PER_DEG_LAT = 111_320;
 
 export interface RunwayReference {
   airport: SupportedAirport;
@@ -16,10 +25,15 @@ export interface RunwayReference {
   oppositeId: string;
   label: string;
   start: RunwayGeoPoint;
+  end?: RunwayGeoPoint;
   headingDeg: number;
   elevationFt: number;
   lengthM: number;
   widthM: number;
+  coordinateSource?: 'synthetic' | 'ourairports';
+  sourceDataset?: 'ourairports';
+  sourceId?: string;
+  sourceNote?: string;
 }
 
 export interface RunwayApproachFixReference {
@@ -61,6 +75,29 @@ function roundedCoordinate(value: number): number {
   return Math.round(value * 1_000_000) / 1_000_000;
 }
 
+function normalizeHeadingDeg(value: number): number {
+  return ((value % 360) + 360) % 360;
+}
+
+function offsetPointMeters(origin: RunwayGeoPoint, northM: number, eastM: number): RunwayGeoPoint {
+  const metersPerDegLon = METERS_PER_DEG_LAT * Math.cos(origin.lat * Math.PI / 180);
+  return {
+    lat: roundedCoordinate(origin.lat + northM / METERS_PER_DEG_LAT),
+    lon: roundedCoordinate(origin.lon + eastM / metersPerDegLon),
+    altFt: origin.altFt,
+  };
+}
+
+export function runwayDepartureEnd(runway: RunwayReference): RunwayGeoPoint {
+  if (runway.end) return runway.end;
+  const headingRad = runway.headingDeg * Math.PI / 180;
+  return offsetPointMeters(
+    runway.start,
+    Math.cos(headingRad) * runway.lengthM,
+    Math.sin(headingRad) * runway.lengthM,
+  );
+}
+
 function pointFromRunwayThreshold(runway: RunwayReference, distanceNmBeforeThreshold: number, altFt: number): RunwayGeoPoint {
   const angularDistance = distanceNmBeforeThreshold * M_PER_NM / EARTH_RADIUS_M;
   const bearing = toRad(runway.headingDeg + 180);
@@ -83,6 +120,51 @@ function pointFromRunwayThreshold(runway: RunwayReference, distanceNmBeforeThres
   };
 }
 
+function norwayRunwayFromRow(row: NorwayRunwayRow): RunwayReference {
+  const [
+    sourceId,
+    airport,
+    id,
+    oppositeId,
+    lat,
+    lon,
+    endLat,
+    endLon,
+    altFt,
+    headingDeg,
+    lengthM,
+    widthM,
+  ] = row;
+  return {
+    airport,
+    id,
+    oppositeId,
+    label: `${id}/${oppositeId}`,
+    start: { lat, lon, altFt },
+    end: { lat: endLat, lon: endLon, altFt },
+    headingDeg,
+    elevationFt: altFt,
+    lengthM,
+    widthM,
+    coordinateSource: 'ourairports',
+    sourceDataset: 'ourairports',
+    sourceId,
+    sourceNote: NORWAY_RUNWAY_SOURCE_NOTE,
+  };
+}
+
+const SOURCE_BACKED_NORWAY_RUNWAYS: RunwayReference[] = NORWAY_RUNWAY_ROWS.map(norwayRunwayFromRow);
+
+function sourceBackedNorwayRunwaysForAirport(airport: string, excludedRunwayIds: readonly string[] = []): RunwayReference[] {
+  const excluded = new Set(excludedRunwayIds);
+  return SOURCE_BACKED_NORWAY_RUNWAYS.filter((runway) => runway.airport === airport && !excluded.has(runway.id));
+}
+
+function sourceBackedNorwayRunwaysExcludingAirports(airports: readonly string[]): RunwayReference[] {
+  const excludedAirports = new Set(airports);
+  return SOURCE_BACKED_NORWAY_RUNWAYS.filter((runway) => !excludedAirports.has(runway.airport));
+}
+
 // ── ENVA (Trondheim Værnes) ────────────────────────────────────────────
 // Single physical runway 09/27. Default airport for all scenarios.
 // `start` is the 09 threshold; runway extends 2999 m at heading 090°.
@@ -100,6 +182,45 @@ export const ENVA_RUNWAY_09: RunwayReference = {
   lengthM: 2999,
   widthM: 45,
 };
+
+// ── ENGM (Oslo Gardermoen) ─────────────────────────────────────────────
+// Private southbound-parallel candidates for the first ENVA→ENGM autoland
+// fixture. Both fixtures are synthetic RFS training data and must not be
+// treated as official runway/procedure data.
+const ENGM_RUNWAY_19R_SYNTHETIC_CANDIDATE: RunwayReference = {
+  airport: 'ENGM',
+  id: '19R',
+  oppositeId: '01L',
+  label: '01L/19R',
+  start: { lat: 60.216067, lon: 11.091664, altFt: 675 },
+  headingDeg: 193.9,
+  elevationFt: 675,
+  lengthM: 3600,
+  widthM: 45,
+  coordinateSource: 'synthetic',
+  sourceNote: 'Synthetic ENGM 19R training fixture fallback selected without Cesium visual verification; not official runway or procedure data.',
+};
+
+const ENGM_RUNWAY_19L_SYNTHETIC_CANDIDATE: RunwayReference = {
+  airport: 'ENGM',
+  id: '19L',
+  oppositeId: '01R',
+  label: '01R/19L',
+  start: { lat: 60.201208, lon: 11.122486, altFt: 670 },
+  headingDeg: 193.9,
+  elevationFt: 670,
+  lengthM: 2950,
+  widthM: 45,
+  coordinateSource: 'synthetic',
+  sourceNote: 'Synthetic ENGM 19L visual-fit candidate retained for RFS comparison only; not official runway or procedure data.',
+};
+
+const ENGM_19_PARALLEL_SYNTHETIC_CANDIDATES: readonly RunwayReference[] = [
+  ENGM_RUNWAY_19R_SYNTHETIC_CANDIDATE,
+  ENGM_RUNWAY_19L_SYNTHETIC_CANDIDATE,
+];
+
+export const ENGM_AUTOLAND_RUNWAY: RunwayReference = ENGM_19_PARALLEL_SYNTHETIC_CANDIDATES[0];
 
 // ── KSEA (Seattle-Tacoma) ──────────────────────────────────────────────
 export const KSEA_RUNWAY_16L: RunwayReference = {
@@ -198,13 +319,69 @@ export const KPDX_RUNWAY_10R_APPROACH: RunwayApproachReference = {
   },
 };
 
-export const ENVA_RUNWAYS: RunwayReference[] = [ENVA_RUNWAY_09];
+export const ENGM_AUTOLAND_APPROACH: RunwayApproachReference = {
+  airport: ENGM_AUTOLAND_RUNWAY.airport,
+  runwayId: ENGM_AUTOLAND_RUNWAY.id,
+  coordinateSource: 'synthetic',
+  sourceNote: 'Synthetic ENGM 19R autoland fixture for RFS ENVA route handoff only; not official procedure data.',
+  initialApproachFix: {
+    ident: 'ENGM19R_IF',
+    point: pointFromRunwayThreshold(ENGM_AUTOLAND_RUNWAY, 12, 3000),
+    distanceNmFromThreshold: 12,
+    speedKt: 210,
+  },
+  finalApproachFix: {
+    ident: 'ENGM19R_FAF',
+    point: pointFromRunwayThreshold(ENGM_AUTOLAND_RUNWAY, 5, ENGM_AUTOLAND_RUNWAY.elevationFt + 1500),
+    distanceNmFromThreshold: 5,
+    speedKt: 140,
+  },
+  threshold: {
+    ident: 'ENGM19R_RWY',
+    point: { ...ENGM_AUTOLAND_RUNWAY.start },
+    speedKt: 140,
+  },
+};
+
+export const NORWAY_RUNWAY_CATALOG_SOURCE = NORWAY_RUNWAY_SOURCE;
+export const NORWAY_SOURCE_BACKED_RUNWAYS: RunwayReference[] = SOURCE_BACKED_NORWAY_RUNWAYS;
+export const NORWAY_AIRPORTS_WITH_SOURCE_RUNWAYS: readonly string[] = NORWAY_AIRPORT_IDENTS;
+
+export const ENVA_RUNWAYS: RunwayReference[] = [
+  ENVA_RUNWAY_09,
+  ...sourceBackedNorwayRunwaysForAirport('ENVA', [ENVA_RUNWAY_09.id]),
+];
+export const ENGM_RUNWAYS: RunwayReference[] = [
+  ENGM_AUTOLAND_RUNWAY,
+  ...sourceBackedNorwayRunwaysForAirport('ENGM', [ENGM_AUTOLAND_RUNWAY.id]),
+];
+export const NORWAY_RUNWAYS: RunwayReference[] = [
+  ...ENVA_RUNWAYS,
+  ...ENGM_RUNWAYS,
+  ...sourceBackedNorwayRunwaysExcludingAirports(['ENVA', 'ENGM']),
+];
 export const KSEA_RUNWAYS: RunwayReference[] = [KSEA_RUNWAY_16L, KSEA_RUNWAY_16C, KSEA_RUNWAY_16R];
 export const KPDX_RUNWAYS: RunwayReference[] = [KPDX_RUNWAY_10L, KPDX_RUNWAY_10R, KPDX_RUNWAY_03];
-export const SUPPORTED_RUNWAYS: RunwayReference[] = [...ENVA_RUNWAYS, ...KSEA_RUNWAYS, ...KPDX_RUNWAYS];
+export const SUPPORTED_RUNWAYS: RunwayReference[] = [...NORWAY_RUNWAYS, ...KSEA_RUNWAYS, ...KPDX_RUNWAYS];
 
 export function runwayByAirportAndId(airport: string, runwayId: string): RunwayReference | undefined {
   return SUPPORTED_RUNWAYS.find(
     (runway) => runway.airport === airport && (runway.id === runwayId || runway.oppositeId === runwayId),
   );
+}
+
+export function orientedRunwayByAirportAndId(airport: string, runwayId: string): RunwayReference | undefined {
+  const runway = runwayByAirportAndId(airport, runwayId);
+  if (!runway) return undefined;
+  if (runway.id === runwayId) return runway;
+  if (runway.oppositeId !== runwayId) return undefined;
+  return {
+    ...runway,
+    id: runway.oppositeId,
+    oppositeId: runway.id,
+    label: `${runway.oppositeId}/${runway.id}`,
+    start: runwayDepartureEnd(runway),
+    end: runway.start,
+    headingDeg: normalizeHeadingDeg(runway.headingDeg + 180),
+  };
 }

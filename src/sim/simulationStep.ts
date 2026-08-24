@@ -23,15 +23,16 @@ import {
   type EffectiveAutoflightTruthContext,
 } from './systems/effectiveAutoflightTruth';
 
-const AP_LATERAL_SERVO_MODES = new Set<AutoflightTruthState['lateralActive']>(['HDG_SEL', 'LNAV']);
+const AP_LATERAL_SERVO_MODES = new Set<AutoflightTruthState['lateralActive']>(['HDG_SEL', 'LNAV', 'APP']);
 const AP_VERTICAL_SERVO_MODES = new Set<AutoflightTruthState['verticalActive']>([
   'ALT_HOLD',
   'VS',
   'VNAV',
   'VNAV_PTH',
   'ALT*',
+  'G_S',
 ]);
-const AP_THRUST_SERVO_MODES = new Set<AutoflightTruthState['thrustActive']>(['SPEED', 'N1']);
+const AP_THRUST_SERVO_MODES = new Set<AutoflightTruthState['thrustActive']>(['SPEED', 'N1', 'RETARD']);
 
 function finiteNumber(value: number | null | undefined): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;

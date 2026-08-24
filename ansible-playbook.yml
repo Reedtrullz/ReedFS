@@ -8,8 +8,7 @@
     app_dir: '/home/deploy/rfs'
     container_name: 'rfs'
     host_port: '3005'
-    canary_host_port: '3004'
-    container_port: '80'
+    container_port: '8080'
     public_domain: 'fly.reidar.tech'
     image_ref: "{{ lookup('env', 'RFS_IMAGE_REF') | default('ghcr.io/reedtrullz/rfs:sha-' ~ git_commit, true) }}"
     expected_commit: "{{ lookup('env', 'RFS_EXPECTED_COMMIT') | default(git_commit, true) }}"
@@ -85,14 +84,52 @@
         image: '{{ deploy_image_ref }}'
         state: started
         ports:
-          - '127.0.0.1:{{ canary_host_port }}:{{ container_port }}'
+          - '127.0.0.1::{{ container_port }}'
+        user: '101:101'
+        read_only: true
+        cap_drop:
+          - ALL
+        security_opts:
+          - no-new-privileges
+        tmpfs:
+          - /var/cache/nginx:rw,noexec,nosuid,size=16m,uid=101,gid=101,mode=755
+          - /var/run:rw,noexec,nosuid,size=4m,uid=101,gid=101,mode=755
+          - /tmp:rw,noexec,nosuid,size=16m,uid=101,gid=101,mode=1777
+        pids_limit: 128
+        memory: '256m'
+        cpus: 1.0
+        log_driver: 'json-file'
+        log_options:
+          max-size: '10m'
+          max-file: '3'
       register: canary_start
 
     - name: Wait for canary health check
       block:
+        - name: Inspect canary dynamic port binding
+          community.docker.docker_container_info:
+            name: '{{ container_name }}_canary'
+          register: canary_info
+
+        - name: Capture canary port bindings
+          set_fact:
+            canary_port_bindings: "{{ canary_info.container.NetworkSettings.Ports[container_port ~ '/tcp'] | default([]) }}"
+
+        - name: Require one loopback-only dynamic canary port
+          assert:
+            that:
+              - canary_port_bindings | length == 1
+              - canary_port_bindings[0].HostIp == '127.0.0.1'
+              - canary_port_bindings[0].HostPort is match('^[0-9]+$')
+            fail_msg: 'Canary did not receive exactly one dynamic loopback port: {{ canary_port_bindings }}'
+
+        - name: Remember dynamic canary host port
+          set_fact:
+            canary_host_port: '{{ canary_port_bindings[0].HostPort }}'
+
         - name: Check canary HTTP response
           uri:
-            url: 'http://localhost:{{ canary_host_port }}/'
+            url: 'http://127.0.0.1:{{ canary_host_port }}/'
             return_content: true
             timeout: 5
           register: canary_health
@@ -102,7 +139,7 @@
 
         - name: Verify canary release metadata
           uri:
-            url: 'http://localhost:{{ canary_host_port }}/rfs-version.json'
+            url: 'http://127.0.0.1:{{ canary_host_port }}/rfs-version.json'
             return_content: true
             timeout: 5
           register: canary_version
@@ -146,6 +183,17 @@
             restart_policy: unless-stopped
             ports:
               - '127.0.0.1:{{ host_port }}:{{ container_port }}'
+            user: '101:101'
+            read_only: true
+            cap_drop:
+              - ALL
+            security_opts:
+              - no-new-privileges
+            tmpfs:
+              - /var/cache/nginx:rw,noexec,nosuid,size=16m,uid=101,gid=101,mode=755
+              - /var/run:rw,noexec,nosuid,size=4m,uid=101,gid=101,mode=755
+              - /tmp:rw,noexec,nosuid,size=16m,uid=101,gid=101,mode=1777
+            pids_limit: 128
             memory: '256m'
             cpus: 1.0
             log_driver: 'json-file'
@@ -223,6 +271,17 @@
             restart_policy: unless-stopped
             ports:
               - '127.0.0.1:{{ host_port }}:{{ container_port }}'
+            user: '101:101'
+            read_only: true
+            cap_drop:
+              - ALL
+            security_opts:
+              - no-new-privileges
+            tmpfs:
+              - /var/cache/nginx:rw,noexec,nosuid,size=16m,uid=101,gid=101,mode=755
+              - /var/run:rw,noexec,nosuid,size=4m,uid=101,gid=101,mode=755
+              - /tmp:rw,noexec,nosuid,size=16m,uid=101,gid=101,mode=1777
+            pids_limit: 128
             memory: '256m'
             cpus: 1.0
             log_driver: 'json-file'

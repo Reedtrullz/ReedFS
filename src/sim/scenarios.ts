@@ -2,7 +2,7 @@ import type { AircraftSpec, AircraftState, FlightPhase, FuelState, GeoPosition }
 import { createB737GearStations, createInitialState } from './types';
 import { eulerToQuat } from './physics/quaternion';
 import type { WindInfo, ScenarioWeatherMetadata } from './weather';
-import { ENVA_RUNWAY_09, KPDX_RUNWAY_10R, KPDX_RUNWAY_10R_APPROACH, KSEA_RUNWAY_16L } from '../viewport/runwayData';
+import { ENVA_RUNWAY_09, KPDX_RUNWAY_10R, KPDX_RUNWAY_10R_APPROACH, KSEA_RUNWAY_16L, type RunwayReference } from '../viewport/runwayData';
 
 export interface ScenarioFuelLoad {
   centerTank: number;
@@ -76,6 +76,11 @@ function scenarioWeather(options: ScenarioWeatherMetadata): ScenarioWeatherMetad
     clouds: options.clouds.map((cloud) => ({ ...cloud })),
     cloudAnchor: { ...options.cloudAnchor },
   };
+}
+
+function gustSeedForRunway(runway: RunwayReference): number {
+  const sourceIdSeed = runway.sourceId ? Number(runway.sourceId) % 10_000 : Number.NaN;
+  return Number.isFinite(sourceIdSeed) ? sourceIdSeed : 7001;
 }
 
 // ── ENVA (default) ─────────────────────────────────────────────────────
@@ -483,4 +488,34 @@ export function createAircraftStateForScenario(spec: AircraftSpec, scenario: Fli
   state.simTime = 0;
 
   return state;
+}
+
+export function createAircraftStateForRunway(
+  spec: AircraftSpec,
+  runway: RunwayReference,
+  template: FlightScenario = ENVA_TUTORIAL_SCENARIO,
+): AircraftState {
+  return createAircraftStateForScenario(spec, {
+    ...template,
+    id: `generated-${runway.airport}-${runway.id}`,
+    name: `${runway.airport} ${runway.id} Generated Route Start`,
+    description: `Generated route start on ${runway.airport} runway ${runway.id}; not a published scenario.`,
+    position: { lat: runway.start.lat, lon: runway.start.lon, alt: runway.elevationFt },
+    runway: {
+      airport: runway.airport,
+      runway: runway.id,
+      elevationFt: runway.elevationFt,
+      headingDeg: runway.headingDeg,
+    },
+    flapSetting: 5,
+    stabilizerTrimUnits: 5,
+    initialAircraft: undefined,
+    wind: { dir: Math.round(runway.headingDeg), speed: 0, gustSeed: gustSeedForRunway(runway) },
+    weather: scenarioWeather({
+      ...template.weather,
+      stationIcao: runway.airport,
+      cloudAnchor: { lat: runway.start.lat, lon: runway.start.lon },
+    }),
+    tutorialSteps: template.tutorialSteps,
+  });
 }

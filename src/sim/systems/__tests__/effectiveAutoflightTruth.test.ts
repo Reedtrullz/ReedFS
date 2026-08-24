@@ -2,10 +2,13 @@ import { describe, expect, it } from 'vitest';
 import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
 import type { FlightPlan } from '@shared/types/fmc';
 import { createInitialState, B737_800_SPEC } from '../../types';
+import { createRunwayToRunwayFlightWithRunways } from '../../flightPlanLoader';
+import { createAircraftStateForRunway } from '../../scenarios';
 import { computeRouteStatus, createNoRouteStatus } from '../navigation';
 import {
   deriveEffectiveAutoflightTruth,
   effectiveAutopilotIsEngaged,
+  hasSyntheticApproachAutolandCapability,
   offAutoflightTruth,
 } from '../effectiveAutoflightTruth';
 
@@ -104,6 +107,109 @@ function aircraftAtRoute(altitudeFt = 5000) {
   aircraft.position.alt = altitudeFt;
   aircraft.velocity.u = 128.6;
   return aircraft;
+}
+
+function envaEngmSyntheticAutolandRoute(): FlightPlan {
+  return {
+    origin: 'ENVA',
+    destination: 'ENGM',
+    flightNumber: 'RFS190',
+    route: 'ENVA ENGM19R_IF ENGM19R_FAF ENGM19R_RWY',
+    waypoints: [
+      { ident: 'ENVA', lat: 63.4583, lon: 10.9101, coordinateSource: 'synthetic', discontinuity: false },
+      {
+        ident: 'ENGM19R_IF',
+        lat: 60.395,
+        lon: 11.0,
+        coordinateSource: 'synthetic',
+        discontinuity: false,
+        legType: 'IF',
+        altitudeConstraint: { type: 'AT', altitude: 3000 },
+        speedConstraint: { type: 'AT_OR_BELOW', speed: 210 },
+      },
+      {
+        ident: 'ENGM19R_FAF',
+        lat: 60.278,
+        lon: 11.055,
+        coordinateSource: 'synthetic',
+        discontinuity: false,
+        legType: 'TF',
+        altitudeConstraint: { type: 'AT', altitude: 2200 },
+        speedConstraint: { type: 'AT_OR_BELOW', speed: 150 },
+      },
+      {
+        ident: 'ENGM19R_RWY',
+        lat: 60.1939,
+        lon: 11.1004,
+        coordinateSource: 'synthetic',
+        discontinuity: false,
+        legType: 'RW',
+        altitudeConstraint: { type: 'AT', altitude: 681 },
+        speedConstraint: { type: 'AT_OR_BELOW', speed: 138 },
+      },
+    ],
+  };
+}
+
+function aircraftOnEngmFinal(altitudeFt = 1600, aglFt = 920) {
+  const aircraft = createInitialState(B737_800_SPEC);
+  aircraft.position.lat = 60.224;
+  aircraft.position.lon = 11.084;
+  aircraft.position.alt = altitudeFt;
+  aircraft.velocity.u = 72;
+  aircraft.ground = {
+    ...aircraft.ground,
+    weightOnWheels: false,
+    aglFt,
+    groundAltFt: 681,
+    contact: 'none',
+    onRunway: false,
+  };
+  aircraft.flightPhase = 'APPROACH';
+  return aircraft;
+}
+
+function engmFinalRouteStatus() {
+  return {
+    ...createNoRouteStatus(envaEngmSyntheticAutolandRoute()),
+    routeName: 'ENVA→ENGM',
+    routeValid: true,
+    routeComplete: false,
+    approachHandoff: 'threshold' as const,
+    lnavAvailable: true,
+    lnavUnavailableReason: null,
+    activeLegIndex: 2,
+    activeLegCount: 3,
+    fromWaypointIndex: 2,
+    toWaypointIndex: 3,
+    fromIdent: 'ENGM19R_FAF',
+    nextWaypointIdent: 'ENGM19R_RWY',
+    distanceToNextM: 2 * 1852,
+    distanceToNextNm: 2,
+    desiredTrackRad: 190 * Math.PI / 180,
+    desiredTrackDegTrue: 190,
+    crossTrackErrorM: 0,
+    alongTrackM: 0,
+    legLengthM: 5 * 1852,
+    waypointReached: false,
+    sequenced: false,
+  };
+}
+
+function makeAppAutolandAp(): AutopilotState {
+  const ap = makeAp();
+  ap.truth.autopilotStatus = 'CMD_AB';
+  ap.truth.lateralActive = 'APP';
+  ap.truth.verticalActive = 'G_S';
+  ap.truth.thrustActive = 'SPEED';
+  ap.boeing.cmdA = true;
+  ap.boeing.cmdB = true;
+  ap.boeing.app = true;
+  ap.boeing.lnav = false;
+  ap.boeing.vnav = false;
+  ap.boeing.speedMode = true;
+  ap.boeing.autothrottleArm = true;
+  return ap;
 }
 
 function routeStatusBeforeTod(aircraft = aircraftAtRoute(30_000), flightPlan = routeWithFutureDescentConstraint()) {
@@ -267,6 +373,100 @@ describe('effective autoflight truth', () => {
       expect(effective.verticalActive).toBe('OFF');
       expect((effective as { lateralOnly?: boolean }).lateralOnly).toBe(true);
     }
+  });
+
+  it('backs APP, G_S, SPEED, and CMD_AB for an airborne synthetic ENVA to ENGM autoland route', () => {
+    const aircraft = aircraftOnEngmFinal();
+    const flightPlan = envaEngmSyntheticAutolandRoute();
+    const routeStatus = engmFinalRouteStatus();
+    const ap = makeAppAutolandAp();
+
+    const effective = deriveEffectiveAutoflightTruth(ap, { aircraft, flightPlan, routeStatus });
+
+    expect(hasSyntheticApproachAutolandCapability({ aircraft, flightPlan, routeStatus })).toBe(true);
+    expect(effective.autopilotStatus).toBe('CMD_AB');
+    expect(effective.lateralActive).toBe('APP');
+    expect(effective.verticalActive).toBe('G_S');
+    expect(effective.thrustActive).toBe('SPEED');
+  });
+
+  it('keeps APP and G_S fail-closed when the route lacks recognizable synthetic approach metadata', () => {
+    const aircraft = aircraftAtRoute(3000);
+    aircraft.ground = { ...aircraft.ground, weightOnWheels: false, aglFt: 2500, contact: 'none', onRunway: false };
+    const flightPlan = constrainedRoute();
+    const routeStatus = computeRouteStatus(aircraft, flightPlan, 0);
+    const ap = makeAppAutolandAp();
+
+    const effective = deriveEffectiveAutoflightTruth(ap, { aircraft, flightPlan, routeStatus });
+
+    expect(hasSyntheticApproachAutolandCapability({ aircraft, flightPlan, routeStatus })).toBe(false);
+    expect(effective.autopilotStatus).toBe('CMD_AB');
+    expect(effective.lateralActive).toBe('OFF');
+    expect(effective.verticalActive).toBe('OFF');
+    expect(effective.thrustActive).toBe('SPEED');
+  });
+
+  it('backs LNAV, VNAV, and SPEED on generated runway-pair routes while keeping APP and G_S unavailable', () => {
+    const { flightPlan, runways } = createRunwayToRunwayFlightWithRunways({
+      originAirport: 'ENBR',
+      originRunway: '17',
+      destinationAirport: 'ENSB',
+      destinationRunway: '09',
+    });
+    const aircraft = createAircraftStateForRunway(B737_800_SPEC, runways.originRunway);
+    aircraft.velocity.u = 128.6;
+    aircraft.ground = { ...aircraft.ground, weightOnWheels: false, aglFt: 500, contact: 'none', onRunway: false };
+    aircraft.flightPhase = 'CLIMB';
+    const routeStatus = computeRouteStatus(aircraft, flightPlan, 0);
+
+    const generatedAp = makeAp();
+    const generatedEffective = deriveEffectiveAutoflightTruth(generatedAp, { aircraft, flightPlan, routeStatus });
+
+    expect(routeStatus.lnavAvailable).toBe(true);
+    expect(generatedEffective.autopilotStatus).toBe('CMD_A');
+    expect(generatedEffective.lateralActive).toBe('LNAV');
+    expect(generatedEffective.verticalActive).toBe('VNAV_PTH');
+    expect(generatedEffective.thrustActive).toBe('SPEED');
+
+    const appAp = makeAppAutolandAp();
+    const appEffective = deriveEffectiveAutoflightTruth(appAp, { aircraft, flightPlan, routeStatus });
+
+    expect(hasSyntheticApproachAutolandCapability({ aircraft, flightPlan, routeStatus })).toBe(false);
+    expect(appEffective.autopilotStatus).toBe('CMD_AB');
+    expect(appEffective.lateralActive).toBe('OFF');
+    expect(appEffective.verticalActive).toBe('OFF');
+    expect(appEffective.thrustActive).toBe('SPEED');
+  });
+
+  it('annunciates RETARD only near touchdown on a backed synthetic autoland route', () => {
+    const aircraft = aircraftOnEngmFinal(710, 29);
+    const flightPlan = envaEngmSyntheticAutolandRoute();
+    const routeStatus = engmFinalRouteStatus();
+    const ap = makeAppAutolandAp();
+
+    const effective = deriveEffectiveAutoflightTruth(ap, { aircraft, flightPlan, routeStatus });
+
+    expect(effective.autopilotStatus).toBe('CMD_AB');
+    expect(effective.lateralActive).toBe('APP');
+    expect(effective.verticalActive).toBe('G_S');
+    expect(effective.thrustActive).toBe('RETARD');
+  });
+
+  it('keeps synthetic autoland truth backed through landing rollout so RETARD remains observable', () => {
+    const aircraft = aircraftOnEngmFinal(691, 10);
+    aircraft.ground = { ...aircraft.ground, weightOnWheels: true, contact: 'gear', onRunway: true };
+    aircraft.flightPhase = 'ROLLOUT';
+    const flightPlan = envaEngmSyntheticAutolandRoute();
+    const routeStatus = engmFinalRouteStatus();
+    const ap = makeAppAutolandAp();
+
+    const effective = deriveEffectiveAutoflightTruth(ap, { aircraft, flightPlan, routeStatus });
+
+    expect(hasSyntheticApproachAutolandCapability({ aircraft, flightPlan, routeStatus })).toBe(true);
+    expect(effective.autopilotStatus).toBe('CMD_AB');
+    expect(effective.lateralActive).toBe('APP');
+    expect(effective.verticalActive).toBe('G_S');
+    expect(effective.thrustActive).toBe('RETARD');
   });
 
   it('derives backed LNAV, VNAV_PTH, SPEED, and CMD_A for a valid constrained route', () => {

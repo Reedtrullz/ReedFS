@@ -56,15 +56,15 @@ Completion records:
 
 ## P1 — Finish gear/tire ground model and takeoff/landing realism
 
-Why this remains: the current pass establishes runway-normal contact, supported-airport prepared-runway/off-runway rectangle sampling for KSEA and KPDX, off-runway rolling/brake/side friction scaling, normal-force liftoff, phase semantics, normal-force-scaled tire side-load/cornering stiffness, anti-skid brake limiting, asymmetric brake-force helpers, dynamic oleo spring/damper compression loads, rudder-pedal-limited nosewheel steering, deterministic crosswind/weathercocking takeoff-roll regressions, KSEA 16L low-speed taxi, KPDX runway/off-runway integration and takeoff elevation regressions, crosswind approach/touchdown/rollout and rollout-braking regressions, player-facing side-specific differential brake controls, and gear-up runway-tangent belly/crash slide deceleration/damping. RFS still needs deeper ground-handling tuning and broader contact/surface coverage before touchdown, rollout, taxi, and crosswind handling can feel fully like an airliner.
+Why this remains: the current pass establishes runway-normal contact, dry gameplay runway rectangles derived from immutable OurAirports Norway/Svalbard endpoint geometry plus KSEA/KPDX fixtures, off-runway rolling/brake/side friction scaling, normal-force liftoff, phase semantics, normal-force-scaled tire side-load/cornering stiffness, anti-skid brake limiting, asymmetric brake-force helpers, dynamic oleo spring/damper compression loads, rudder-pedal-limited nosewheel steering, deterministic crosswind/weathercocking takeoff-roll regressions, KSEA 16L low-speed taxi, KPDX runway/off-runway integration and takeoff elevation regressions, crosswind approach/touchdown/rollout and rollout-braking regressions, player-facing side-specific differential brake controls, and gear-up runway-tangent belly/crash slide deceleration/damping. RFS still needs deeper ground-handling tuning and broader contact/surface fidelity before touchdown, rollout, taxi, and crosswind handling can feel fully like an airliner.
 
 Remaining P1 scope:
 
 - Deeper rollout, taxi, touchdown, braking, and crosswind tuning beyond the current deterministic guard scenarios.
 - Broader terrain mesh collision.
-- Additional airport runway surface coverage beyond KSEA/KPDX prepared runway rectangles, plus broader airport surface modeling outside those rectangles.
+- Higher-fidelity airport runway surfaces beyond endpoint-derived rectangles, plus broader airport surface modeling outside those rectangles.
 
-2026-06-16 disposition for surface/crosswind/tire realism: defer source-backed wet/off-runway/high-speed/low-speed tire side-load tuning, wet/contaminated runway behavior, broader airport/taxiway/apron surfaces, and terrain mesh collision until permitted tire/brake/ground-contact, runway/airport, and surface-condition source packets exist. Current coverage remains deterministic gameplay guard scenarios on handcrafted dry KSEA/KPDX prepared-runway rectangles plus simplified off-runway friction scaling; it is not certified or broad airport-surface proof.
+2026-06-17 disposition for surface/crosswind/tire realism: immutable OurAirports endpoint geometry is accepted only for simplified Norway/Svalbard runway placement. Defer source-backed wet/off-runway/high-speed/low-speed tire side-load tuning, wet/contaminated runway behavior, displaced thresholds, slope, broader airport/taxiway/apron surfaces, and terrain mesh collision until the corresponding source packets exist. Current coverage remains deterministic gameplay guard scenarios on dry endpoint-derived or fixture rectangles plus simplified off-runway friction scaling; it is not certified or broad airport-surface proof.
 
 Suggested implementation files:
 
