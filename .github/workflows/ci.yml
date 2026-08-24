@@ -287,7 +287,7 @@ jobs:
             docker pull "$IMAGE_REF"
             docker rm -f rfs_canary 2>/dev/null || true
 
-            # Start canary on port 3004. Existing production stays up until canary passes.
+            # Let Docker reserve an unused loopback port. Existing production stays up until canary passes.
             docker run -d --name rfs_canary \
               --read-only \
               --cap-drop ALL \
@@ -298,13 +298,22 @@ jobs:
               --pids-limit 128 \
               --user 101:101 \
               --memory 256m --cpus 1.0 \
-              -p 127.0.0.1:3004:8080 \
+              -p 127.0.0.1::8080 \
               -v "$VERSION_METADATA_PATH:/usr/share/nginx/html/rfs-version.json:ro" \
               "$IMAGE_REF"
 
+            CANARY_PORT="$(docker port rfs_canary 8080/tcp | sed -n 's/^127\.0\.0\.1:\([0-9][0-9]*\)$/\1/p' | head -n1)"
+            if [ -z "$CANARY_PORT" ]; then
+              echo "Canary loopback port discovery failed!"
+              docker logs --tail=50 rfs_canary
+              docker rm -f rfs_canary
+              exit 1
+            fi
+            CANARY_BASE_URL="http://127.0.0.1:${CANARY_PORT}"
+
             # Canary health and version checks.
             for attempt in $(seq 1 10); do
-              if curl -fsS http://localhost:3004/ > /dev/null; then
+              if curl -fsS "$CANARY_BASE_URL/" > /dev/null; then
                 break
               fi
               if [ "$attempt" = "10" ]; then
@@ -315,7 +324,7 @@ jobs:
               fi
               sleep 3
             done
-            if ! CANARY_VERSION_JSON="$(curl -fsS http://localhost:3004/rfs-version.json)" || \
+            if ! CANARY_VERSION_JSON="$(curl -fsS "$CANARY_BASE_URL/rfs-version.json")" || \
               ! printf '%s\n' "$CANARY_VERSION_JSON" | grep -F "$EXPECTED_COMMIT" > /dev/null || \
               ! printf '%s\n' "$CANARY_VERSION_JSON" | grep -F "$EXPECTED_IMAGE_DIGEST" > /dev/null; then
               echo "Canary version check failed!"

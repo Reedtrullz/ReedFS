@@ -194,7 +194,7 @@ push master
   -> GitHub Actions test
   -> GHCR publish ghcr.io/reedtrullz/rfs:latest
   -> SSH deploy to VPS
-  -> canary on localhost:3004
+  -> canary on a Docker-assigned loopback port
   -> promote to localhost:3005 after health check
   -> Caddy serves https://fly.reidar.tech
 ```
