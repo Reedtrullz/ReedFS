@@ -100,7 +100,7 @@ check(ci.includes("EXPECTED_IMAGE_DIGEST=${{ needs.publish.outputs.image_digest 
 check(ci.includes("VERSION_METADATA_PATH") && ci.includes('"imageDigest": "$EXPECTED_IMAGE_DIGEST"'), "deploy must write post-push release metadata containing the immutable image digest");
 check(ci.includes('-v "$VERSION_METADATA_PATH:/usr/share/nginx/html/rfs-version.json:ro"'), "deploy must mount post-push release metadata into canary and production containers");
 check(ci.includes('grep -F "$EXPECTED_IMAGE_DIGEST"'), "deploy must verify served /rfs-version.json contains the immutable image digest");
-check(ci.includes('if ! CANARY_VERSION_JSON="$(curl -fsS http://localhost:3004/rfs-version.json)"') && ci.includes('if ! PUBLIC_VERSION_JSON="$(curl -fsS https://fly.reidar.tech/rfs-version.json)"'), "deploy metadata fetch failures must enter cleanup/rollback paths under set -e");
+check(ci.includes('if ! CANARY_VERSION_JSON="$(curl -fsS "$CANARY_BASE_URL/rfs-version.json")"') && ci.includes('if ! PUBLIC_VERSION_JSON="$(curl -fsS https://fly.reidar.tech/rfs-version.json)"'), "deploy metadata fetch failures must enter cleanup/rollback paths under set -e");
 check(!ci.includes("RFS_IMAGE_DIGEST=${{ steps.build.outputs.digest }}"), "workflow must not pass the build output digest back into the same Docker build");
 check(ci.includes("PREVIOUS_IMAGE_ID=\"$(docker inspect -f '{{.Image}}' rfs") && ci.includes("PREVIOUS_IMAGE_REF=\"$(docker inspect -f '{{.Config.Image}}' rfs"), "deploy rollback must capture previous image ID and Config.Image fallback");
 check(!ci.includes('"$PREVIOUS_IMAGE" || true'), "deploy rollback container start failure must be fatal");
@@ -178,7 +178,9 @@ const hardenedRunFlags = [
 for (const flag of hardenedRunFlags) {
   check(ci.includes(flag), `workflow docker runs must include ${flag}`);
 }
-check((ci.match(/127\.0\.0\.1:3005:8080/g) ?? []).length >= 2 && ci.includes("127.0.0.1:3004:8080"), "workflow smoke/deploy runs must map host ports to container port 8080");
+check((ci.match(/127\.0\.0\.1:3005:8080/g) ?? []).length >= 2 && ci.includes("127.0.0.1::8080"), "workflow smoke/deploy runs must map host ports to container port 8080");
+check(ci.includes("docker port rfs_canary 8080/tcp") && ci.includes('if [ -z "$CANARY_PORT" ]'), "deploy must discover and validate Docker's dynamically allocated canary loopback port");
+check(!ci.includes("127.0.0.1:3004:8080"), "deploy must not reuse Handleplan's reserved host port 3004 for the RFS canary");
 
 check(!/host_key_checking\s*=\s*false/i.test(ansibleCfg), "ansible.cfg must not disable host key checking");
 check(/host_key_checking\s*=\s*true/i.test(ansibleCfg), "ansible.cfg should explicitly enable host key checking");
