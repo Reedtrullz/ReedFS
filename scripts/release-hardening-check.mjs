@@ -51,13 +51,13 @@ check(packageJson.scripts?.["bootstrap:check"] === "node scripts/bootstrap-rfms-
 const allWorkflowYaml = `${ci}\n${codeql}`;
 const requiredActions = [
   ["actions/checkout", "9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0"],
-  ["actions/setup-node", "48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e"],
-  ["docker/login-action", "650006c6eb7dba73a995cc03b0b2d7f5ca915bee"],
-  ["docker/build-push-action", "f9f3042f7e2789586610d6e8b85c8f03e5195baf"],
+  ["actions/setup-node", "820762786026740c76f36085b0efc47a31fe5020"],
+  ["docker/login-action", "af1e73f918a031802d376d3c8bbc3fe56130a9b0"],
+  ["docker/build-push-action", "53b7df96c91f9c12dcc8a07bcb9ccacbed38856a"],
   ["appleboy/ssh-action", "0ff4204d59e8e51228ff73bce53f80d53301dee2"],
   ["gitleaks/gitleaks-action", "e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e"],
-  ["github/codeql-action/init", "8aad20d150bbac5944a9f9d289da16a4b0d87c1e"],
-  ["github/codeql-action/analyze", "8aad20d150bbac5944a9f9d289da16a4b0d87c1e"],
+  ["github/codeql-action/init", "7188fc363630916deb702c7fdcf4e481b751f97a"],
+  ["github/codeql-action/analyze", "7188fc363630916deb702c7fdcf4e481b751f97a"],
   ["aquasecurity/trivy-action", "ed142fd0673e97e23eac54620cfb913e5ce36c25"],
 ];
 for (const [action, sha] of requiredActions) {
@@ -114,7 +114,7 @@ check(ci.includes('docker logs --tail=50 rfs_canary') && ci.includes('docker rm 
 
 check(dockerfile.includes("node:22-alpine@sha256:ab07539e0988b63558ff621f5fbe1077054c39d9809112974fb79993949d41cd"), "Dockerfile must pin node:22-alpine by digest");
 check(dockerfile.includes("nginx:alpine@sha256:20316569d8f81a160065d7d2a5eeffc7ca97d79022462ee255fd23fa103a6b5c"), "Dockerfile must pin nginx:alpine by digest");
-check(dockerfile.includes("RUN apk upgrade --no-cache libcrypto3 libssl3 libxml2 libexpat"), "Dockerfile must refresh fixed Alpine TLS/XML packages after the pinned nginx base image");
+check(dockerfile.includes("RUN apk upgrade --no-cache libcrypto3 libssl3 libxml2 libexpat c-ares curl libcurl libuuid"), "Dockerfile must refresh fixed Alpine TLS/XML/network/UUID packages after the pinned nginx base image");
 check(dockerfile.includes("COPY scripts/bootstrap-rfms-shared.mjs") && dockerfile.includes("RUN node scripts/bootstrap-rfms-shared.mjs") && bootstrapRfmsShared.includes("810fc9652da431eaf8978b85bf4af131605559b5"), "Dockerfile must bootstrap the audited RFMS/RFMC commit");
 check(dockerfile.includes("npm ci --legacy-peer-deps"), "Dockerfile must use npm ci --legacy-peer-deps");
 check(dockerfile.includes("RFS_COMMIT_SHA") && dockerfile.includes("RFS_IMAGE_REF"), "Dockerfile must pass release metadata into the build");
