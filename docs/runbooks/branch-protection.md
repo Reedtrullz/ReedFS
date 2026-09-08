@@ -21,7 +21,7 @@ For `master`, branch protection should require:
 
 `publish` and `deploy` run only after merge to `master`; verify them as release gates using `release-closeout.md`, not as required PR checks.
 
-Action upgrades must update the matching exact SHA in `scripts/release-hardening-check.mjs` alongside the workflow. Update CodeQL `init` and `analyze` together; Dependabot groups them in one PR.
+Action upgrades change only the workflow pins. The release checker parses every workflow, requires full commit SHAs for all action and reusable-workflow references, and checks that required actions remain present. Update CodeQL `init` and `analyze` together with the same SHA; Dependabot groups them in one PR. Local and Docker action references are not currently allowed by this policy.
 
 ## Read-only verification
 
