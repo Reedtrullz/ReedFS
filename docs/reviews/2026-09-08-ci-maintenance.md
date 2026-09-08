@@ -36,6 +36,10 @@ The visible takeoff/descent tests install Playwright's clock and repeatedly call
 
 A future speed experiment should compare one versus two workers on the same commit and runner class, measuring exact per-test durations, failures/retries and CPU pressure. Keep the single-worker default until that experiment demonstrates an improvement without reducing proof reliability.
 
+## Validation finding
+
+The first PR scan caught exponential regex backtracking in the new validator. A bounded subprocess test reproduced the timeout; removing slash from the repeated path-segment class eliminates ambiguous partitioning. The regression passes after the fix. Branch protection now also requires the separate `CodeQL` findings result, because a successful analysis job alone does not mean no new findings.
+
 ## Other observation
 
 Installing dependencies reported nine existing npm advisories in @babel/core, brace-expansion, browserslist, dompurify, nanoid, postcss, protobufjs, undici and vite. The new YAML parser is not flagged. These dependencies were not upgraded in this focused change; package-lock changes add only yaml. Runtime image scanning is a separate gate and does not establish npm dependency safety.

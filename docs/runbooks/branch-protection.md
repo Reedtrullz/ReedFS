@@ -13,11 +13,14 @@ For `master`, branch protection should require:
   - `test`
   - `docker-smoke`
   - `Analyze JavaScript/TypeScript`
+  - `CodeQL`
 - Rules apply to administrators.
 - Force pushes are disabled.
 - Branch deletion is disabled.
 
 > Note: GitHub check-run context names must match the exact names GitHub exposes for this repository. If GitHub reports a renamed context, update this runbook and the required context list only after verifying the corresponding workflow job is the intended one.
+
+`Analyze JavaScript/TypeScript` proves the analysis ran; the separate `CodeQL` result blocks new findings. Bind the former checks to GitHub Actions (app15368) and `CodeQL` to GitHub Advanced Security (app57789) when configuring checks via the API.
 
 `publish` and `deploy` run only after merge to `master`; verify them as release gates using `release-closeout.md`, not as required PR checks.
 
@@ -32,7 +35,7 @@ source ~/.nvm/nvm.sh && nvm use 22 >/dev/null
 node scripts/check-branch-protection.mjs \
   --repo Reedtrullz/ReedFS \
   --branch master \
-  --required "secret-scan,test,docker-smoke,Analyze JavaScript/TypeScript" \
+  --required "secret-scan,test,docker-smoke,Analyze JavaScript/TypeScript,CodeQL" \
   --require-admins \
   --forbid-force-push \
   --forbid-delete
@@ -53,7 +56,7 @@ cat > /tmp/rfs-branch-protection.json <<'JSON'
 {
   "required_status_checks": {
     "strict": true,
-    "contexts": ["secret-scan", "test", "docker-smoke", "Analyze JavaScript/TypeScript"]
+    "contexts": ["secret-scan", "test", "docker-smoke", "Analyze JavaScript/TypeScript", "CodeQL"]
   },
   "enforce_admins": true,
   "required_pull_request_reviews": null,
