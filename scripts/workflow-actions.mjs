@@ -17,7 +17,7 @@ export function validateWorkflowActions(workflows, requiredActions) {
         for (const entry of [job, ...(job.steps ?? [])]) {
           if (!entry || typeof entry !== 'object' || Array.isArray(entry)) throw new Error(`invalid step: ${jobName}`);
           if (!Object.hasOwn(entry, 'uses')) continue;
-          const match = typeof entry.uses === 'string' && entry.uses.match(/^([\w.-]+\/[\w.-]+(?:\/[\w./-]+)*)@([a-f0-9]{40})$/i);
+          const match = typeof entry.uses === 'string' && entry.uses.match(/^([\w.-]+\/[\w.-]+(?:\/[\w.-]+)*)@([a-f0-9]{40})$/i);
           if (!match) {
             failures.push(`${file}/${jobName}: action must use a full commit SHA: ${String(entry.uses)}`);
             continue;

@@ -1,3 +1,5 @@
+import { spawnSync } from 'node:child_process';
+import process from 'node:process';
 import { describe, expect, it } from 'vitest';
 import { validateWorkflowActions } from '../workflow-actions.mjs';
 
@@ -41,4 +43,15 @@ describe('workflow action pins', () => {
   it.each(['jobs: [', 'jobs:\n  test:\n    steps:\n      - uses: false\n', 'jobs:\n  test:\n    steps:\n      - uses: actions/checkout@main\n        uses: actions/checkout@' + sha])('fails closed on invalid YAML or values', (source) => {
     expect(validate(source)).not.toEqual([]);
   });
+});
+
+it('rejects long malformed paths without excessive backtracking', () => {
+  const result = spawnSync(process.execPath, ['--input-type=module', '-e', `
+    import { validateWorkflowActions } from './scripts/workflow-actions.mjs';
+    const ref = '-/-/' + '-/'.repeat(100) + '!';
+    const source = 'jobs: {test: {steps: [{uses: "' + ref + '"}]}}';
+    if (validateWorkflowActions({'ci.yml': source}, []).length === 0) process.exit(1);
+  `], { timeout: 2000, encoding: 'utf8' });
+  expect(result.error).toBeUndefined();
+  expect(result.status).toBe(0);
 });
