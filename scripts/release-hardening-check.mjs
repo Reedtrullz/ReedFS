@@ -50,14 +50,14 @@ check(packageJson.scripts?.["bootstrap:check"] === "node scripts/bootstrap-rfms-
 
 const allWorkflowYaml = `${ci}\n${codeql}`;
 const requiredActions = [
-  ["actions/checkout", "9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0"],
+  ["actions/checkout", "3d3c42e5aac5ba805825da76410c181273ba90b1"],
   ["actions/setup-node", "820762786026740c76f36085b0efc47a31fe5020"],
-  ["docker/login-action", "af1e73f918a031802d376d3c8bbc3fe56130a9b0"],
+  ["docker/login-action", "dbcb813823bdd20940b903addbd779551569679f"],
   ["docker/build-push-action", "53b7df96c91f9c12dcc8a07bcb9ccacbed38856a"],
   ["appleboy/ssh-action", "0ff4204d59e8e51228ff73bce53f80d53301dee2"],
   ["gitleaks/gitleaks-action", "e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e"],
-  ["github/codeql-action/init", "7188fc363630916deb702c7fdcf4e481b751f97a"],
-  ["github/codeql-action/analyze", "7188fc363630916deb702c7fdcf4e481b751f97a"],
+  ["github/codeql-action/init", "cdf488f595d80d6e07e03d4674febd5ab45fa938"],
+  ["github/codeql-action/analyze", "cdf488f595d80d6e07e03d4674febd5ab45fa938"],
   ["aquasecurity/trivy-action", "ed142fd0673e97e23eac54620cfb913e5ce36c25"],
 ];
 for (const [action, sha] of requiredActions) {
