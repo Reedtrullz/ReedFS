@@ -1,7 +1,9 @@
 #!/usr/bin/env node
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { exit, stderr, stdout } from "node:process";
+
+import { validateWorkflowActions } from "./workflow-actions.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const failures = [];
@@ -48,21 +50,23 @@ for (const [name, command] of Object.entries(packageJson.scripts ?? {})) {
 check(packageJson.scripts?.bootstrap === "node scripts/bootstrap-rfms-shared.mjs", "package.json must expose npm run bootstrap for RFMS shared setup");
 check(packageJson.scripts?.["bootstrap:check"] === "node scripts/bootstrap-rfms-shared.mjs --check", "package.json must expose npm run bootstrap:check for RFMS shared verification");
 
-const allWorkflowYaml = `${ci}\n${codeql}`;
 const requiredActions = [
-  ["actions/checkout", "3d3c42e5aac5ba805825da76410c181273ba90b1"],
-  ["actions/setup-node", "820762786026740c76f36085b0efc47a31fe5020"],
-  ["docker/login-action", "dbcb813823bdd20940b903addbd779551569679f"],
-  ["docker/build-push-action", "53b7df96c91f9c12dcc8a07bcb9ccacbed38856a"],
-  ["appleboy/ssh-action", "0ff4204d59e8e51228ff73bce53f80d53301dee2"],
-  ["gitleaks/gitleaks-action", "e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e"],
-  ["github/codeql-action/init", "cdf488f595d80d6e07e03d4674febd5ab45fa938"],
-  ["github/codeql-action/analyze", "cdf488f595d80d6e07e03d4674febd5ab45fa938"],
-  ["aquasecurity/trivy-action", "ed142fd0673e97e23eac54620cfb913e5ce36c25"],
+  "actions/checkout",
+  "actions/setup-node",
+  "docker/login-action",
+  "docker/build-push-action",
+  "appleboy/ssh-action",
+  "gitleaks/gitleaks-action",
+  "github/codeql-action/init",
+  "github/codeql-action/analyze",
+  "aquasecurity/trivy-action",
 ];
-for (const [action, sha] of requiredActions) {
-  check(allWorkflowYaml.includes(`uses: ${action}@${sha}`), `workflow must pin ${action} to ${sha}`);
-}
+const workflows = Object.fromEntries(
+  readdirSync(resolve(root, ".github/workflows"))
+    .filter((file) => /\.ya?ml$/.test(file))
+    .map((file) => [file, read(`.github/workflows/${file}`)]),
+);
+failures.push(...validateWorkflowActions(workflows, requiredActions));
 
 check(/^permissions:\n\s+contents: read/m.test(ci), "workflow must define least-privilege top-level permissions");
 
@@ -80,7 +84,6 @@ check(codeql.includes("security-events: write"), "CodeQL workflow must have secu
 check(codeql.includes("languages: javascript-typescript"), "CodeQL workflow must analyze JavaScript/TypeScript");
 check(codeql.includes("build-mode: none"), "CodeQL workflow must use no-build analysis for JS/TS");
 
-check(ci.includes("aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25"), "docker-smoke job must run pinned Trivy image scan");
 check(ci.includes("image-ref: rfs:pr-smoke-${{ github.sha }}"), "Trivy scan must inspect the PR-safe smoke image");
 check(ci.includes("severity: HIGH,CRITICAL") && ci.includes("exit-code: '1'"), "Trivy scan must fail on HIGH/CRITICAL vulnerabilities");
 
