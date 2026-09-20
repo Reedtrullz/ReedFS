@@ -32,7 +32,7 @@ The next major enhancements are the prioritized realism/product phases documente
 - Weather/atmosphere: partial. RFS parses METAR wind/cloud data, provides scenario weather fallback, deterministic gusts, and simple cloud billboards; visibility rendering, QNH/temperature pressure-altitude and density-altitude effects, precipitation, and weather-driven scene degradation remain deferred.
 - Audio: partial. RFS has explicit Web Audio startup, N1-driven engine tone mapping, persisted mute/volume/caption settings, and GPWS captions/speech; richer engine, cockpit, airframe, warning, and spatial sound layers remain deferred.
 - Scene loading/error states: partial. RFS has an app ErrorBoundary, a visible `SCENERY DEGRADED` status for missing Cesium Ion scenery, and degraded ellipsoid fallback; richer loading, retry, scenery-error, and network-failure UX remain deferred.
-- PWA: deferred. RFS does not yet claim installability/offline support; manifest icons, service worker strategy, cache policy, and offline/error fallback screens remain future product work.
+- PWA: partial. The Vite build generates a service worker (vite-plugin-pwa, auto-update) that precaches the app shell (JS/CSS/HTML/SVG/fonts) and cleans up outdated caches. Cesium tile/terrain/imagery requests and the simulation worker stay network-only, so an offline visit serves the shell but not globe scenery. Offline/error fallback screens and richer offline behavior remain deferred.
 
 Visual snapshots are not proof of audio, weather, PWA, or error-state behavior; those claims require dedicated unit/component/browser evidence for the behavior itself.
 

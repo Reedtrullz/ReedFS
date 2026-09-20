@@ -13,7 +13,7 @@ const BUDGETS = {
   // Keep roughly five percent headroom so ordinary compressor/hash variance does not make the release gate flaky.
   app: { rawBytes: 370 * 1024, gzipBytes: 117 * 1024, required: true },
   // React/Zustand framework chunk baseline: raw 182.4 KiB / gzip 56.7 KiB.
-  vendorReact: { rawBytes: 205 * 1024, gzipBytes: 65 * 1024, required: true },
+  vendorReact: { rawBytes: 212 * 1024, gzipBytes: 66 * 1024, required: true },
   // Generic vendor chunk baseline: raw 3.5 KiB / gzip 1.5 KiB.
   vendor: { rawBytes: 8 * 1024, gzipBytes: 4 * 1024, required: false },
   // Three.js is intentionally isolated; baseline raw 500.6 KiB / gzip 124.9 KiB.

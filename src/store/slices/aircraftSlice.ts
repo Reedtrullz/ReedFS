@@ -6,6 +6,7 @@ import { composeControlsSlice, syncGuidanceState } from '../../sim/simulationSte
 import { createNoRouteStatus } from '../../sim/systems/navigation';
 import { createAutopilotControllerState } from '../../sim/systems/autopilot';
 import { createInputManagerState } from '../../input/InputManager';
+import { resetGPWS } from '../../audio/GPWS';
 import type { WindInfo } from '../../sim/weather';
 import type { SimStore } from '../simStore';
 import {
@@ -187,6 +188,7 @@ export function createAircraftSlice(set: SimStoreSet): Pick<
     }),
 
     reset: () => set((s) => {
+      resetGPWS();
       const scenario = scenarioById(s.selectedScenarioId);
       const pilotInputs = inputsForScenario(scenario);
       const aircraft = createAircraftStateForScenario(B737_800_SPEC, scenario);
@@ -219,6 +221,7 @@ export function createAircraftSlice(set: SimStoreSet): Pick<
     }),
 
     setScenario: (scenarioId) => set(() => {
+      resetGPWS();
       const scenario = scenarioById(scenarioId);
       const pilotInputs = inputsForScenario(scenario);
       const aircraft = createAircraftStateForScenario(B737_800_SPEC, scenario);

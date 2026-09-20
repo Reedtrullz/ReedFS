@@ -1,11 +1,23 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import cesium from 'vite-plugin-cesium';
+import { VitePWA } from 'vite-plugin-pwa';
 import path from 'path';
 import { rfsManualChunk } from './manualChunks.config';
 
 export default defineConfig({
-  plugins: [react(), cesium()],
+  plugins: [react(), cesium(), VitePWA({
+    registerType: 'autoUpdate',
+    includeAssets: ['manifest.json', 'icons/*'],
+    manifest: false,
+    workbox: {
+      globPatterns: ['**/*.{js,css,html,svg,woff2}'],
+      // Cesium tiles/workers stay network-only; only the app shell precaches.
+      globIgnores: ['cesium/**', 'assets/simulationWorker-*.js'],
+      navigateFallback: '/index.html',
+      cleanupOutdatedCaches: true,
+    },
+  })],
   resolve: {
     alias: {
       '@shared': path.resolve(__dirname, '../RFMS/shared/src'),

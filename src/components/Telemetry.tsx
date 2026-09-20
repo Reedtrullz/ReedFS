@@ -17,6 +17,10 @@ export function Telemetry() {
       pointerEvents: 'none',
     }}>
       <div style={{ fontWeight: 'bold', marginBottom: 4 }}>SIM: {vm.status.toUpperCase()}</div>
+      <div style={{ opacity: 0.7 }}>
+        RATE {vm.simRate}x
+        {vm.droppedSimTimeSeconds > 0.01 ? ` | DROPPED ${vm.droppedSimTimeSeconds.toFixed(1)}s` : ''}
+      </div>
       {vm.takeoffCue && <div style={{ fontWeight: 'bold', color: '#ff0', marginBottom: 4 }}>{vm.takeoffCue}</div>}
       {row('ALT', `${vm.altitudeFt.toFixed(0)} ft`)}
       {row('IAS', `${vm.iasKt.toFixed(0)} kt`)}

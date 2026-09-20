@@ -331,6 +331,8 @@ export function selectMcpViewModel(s: SimStore): McpViewModel {
 export interface TelemetryViewModel {
   status: SimStore['status'];
   takeoffCue: string | null;
+  simRate: number;
+  droppedSimTimeSeconds: number;
   altitudeFt: number;
   iasKt: number;
   tasKt: number;
@@ -357,6 +359,8 @@ export function selectTelemetryViewModel(s: SimStore): TelemetryViewModel {
   const next: TelemetryViewModel = {
     status: s.status,
     takeoffCue: takeoffCueText(s.aircraft, d.ias, s.selectedScenarioId),
+    simRate: s.simRate,
+    droppedSimTimeSeconds: s.droppedSimulationTimeSeconds,
     altitudeFt: s.aircraft.position.alt,
     iasKt: d.ias,
     tasKt: d.tas,

@@ -87,7 +87,12 @@ check(codeql.includes("build-mode: none"), "CodeQL workflow must use no-build an
 check(ci.includes("image-ref: rfs:pr-smoke-${{ github.sha }}"), "Trivy scan must inspect the PR-safe smoke image");
 check(ci.includes("severity: HIGH,CRITICAL") && ci.includes("exit-code: '1'"), "Trivy scan must fail on HIGH/CRITICAL vulnerabilities");
 
-check(/concurrency:\n\s+group:\s+\$\{\{ github\.workflow \}\}-\$\{\{ github\.ref \}\}\n\s+cancel-in-progress:\s+false/m.test(ci), "workflow must serialize runs per workflow/ref with cancel-in-progress: false so VPS deploys cannot overlap");
+const concurrencyMatch = ci.match(/concurrency:\n\s+group:\s+\$\{\{ github\.workflow \}\}-\$\{\{ github\.ref \}\}\n\s+cancel-in-progress:\s*(.+)$/m);
+const cancelInProgress = concurrencyMatch?.[1]?.trim();
+check(
+  cancelInProgress === "false" || cancelInProgress === String.fromCharCode(36) + "{{ github.event_name == 'pull_request' }}",
+  "workflow must serialize runs per workflow/ref so VPS deploys cannot overlap (PR-only cancel allowed)",
+);
 check(ci.includes("security-events: write"), "gitleaks job must have security-events write permission");
 check(ci.includes("pull-requests: read"), "gitleaks job must have pull-requests read permission for pull_request runs");
 check(ci.includes("node scripts/bootstrap-rfms-shared.mjs") && bootstrapRfmsShared.includes("810fc9652da431eaf8978b85bf4af131605559b5"), "workflow must bootstrap RFMS/RFMC from the audited commit");
