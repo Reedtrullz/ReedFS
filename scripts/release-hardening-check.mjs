@@ -102,7 +102,14 @@ check(ci.includes("push: false"), "workflow must include a PR-safe Docker smoke 
 check(ci.includes("load: true"), "workflow must load the PR Docker smoke image into the local daemon");
 check(ci.includes("curl -fsS http://localhost:3005/") && ci.includes("curl -fsS http://localhost:3005/rfs-version.json"), "workflow PR Docker smoke must curl / and /rfs-version.json");
 check(ci.includes("ghcr.io/reedtrullz/rfs:latest") && ci.includes("ghcr.io/reedtrullz/rfs:sha-${{ github.sha }}"), "workflow must push latest and sha-${{ github.sha }} tags");
-check(ci.includes("VITE_CESIUM_ION_TOKEN=${{ secrets.VITE_CESIUM_ION_TOKEN }}"), "workflow Docker build must pass the VITE_CESIUM_ION_TOKEN repo secret as a build arg");
+check(
+  ci.includes("cesium_ion_token=${{ secrets.VITE_CESIUM_ION_TOKEN }}"),
+  "workflow Docker build must pass the VITE_CESIUM_ION_TOKEN repo secret as a BuildKit secret mount",
+);
+check(
+  !ci.includes("VITE_CESIUM_ION_TOKEN=${{ secrets."),
+  "workflow Docker build must not pass VITE_CESIUM_ION_TOKEN as a build arg",
+);
 check(ci.includes("IMAGE_REF=ghcr.io/reedtrullz/rfs:sha-${{ github.sha }}"), "deploy must use the immutable sha image ref");
 check(!/docker run[^\n]*ghcr\.io\/reedtrullz\/rfs:latest/.test(ci), "deploy must not run mutable latest");
 check(ci.includes("curl -fsS https://fly.reidar.tech/"), "workflow must verify the public domain after promotion");
@@ -129,7 +136,14 @@ check(dockerfile.includes("RFS_COMMIT_SHA") && dockerfile.includes("RFS_IMAGE_RE
 check(dockerfile.includes("USER 101:101"), "Dockerfile runtime stage must run nginx as fixed non-root UID/GID 101:101");
 check(dockerfile.includes("COPY --from=builder --chown=101:101 /app/dist"), "Dockerfile must chown static assets for the non-root nginx user");
 check(dockerfile.includes("EXPOSE 8080") && dockerfile.includes("http://127.0.0.1:8080/"), "Dockerfile runtime must expose and healthcheck non-privileged port 8080");
-check(dockerfile.includes("ARG VITE_CESIUM_ION_TOKEN") && dockerfile.includes("VITE_CESIUM_ION_TOKEN=${VITE_CESIUM_ION_TOKEN}"), "Dockerfile must expose VITE_CESIUM_ION_TOKEN to the Vite build");
+check(
+  dockerfile.includes('--mount=type=secret,id=cesium_ion_token') && dockerfile.includes('VITE_CESIUM_ION_TOKEN="$(cat /run/secrets/cesium_ion_token'),
+  "Dockerfile must expose VITE_CESIUM_ION_TOKEN to the Vite build via a BuildKit secret mount",
+);
+check(
+  !dockerfile.includes("ARG VITE_CESIUM_ION_TOKEN"),
+  "Dockerfile must not declare VITE_CESIUM_ION_TOKEN as a build arg",
+);
 
 const requiredDockerignoreExclusions = [
   ".git",
