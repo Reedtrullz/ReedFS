@@ -64,7 +64,8 @@ function checkMode3(state: AircraftState): string | null {
 
 function checkMode6(state: AircraftState): string | null {
   const bankDeg = Math.abs((quatToEuler(state.quaternion).phi * 180) / Math.PI);
-  if (bankDeg > 35) return 'BANK ANGLE';
+  const aglFt = state.ground?.aglFt ?? state.position.alt - (state.ground?.groundAltFt ?? 0);
+  if (bankDeg > 35 && aglFt > 500) return 'BANK ANGLE';
   return null;
 }
 
@@ -85,8 +86,13 @@ export interface GpwsUpdateOptions {
   onCaption?: (event: AudioCaptionEvent) => void;
 }
 
-let lastAlert = '';
 let lastAlertTime = 0;
+
+const GPWS_REPEAT_INTERVAL_MS = 3000;
+
+export function resetGPWS(): void {
+  lastAlertTime = 0;
+}
 
 export function updateGPWS(state: AircraftState, options: GpwsUpdateOptions = {}): void {
   const now = options.nowMs ?? performance.now();
@@ -94,8 +100,7 @@ export function updateGPWS(state: AircraftState, options: GpwsUpdateOptions = {}
   const shouldCaption = options.captionsEnabled ?? true;
   const shouldSpeak = options.speechEnabled ?? true;
   if (!shouldCaption && !shouldSpeak) return;
-  if (alert && alert !== lastAlert && now - lastAlertTime > 3000) {
-    lastAlert = alert;
+  if (alert && now - lastAlertTime > GPWS_REPEAT_INTERVAL_MS) {
     lastAlertTime = now;
     if (shouldCaption) {
       options.onCaption?.({ kind: 'gpws', text: alert, timestampMs: now });
