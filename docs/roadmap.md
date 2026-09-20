@@ -115,13 +115,13 @@ Acceptance tests:
 
 ## P3 — Physics worker and deterministic timing
 
-Why this follows state stabilization: moving a broken state contract to a worker makes bugs harder to see. The state contract is now stable enough to serialize; the default main-thread loop stays synchronous, and the experimental flag bridges the live loop to the worker asynchronously.
+Why this follows state stabilization: moving a broken state contract to a worker makes bugs harder to see. The state contract is now stable enough to serialize; the async bridge drives the live loop through the worker by default, with `VITE_RFS_WORKER_PHYSICS=0` as the main-thread escape hatch.
 
 Scope:
 
 - Worker codec, feature flag, worker entry scaffolding, runtime adapters, worker-handler parity tests, and an experimental browser-Worker `stepAsync()` path exist.
-  - Current disposition: experimental browser-Worker runtime remains default-off; `simStore.tickAsync()` now bridges the frame loop to `stepAsync()` with in-flight frame coalescing and generation-based invalidation (reset, scenario, pause, flight plan, persistence loads), falling back to synchronous `tick()` when the runtime has no `stepAsync`. With `VITE_RFS_WORKER_PHYSICS=1` the browser-worker adapter drives the live loop asynchronously; the flag remains experimental and default-off.
-  - Current disposition: batch commits preserve pilot-owned inputs changed mid-flight instead of reverting them with the dispatch-time control echo; worker-enabled browser/E2E smoke (npm run test:e2e:worker-physics) drives a real-time ENVA takeoff through the browser-worker runtime on the production preview bundle. Remaining before default-on migration: worker lifecycle disposal audit and visual/E2E parity evidence.
+  - Current disposition: the browser-Worker runtime is default-on; `simStore.tickAsync()` bridges the frame loop to `stepAsync()` with in-flight frame coalescing and generation-based invalidation (reset, scenario, pause, flight plan, persistence loads), falling back to synchronous `tick()` when the runtime has no `stepAsync` or when `VITE_RFS_WORKER_PHYSICS=0` pins the main-thread escape hatch.
+  - Current disposition: batch commits preserve pilot-owned inputs changed mid-flight instead of reverting them with the dispatch-time control echo. The worker lifecycle disposal audit found no leak: every generation bump (reset, scenario, pause, flight plan, persistence loads) clears `asyncPhysicsInFlight` atomically with the bump, `dispose()` drains pending requests through the fallback and terminates the Worker, and the runtime is a page-lifetime singleton with no per-flight construction. Visual/E2E parity evidence: the default-on runtime is exercised by the full Vitest suite, the full e2e suite, the visual snapshot suite (identical screenshots across worker and main-thread builds), and the worker smoke (npm run test:e2e:worker-physics) on the production preview bundle.
 - Keep the fixed-timestep accumulator and deterministic main-thread tests green while migrating.
 
 Suggested implementation files:

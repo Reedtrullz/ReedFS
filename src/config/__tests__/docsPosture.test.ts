@@ -42,17 +42,18 @@ describe('canonical docs posture', () => {
     expect(architecture).toMatch(/no SharedArrayBuffer\/COOP\/COEP dependency is introduced/i);
   });
 
-  it('keeps worker physics documented as experimental and synchronous-store default-off', () => {
-    expect(readme).toMatch(/production still defaults to the main-thread adapter/i);
+  it('keeps worker physics documented as the default-on runtime with a main-thread escape hatch', () => {
+    expect(readme).toMatch(/default-on browser .Worker./i);
+    expect(readme).toMatch(/VITE_RFS_WORKER_PHYSICS=0. is the documented escape hatch/i);
     expect(readme).toMatch(/simStore\.tickAsync\(\)` bridges the frame loop to the worker runtime/i);
     expect(readme).toMatch(/preserving pilot inputs changed mid-flight/i);
     expect(architecture).toMatch(/store loop bridges to browser-worker `stepAsync\(\)` via `tickAsync\(\)`/i);
     expect(architecture).toMatch(/sync `step\(\)` still falls back to main-thread physics when the async path cannot be used/i);
-    expect(roadmap).toMatch(/experimental browser-Worker runtime remains default-off/i);
-    expect(roadmap).toMatch(/the default main-thread loop stays synchronous, and the experimental flag bridges the live loop to the worker asynchronously/i);
+    expect(roadmap).toMatch(/browser-Worker runtime is default-on/i);
+    expect(roadmap).toMatch(/VITE_RFS_WORKER_PHYSICS=0. pins the main-thread escape hatch/i);
     expect(roadmap).toMatch(/batch commits preserve pilot-owned inputs changed mid-flight/i);
     expect(roadmap).toMatch(/npm run test:e2e:worker-physics/i);
-    expect(roadmap).toMatch(/Remaining before default-on migration: worker lifecycle disposal audit and visual\/E2E parity evidence/i);
+    expect(roadmap).toMatch(/Visual.E2E parity evidence: the default-on runtime is exercised by the full Vitest suite/i);
   });
 
   it('records rendering, weather, audio, immersion, and PWA disposition without snapshot overclaims', () => {

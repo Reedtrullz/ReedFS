@@ -126,29 +126,31 @@ describe('simulation runtime adapters', () => {
     expect(getSimulationRuntime().kind).toBe('main-thread');
   });
 
-  it('keeps the browser Worker runtime default-off and creates it only for the explicit env flag', () => {
+  it('creates the browser Worker runtime by default and keeps main-thread only for explicit opt-out', () => {
     const createRuntime = createRuntimeFactory();
-    let workerCreated = false;
+    let workerCreated = 0;
+    const workerFactory = () => {
+      workerCreated += 1;
+      return new FakeBrowserWorker();
+    };
 
     const defaultRuntime = createRuntime({
       env: {},
-      workerFactory: () => {
-        workerCreated = true;
-        return new FakeBrowserWorker();
-      },
+      workerFactory,
     });
 
-    expect(defaultRuntime.kind).toBe('main-thread');
-    expect(workerCreated).toBe(false);
+    expect(defaultRuntime.kind).toBe('browser-worker');
+    expect(typeof defaultRuntime.stepAsync).toBe('function');
+    expect(workerCreated).toBe(1);
+    defaultRuntime.dispose?.();
 
-    const workerRuntime = createRuntime({
-      env: { VITE_RFS_WORKER_PHYSICS: '1' },
-      workerFactory: () => new FakeBrowserWorker(),
+    const optOutRuntime = createRuntime({
+      env: { VITE_RFS_WORKER_PHYSICS: '0' },
+      workerFactory,
     });
 
-    expect(workerRuntime.kind).toBe('browser-worker');
-    expect(typeof workerRuntime.stepAsync).toBe('function');
-    workerRuntime.dispose?.();
+    expect(optOutRuntime.kind).toBe('main-thread');
+    expect(workerCreated).toBe(1);
   });
 
   it('falls back to main-thread when explicit browser Worker construction fails', () => {

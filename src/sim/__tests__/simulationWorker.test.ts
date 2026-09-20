@@ -85,8 +85,8 @@ afterEach(() => {
 });
 
 describe('simulationWorker', () => {
-  it('documents that worker physics is disabled by default', () => {
-    expect(SIMULATION_WORKER_PHYSICS_ENABLED_BY_DEFAULT).toBe(false);
+  it('documents that worker physics is enabled by default', () => {
+    expect(SIMULATION_WORKER_PHYSICS_ENABLED_BY_DEFAULT).toBe(true);
   });
 
   it('handles a simulation step request with a result matching the direct simulation step', () => {
