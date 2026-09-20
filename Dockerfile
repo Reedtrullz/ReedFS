@@ -4,7 +4,6 @@ ARG RFS_COMMIT_SHA=unknown
 ARG RFS_IMAGE_REF=unknown
 ARG RFS_IMAGE_DIGEST=unknown
 ARG RFS_VERSION=0.0.0
-ARG VITE_CESIUM_ION_TOKEN=
 
 # Build RFS
 RUN apk add --no-cache git
@@ -19,9 +18,12 @@ COPY . .
 ENV RFS_COMMIT_SHA=${RFS_COMMIT_SHA} \
   RFS_IMAGE_REF=${RFS_IMAGE_REF} \
   RFS_IMAGE_DIGEST=${RFS_IMAGE_DIGEST} \
-  RFS_VERSION=${RFS_VERSION} \
-  VITE_CESIUM_ION_TOKEN=${VITE_CESIUM_ION_TOKEN}
-RUN npm run build
+  RFS_VERSION=${RFS_VERSION}
+# Token reaches Vite as a command-scoped env var from a BuildKit secret mount;
+# the value never lands in an image layer and defaults to empty (degraded scene policy).
+RUN --mount=type=secret,id=cesium_ion_token,required=false \
+  VITE_CESIUM_ION_TOKEN="$(cat /run/secrets/cesium_ion_token 2>/dev/null || true)" \
+  npm run build
 
 FROM nginx:alpine@sha256:20316569d8f81a160065d7d2a5eeffc7ca97d79022462ee255fd23fa103a6b5c
 RUN apk upgrade --no-cache libcrypto3 libssl3 libxml2 libexpat c-ares curl libcurl libuuid
