@@ -115,13 +115,13 @@ Acceptance tests:
 
 ## P3 — Physics worker and deterministic timing
 
-Why this follows state stabilization: moving a broken state contract to a worker makes bugs harder to see. The state contract is now stable enough to serialize, but the live store loop is still intentionally synchronous.
+Why this follows state stabilization: moving a broken state contract to a worker makes bugs harder to see. The state contract is now stable enough to serialize; the default main-thread loop stays synchronous, and the experimental flag bridges the live loop to the worker asynchronously.
 
 Scope:
 
 - Worker codec, feature flag, worker entry scaffolding, runtime adapters, worker-handler parity tests, and an experimental browser-Worker `stepAsync()` path exist.
   - Current disposition: experimental browser-Worker runtime remains default-off; `simStore.tickAsync()` now bridges the frame loop to `stepAsync()` with in-flight frame coalescing and generation-based invalidation (reset, scenario, pause, flight plan, persistence loads), falling back to synchronous `tick()` when the runtime has no `stepAsync`. With `VITE_RFS_WORKER_PHYSICS=1` the browser-worker adapter drives the live loop asynchronously; the flag remains experimental and default-off.
-  - Remaining before default-on migration: worker-enabled browser/E2E smoke, worker lifecycle disposal audit, and visual/E2E parity evidence.
+  - Current disposition: batch commits preserve pilot-owned inputs changed mid-flight instead of reverting them with the dispatch-time control echo; worker-enabled browser/E2E smoke (npm run test:e2e:worker-physics) drives a real-time ENVA takeoff through the browser-worker runtime on the production preview bundle. Remaining before default-on migration: worker lifecycle disposal audit and visual/E2E parity evidence.
 - Keep the fixed-timestep accumulator and deterministic main-thread tests green while migrating.
 
 Suggested implementation files:

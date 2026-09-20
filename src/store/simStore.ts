@@ -232,7 +232,16 @@ export const useSimStore = create<SimStore>((set, get) => {
       const state = get();
       if (state.status !== 'running') return;
       if (state.asyncPhysicsInFlight) {
-        set({ lastFrameTime: timestamp });
+        // Frames arriving while a batch is in flight must bank their wall
+        // time into the accumulator; resetting lastFrameTime here would
+        // silently drop real time between dispatches and run the sim slow.
+        const skippedDelta = state.lastFrameTime > 0
+          ? Math.max(0, (timestamp - state.lastFrameTime) / 1000)
+          : 0;
+        set({
+          lastFrameTime: timestamp,
+          fixedStepAccumulatorSeconds: state.fixedStepAccumulatorSeconds + skippedDelta * Math.max(1, state.simRate),
+        });
         return;
       }
 
@@ -278,17 +287,34 @@ export const useSimStore = create<SimStore>((set, get) => {
       let nextApControllerState = apControllerState;
       let remainingSteps = stepCount;
 
+      const committedSteps = () => stepCount - remainingSteps;
+
       const applyBatch = (result: SimulationStepResult) => {
         if (get().asyncPhysicsGeneration !== generation) return;
         accumulator -= (stepCount - remainingSteps) * FIXED_STEP_SECONDS;
         if (Math.abs(accumulator) < 1e-12) accumulator = 0;
+        // Inputs may change while a batch is in flight. Physics echoes the
+        // dispatch-time pilot inputs back in result.controls, so committing
+        // them verbatim would revert any lever moved mid-batch. Pilot-owned
+        // axes stay authoritative from the live store; AP commands still come
+        // from physics because only it integrates autopilot servo state.
+        const current = get();
+        const pilotInputs = current.pilotInputs;
+        const controls = composeControlsSlice(pilotInputs, result.apCommands, apState, {
+          aircraft: result.aircraft,
+          flightPlan,
+          routeStatus: result.routeStatus,
+        });
         set({
           aircraft: result.aircraft,
           lastFrameTime: timestamp,
           fixedStepAccumulatorSeconds: accumulator,
-          simulationTimeSeconds: state.simulationTimeSeconds + (stepCount - remainingSteps) * FIXED_STEP_SECONDS,
+          simulationTimeSeconds: state.simulationTimeSeconds + committedSteps() * FIXED_STEP_SECONDS,
           droppedSimulationTimeSeconds: droppedTime,
-          ...result.controls,
+          pilotInputs,
+          apCommands: controls.apCommands,
+          effectiveControls: controls.effectiveControls,
+          inputs: controls.effectiveControls,
           apControllerState: result.apControllerState,
           activeLegIndex: result.activeLegIndex,
           routeStatus: result.routeStatus,
@@ -299,6 +325,7 @@ export const useSimStore = create<SimStore>((set, get) => {
 
       const runBatch = (): Promise<void> => {
         if (remainingSteps <= 0) return Promise.resolve();
+        const batchSteps = remainingSteps;
         const input = {
           aircraft: nextAircraft,
           spec,
@@ -315,6 +342,7 @@ export const useSimStore = create<SimStore>((set, get) => {
           guidance: nextGuidance,
           apControllerState: nextApControllerState,
           cloneAircraft: false,
+          steps: batchSteps,
         };
         return asyncRuntime.stepAsync(input).then((result) => {
           if (get().asyncPhysicsGeneration !== generation) return;
@@ -323,8 +351,7 @@ export const useSimStore = create<SimStore>((set, get) => {
           nextRouteStatus = result.routeStatus;
           nextGuidance = result.guidance;
           nextApControllerState = result.apControllerState;
-          remainingSteps -= 1;
-          if (remainingSteps > 0) return runBatch();
+          remainingSteps = 0;
           applyBatch(result);
         });
       };

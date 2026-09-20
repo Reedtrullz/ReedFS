@@ -10,13 +10,16 @@ import { createAutopilotControllerState } from '../../sim/systems/autopilot';
 
 function asyncRuntimeStub() {
   const calls: Array<{ aircraftAltFt: number }> = [];
+  const stepsRequested: number[] = [];
   return {
     calls,
+    stepsRequested,
     runtime: {
       kind: 'browser-worker' as const,
       step: () => { throw new Error('sync step should not be used by tickAsync'); },
       stepAsync: (input: SimulationStepInput) => {
         calls.push({ aircraftAltFt: input.aircraft.position.alt });
+        stepsRequested.push(input.steps ?? 1);
         const result = {
           aircraft: structuredClone(input.aircraft),
           routeStatus: createNoRouteStatus(),
@@ -78,7 +81,8 @@ describe('tickAsync bridge', () => {
     useSimStore.setState({ fixedStepAccumulatorSeconds: 3 * (1 / 60), lastFrameTime: 16 });
     useSimStore.getState().tickAsync(16);
     await vi.waitFor(() => expect(useSimStore.getState().asyncPhysicsInFlight).toBe(false));
-    expect(stub.calls.length).toBe(3);
+    expect(stub.calls.length).toBe(1);
+    expect(stub.stepsRequested[0]).toBe(3);
     expect(useSimStore.getState().simulationTimeSeconds).toBeCloseTo(3 / 60, 6);
     expect(useSimStore.getState().fixedStepAccumulatorSeconds).toBeCloseTo(0, 6);
     restore();
@@ -92,7 +96,8 @@ describe('tickAsync bridge', () => {
     useSimStore.getState().tickAsync(16);
     expect(useSimStore.getState().asyncPhysicsInFlight).toBe(true);
     await vi.waitFor(() => expect(useSimStore.getState().asyncPhysicsInFlight).toBe(false));
-    expect(stub.calls.length).toBe(2);
+    expect(stub.calls.length).toBe(1);
+    expect(stub.stepsRequested[0]).toBe(2);
     expect(useSimStore.getState().simulationTimeSeconds).toBeCloseTo(2 / 60, 6);
     expect(useSimStore.getState().fixedStepAccumulatorSeconds).toBeCloseTo(0, 6);
     restore();
@@ -125,7 +130,24 @@ describe('tickAsync bridge', () => {
     useSimStore.getState().tickAsync(48);
     expect(useSimStore.getState().asyncPhysicsInFlight).toBe(true);
     await vi.waitFor(() => expect(useSimStore.getState().asyncPhysicsInFlight).toBe(false));
-    expect(stub.calls.length).toBe(3);
+    expect(stub.calls.length).toBe(1);
+    expect(stub.stepsRequested[0]).toBe(3);
+    restore();
+  });
+  it('preserves pilot input changes that land while a batch is in flight', async () => {
+    const stub = asyncRuntimeStub();
+    const restore = setSimulationRuntimeForTests(stub.runtime);
+    seedRunningScenario();
+    useSimStore.setState({ fixedStepAccumulatorSeconds: 2 * (1 / 60), lastFrameTime: 16 });
+    useSimStore.getState().tickAsync(16);
+    // Simulate an ArrowUp throttle press landing mid-flight, as a real keydown
+    // would while the worker round trip is pending.
+    useSimStore.setState({ pilotInputs: { ...useSimStore.getState().pilotInputs, throttle1: 1, throttle2: 1 } });
+    await vi.waitFor(() => expect(useSimStore.getState().asyncPhysicsInFlight).toBe(false));
+    expect(useSimStore.getState().pilotInputs.throttle1).toBe(1);
+    expect(useSimStore.getState().pilotInputs.throttle2).toBe(1);
+    expect(useSimStore.getState().effectiveControls.throttle1).toBe(1);
+    expect(useSimStore.getState().simulationTimeSeconds).toBeCloseTo(2 / 60, 6);
     restore();
   });
 });

@@ -44,11 +44,15 @@ describe('canonical docs posture', () => {
 
   it('keeps worker physics documented as experimental and synchronous-store default-off', () => {
     expect(readme).toMatch(/production still defaults to the main-thread adapter/i);
-    expect(readme).toMatch(/current `simStore\.tick\(\)` path remains synchronous/i);
-    expect(architecture).toMatch(/sync `step\(\)` still falls back to main-thread physics until the frame scheduler becomes async-aware/i);
+    expect(readme).toMatch(/simStore\.tickAsync\(\)` bridges the frame loop to the worker runtime/i);
+    expect(readme).toMatch(/preserving pilot inputs changed mid-flight/i);
+    expect(architecture).toMatch(/store loop bridges to browser-worker `stepAsync\(\)` via `tickAsync\(\)`/i);
+    expect(architecture).toMatch(/sync `step\(\)` still falls back to main-thread physics when the async path cannot be used/i);
     expect(roadmap).toMatch(/experimental browser-Worker runtime remains default-off/i);
-    expect(roadmap).toMatch(/`simStore\.tick\(\)` remains synchronous/i);
-    expect(roadmap).toMatch(/async scheduler\/store bridge plan is required before default-on/i);
+    expect(roadmap).toMatch(/the default main-thread loop stays synchronous, and the experimental flag bridges the live loop to the worker asynchronously/i);
+    expect(roadmap).toMatch(/batch commits preserve pilot-owned inputs changed mid-flight/i);
+    expect(roadmap).toMatch(/npm run test:e2e:worker-physics/i);
+    expect(roadmap).toMatch(/Remaining before default-on migration: worker lifecycle disposal audit and visual\/E2E parity evidence/i);
   });
 
   it('records rendering, weather, audio, immersion, and PWA disposition without snapshot overclaims', () => {

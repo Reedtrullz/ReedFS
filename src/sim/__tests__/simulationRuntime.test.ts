@@ -180,6 +180,22 @@ describe('simulation runtime adapters', () => {
     runtime.dispose?.();
   });
 
+  it('executes multi-step batches per dispatch in parity with the main-thread runtime', async () => {
+    const createRuntime = createRuntimeFactory();
+    const fakeWorker = new FakeBrowserWorker();
+    const runtime = createRuntime({
+      env: { VITE_RFS_WORKER_PHYSICS: '1' },
+      workerFactory: () => fakeWorker,
+    });
+    const stepInput = { ...input(), steps: 4 };
+    const expected = new MainThreadSimulationRuntime().step(stepInput);
+
+    await expect(runtime.stepAsync?.(stepInput)).resolves.toEqual(expected);
+    expect(fakeWorker.messages).toHaveLength(1);
+    expect(stepInput.aircraft.simTime).toBe(0);
+    runtime.dispose?.();
+  });
+
   it('falls back to main-thread stepping when the browser Worker times out', async () => {
     const createRuntime = createRuntimeFactory();
     const runtime = createRuntime({

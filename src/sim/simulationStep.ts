@@ -135,6 +135,11 @@ export interface SimulationStepInput {
    */
   weather?: ScenarioWeatherMetadata | null;
   dt: number;
+  /**
+   * Number of fixed steps the runtime should execute for this dispatch.
+   * Optional for backward compatibility; defaults to a single step.
+   */
+  steps?: number;
   status: SimulationStatus;
   selectedScenarioId: string;
   guidance: GuidanceState;
@@ -154,6 +159,32 @@ export interface SimulationStepResult {
   controls: ControlsSlice;
   guidance: GuidanceState;
   apControllerState: AutopilotControllerState;
+}
+
+/**
+ * Runs a multi-step batch in one call. Physics parity comes from chaining
+ * advanceSimulationStep itself; only plumbing state forward differs.
+ */
+export function advanceSimulationBatch(
+  input: SimulationStepInput,
+  steps: number,
+): SimulationStepResult {
+  const stepCount = Math.max(1, Math.floor(steps));
+  let current: SimulationStepInput = { ...input, steps: stepCount };
+  let result: SimulationStepResult = advanceSimulationStep(current);
+  for (let i = 1; i < stepCount; i++) {
+    current = {
+      ...current,
+      aircraft: result.aircraft,
+      routeStatus: result.routeStatus,
+      activeLegIndex: result.activeLegIndex,
+      guidance: result.guidance,
+      apControllerState: result.apControllerState,
+      cloneAircraft: false,
+    };
+    result = advanceSimulationStep(current);
+  }
+  return result;
 }
 
 function filterApCommandsByEffectiveModes(
