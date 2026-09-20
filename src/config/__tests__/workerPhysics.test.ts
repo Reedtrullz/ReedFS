@@ -18,13 +18,22 @@ describe('worker physics config', () => {
     vi.unstubAllEnvs();
   });
 
-  it('defaults to disabled main-thread physics when the flag is absent', () => {
+  it('defaults to enabled worker physics when the flag is absent', () => {
     expect(resolveWorkerPhysicsConfig({})).toEqual({
-      enabled: false,
+      enabled: true,
       source: 'default',
-      reason: expect.stringContaining('default-off'),
+      reason: expect.stringContaining('default-on'),
     });
-    expect(isWorkerPhysicsEnabled({})).toBe(false);
+    expect(isWorkerPhysicsEnabled({})).toBe(true);
+  });
+
+  it('forces main-thread physics when the flag is explicitly disabled', () => {
+    expect(resolveWorkerPhysicsConfig(envWithWorkerPhysicsFlag('0'))).toEqual({
+      enabled: false,
+      source: 'env',
+      rawValue: '0',
+    });
+    expect(isWorkerPhysicsEnabled(envWithWorkerPhysicsFlag('0'))).toBe(false);
   });
 
   it.each(['1', 'true', 'TRUE', 'yes', 'on', 'enabled', true])(

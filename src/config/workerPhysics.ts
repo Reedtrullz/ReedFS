@@ -1,5 +1,5 @@
 export const WORKER_PHYSICS_ENV_FLAG = 'VITE_RFS_WORKER_PHYSICS' as const;
-export const WORKER_PHYSICS_ENABLED_BY_DEFAULT = false as const;
+export const WORKER_PHYSICS_ENABLED_BY_DEFAULT = true as const;
 
 export type WorkerPhysicsEnv = Record<string, string | boolean | undefined>;
 export type WorkerPhysicsConfigSource = 'default' | 'env';
@@ -27,7 +27,7 @@ export function resolveWorkerPhysicsConfig(
     return {
       enabled: WORKER_PHYSICS_ENABLED_BY_DEFAULT,
       source: 'default',
-      reason: 'worker physics is default-off; main-thread physics remains the production runtime',
+      reason: 'worker physics is default-on; set VITE_RFS_WORKER_PHYSICS=0 to force main-thread physics',
     };
   }
 

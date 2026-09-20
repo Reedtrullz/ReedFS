@@ -55,8 +55,10 @@ function expectExplicitLandingSequence(phases: string[]): void {
   expect(phases.indexOf('ROLLOUT')).toBeLessThan(phases.indexOf('STOPPED'));
 }
 
-async function expectWorkerRuntimeWhenFlagged(page: Parameters<typeof openRfs>[0]): Promise<void> {
-  if (process.env.VITE_RFS_WORKER_PHYSICS !== '1') return;
+async function expectBrowserWorkerRuntime(page: Parameters<typeof openRfs>[0]): Promise<void> {
+  // Worker physics is default-on; skip the assertion only when a run pins
+  // the escape hatch back to main-thread physics.
+  if (process.env.VITE_RFS_WORKER_PHYSICS === '0') return;
 
   const runtimeKind = await page.evaluate(async () => {
     const mod = await import('/src/sim/simulationRuntime.ts');
@@ -69,7 +71,7 @@ async function expectWorkerRuntimeWhenFlagged(page: Parameters<typeof openRfs>[0
 test.describe('RFS playable flight loops', () => {
   test('ENVA tutorial reaches clean climb with phase-aware guidance', async ({ page }) => {
     await openRfs(page);
-    await expectWorkerRuntimeWhenFlagged(page);
+    await expectBrowserWorkerRuntime(page);
     await startRoll(page);
 
     const snapshot = await flyEnvaTakeoffToCleanClimb(page);

@@ -13,6 +13,9 @@ import {
 } from './helpers/rfsBlackbox';
 
 const SIMULATION_WORKER_URL_FRAGMENT = 'simulationWorker';
+// Worker physics is default-on; the smoke must remain meaningful when a run
+// explicitly pins the VITE_RFS_WORKER_PHYSICS=0 main-thread escape hatch.
+const WORKER_PHYSICS_EXPLICITLY_DISABLED = process.env.VITE_RFS_WORKER_PHYSICS === '0';
 const MIN_STEPS_PER_SECOND = 48;
 const MIN_TOTAL_DISPATCHES = 5;
 const MIN_WORKER_ROUND_TRIPS = 5;
@@ -36,6 +39,7 @@ test.describe('worker physics smoke', () => {
   test.describe.configure({ timeout: 420_000 });
 
   test('drives a real-time takeoff through the browser-worker physics runtime', async ({ page }) => {
+    test.skip(WORKER_PHYSICS_EXPLICITLY_DISABLED, 'worker physics explicitly disabled via VITE_RFS_WORKER_PHYSICS=0');
     useRealTimeVisibleSim(page);
     const simulationWorkersSpawned = watchSimulationWorkerSpawn(page);
 
