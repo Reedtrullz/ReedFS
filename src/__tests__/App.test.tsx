@@ -173,6 +173,7 @@ vi.mock('../store/simStore', () => {
     effectiveControls: { elevator: 0, aileron: 0, rudder: 0, throttle1: 0, throttle2: 0, flapLever: 0, gearLever: 'DOWN' as const, spoilers: 0, brake: 0, leftBrake: 0, rightBrake: 0 },
     simRate: 1,
     tick: vi.fn(),
+    tickAsync: vi.fn(),
     cycleSimRate: mockCycleSimRate,
     start: mockStart,
     startTakeoffRoll: mockStartTakeoffRoll,

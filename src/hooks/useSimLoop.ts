@@ -9,7 +9,7 @@ export interface UseSimLoopOptions {
 }
 
 export function useSimLoop(options: UseSimLoopOptions = {}) {
-  const tickRef = useRef(useSimStore.getState().tick);
+  const tickRef = useRef(useSimStore.getState().tickAsync);
   const inputFrameRef = useRef(options.onInputFrame);
   const renderEffectsFrameRef = useRef(options.onRenderEffectsFrame);
   const audioFrameRef = useRef(options.onAudioFrame);
@@ -21,7 +21,7 @@ export function useSimLoop(options: UseSimLoopOptions = {}) {
   }, [options.onInputFrame, options.onRenderEffectsFrame, options.onAudioFrame]);
 
   useEffect(() => {
-    const unsub = useSimStore.subscribe((s) => { tickRef.current = s.tick; });
+    const unsub = useSimStore.subscribe((s) => { tickRef.current = s.tickAsync; });
     const scheduler = new FrameScheduler({
       input: (context) => inputFrameRef.current?.(context),
       fixedSimulation: ({ timestamp }) => tickRef.current(timestamp),

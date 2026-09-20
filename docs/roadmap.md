@@ -120,8 +120,8 @@ Why this follows state stabilization: moving a broken state contract to a worker
 Scope:
 
 - Worker codec, feature flag, worker entry scaffolding, runtime adapters, worker-handler parity tests, and an experimental browser-Worker `stepAsync()` path exist.
-- Current disposition: experimental browser-Worker runtime remains default-off; `simStore.tick()` remains synchronous; sync `step()` still falls back to main-thread physics even when `VITE_RFS_WORKER_PHYSICS=1` selects the browser-worker adapter. The flag proves protocol/parity only and is not a production-active physics loop.
-- Remaining: async scheduler/store bridge plan is required before default-on migration, covering input frames, AP/controller state, flight plan, route status, wind, worker lifecycle errors, timeout fallback, pause/resume/reset disposal, and visual/E2E parity.
+  - Current disposition: experimental browser-Worker runtime remains default-off; `simStore.tickAsync()` now bridges the frame loop to `stepAsync()` with in-flight frame coalescing and generation-based invalidation (reset, scenario, pause, flight plan, persistence loads), falling back to synchronous `tick()` when the runtime has no `stepAsync`. With `VITE_RFS_WORKER_PHYSICS=1` the browser-worker adapter drives the live loop asynchronously; the flag remains experimental and default-off.
+  - Remaining before default-on migration: worker-enabled browser/E2E smoke, worker lifecycle disposal audit, and visual/E2E parity evidence.
 - Keep the fixed-timestep accumulator and deterministic main-thread tests green while migrating.
 
 Suggested implementation files:

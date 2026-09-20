@@ -6,8 +6,8 @@ import type { WindInfo } from '../sim/weather';
 import type { ScenarioWeatherMetadata } from '../sim/weather';
 import type { RunwayReference } from '../viewport/runwayData';
 import type { GuidanceState } from '../sim/guidanceState';
-import { composeControlsSlice } from '../sim/simulationStep';
-import { getSimulationRuntime } from '../sim/simulationRuntime';
+import { composeControlsSlice, type SimulationStepResult } from '../sim/simulationStep';
+import { getSimulationRuntime, type AsyncSimulationRuntime } from '../sim/simulationRuntime';
 import type { SimulationStatus } from '../sim/simulationStatus';
 import type { RouteStatusSnapshot } from '../sim/systems/navigation';
 import type { AutopilotControllerState } from '../sim/systems/autopilot';
@@ -52,6 +52,10 @@ export interface SimStore {
   wind: WindInfo | null;
   /** Live weather (scenario seed updated by METAR QNH/temperature) fed to physics. */
   weather: ScenarioWeatherMetadata | null;
+  /** Bumped whenever aircraft state is replaced or the loop is paused/reset; in-flight async physics batches with an older generation are discarded. */
+  asyncPhysicsGeneration: number;
+  /** True while one worker physics batch is awaited by the async frame bridge. */
+  asyncPhysicsInFlight: boolean;
   selectedScenarioId: string;
   guidance: GuidanceState;
   controlFeedbackMessage: string | null;
@@ -61,6 +65,13 @@ export interface SimStore {
   setTakeoffConfig: () => void;
   applyInputActions: (actions: InputActions, dt: number) => void;
   tick: (timestamp: number) => void;
+  /**
+   * Async-aware frame-bridge entry point. Dispatches fixed-step batches through
+   * runtime.stepAsync when the active runtime supports it, reserving frame timing
+   * immediately so render/audio phases never block on worker latency. Falls back
+   * to the synchronous tick when no async runtime is active.
+   */
+  tickAsync: (timestamp: number) => void;
   cycleSimRate: () => void;
   start: () => void;
   startTakeoffRoll: () => void;
@@ -206,6 +217,122 @@ export const useSimStore = create<SimStore>((set, get) => {
         activeLegIndex: nextActiveLegIndex,
         routeStatus: nextRouteStatus,
         guidance: nextGuidance,
+      });
+    },
+
+    tickAsync: (timestamp) => {
+      const runtime = getSimulationRuntime();
+      const asyncRuntime: AsyncSimulationRuntime | null =
+        'stepAsync' in runtime && typeof runtime.stepAsync === 'function' ? runtime as AsyncSimulationRuntime : null;
+      if (!asyncRuntime) {
+        get().tick(timestamp);
+        return;
+      }
+
+      const state = get();
+      if (state.status !== 'running') return;
+      if (state.asyncPhysicsInFlight) {
+        set({ lastFrameTime: timestamp });
+        return;
+      }
+
+      const frameDeltaSeconds = state.lastFrameTime > 0
+        ? Math.max(0, (timestamp - state.lastFrameTime) / 1000)
+        : FIXED_STEP_SECONDS;
+      const scaledFrameDeltaSeconds = frameDeltaSeconds * Math.max(1, state.simRate);
+      let accumulator = state.fixedStepAccumulatorSeconds + scaledFrameDeltaSeconds;
+      const maxStepsThisFrame = maxStepsPerRenderedFrame(state.simRate);
+      let droppedTime = state.droppedSimulationTimeSeconds;
+      let stepCount = Math.floor(accumulator / FIXED_STEP_SECONDS);
+      if (stepCount > maxStepsThisFrame) {
+        const executableTime = maxStepsThisFrame * FIXED_STEP_SECONDS;
+        droppedTime += accumulator - executableTime;
+        accumulator = executableTime;
+        stepCount = maxStepsThisFrame;
+      }
+
+      if (stepCount <= 0) {
+        set({ lastFrameTime: timestamp, fixedStepAccumulatorSeconds: accumulator, droppedSimulationTimeSeconds: droppedTime });
+        return;
+      }
+
+      const generation = state.asyncPhysicsGeneration;
+      const {
+        aircraft,
+        spec,
+      pilotInputs,
+      apState,
+      flightPlan,
+        activeLegIndex,
+        routeStatus,
+        wind,
+        weather,
+        selectedScenarioId,
+        guidance,
+        apControllerState,
+      } = state;
+      let nextAircraft = structuredClone(aircraft);
+      let nextActiveLegIndex = activeLegIndex;
+      let nextRouteStatus = routeStatus;
+      let nextGuidance = guidance;
+      let nextApControllerState = apControllerState;
+      let remainingSteps = stepCount;
+
+      const applyBatch = (result: SimulationStepResult) => {
+        if (get().asyncPhysicsGeneration !== generation) return;
+        accumulator -= (stepCount - remainingSteps) * FIXED_STEP_SECONDS;
+        if (Math.abs(accumulator) < 1e-12) accumulator = 0;
+        set({
+          aircraft: result.aircraft,
+          lastFrameTime: timestamp,
+          fixedStepAccumulatorSeconds: accumulator,
+          simulationTimeSeconds: state.simulationTimeSeconds + (stepCount - remainingSteps) * FIXED_STEP_SECONDS,
+          droppedSimulationTimeSeconds: droppedTime,
+          ...result.controls,
+          apControllerState: result.apControllerState,
+          activeLegIndex: result.activeLegIndex,
+          routeStatus: result.routeStatus,
+          guidance: result.guidance,
+          asyncPhysicsInFlight: false,
+        });
+      };
+
+      const runBatch = (): Promise<void> => {
+        if (remainingSteps <= 0) return Promise.resolve();
+        const input = {
+          aircraft: nextAircraft,
+          spec,
+          pilotInputs,
+          apState,
+          flightPlan,
+          activeLegIndex: nextActiveLegIndex,
+          routeStatus: nextRouteStatus,
+          wind,
+          weather,
+          dt: FIXED_STEP_SECONDS,
+          status: state.status,
+          selectedScenarioId,
+          guidance: nextGuidance,
+          apControllerState: nextApControllerState,
+          cloneAircraft: false,
+        };
+        return asyncRuntime.stepAsync(input).then((result) => {
+          if (get().asyncPhysicsGeneration !== generation) return;
+          nextAircraft = result.aircraft;
+          nextActiveLegIndex = result.activeLegIndex;
+          nextRouteStatus = result.routeStatus;
+          nextGuidance = result.guidance;
+          nextApControllerState = result.apControllerState;
+          remainingSteps -= 1;
+          if (remainingSteps > 0) return runBatch();
+          applyBatch(result);
+        });
+      };
+
+      set({ asyncPhysicsInFlight: true });
+      runBatch().catch(() => {
+        if (get().asyncPhysicsGeneration !== generation) return;
+        set({ asyncPhysicsInFlight: false });
       });
     },
 

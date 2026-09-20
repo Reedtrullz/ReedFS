@@ -81,6 +81,8 @@ export function createRouteSlice(set: SimStoreSet): Pick<SimStore, 'setFlightPla
         activeLegIndex,
         routeStatus,
         wind: { dir: Math.round(originRunway.headingDeg), speed: 0, gustSeed: gustSeedForRunway(originRunway) },
+        asyncPhysicsGeneration: s.asyncPhysicsGeneration + 1,
+        asyncPhysicsInFlight: false,
         controlFeedbackMessage: null,
         guidance: syncGuidanceState(s.guidance, scenario, 'stopped', aircraft, controlsSlice.effectiveControls),
       };

@@ -110,7 +110,7 @@ export function createPersistenceSlice(set: SimStoreSet): Pick<SimStore, 'saveSc
       }
     }),
 
-    loadScenarioState: (storage, slotId) => set(() => {
+    loadScenarioState: (storage, slotId) => set((s) => {
       const targetStorage = storage ?? defaultScenarioStorage();
       if (!targetStorage) {
         return { scenarioPersistenceMessage: 'Ignored saved scenario: localStorage is not available.' };
@@ -127,6 +127,8 @@ export function createPersistenceSlice(set: SimStoreSet): Pick<SimStore, 'saveSc
       try {
         return {
           ...restoreSnapshotSlice(loaded.snapshot, loaded.metadata.id === DEFAULT_SCENARIO_SAVE_SLOT_ID ? 'Saved scenario' : loaded.metadata.name),
+          asyncPhysicsGeneration: s.asyncPhysicsGeneration + 1,
+          asyncPhysicsInFlight: false,
           scenarioSaveSlots: listScenarioSaveSlots(targetStorage),
         };
       } catch (error) {
