@@ -81,6 +81,21 @@ export function metarFromScenarioWeather(weather: ScenarioWeatherMetadata, wind:
   };
 }
 
+export function parseMetarWeather(
+  m: MetarData,
+  scenarioWeather: ScenarioWeatherMetadata,
+): ScenarioWeatherMetadata {
+  const qnh = Number.isFinite(m.qnh) ? m.qnh : 1013.25;
+  const temperature = Number.isFinite(m.temperature) ? m.temperature : 15;
+  return {
+    ...scenarioWeather,
+    surfaceTemperatureC: temperature,
+    qnhHpa: qnh,
+    visibilityM: Number.isFinite(m.visibility) ? m.visibility : scenarioWeather.visibilityM,
+    clouds: m.clouds.map((cloud) => ({ ...cloud })),
+  };
+}
+
 export async function fetchMetar(icao: string): Promise<MetarData | null> {
   const metarApiBase = import.meta.env.VITE_METAR_API_URL;
   if (!metarApiBase) return null;

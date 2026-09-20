@@ -30,7 +30,7 @@ export function createRouteState(
   };
 }
 
-export function createRouteSlice(set: SimStoreSet): Pick<SimStore, 'setFlightPlan' | 'setFlightPlanAtRunway' | 'setWind'> {
+export function createRouteSlice(set: SimStoreSet): Pick<SimStore, 'setFlightPlan' | 'setFlightPlanAtRunway' | 'setWind' | 'setWeather'> {
   return {
     setFlightPlan: (fp) => set((s) => {
       const { activeLegIndex, routeStatus } = createRouteState(s, fp);
@@ -81,11 +81,14 @@ export function createRouteSlice(set: SimStoreSet): Pick<SimStore, 'setFlightPla
         activeLegIndex,
         routeStatus,
         wind: { dir: Math.round(originRunway.headingDeg), speed: 0, gustSeed: gustSeedForRunway(originRunway) },
+        asyncPhysicsGeneration: s.asyncPhysicsGeneration + 1,
+        asyncPhysicsInFlight: false,
         controlFeedbackMessage: null,
         guidance: syncGuidanceState(s.guidance, scenario, 'stopped', aircraft, controlsSlice.effectiveControls),
       };
     }),
 
     setWind: (w) => set({ wind: w }),
+    setWeather: (w) => set({ weather: w }),
   };
 }

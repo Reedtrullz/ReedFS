@@ -1,6 +1,6 @@
 import { isWorkerPhysicsEnabled, type WorkerPhysicsEnv } from '../config/workerPhysics';
 import {
-  advanceSimulationStep,
+  advanceSimulationBatch,
   type SimulationStepInput,
   type SimulationStepResult,
 } from './simulationStep';
@@ -49,7 +49,7 @@ export class MainThreadSimulationRuntime implements SimulationRuntime {
   readonly kind = 'main-thread' as const;
 
   step(input: SimulationStepInput): SimulationStepResult {
-    return advanceSimulationStep(input);
+    return advanceSimulationBatch(input, input.steps ?? 1);
   }
 }
 
@@ -65,6 +65,10 @@ export class WorkerHandlerSimulationRuntime implements SimulationRuntime {
       throw new Error(`Simulation worker runtime failed: ${response.error.message}`);
     }
     return response.result;
+  }
+
+  stepAsync(input: SimulationStepInput): Promise<SimulationStepResult> {
+    return Promise.resolve(this.step(input));
   }
 }
 
@@ -193,4 +197,11 @@ export function setSimulationRuntimeForTests(runtime: SimulationRuntime): () => 
   return () => {
     currentRuntime = previous;
   };
+}
+
+// E2E-only probe, baked in when the smoke script builds with VITE_RFS_SMOKE=1.
+// Lets worker-physics E2E wrap the real runtime singleton without a dev-only
+// module import that cannot resolve in a production preview bundle.
+if (import.meta.env.VITE_RFS_SMOKE === '1') {
+  (window as unknown as { __RFS_GET_SIMULATION_RUNTIME?: () => SimulationRuntime }).__RFS_GET_SIMULATION_RUNTIME = () => currentRuntime;
 }

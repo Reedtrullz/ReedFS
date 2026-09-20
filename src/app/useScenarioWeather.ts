@@ -5,6 +5,7 @@ import {
   fetchMetar,
   metarFromScenarioWeather,
   parseMetarWind,
+  parseMetarWeather,
   type MetarData,
 } from '../sim/weather';
 
@@ -31,11 +32,13 @@ export function useScenarioWeather(selectedScenarioId: string): ScenarioWeatherS
     let cancelled = false;
 
     useSimStore.getState().setWind(parseMetarWind(fallbackMetarData, weatherWindSeed));
+    useSimStore.getState().setWeather(parseMetarWeather(fallbackMetarData, scenario.weather));
 
     fetchMetar(scenario.weather.stationIcao).then((metar) => {
       if (cancelled || useSimStore.getState().selectedScenarioId !== scenario.id) return;
       if (metar) {
         useSimStore.getState().setWind(parseMetarWind(metar, weatherWindSeed));
+        useSimStore.getState().setWeather(parseMetarWeather(metar, scenario.weather));
         setFetchedMetarData({ scenarioId: scenario.id, metar });
       }
     });

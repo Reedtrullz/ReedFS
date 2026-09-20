@@ -1,5 +1,5 @@
 import { WORKER_PHYSICS_ENABLED_BY_DEFAULT } from '../config/workerPhysics';
-import { advanceSimulationStep } from './simulationStep';
+import { advanceSimulationBatch } from './simulationStep';
 import {
   decodeSimulationStepRequest,
   encodeSimulationStepError,
@@ -37,7 +37,10 @@ function requestIdFromUnknownMessage(message: unknown): string {
 export function handleSimulationWorkerMessage(message: unknown): SimulationStepResponseMessage {
   try {
     const request = decodeSimulationStepRequest(message);
-    return encodeSimulationStepResult(request.requestId, advanceSimulationStep(request.input));
+    return encodeSimulationStepResult(
+      request.requestId,
+      advanceSimulationBatch(request.input, request.input.steps ?? 1),
+    );
   } catch (error) {
     return encodeSimulationStepError(requestIdFromUnknownMessage(message), error);
   }

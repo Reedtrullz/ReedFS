@@ -7,6 +7,7 @@ import { integrate } from './physics/integrate';
 import { deriveRouteDrivenFlightPhase } from './flightPhasePredicates';
 import { rebuildGuidanceState, type GuidanceState } from './guidanceState';
 import { scenarioById, type FlightScenario } from './scenarios';
+import type { ScenarioWeatherMetadata } from './weather';
 import {
   computeRouteStatus,
   createNoRouteStatus,
@@ -128,7 +129,17 @@ export interface SimulationStepInput {
   activeLegIndex: number | null;
   routeStatus: RouteStatusSnapshot;
   wind: WindInfo | null;
+  /**
+   * Live METAR-updated weather overrides. Falls back to the selected scenario's
+   * weather when omitted, which keeps direct callers scenario-only.
+   */
+  weather?: ScenarioWeatherMetadata | null;
   dt: number;
+  /**
+   * Number of fixed steps the runtime should execute for this dispatch.
+   * Optional for backward compatibility; defaults to a single step.
+   */
+  steps?: number;
   status: SimulationStatus;
   selectedScenarioId: string;
   guidance: GuidanceState;
@@ -148,6 +159,32 @@ export interface SimulationStepResult {
   controls: ControlsSlice;
   guidance: GuidanceState;
   apControllerState: AutopilotControllerState;
+}
+
+/**
+ * Runs a multi-step batch in one call. Physics parity comes from chaining
+ * advanceSimulationStep itself; only plumbing state forward differs.
+ */
+export function advanceSimulationBatch(
+  input: SimulationStepInput,
+  steps: number,
+): SimulationStepResult {
+  const stepCount = Math.max(1, Math.floor(steps));
+  let current: SimulationStepInput = { ...input, steps: stepCount };
+  let result: SimulationStepResult = advanceSimulationStep(current);
+  for (let i = 1; i < stepCount; i++) {
+    current = {
+      ...current,
+      aircraft: result.aircraft,
+      routeStatus: result.routeStatus,
+      activeLegIndex: result.activeLegIndex,
+      guidance: result.guidance,
+      apControllerState: result.apControllerState,
+      cloneAircraft: false,
+    };
+    result = advanceSimulationStep(current);
+  }
+  return result;
 }
 
 function filterApCommandsByEffectiveModes(
@@ -201,6 +238,7 @@ export function syncGuidanceState(
 export function advanceSimulationStep(input: SimulationStepInput): SimulationStepResult {
   const state = input.cloneAircraft === false ? input.aircraft : structuredClone(input.aircraft);
   const scenario = scenarioById(input.selectedScenarioId);
+  const weather = input.weather ?? scenario.weather;
   const routeBeforeTick = input.flightPlan
     ? computeRouteStatus(state, input.flightPlan, input.activeLegIndex)
     : createNoRouteStatus();
@@ -228,7 +266,7 @@ export function advanceSimulationStep(input: SimulationStepInput): SimulationSte
   const apCommands = apCommandResult.commands;
   const controlsForIntegration = composeControlsSlice(input.pilotInputs, apCommands, input.apState, truthContext);
 
-  integrate(state, controlsForIntegration.effectiveControls, input.spec, input.dt, input.wind, scenario.weather);
+  integrate(state, controlsForIntegration.effectiveControls, input.spec, input.dt, input.wind, weather);
 
   const routeStatus = input.flightPlan
     ? computeRouteStatus(state, input.flightPlan, routeBeforeTick.activeLegIndex)

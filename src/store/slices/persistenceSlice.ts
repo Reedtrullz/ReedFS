@@ -18,6 +18,7 @@ import {
   type ScenarioSnapshot,
 } from '../scenarioPersistence';
 import type { SimStoreSet } from './aircraftSlice';
+import { cloneWeather } from './aircraftSlice';
 import { createRouteState } from './routeSlice';
 
 function defaultScenarioStorage(): ScenarioPersistenceStorage | null {
@@ -60,6 +61,7 @@ function restoreSnapshotSlice(snapshot: ScenarioSnapshot, slotName = 'Saved scen
     activeLegIndex: routeSlice.routeStatus.activeLegIndex,
     routeStatus: routeSlice.routeStatus,
     wind: structuredClone(snapshot.wind),
+    weather: cloneWeather(scenario.weather),
     guidance: buildGuidanceState({
       scenario,
       status: restoredStatus,
@@ -108,7 +110,7 @@ export function createPersistenceSlice(set: SimStoreSet): Pick<SimStore, 'saveSc
       }
     }),
 
-    loadScenarioState: (storage, slotId) => set(() => {
+    loadScenarioState: (storage, slotId) => set((s) => {
       const targetStorage = storage ?? defaultScenarioStorage();
       if (!targetStorage) {
         return { scenarioPersistenceMessage: 'Ignored saved scenario: localStorage is not available.' };
@@ -125,6 +127,8 @@ export function createPersistenceSlice(set: SimStoreSet): Pick<SimStore, 'saveSc
       try {
         return {
           ...restoreSnapshotSlice(loaded.snapshot, loaded.metadata.id === DEFAULT_SCENARIO_SAVE_SLOT_ID ? 'Saved scenario' : loaded.metadata.name),
+          asyncPhysicsGeneration: s.asyncPhysicsGeneration + 1,
+          asyncPhysicsInFlight: false,
           scenarioSaveSlots: listScenarioSaveSlots(targetStorage),
         };
       } catch (error) {

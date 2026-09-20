@@ -28,6 +28,7 @@
     "build": "tsc -b && vite build && node scripts/write-version-metadata.mjs dist/rfs-version.json",
     "typecheck": "tsc -b",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "lint": "eslint .",
     "lint:ci": "eslint . --max-warnings=0",
     "check:deps": "node scripts/check-single-three.mjs",
@@ -37,6 +38,7 @@
     "check": "npm run check:deps && npm run check:release && npm run check:blackbox && npm run lint:ci && npm run typecheck && npm run test && npm run build && npm run check:bundle",
     "preview": "vite preview",
     "test:e2e": "VITE_RFS_VISUAL_TEST=0 CI=1 PLAYWRIGHT_JSON_OUTPUT_NAME=test-results/e2e-timings.json playwright test e2e/rfs-blackbox-player-loop.spec.ts e2e/rfs-browser-assisted-airborne-mcp.spec.ts e2e/rfs-flight.spec.ts e2e/rfs-responsive-accessibility.spec.ts e2e/rfs-route-descent.spec.ts e2e/rfs-route.spec.ts e2e/rfs-runway-pair-routing.spec.ts e2e/rfs-truth-flow.spec.ts --workers=1 --reporter=list,json",
+    "test:e2e:worker-physics": "VITE_RFS_VISUAL_TEST=0 VITE_RFS_PREVIEW=1 VITE_RFS_WORKER_PHYSICS=1 VITE_RFS_SMOKE=1 CI=1 sh -c 'npm run build && playwright test e2e/rfs-worker-physics-smoke.spec.ts --workers=1 --reporter=line'",
     "test:e2e:full-flight": "VITE_RFS_VISUAL_TEST=0 CI=1 playwright test e2e/rfs-full-flight-blackbox.spec.ts --workers=1 --reporter=line",
     "test:visual": "VITE_RFS_VISUAL_TEST=1 PLAYWRIGHT_JSON_OUTPUT_NAME=test-results/visual-timings.json playwright test e2e/rfs-visual.spec.ts --workers=1 --reporter=line,json && node scripts/check-visual-timings.mjs",
     "test:visual:update": "VITE_RFS_VISUAL_TEST=1 playwright test --update-snapshots"
@@ -66,6 +68,7 @@
     "@types/react-dom": "^19.2.3",
     "@types/three": "^0.184.1",
     "@vitejs/plugin-react": "^6.0.1",
+    "@vitest/coverage-v8": "4.1.11",
     "eslint": "^10.4.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react": "^7.37.5",

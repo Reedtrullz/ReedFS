@@ -1,10 +1,15 @@
 import { defineConfig, devices, type PlaywrightTestConfig } from '@playwright/test';
 
-export function resolvePlaywrightWebServerEnv(env: { VITE_RFS_VISUAL_TEST?: string } = process.env) {
-  return env.VITE_RFS_VISUAL_TEST === '1' ? { VITE_RFS_VISUAL_TEST: '1' } : undefined;
+export function resolvePlaywrightWebServerEnv(env: { VITE_RFS_VISUAL_TEST?: string; VITE_RFS_WORKER_PHYSICS?: string; VITE_RFS_SMOKE?: string } = process.env) {
+  const resolved: Record<string, string> = {};
+  if (env.VITE_RFS_VISUAL_TEST === '1') resolved.VITE_RFS_VISUAL_TEST = '1';
+  if (env.VITE_RFS_WORKER_PHYSICS === '1') resolved.VITE_RFS_WORKER_PHYSICS = '1';
+  if (env.VITE_RFS_SMOKE === '1') resolved.VITE_RFS_SMOKE = '1';
+  return Object.keys(resolved).length > 0 ? resolved : undefined;
 }
 
 const visualTestWebServerEnv = resolvePlaywrightWebServerEnv();
+const usePreviewWebServer = process.env.VITE_RFS_PREVIEW === '1';
 
 export default defineConfig({
   testDir: './e2e',
@@ -29,10 +34,12 @@ export default defineConfig({
       reducedMotion: 'reduce',
     },
   },
-  webServer: {
-    command: 'npm run dev -- --host 127.0.0.1',
+ webServer: {
+    command: usePreviewWebServer
+      ? 'npm run preview -- --host 127.0.0.1 --port 5173 --strictPort'
+      : 'npm run dev -- --host 127.0.0.1',
     url: 'http://127.0.0.1:5173',
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: !process.env.CI && !usePreviewWebServer,
     timeout: 120_000,
     ...(visualTestWebServerEnv ? { env: visualTestWebServerEnv } : {}),
   },

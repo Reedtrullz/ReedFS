@@ -115,13 +115,13 @@ Acceptance tests:
 
 ## P3 — Physics worker and deterministic timing
 
-Why this follows state stabilization: moving a broken state contract to a worker makes bugs harder to see. The state contract is now stable enough to serialize, but the live store loop is still intentionally synchronous.
+Why this follows state stabilization: moving a broken state contract to a worker makes bugs harder to see. The state contract is now stable enough to serialize; the default main-thread loop stays synchronous, and the experimental flag bridges the live loop to the worker asynchronously.
 
 Scope:
 
 - Worker codec, feature flag, worker entry scaffolding, runtime adapters, worker-handler parity tests, and an experimental browser-Worker `stepAsync()` path exist.
-- Current disposition: experimental browser-Worker runtime remains default-off; `simStore.tick()` remains synchronous; sync `step()` still falls back to main-thread physics even when `VITE_RFS_WORKER_PHYSICS=1` selects the browser-worker adapter. The flag proves protocol/parity only and is not a production-active physics loop.
-- Remaining: async scheduler/store bridge plan is required before default-on migration, covering input frames, AP/controller state, flight plan, route status, wind, worker lifecycle errors, timeout fallback, pause/resume/reset disposal, and visual/E2E parity.
+  - Current disposition: experimental browser-Worker runtime remains default-off; `simStore.tickAsync()` now bridges the frame loop to `stepAsync()` with in-flight frame coalescing and generation-based invalidation (reset, scenario, pause, flight plan, persistence loads), falling back to synchronous `tick()` when the runtime has no `stepAsync`. With `VITE_RFS_WORKER_PHYSICS=1` the browser-worker adapter drives the live loop asynchronously; the flag remains experimental and default-off.
+  - Current disposition: batch commits preserve pilot-owned inputs changed mid-flight instead of reverting them with the dispatch-time control echo; worker-enabled browser/E2E smoke (npm run test:e2e:worker-physics) drives a real-time ENVA takeoff through the browser-worker runtime on the production preview bundle. Remaining before default-on migration: worker lifecycle disposal audit and visual/E2E parity evidence.
 - Keep the fixed-timestep accumulator and deterministic main-thread tests green while migrating.
 
 Suggested implementation files:
@@ -200,7 +200,7 @@ Acceptance tests:
 Scope:
 
 - Deterministic gusts now perturb air-relative velocity without mutating ground velocity, and fixed-step scenario regressions cover direct-crosswind weathercocking takeoff rolls plus crosswind approach/touchdown/rollout.
-- Remaining: cloud/visibility rendering tied to parsed METAR layers and QNH/temperature effects for pressure/density altitude. Deeper crosswind landing/rollout feel tuning remains part of P1 ground handling, not missing weather plumbing.
+- Remaining: cloud/visibility rendering tied to parsed METAR layers. QNH/temperature pressure/density-altitude effects and baro-indicated PFD altitude are implemented; deeper crosswind landing/rollout feel tuning remains part of P1 ground handling, not missing weather plumbing.
 
 Acceptance tests:
 
@@ -219,7 +219,7 @@ Remaining scope:
 2026-06-16 rendering/weather/audio/immersion disposition:
 
 - Cockpit/interior: partial. Implemented baseline includes the cockpit camera/shell, PFD/FMA, MCP, cockpit interaction hooks, route/scenario controls, and visual layout guards; deferred scope is a complete modeled 737 cockpit interior, panel-system depth, lighting, and product-grade instrument layout.
-- Weather/atmosphere: partial. Implemented baseline includes METAR wind/cloud parsing, scenario weather fallback, deterministic gusts, and simple cloud billboards; deferred scope is visibility rendering, QNH/temperature pressure-altitude and density-altitude effects, precipitation, and weather-driven scene degradation.
+- Weather/atmosphere: partial. Implemented baseline includes METAR wind/QNH/temperature parsing, density-altitude physics, baro-indicated PFD altitude, scenario weather fallback, deterministic gusts, and simple cloud billboards; deferred scope is visibility rendering, precipitation, and weather-driven scene degradation.
 - Audio: partial. Implemented baseline includes explicit Web Audio startup, N1-driven engine tone mapping, persisted mute/volume/caption settings, and GPWS captions/speech; deferred scope is richer engine, cockpit, airframe, warning, and spatial sound layers.
 - Scene loading/error states: partial. Implemented baseline includes the app ErrorBoundary, visible `SCENERY DEGRADED` status for missing Cesium Ion scenery, and degraded ellipsoid fallback; deferred scope is richer loading, retry, scenery-error, and network-failure UX.
  - PWA: partial. The Vite build generates a service worker (vite-plugin-pwa, auto-update) that precaches the app shell (JS/CSS/HTML/SVG/fonts) and cleans up outdated caches. Cesium tile/terrain/imagery requests and the simulation worker stay network-only, so an offline visit serves the shell but not globe scenery. Offline/error fallback screens and richer offline behavior remain deferred.
