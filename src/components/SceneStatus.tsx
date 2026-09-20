@@ -1,19 +1,45 @@
 import type { CSSProperties } from 'react';
 import type { CesiumScenePolicy } from '../config/cesium';
+import type { CesiumSceneFailure } from '../viewport/CesiumViewport';
 
 interface SceneStatusProps {
   policy: CesiumScenePolicy;
+  /** Latest Ion scene failure after mount; a non-null value overrides degraded-only display */
+  failure?: CesiumSceneFailure | null;
+  /** Bumped by the parent when it remounts scenery after a retry */
+  retryKey?: number;
+  /** Invoked when the user requests scenery recovery; omit to hide the retry control */
+  onRetry?: () => void;
 }
 
-export function SceneStatus({ policy }: SceneStatusProps) {
-  if (policy.mode === 'ion') {
+const FAILURE_LABELS: Record<CesiumSceneFailure['stage'], string> = {
+  buildings: '3D buildings could not be loaded.',
+  imagery: 'Globe imagery or terrain hit a render error.',
+};
+
+export function SceneStatusOverlay({ policy, failure, retryKey, onRetry }: SceneStatusProps) {
+  const failureMessage = failure ? FAILURE_LABELS[failure.stage] : null;
+
+  if (policy.mode === 'ion' && !failureMessage) {
     return null;
   }
 
   return (
     <div role="status" aria-live="polite" style={statusStyle}>
-      <span style={titleStyle}>SCENERY DEGRADED</span>
-      <span style={reasonStyle}>{policy.reason ?? 'Cesium Ion scenery is unavailable.'}</span>
+      <span style={titleStyle}>{failureMessage ? 'SCENERY ERROR' : 'SCENERY DEGRADED'}</span>
+      <span style={reasonStyle}>
+        {failureMessage ?? policy.reason ?? 'Cesium Ion scenery is unavailable.'}
+      </span>
+      {onRetry && failureMessage ? (
+        <button
+          type="button"
+          onClick={() => onRetry()}
+          data-rfs-retry-scenery={retryKey ?? 0}
+          style={retryButtonStyle}
+        >
+          RETRY SCENERY
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -50,4 +76,20 @@ const reasonStyle: CSSProperties = {
   color: '#ffe8bf',
   fontWeight: 700,
   lineHeight: 1.35,
+};
+
+const retryButtonStyle: CSSProperties = {
+  pointerEvents: 'auto',
+  alignSelf: 'center',
+  marginTop: 4,
+  padding: '4px 10px',
+  border: '1px solid rgba(255, 183, 77, 0.9)',
+  borderRadius: 4,
+  background: 'rgba(60, 38, 0, 0.9)',
+  color: '#ffe0a3',
+  fontFamily: 'inherit',
+  fontSize: 12,
+  fontWeight: 900,
+  letterSpacing: 1.2,
+  cursor: 'pointer',
 };

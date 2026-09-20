@@ -6,6 +6,7 @@ const {
   mockFromWorldTerrain,
   mockCreateOsmBuildingsAsync,
   mockOsmBuildings,
+  mockRenderErrorListeners,
 } = vi.hoisted(() => ({
   mockViewerDestroy: vi.fn(),
   mockViewerInstances: [] as Array<{
@@ -13,6 +14,9 @@ const {
     isDestroyed: ReturnType<typeof vi.fn>;
     scene: {
       screenSpaceCameraController: { enableInputs: boolean };
+      renderError: {
+        addEventListener: ReturnType<typeof vi.fn>;
+      };
       globe: { enableLighting: boolean; terrainExaggeration?: number; showWaterEffect?: boolean };
       skyAtmosphere: { show: boolean };
       requestRenderMode?: boolean;
@@ -23,6 +27,7 @@ const {
   mockFromWorldTerrain: vi.fn(() => ({ kind: 'world-terrain' })),
   mockCreateOsmBuildingsAsync: vi.fn(() => Promise.resolve({ kind: 'osm-buildings' })),
   mockOsmBuildings: { kind: 'osm-buildings' },
+  mockRenderErrorListeners: [] as Array<() => void>,
 }));
 
 vi.mock('cesium', () => ({
@@ -39,6 +44,11 @@ vi.mock('cesium', () => ({
         screenSpaceCameraController: { enableInputs: true },
         globe: { enableLighting: false },
         skyAtmosphere: { show: false },
+        renderError: {
+          addEventListener: vi.fn((listener: () => void) => {
+            mockRenderErrorListeners.push(listener);
+          }),
+        },
         primitives: { add: vi.fn((primitive: unknown) => primitive), remove: vi.fn() },
       },
     };
@@ -78,10 +88,12 @@ async function flushMicrotasks() {
 
 function createDeferred<T>() {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((promiseResolve) => {
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
     resolve = promiseResolve;
+    reject = promiseReject;
   });
-  return { promise, resolve };
+  return { promise, resolve, reject };
 }
 
 describe('CesiumViewport scene policy', () => {
@@ -90,6 +102,7 @@ describe('CesiumViewport scene policy', () => {
     vi.stubEnv('VITE_CESIUM_ION_TOKEN', '');
     vi.stubEnv('VITE_RFS_VISUAL_TEST', undefined);
     mockViewerInstances.length = 0;
+    mockRenderErrorListeners.length = 0;
     mockCreateOsmBuildingsAsync.mockResolvedValue(mockOsmBuildings);
   });
 
@@ -183,5 +196,45 @@ describe('CesiumViewport scene policy', () => {
 
     expect(ionViewer.scene.primitives.add).not.toHaveBeenCalled();
     expect(degradedViewer.scene.primitives.add).not.toHaveBeenCalled();
+  });
+
+  it('reports an OSM buildings load failure instead of swallowing it', async () => {
+    const onSceneFailure = vi.fn();
+    mockCreateOsmBuildingsAsync.mockRejectedValueOnce(new Error('network unavailable'));
+
+    render(<CesiumViewport scenePolicy={ionPolicy} onSceneFailure={onSceneFailure} />);
+    await flushMicrotasks();
+
+    expect(onSceneFailure).toHaveBeenCalledTimes(1);
+    expect(onSceneFailure).toHaveBeenCalledWith({ stage: 'buildings', error: expect.any(Error) });
+  });
+
+  it('reports scene render errors through the failure callback', () => {
+    const onSceneFailure = vi.fn();
+
+    render(<CesiumViewport scenePolicy={ionPolicy} onSceneFailure={onSceneFailure} />);
+    expect(mockRenderErrorListeners).toHaveLength(1);
+
+    act(() => {
+      mockRenderErrorListeners[0]();
+    });
+
+    expect(onSceneFailure).toHaveBeenCalledWith({ stage: 'imagery', error: undefined });
+  });
+
+  it('stops reporting failures after the viewer is disposed', async () => {
+    const onSceneFailure = vi.fn();
+    const deferred = createDeferred<{ kind: string }>();
+    mockCreateOsmBuildingsAsync.mockReturnValueOnce(deferred.promise);
+
+    const { unmount } = render(<CesiumViewport scenePolicy={ionPolicy} onSceneFailure={onSceneFailure} />);
+    unmount();
+
+    await act(async () => {
+      deferred.reject(new Error('late failure'));
+      await deferred.promise.catch(() => undefined);
+    });
+
+    expect(onSceneFailure).not.toHaveBeenCalled();
   });
 });
