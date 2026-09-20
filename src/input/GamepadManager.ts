@@ -107,7 +107,11 @@ export function __resetGamepadStateForTests(): void {
 
 export function readGamepadActions(calibration: GamepadCalibration = DEFAULT_GAMEPAD_CALIBRATION): GamepadInputActions | null {
   const gp = getFirstGamepad();
-  if (!gp) return null;
+  if (!gp) {
+    // Disconnect clears edge memory so a reconnecting pad cannot replay stale button edges.
+    previousPressedButtons = new Set<number>();
+    return null;
+  }
 
   const leftX = activeAxis(gp.axes?.[0], calibration.axisDeadzone);
   const leftY = activeAxis(gp.axes?.[1], calibration.axisDeadzone);
