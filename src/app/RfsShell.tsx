@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import type { Viewer as CesiumViewer } from 'cesium';
 import { getCesiumScenePolicy } from '../config/cesium';
 import type { RunwayLayerProps } from '../viewport/RunwayLayer';
+import type { CesiumSceneFailure } from '../viewport/CesiumViewport';
 import { LoadingScreen } from '../components/LoadingScreen';
 import { useSimLoop } from '../hooks/useSimLoop';
 import { useAudioLoop } from '../hooks/useAudioLoop';
@@ -24,7 +25,7 @@ import { FPSMonitor } from '../components/FPSMonitor';
 import { EngineStrip } from '../components/EngineStrip';
 import { ScenarioPanel } from '../components/ScenarioPanel';
 import { RouteStatus } from '../components/RouteStatus';
-import { SceneStatus } from '../components/SceneStatus';
+import { SceneStatusOverlay } from '../components/SceneStatus';
 import { TakeoffSetupPanel } from '../components/TakeoffSetupPanel';
 import { RouteBuilderPanel } from '../components/RouteBuilderPanel';
 import { BottomControlBar, type AudioUiStatus } from '../components/BottomControlBar';
@@ -111,6 +112,8 @@ export function RfsShell() {
   const [camMode, setCamMode] = useState<CameraMode>('chase');
   const [overlayMode, setOverlayMode] = useState<OverlayMode>('flight');
   const [viewerGeneration, setViewerGeneration] = useState(0);
+  const [retryKey, setRetryKey] = useState(0);
+  const [sceneFailure, setSceneFailure] = useState<CesiumSceneFailure | null>(null);
   const [runwayOverrides, setRunwayOverrides] = useState<RunwayLayerProps['runwayOverrides']>(undefined);
   const [routeLoadMessage, setRouteLoadMessage] = useState<string | null>(null);
 
@@ -206,6 +209,15 @@ export function RfsShell() {
         orientation: { heading: CesiumMath.toRadians(0), pitch: CesiumMath.toRadians(-30), roll: 0 },
       });
     });
+  }, []);
+
+  const handleSceneFailure = useCallback((failure: CesiumSceneFailure) => {
+    setSceneFailure((current) => current ?? failure);
+  }, []);
+
+  const handleSceneRetry = useCallback(() => {
+    setSceneFailure(null);
+    setRetryKey((key) => key + 1);
   }, []);
 
   const handleAudioSettingsChange = useCallback((nextSettings: AudioSettingsState) => {
@@ -308,7 +320,12 @@ export function RfsShell() {
     <RfsLayout
       viewport={(
         <Suspense fallback={<LoadingScreen />}>
-          <CesiumViewport onReady={handleViewerReady} scenePolicy={cesiumScenePolicy} />
+          <CesiumViewport
+            key={`cesium-${retryKey}`}
+            onReady={handleViewerReady}
+            onSceneFailure={handleSceneFailure}
+            scenePolicy={cesiumScenePolicy}
+          />
         </Suspense>
       )}
       sceneLayers={viewerReady ? (
@@ -349,7 +366,14 @@ export function RfsShell() {
           <div data-rfs-panel="mcp"><RfsMCP /></div>
         </Suspense>
       ) : null}
-      sceneStatus={<SceneStatus policy={cesiumScenePolicy} />}
+      sceneStatus={(
+        <SceneStatusOverlay
+          policy={cesiumScenePolicy}
+          failure={sceneFailure}
+          retryKey={retryKey}
+          onRetry={handleSceneRetry}
+        />
+      )}
       scenarioPanel={showFlightInstruments ? <ScenarioPanel /> : null}
       routeBuilderPanel={showFlightInstruments ? <RouteBuilderPanel onRouteLoad={setRouteLoadMessage} /> : null}
       routeStatus={showFlightInstruments ? <RouteStatus /> : null}

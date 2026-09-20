@@ -9,6 +9,21 @@ export interface CesiumViewportProps {
   scenePolicy?: CesiumScenePolicy;
   /** Called with the viewer instance after mount */
   onReady?: (viewer: Cesium.Viewer) => void;
+  /** Reports the first failed Ion scene-asset stage after the viewer mounts */
+  onSceneFailure?: (failure: CesiumSceneFailure) => void;
+}
+
+export type CesiumSceneFailure =
+  | { stage: 'buildings'; error: unknown }
+  | { stage: 'imagery'; error: unknown };
+
+function setupSceneFailureHandling(
+  viewer: Cesium.Viewer,
+  onSceneFailure: ((failure: CesiumSceneFailure) => void) | undefined,
+): void {
+  viewer.scene.renderError?.addEventListener((_scene: unknown, error: unknown) => {
+    onSceneFailure?.({ stage: 'imagery', error });
+  });
 }
 
 type GlobeWithOptionalEffects = Cesium.Globe & {
@@ -16,7 +31,7 @@ type GlobeWithOptionalEffects = Cesium.Globe & {
   showWaterEffect?: boolean;
 };
 
-export function CesiumViewport({ onReady, scenePolicy }: CesiumViewportProps) {
+export function CesiumViewport({ onReady, onSceneFailure, scenePolicy }: CesiumViewportProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<Cesium.Viewer | null>(null);
 
@@ -47,13 +62,19 @@ export function CesiumViewport({ onReady, scenePolicy }: CesiumViewportProps) {
     viewerRef.current = viewer;
     viewer.scene.screenSpaceCameraController.enableInputs = false;
 
+    setupSceneFailureHandling(viewer, onSceneFailure);
+
     // Enable Cesium OSM 3D buildings
     if (policy.osmBuildings) {
       Cesium.createOsmBuildingsAsync().then((buildings) => {
         if (!disposed && viewerRef.current === viewer && !viewer.isDestroyed()) {
           viewer.scene.primitives.add(buildings);
         }
-      }).catch(() => {});
+      }).catch((error: unknown) => {
+        if (!disposed && viewerRef.current === viewer && !viewer.isDestroyed()) {
+          onSceneFailure?.({ stage: 'buildings', error });
+        }
+      });
     }
 
     // Scene enhancements
@@ -83,7 +104,7 @@ export function CesiumViewport({ onReady, scenePolicy }: CesiumViewportProps) {
         viewerRef.current = null;
       }
     };
-  }, [onReady, scenePolicy]);
+  }, [onReady, onSceneFailure, scenePolicy]);
 
   return (
     <div
