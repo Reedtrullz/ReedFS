@@ -5,8 +5,9 @@ import rfsShellSource from '../RfsShell.tsx?raw';
 import hookSource from '../useScenarioWeather.ts?raw';
 import { useScenarioWeather } from '../useScenarioWeather';
 
-const { mockSetWind, mockFetchMetar, mockStoreState } = vi.hoisted(() => ({
+const { mockSetWind, mockSetWeather, mockFetchMetar, mockStoreState } = vi.hoisted(() => ({
   mockSetWind: vi.fn(),
+  mockSetWeather: vi.fn(),
   mockFetchMetar: vi.fn(),
   mockStoreState: { selectedScenarioId: 'enva-tutorial' },
 }));
@@ -14,7 +15,7 @@ const { mockSetWind, mockFetchMetar, mockStoreState } = vi.hoisted(() => ({
 vi.mock('../../store/simStore', () => ({
   useSimStore: Object.assign(
     vi.fn((selector?: (state: typeof mockStoreState) => unknown) => (selector ? selector(mockStoreState) : mockStoreState)),
-    { getState: vi.fn(() => ({ ...mockStoreState, setWind: mockSetWind })) },
+    { getState: vi.fn(() => ({ ...mockStoreState, setWind: mockSetWind, setWeather: mockSetWeather })) },
   ),
 }));
 

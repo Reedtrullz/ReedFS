@@ -32,7 +32,7 @@ class MockOscillatorNode {
 }
 vi.stubGlobal('OscillatorNode', MockOscillatorNode);
 
-const { mockSetInput, mockApplyInputActions, mockStart, mockStartTakeoffRoll, mockAbortTakeoff, mockPause, mockResume, mockReset, mockCycleSimRate, mockSetScenario, mockSetTutorialStep, mockSetFlightPlan, mockSetFlightPlanAtRunway, mockSetApState, mockSetWind, mockFetchMetar, mockCloudLayer, mockReadGamepadActions } = vi.hoisted(() => ({
+const { mockSetInput, mockApplyInputActions, mockStart, mockStartTakeoffRoll, mockAbortTakeoff, mockPause, mockResume, mockReset, mockCycleSimRate, mockSetScenario, mockSetTutorialStep, mockSetFlightPlan, mockSetFlightPlanAtRunway, mockSetApState, mockSetWind, mockSetWeather, mockFetchMetar, mockCloudLayer, mockReadGamepadActions } = vi.hoisted(() => ({
   mockSetInput: vi.fn(),
   mockApplyInputActions: vi.fn(),
   mockStart: vi.fn(),
@@ -48,6 +48,7 @@ const { mockSetInput, mockApplyInputActions, mockStart, mockStartTakeoffRoll, mo
   mockSetFlightPlanAtRunway: vi.fn(),
   mockSetApState: vi.fn(),
   mockSetWind: vi.fn(),
+  mockSetWeather: vi.fn(),
   mockFetchMetar: vi.fn(async () => null),
   mockCloudLayer: vi.fn(() => null),
   mockReadGamepadActions: vi.fn((): unknown => null),
@@ -187,6 +188,7 @@ vi.mock('../store/simStore', () => {
     setFlightPlanAtRunway: mockSetFlightPlanAtRunway,
     setApState: mockSetApState,
     setWind: mockSetWind,
+    setWeather: mockSetWeather,
   };
   type MockSimStoreState = typeof state;
   const mock = Object.assign(

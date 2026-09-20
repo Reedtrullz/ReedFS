@@ -58,7 +58,24 @@ export const selectPfdFlightPlan = (s: SimStore) => s.flightPlan;
 export const selectPfdRouteStatus = (s: SimStore) => s.routeStatus;
 export const selectPfdApStateForGuidance = (s: SimStore) => s.apState;
 export const selectPfdIas = (s: SimStore) => Math.max(0, computeDerived(s.aircraft, s.wind).ias);
-export const selectPfdAltitude = (s: SimStore) => Math.max(0, s.aircraft.position.alt);
+const STANDARD_PRESSURE_HPA = 1013.25;
+const FEET_PER_HPA = 27;
+
+export function baroIndicatedAltitudeFt(trueAltitudeFt: number, qnhHpa: number): number {
+  if (!Number.isFinite(trueAltitudeFt) || !Number.isFinite(qnhHpa) || qnhHpa <= 0) return trueAltitudeFt;
+  return Math.round(trueAltitudeFt + (STANDARD_PRESSURE_HPA - qnhHpa) * FEET_PER_HPA);
+}
+
+export const selectPfdAltitude = (s: SimStore) => {
+  const qnhHpa = s.weather?.qnhHpa ?? null;
+  const indicated = baroIndicatedAltitudeFt(s.aircraft.position.alt, qnhHpa ?? STANDARD_PRESSURE_HPA);
+  return Math.max(0, indicated);
+};
+
+export const selectPfdTrueAltitude = (s: SimStore) => Math.max(0, s.aircraft.position.alt);
+
+export const selectPfdQnhHpa = (s: SimStore): number | null =>
+  s.weather && Number.isFinite(s.weather.qnhHpa) ? s.weather.qnhHpa : null;
 export const selectPfdLatitude = (s: SimStore) => s.aircraft.position.lat;
 export const selectPfdLongitude = (s: SimStore) => s.aircraft.position.lon;
 export const selectPfdVelocityU = (s: SimStore) => s.aircraft.velocity.u;

@@ -4,6 +4,8 @@ import {
   selectPfdAltitude,
   selectPfdApStateForGuidance,
   selectPfdFlightDirectorEnabled,
+  selectPfdQnhHpa,
+  selectPfdTrueAltitude,
   selectPfdFlightPhase,
   selectPfdFlightPlan,
   selectPfdFmaArmedVerticalText,
@@ -488,7 +490,8 @@ export function RfsPFD() {
   const routeStatus = useSimStore(selectPfdRouteStatus);
   const apStateForGuidance = useSimStore(selectPfdApStateForGuidance);
   const ias = useSimStore(selectPfdIas);
-  const altitude = useSimStore(selectPfdAltitude);
+  const trueAltitude = useSimStore(selectPfdTrueAltitude);
+  const indicatedAltitude = useSimStore(selectPfdAltitude);
   const latitude = useSimStore(selectPfdLatitude);
   const longitude = useSimStore(selectPfdLongitude);
   const velocityU = useSimStore(selectPfdVelocityU);
@@ -519,13 +522,14 @@ export function RfsPFD() {
   const selectedAltitude = useSimStore(selectPfdSelectedAltitude);
   const selectedVerticalSpeed = useSimStore(selectPfdSelectedVerticalSpeed);
   const flightDirectorEnabled = useSimStore(selectPfdFlightDirectorEnabled);
+  const qnhHpa = useSimStore(selectPfdQnhHpa);
   const selectedScenarioId = useSimStore(selectPfdSelectedScenarioId);
   const flightPhase = useSimStore(selectPfdFlightPhase);
   const takeoffCue = useSimStore(selectPfdTakeoffCue);
   const vSpeeds = maybeFindPerformanceCardForScenario(selectedScenarioId)?.vSpeeds;
   const showTakeoffReference = takeoffCue != null || flightPhase === 'PARKED' || flightPhase === 'TAKEOFF';
   const aircraftForVnav = {
-    position: { lat: latitude, lon: longitude, alt: altitude },
+    position: { lat: latitude, lon: longitude, alt: trueAltitude },
     velocity: { u: velocityU, v: velocityV, w: velocityW },
     ground: {
       aglFt: groundAglFt,
@@ -555,7 +559,7 @@ export function RfsPFD() {
     currentRollDeg: roll,
     currentPitchDeg: pitch,
     currentVerticalSpeedFpm: vs,
-    altitudeFt: altitude,
+    altitudeFt: trueAltitude,
     selectedHeadingDeg: selectedHeading,
     selectedAltitudeFt: selectedAltitude,
     selectedVerticalSpeedFpm: selectedVerticalSpeed,
@@ -773,12 +777,29 @@ export function RfsPFD() {
 
         <Tape
           label="ALT"
-          value={altitude}
+          value={indicatedAltitude}
           unit="FT"
-          ticks={tapeTicks(altitude, 500, 5)}
+          ticks={tapeTicks(indicatedAltitude, 500, 5)}
           align="left"
           selectedBug={hasMcpTargets ? { ariaLabel: 'Altitude selected bug', label: 'ALT BUG', value: selectedAltitude } : undefined}
         />
+        <div
+          aria-label="Altimeter QNH setting"
+          style={{
+            marginTop: 6,
+            padding: '3px 8px',
+            borderRadius: 4,
+            background: 'rgba(0,0,0,0.55)',
+            border: '1px solid rgba(120,180,210,0.35)',
+            color: qnhHpa === 1013.25 ? '#ffd84a' : '#ffffff',
+            fontSize: 12,
+            fontWeight: 800,
+            letterSpacing: 0.6,
+            textAlign: 'right',
+          }}
+        >
+          {qnhHpa !== null ? `QNH ${qnhHpa.toFixed(0)}` : 'QNH STD'}
+        </div>
       </div>
     </section>
   );

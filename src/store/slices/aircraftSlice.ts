@@ -7,7 +7,7 @@ import { createNoRouteStatus } from '../../sim/systems/navigation';
 import { createAutopilotControllerState } from '../../sim/systems/autopilot';
 import { createInputManagerState } from '../../input/InputManager';
 import { resetGPWS } from '../../audio/GPWS';
-import type { WindInfo } from '../../sim/weather';
+import type { ScenarioWeatherMetadata, WindInfo } from '../../sim/weather';
 import type { SimStore } from '../simStore';
 import {
   inputManagerForScenario,
@@ -18,6 +18,14 @@ export type SimStoreSet = (partial: Partial<SimStore> | ((state: SimStore) => Pa
 
 export function cloneWind(wind: WindInfo): WindInfo {
   return { ...wind };
+}
+
+export function cloneWeather(weather: ScenarioWeatherMetadata): ScenarioWeatherMetadata {
+  return {
+    ...weather,
+    clouds: weather.clouds.map((cloud) => ({ ...cloud })),
+    cloudAnchor: { ...weather.cloudAnchor },
+  };
 }
 
 export function createAircraftSlice(set: SimStoreSet): Pick<
@@ -40,6 +48,7 @@ export function createAircraftSlice(set: SimStoreSet): Pick<
   | 'activeLegIndex'
   | 'routeStatus'
   | 'wind'
+  | 'weather'
   | 'selectedScenarioId'
   | 'guidance'
   | 'controlFeedbackMessage'
@@ -82,6 +91,7 @@ export function createAircraftSlice(set: SimStoreSet): Pick<
     activeLegIndex: null,
     routeStatus: initialRouteStatus,
     wind: cloneWind(ENVA_TUTORIAL_SCENARIO.wind),
+    weather: cloneWeather(ENVA_TUTORIAL_SCENARIO.weather),
     selectedScenarioId: ENVA_TUTORIAL_SCENARIO.id,
     guidance: initialGuidance,
     controlFeedbackMessage: null,
@@ -210,6 +220,7 @@ export function createAircraftSlice(set: SimStoreSet): Pick<
         activeLegIndex: null,
         routeStatus: createNoRouteStatus(),
         wind: cloneWind(scenario.wind),
+        weather: cloneWeather(scenario.weather),
         controlFeedbackMessage: null,
         guidance: buildGuidanceState({
           scenario,
@@ -243,6 +254,7 @@ export function createAircraftSlice(set: SimStoreSet): Pick<
         activeLegIndex: null,
         routeStatus: createNoRouteStatus(),
         wind: cloneWind(scenario.wind),
+        weather: cloneWeather(scenario.weather),
         controlFeedbackMessage: null,
         guidance: buildGuidanceState({
           scenario,

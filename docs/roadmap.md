@@ -200,7 +200,7 @@ Acceptance tests:
 Scope:
 
 - Deterministic gusts now perturb air-relative velocity without mutating ground velocity, and fixed-step scenario regressions cover direct-crosswind weathercocking takeoff rolls plus crosswind approach/touchdown/rollout.
-- Remaining: cloud/visibility rendering tied to parsed METAR layers and QNH/temperature effects for pressure/density altitude. Deeper crosswind landing/rollout feel tuning remains part of P1 ground handling, not missing weather plumbing.
+- Remaining: cloud/visibility rendering tied to parsed METAR layers. QNH/temperature pressure/density-altitude effects and baro-indicated PFD altitude are implemented; deeper crosswind landing/rollout feel tuning remains part of P1 ground handling, not missing weather plumbing.
 
 Acceptance tests:
 
@@ -219,7 +219,7 @@ Remaining scope:
 2026-06-16 rendering/weather/audio/immersion disposition:
 
 - Cockpit/interior: partial. Implemented baseline includes the cockpit camera/shell, PFD/FMA, MCP, cockpit interaction hooks, route/scenario controls, and visual layout guards; deferred scope is a complete modeled 737 cockpit interior, panel-system depth, lighting, and product-grade instrument layout.
-- Weather/atmosphere: partial. Implemented baseline includes METAR wind/cloud parsing, scenario weather fallback, deterministic gusts, and simple cloud billboards; deferred scope is visibility rendering, QNH/temperature pressure-altitude and density-altitude effects, precipitation, and weather-driven scene degradation.
+- Weather/atmosphere: partial. Implemented baseline includes METAR wind/QNH/temperature parsing, density-altitude physics, baro-indicated PFD altitude, scenario weather fallback, deterministic gusts, and simple cloud billboards; deferred scope is visibility rendering, precipitation, and weather-driven scene degradation.
 - Audio: partial. Implemented baseline includes explicit Web Audio startup, N1-driven engine tone mapping, persisted mute/volume/caption settings, and GPWS captions/speech; deferred scope is richer engine, cockpit, airframe, warning, and spatial sound layers.
 - Scene loading/error states: partial. Implemented baseline includes the app ErrorBoundary, visible `SCENERY DEGRADED` status for missing Cesium Ion scenery, and degraded ellipsoid fallback; deferred scope is richer loading, retry, scenery-error, and network-failure UX.
  - PWA: partial. The Vite build generates a service worker (vite-plugin-pwa, auto-update) that precaches the app shell (JS/CSS/HTML/SVG/fonts) and cleans up outdated caches. Cesium tile/terrain/imagery requests and the simulation worker stay network-only, so an offline visit serves the shell but not globe scenery. Offline/error fallback screens and richer offline behavior remain deferred.

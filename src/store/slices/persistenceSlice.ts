@@ -18,6 +18,7 @@ import {
   type ScenarioSnapshot,
 } from '../scenarioPersistence';
 import type { SimStoreSet } from './aircraftSlice';
+import { cloneWeather } from './aircraftSlice';
 import { createRouteState } from './routeSlice';
 
 function defaultScenarioStorage(): ScenarioPersistenceStorage | null {
@@ -60,6 +61,7 @@ function restoreSnapshotSlice(snapshot: ScenarioSnapshot, slotName = 'Saved scen
     activeLegIndex: routeSlice.routeStatus.activeLegIndex,
     routeStatus: routeSlice.routeStatus,
     wind: structuredClone(snapshot.wind),
+    weather: cloneWeather(scenario.weather),
     guidance: buildGuidanceState({
       scenario,
       status: restoredStatus,

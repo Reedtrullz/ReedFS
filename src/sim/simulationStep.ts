@@ -7,6 +7,7 @@ import { integrate } from './physics/integrate';
 import { deriveRouteDrivenFlightPhase } from './flightPhasePredicates';
 import { rebuildGuidanceState, type GuidanceState } from './guidanceState';
 import { scenarioById, type FlightScenario } from './scenarios';
+import type { ScenarioWeatherMetadata } from './weather';
 import {
   computeRouteStatus,
   createNoRouteStatus,
@@ -128,6 +129,11 @@ export interface SimulationStepInput {
   activeLegIndex: number | null;
   routeStatus: RouteStatusSnapshot;
   wind: WindInfo | null;
+  /**
+   * Live METAR-updated weather overrides. Falls back to the selected scenario's
+   * weather when omitted, which keeps direct callers scenario-only.
+   */
+  weather?: ScenarioWeatherMetadata | null;
   dt: number;
   status: SimulationStatus;
   selectedScenarioId: string;
@@ -201,6 +207,7 @@ export function syncGuidanceState(
 export function advanceSimulationStep(input: SimulationStepInput): SimulationStepResult {
   const state = input.cloneAircraft === false ? input.aircraft : structuredClone(input.aircraft);
   const scenario = scenarioById(input.selectedScenarioId);
+  const weather = input.weather ?? scenario.weather;
   const routeBeforeTick = input.flightPlan
     ? computeRouteStatus(state, input.flightPlan, input.activeLegIndex)
     : createNoRouteStatus();
@@ -228,7 +235,7 @@ export function advanceSimulationStep(input: SimulationStepInput): SimulationSte
   const apCommands = apCommandResult.commands;
   const controlsForIntegration = composeControlsSlice(input.pilotInputs, apCommands, input.apState, truthContext);
 
-  integrate(state, controlsForIntegration.effectiveControls, input.spec, input.dt, input.wind, scenario.weather);
+  integrate(state, controlsForIntegration.effectiveControls, input.spec, input.dt, input.wind, weather);
 
   const routeStatus = input.flightPlan
     ? computeRouteStatus(state, input.flightPlan, routeBeforeTick.activeLegIndex)

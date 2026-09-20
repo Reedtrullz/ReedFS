@@ -3,6 +3,7 @@ import type { AircraftState, AutopilotCommands, ControlInputs, AircraftSpec } fr
 import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
 import type { FlightPlan } from '@shared/types/fmc';
 import type { WindInfo } from '../sim/weather';
+import type { ScenarioWeatherMetadata } from '../sim/weather';
 import type { RunwayReference } from '../viewport/runwayData';
 import type { GuidanceState } from '../sim/guidanceState';
 import { composeControlsSlice } from '../sim/simulationStep';
@@ -49,6 +50,8 @@ export interface SimStore {
   activeLegIndex: number | null;
   routeStatus: RouteStatusSnapshot;
   wind: WindInfo | null;
+  /** Live weather (scenario seed updated by METAR QNH/temperature) fed to physics. */
+  weather: ScenarioWeatherMetadata | null;
   selectedScenarioId: string;
   guidance: GuidanceState;
   controlFeedbackMessage: string | null;
@@ -71,6 +74,7 @@ export interface SimStore {
   setFlightPlan: (fp: FlightPlan | null) => void;
   setFlightPlanAtRunway: (fp: FlightPlan, originRunway: RunwayReference) => void;
   setWind: (w: WindInfo | null) => void;
+  setWeather: (w: ScenarioWeatherMetadata | null) => void;
   saveScenarioState: (storage?: ScenarioPersistenceStorage, options?: ScenarioSaveOptions) => void;
   loadScenarioState: (storage?: ScenarioPersistenceStorage, slotId?: string) => void;
   refreshScenarioSaveSlots: (storage?: ScenarioPersistenceStorage) => void;
@@ -103,6 +107,7 @@ export const useSimStore = create<SimStore>((set, get) => {
 
     tick: (timestamp: number) => {
       const {
+        weather,
         status,
         lastFrameTime,
         fixedStepAccumulatorSeconds,
@@ -171,6 +176,7 @@ export const useSimStore = create<SimStore>((set, get) => {
           activeLegIndex: nextActiveLegIndex,
           routeStatus: nextRouteStatus,
           wind,
+          weather,
           dt: FIXED_STEP_SECONDS,
           status,
           selectedScenarioId,
