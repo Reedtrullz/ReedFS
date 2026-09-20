@@ -90,7 +90,7 @@ check(ci.includes("severity: HIGH,CRITICAL") && ci.includes("exit-code: '1'"), "
 const concurrencyMatch = ci.match(/concurrency:\n\s+group:\s+\$\{\{ github\.workflow \}\}-\$\{\{ github\.ref \}\}\n\s+cancel-in-progress:\s*(.+)$/m);
 const cancelInProgress = concurrencyMatch?.[1]?.trim();
 check(
-  cancelInProgress === "false" || cancelInProgress === "\${{ github.event_name == 'pull_request' }}",
+  cancelInProgress === "false" || cancelInProgress === String.fromCharCode(36) + "{{ github.event_name == 'pull_request' }}",
   "workflow must serialize runs per workflow/ref so VPS deploys cannot overlap (PR-only cancel allowed)",
 );
 check(ci.includes("security-events: write"), "gitleaks job must have security-events write permission");
