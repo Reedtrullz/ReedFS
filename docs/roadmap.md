@@ -144,12 +144,12 @@ Acceptance tests:
 
 ## P4 — Release rendering hardening
 
-Why this matters: the renderer now has a persistent aircraft, cockpit shell, camera manager, and Cesium-native runway layer. The next rendering risk is release confidence: dependency duplication and deterministic visual proof.
+Why this matters: the renderer now has a persistent aircraft, cockpit shell, camera manager, and Cesium-native runway layer. The next rendering risk is release confidence: dependency duplication and deterministic visual proof. Bundle splitting for Cesium-heavy chunks is complete: Three.js is isolated in a vendor chunk and Cesium is served by `vite-plugin-cesium`, with `check:bundle` enforcing budgets.
 
 Remaining scope:
 
-- Keep lifecycle cleanup assertions for event listeners, Cesium entities, and the single Three/Cesium bridge.
-- Bundle splitting for Cesium-heavy chunks; current build still warns about >500 kB chunks.
+- Keep lifecycle cleanup assertions for event listeners, Cesium entities, and the single Three/Cesium bridge (ongoing; existing coverage in `LayerCleanup.test.tsx` and lifecycle mocks, with no known open findings).
+- ~~Bundle splitting for Cesium-heavy chunks; current build still warns about >500 kB chunks.~~ Complete: Three.js is isolated in a vendor chunk and Cesium is served by `vite-plugin-cesium`; `check:bundle` enforces budgets and the build no longer warns.
 
 Suggested implementation files:
 
