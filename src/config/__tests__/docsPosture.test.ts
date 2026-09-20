@@ -59,7 +59,9 @@ describe('canonical docs posture', () => {
       /Weather\/atmosphere: partial/i,
       /Audio: partial/i,
       /Scene loading\/error states: partial/i,
-      /PWA: deferred/i,
+      /PWA: partial/i,
+      /The Vite build generates a service worker/i,
+      /Cesium tile\/terrain\/imagery requests and the simulation worker stay network-only/i,
       /Visual snapshots are not proof of audio, weather, PWA, or error-state behavior/i,
     ]) {
       expect(readme).toMatch(requiredDisposition);
