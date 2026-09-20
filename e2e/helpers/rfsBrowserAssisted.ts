@@ -29,6 +29,12 @@ export async function fastForwardToPositiveRateThroughBrowserSim(page: Page): Pr
     const { computeDerived } = await import(derivedModule) as {
       computeDerived: (aircraft: BrowserAircraftState, wind: unknown) => BrowserDerivedState;
     };
+    // This helper drives physics with synchronous tick() calls inside one
+    // evaluate block. Pin main-thread physics and drain any in-flight worker
+    // batch first, or a stale batch can resolve after the block and clobber
+    // the fast-forwarded state (slow CI runners hit this with worker-on).
+    useSimStore.setState({ asyncPhysicsInFlight: false });
+    useSimStore.setState((s: { asyncPhysicsGeneration: number }) => ({ asyncPhysicsGeneration: s.asyncPhysicsGeneration + 1 }));
 
     const advanceOneFrame = (): BrowserDerivedState => {
       const state = useSimStore.getState();

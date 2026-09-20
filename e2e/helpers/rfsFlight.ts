@@ -137,6 +137,11 @@ async function runFlightHelper(page: Page, mode: FlightHelperMode): Promise<Flig
       const { computeDerived } = derivedImport;
       const { isPositiveRateEstablished } = flightPhasePredicatesImport;
 
+      // Sync tick() loop: pin main-thread physics and drain any in-flight
+      // worker batch so a stale async commit cannot clobber this state.
+      useSimStore.setState({ asyncPhysicsInFlight: false });
+      useSimStore.setState((s: { asyncPhysicsGeneration: number }) => ({ asyncPhysicsGeneration: s.asyncPhysicsGeneration + 1 }));
+
       let timestamp = performance.now();
 
       const syncManualClock = (): void => {
@@ -380,6 +385,11 @@ export async function flyApproachToLandingRolloutAndReset(page: Page, targetAirp
     const { sampleSupportedAirportSurface } = runwaySurfaceImport;
     const runway = targetAirport === 'KPDX' ? KPDX_RUNWAY_10R : ENVA_RUNWAY_09;
     const scenarioId = targetAirport === 'KPDX' ? 'kpdx-tutorial' : 'enva-tutorial';
+
+    // Sync tick() loop: pin main-thread physics and drain any in-flight
+    // worker batch so a stale async commit cannot clobber this state.
+    useSimStore.setState({ asyncPhysicsInFlight: false });
+    useSimStore.setState((s: { asyncPhysicsGeneration: number }) => ({ asyncPhysicsGeneration: s.asyncPhysicsGeneration + 1 }));
 
     let timestamp = performance.now();
     const syncManualClock = (): void => {
@@ -701,6 +711,11 @@ export async function flyDescentApproachToLandingRolloutAndReset(page: Page): Pr
     const { eulerToQuat } = quaternionImport;
     const { ENVA_RUNWAY_09 } = runwayDataImport;
     const { sampleSupportedAirportSurface } = runwaySurfaceImport;
+
+    // Sync tick() loop: pin main-thread physics and drain any in-flight
+    // worker batch so a stale async commit cannot clobber this state.
+    useSimStore.setState({ asyncPhysicsInFlight: false });
+    useSimStore.setState((s: { asyncPhysicsGeneration: number }) => ({ asyncPhysicsGeneration: s.asyncPhysicsGeneration + 1 }));
 
     let timestamp = performance.now();
     const syncManualClock = (): void => {

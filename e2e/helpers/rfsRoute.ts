@@ -767,6 +767,11 @@ async function flyKseaRouteProof(page: Page, setup: RouteProofSetup): Promise<Ro
       };
       const samples: RouteProofSnapshot[] = [];
 
+      // Sync tick() loop: pin main-thread physics and drain any in-flight
+      // worker batch so a stale async commit cannot clobber this state.
+      useSimStore.setState({ asyncPhysicsInFlight: false });
+      useSimStore.setState((s: { asyncPhysicsGeneration: number }) => ({ asyncPhysicsGeneration: s.asyncPhysicsGeneration + 1 }));
+
       const tickOnce = (): void => {
         timestamp += fixedStepMs;
         useSimStore.getState().tick(timestamp);
