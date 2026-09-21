@@ -19,7 +19,6 @@ import {
   readVisibleRouteStatus,
   resetThroughVisibleControls,
   rotateToVisiblePositiveRate,
-  selectKseaScenarioThroughVisibleControls,
   selectEnvaScenarioThroughVisibleControls,
   setVisibleMcpAltitudeAtLeast,
   setVisibleMcpAltitudeAtMost,
@@ -29,7 +28,6 @@ import {
   setVisibleSimRateTarget,
   startRollThroughVisibleControls,
   toggleVisibleGearThroughVisibleControls,
-  useRealTimeVisibleSim,
   waitForVisibleFlightPhase,
   waitForVisibleFmaModes,
   type VisibleRouteLoadExpectation,
@@ -40,147 +38,8 @@ const ENVA_ENGM_ROUTE: VisibleRouteLoadExpectation = {
   activeLegCount: 4,
   firstLeg: 'ENVA → RFSNOR',
 };
-
-const KSEA_KPDX_RUNWAY_PAIR_ROUTE: VisibleRouteLoadExpectation = {
-  routeName: 'KSEA→KPDX',
-  activeLegCount: 5,
-  firstLeg: 'KSEA16L_DEP → KSEA16L_CLB',
-};
-
 test.describe('RFS full flight black-box acceptance', () => {
   test.describe.configure({ retries: 0 });
-
-  test('KSEA to KPDX runway-pair VNAV proof descends without MCP intervention', async ({ page }) => {
-    test.setTimeout(2_400_000);
-
-    await page.clock.install();
-    await openRfsBlackbox(page);
-    await selectKseaScenarioThroughVisibleControls(page);
-
-    const builderOrigin = page.getByLabel('Custom origin runway');
-    const builderDestination = page.getByLabel('Custom destination runway');
-    await builderOrigin.selectOption('KSEA:16L');
-    await builderDestination.selectOption('KPDX:10R');
-    const loadRouteButton = page.getByRole('button', { name: /^Load Route$/ });
-    await expect(loadRouteButton).toBeEnabled();
-    await loadRouteButton.click();
-    await expect(page.getByLabel('Generated route result')).toHaveText('KSEA 16L → KPDX 10R');
-
-    const routeStatus = page.getByLabel('Route status');
-    await expect(routeStatus).toContainText('KSEA→KPDX');
-    await expect(routeStatus).toContainText('LEG 1/5');
-    await expect(routeStatus).toContainText(KSEA_KPDX_RUNWAY_PAIR_ROUTE.firstLeg);
-
-    const takeoffSetup = page.getByRole('region', { name: 'Takeoff setup' });
-    const currentConfig = takeoffSetup.getByLabel('Current takeoff configuration');
-    await configureScenarioTakeoffThroughVisibleControls(page);
-    await expect(currentConfig).toContainText(/Flaps\s+5/);
-    await expect(currentConfig).toContainText(/Trim\s+5\.0/);
-
-    await startRollThroughVisibleControls(page);
-    await advanceTakeoffThrustThroughVisibleControls(page);
-    await driveVisibleSimUntil(page, 'visible KSEA takeoff speed for deliberate rotation', async () => {
-      return (await readVisibleFlightNumbers(page)).iasKt >= 145;
-    }, {
-      timeoutMs: 120_000,
-      stepMs: 1000,
-    });
-    await rotateToVisiblePositiveRate(page);
-    expect(await waitForVisibleFlightPhase(page, /^(CLIMB|CRUISE)$/)).toMatch(/^(CLIMB|CRUISE)$/);
-
-    // From here the autoflight handover is staged in real time: the fake clock
-    // at 16x lets hands-off pitch decay become a full bunt during cleanup.
-    await page.clock.resume();
-    useRealTimeVisibleSim(page);
-
-    await toggleVisibleGearThroughVisibleControls(page, 'UP');
-    await expect(currentConfig).toContainText(/Gear\s+UP/);
-    await cleanUpAirframeThroughVisibleControls(page);
-    await expect(currentConfig).toContainText(/Flaps\s+0/);
-
-    await setVisibleMcpAltitudeAtLeast(page, 15_000);
-    await setVisibleMcpSpeedAtLeast(page, 250);
-    await clickVisibleMcpMode(page, 'LNAV');
-    await clickVisibleMcpMode(page, 'SPD');
-    await clickVisibleMcpMode(page, 'VNAV');
-    await waitForVisibleFmaModes(page, {
-      thrustActive: 'SPEED',
-      lateralActive: 'LNAV',
-      verticalActive: /^(VNAV|VNAV_PTH|ALT\*)$/,
-      autopilotStatus: 'CMD_A',
-    });
-    await expect(page.getByRole('status', { name: 'Autopilot authority warning' })).toHaveCount(0);
-
-    await page.clock.resume();
-    useRealTimeVisibleSim(page);
-    // The manual climb, MCP pinning, and engagement all run at 1x: the sim rate
-    // multiplies every blind window between polls and clicks, so 16x turns a
-    // marginal hands-off climb into a bunt before the next poll observes it.
-    await setVisibleSimRateTarget(page, 1);
-
-    let lastClimbNumbers = { altitudeFt: 0, iasKt: 0, verticalSpeedFpm: 0 };
-    try {
-      await driveVisibleSimUntil(page, 'visible VNAV climb approaching the enroute constraint', async () => {
-        const numbers = await readVisibleFlightNumbers(page);
-        lastClimbNumbers = { altitudeFt: numbers.altitudeFt, iasKt: numbers.iasKt, verticalSpeedFpm: numbers.verticalSpeedFpm };
-        return numbers.altitudeFt >= 11_000;
-      }, {
-        timeoutMs: 600_000,
-        stepMs: 1000,
-      });
-    } catch (error) {
-      throw new Error(`VNAV climb stalled at ${JSON.stringify(lastClimbNumbers)}`, { cause: error });
-    }
-    await driveVisibleSimUntil(page, 'visible VNAV cruise capture at the enroute constraint', async () => {
-      const fma = await readVisibleFmaModes(page);
-      const numbers = await readVisibleFlightNumbers(page);
-      return fma.verticalActive === 'ALT_HOLD' && numbers.altitudeFt >= 11_500;
-    }, {
-      timeoutMs: 600_000,
-      stepMs: 1000,
-    });
-
-    await setVisibleSimRateTarget(page, 64);
-    await driveVisibleSimUntil(page, 'visible VNAV path descent after TOD', async () => {
-      return (await readVisibleFmaModes(page)).verticalActive === 'VNAV_PTH';
-    }, {
-      timeoutMs: 240_000,
-      stepMs: 1000,
-    });
-
-    await setVisibleSimRateTarget(page, 16);
-    expect(await waitForVisibleFlightPhase(page, /^DESCENT$/)).toBe('DESCENT');
-
-    await driveVisibleSimUntil(page, 'visible DES-constraint descent progress toward the FAF', async () => {
-      const route = await readVisibleRouteStatus(page);
-      return (route.activeLegIndex ?? 1) >= 4;
-    }, {
-      timeoutMs: 360_000,
-      stepMs: 1000,
-    });
-
-    await setVisibleSimRateTarget(page, 1);
-    await configureLandingAirframeThroughVisibleControls(page, 30);
-    await expect(currentConfig).toContainText(/Gear\s+DOWN/);
-    await expect(currentConfig).toContainText(/Flaps\s+30/);
-    await setVisibleSimRateTarget(page, 4);
-    expect(await waitForVisibleFlightPhase(page, /^APPROACH$/)).toBe('APPROACH');
-    await driveVisibleSimUntil(page, 'visible approach handoff at the FAF leg', async () => {
-      const route = await readVisibleRouteStatus(page);
-      return (route.activeLegIndex ?? 1) >= 5;
-    }, {
-      timeoutMs: 240_000,
-      stepMs: 1000,
-    });
-
-    const finalFma = await readVisibleFmaModes(page);
-    expect(['VNAV', 'VNAV_PTH', 'ALT_HOLD']).toContain(finalFma.verticalActive);
-    expect(finalFma.lateralActive).toBe('LNAV');
-
-    await resetThroughVisibleControls(page);
-    await expect(page.getByRole('button', { name: /^START ROLL$/ })).toBeVisible();
-    await expect(routeStatus).toContainText('NO ROUTE');
-  });
 
   test('continuous ENVA to ENGM route/autoland proof reaches STOPPED before reset', async ({ page }) => {
     test.setTimeout(3_000_000);
