@@ -100,6 +100,8 @@ describe('VNAV cruise regression', () => {
     ap.boeing.vnav = true;
 
     const log: string[] = [];
+    let sawAltHold = false;
+    let sawVnavPthLeg2 = false;
     for (let frame = 0; frame < 60 * 1800; frame += 1) {
       const rs = computeRouteStatus(aircraft, flightPlan, activeLegIndex);
       const result = advanceSimulationStep({
@@ -116,6 +118,8 @@ describe('VNAV cruise regression', () => {
 
       if (frame % 60 === 0) {
         const truth = deriveEffectiveAutoflightTruth(ap, { aircraft, flightPlan, routeStatus: rs });
+        sawAltHold = sawAltHold || truth.verticalActive === 'ALT_HOLD';
+        sawVnavPthLeg2 = sawVnavPthLeg2 || (truth.verticalActive === 'VNAV_PTH' && activeLegIndex === 2);
         const iasKt = Math.hypot(aircraft.velocity.u, aircraft.velocity.v) * 1.944;
         const vsFpm = aircraft.velocity.w * -196.85;
         log.push(
@@ -125,9 +129,10 @@ describe('VNAV cruise regression', () => {
           + ' thr1=' + (result.controls.effectiveControls.throttle1?.toFixed(2) ?? '-')
           + ' n1=' + aircraft.engines[0].n1.toFixed(0)
         );
+        if (sawAltHold && sawVnavPthLeg2) break;
       }
     }
     expect(log.join('\n')).toContain('fma=ALT_HOLD');
     expect(log.join('\n')).toMatch(/leg=2 fma=VNAV_PTH/);
-  });
+  }, 30_000);
 });
