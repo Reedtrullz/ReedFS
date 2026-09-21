@@ -8,7 +8,6 @@ export interface RfsLayoutProps {
   sceneStatus?: ReactNode;
   scenarioPanel?: ReactNode;
   routeBuilderPanel?: ReactNode;
-  routeEditPanel?: ReactNode;
   routeStatus?: ReactNode;
   takeoffSetupPanel?: ReactNode;
   engineStrip?: ReactNode;
@@ -25,7 +24,6 @@ export function RfsLayout({
   sceneStatus,
   scenarioPanel,
   routeBuilderPanel,
-  routeEditPanel,
   routeStatus,
   takeoffSetupPanel,
   engineStrip,
@@ -42,11 +40,10 @@ export function RfsLayout({
         {sceneLayers}
       </div>
 
-      {(scenarioPanel || routeBuilderPanel || routeEditPanel || takeoffSetupPanel) && (
+      {(scenarioPanel || routeBuilderPanel || takeoffSetupPanel) && (
         <div className="rfs-layout__top-left" data-rfs-zone="top-left">
           {scenarioPanel && <div data-rfs-panel="scenario">{scenarioPanel}</div>}
           {routeBuilderPanel && <div data-rfs-panel="route-builder">{routeBuilderPanel}</div>}
-          {routeEditPanel && <div data-rfs-panel="route-edit">{routeEditPanel}</div>}
           {takeoffSetupPanel && <div data-rfs-panel="takeoff-setup">{takeoffSetupPanel}</div>}
         </div>
       )}

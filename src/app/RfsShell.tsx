@@ -376,8 +376,12 @@ export function RfsShell() {
         />
       )}
       scenarioPanel={showFlightInstruments ? <ScenarioPanel /> : null}
-      routeBuilderPanel={showFlightInstruments ? <RouteBuilderPanel onRouteLoad={setRouteLoadMessage} /> : null}
-      routeEditPanel={showFlightInstruments ? <RouteEditPanel /> : null}
+      routeBuilderPanel={showFlightInstruments ? (
+        <>
+          <RouteBuilderPanel onRouteLoad={setRouteLoadMessage} />
+          <RouteEditPanel />
+        </>
+      ) : null}
       routeStatus={showFlightInstruments ? <RouteStatus /> : null}
       takeoffSetupPanel={showFlightInstruments ? <TakeoffSetupPanel /> : null}
       engineStrip={<EngineStrip />}
