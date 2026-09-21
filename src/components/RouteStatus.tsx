@@ -102,7 +102,7 @@ function RouteSourceReadback({ routeName, generated }: { routeName: string; gene
       <div style={{ color: '#ffefb8', fontWeight: 700, marginTop: 2 }}>
         {generated
           ? 'LNAV/VNAV/SPD constraints are generated from runway geometry'
-          : 'RFMS adapter seam only — no CDU/EXEC route edit UI'}
+          : 'Route edits via FMS route edit panel'}
       </div>
       {syntheticApproach && (
         <div style={{ color: '#ffefb8', fontWeight: 700, marginTop: 2 }}>

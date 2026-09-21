@@ -81,15 +81,14 @@ describe('RouteStatus', () => {
     expect(useSimStore.getState().routeStatus.activeLegIndex).toBe(7);
   });
 
-  it('labels the current loaded route as a default training route instead of a full route editor flow', () => {
+  it('labels the current loaded route as a default training route with FMS route editing available', () => {
     useSimStore.setState({ routeStatus: routeStatus() });
 
     render(<RouteStatus />);
 
     expect(screen.getByText(/DEFAULT TRAINING ROUTE/i)).toBeTruthy();
     expect(screen.getByText(/Scenario default route/i)).toBeTruthy();
-    expect(screen.getByText(/RFMS adapter seam only/i)).toBeTruthy();
-    expect(screen.getByText(/no CDU\/EXEC route edit UI/i)).toBeTruthy();
+    expect(screen.getByText(/FMS route edit panel/i)).toBeTruthy();
     expect(screen.getByText(/synthetic training approach/i)).toBeTruthy();
     expect(screen.getByText(/not official procedure data/i)).toBeTruthy();
   });

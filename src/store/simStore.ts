@@ -6,6 +6,7 @@ import type { WindInfo } from '../sim/weather';
 import type { ScenarioWeatherMetadata } from '../sim/weather';
 import type { RunwayReference } from '../viewport/runwayData';
 import type { GuidanceState } from '../sim/guidanceState';
+import type { RouteEditSession } from '../sim/fms/routeAdapter';
 import { composeControlsSlice, type SimulationStepResult } from '../sim/simulationStep';
 import { getSimulationRuntime, type AsyncSimulationRuntime } from '../sim/simulationRuntime';
 import type { SimulationStatus } from '../sim/simulationStatus';
@@ -49,6 +50,9 @@ export interface SimStore {
   flightPlan: FlightPlan | null;
   activeLegIndex: number | null;
   routeStatus: RouteStatusSnapshot;
+  /** RFMS-backed staged route edits; draft stays inert until EXEC. */
+  routeEditSession: RouteEditSession | null;
+  routeEditMessage: string | null;
   wind: WindInfo | null;
   /** Live weather (scenario seed updated by METAR QNH/temperature) fed to physics. */
   weather: ScenarioWeatherMetadata | null;
@@ -84,6 +88,10 @@ export interface SimStore {
   setApState: (ap: AutopilotState | null) => void;
   setFlightPlan: (fp: FlightPlan | null) => void;
   setFlightPlanAtRunway: (fp: FlightPlan, originRunway: RunwayReference) => void;
+  stageDirectTo: (ident: string) => void;
+  stageInsertDiscontinuity: (afterIndex: number) => void;
+  undoRouteEditOperation: () => void;
+  executeRouteEdit: () => void;
   setWind: (w: WindInfo | null) => void;
   setWeather: (w: ScenarioWeatherMetadata | null) => void;
   saveScenarioState: (storage?: ScenarioPersistenceStorage, options?: ScenarioSaveOptions) => void;
