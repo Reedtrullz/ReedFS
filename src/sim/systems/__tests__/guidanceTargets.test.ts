@@ -401,6 +401,80 @@ describe('resolveGuidanceTargets', () => {
     expect(shared.vertical?.targetVerticalSpeedFpm).toBeGreaterThan(0);
   });
 
+  function vsApState(selectedAltitudeFt: number, verticalSpeedFpm: number): AutopilotState {
+    const ap = apState();
+    ap.truth.verticalActive = 'VS';
+    ap.boeing.vnav = false;
+    ap.boeing.vs = true;
+    ap.boeing.altitude = selectedAltitudeFt;
+    ap.boeing.verticalSpeed = verticalSpeedFpm;
+    return ap;
+  }
+
+  function aircraftDescendingAt(altitudeFt: number) {
+    const aircraft = aircraftAtRoute();
+    aircraft.position.alt = altitudeFt;
+    aircraft.velocity.w = -15;
+    return aircraft;
+  }
+
+  it('keeps the raw selected VS command outside the MCP capture window', () => {
+    const shared = resolveGuidanceTargets({
+      aircraft: aircraftDescendingAt(11_000),
+      apState: vsApState(3_000, -900),
+      flightPlan: null,
+      routeStatus: createNoRouteStatus(),
+    });
+
+    expect(shared.truth.verticalActive).toBe('VS');
+    expect(shared.vertical?.targetVerticalSpeedFpm).toBe(-900);
+  });
+
+  it('hands a near-MCP selected VS descent to ALT* capture guidance', () => {
+    const shared = resolveGuidanceTargets({
+      aircraft: aircraftDescendingAt(3_200),
+      apState: vsApState(3_000, -900),
+      flightPlan: null,
+      routeStatus: createNoRouteStatus(),
+    });
+
+    expect(shared.truth.verticalActive).toBe('ALT*');
+    expect(shared.vertical?.mode).toBe('ALT*');
+    expect(shared.vertical?.targetVerticalSpeedFpm).toBe(-800);
+  });
+
+  it('levels off selected VS after overshooting the MCP altitude instead of re-arming the dive', () => {
+    const justPast = resolveGuidanceTargets({
+      aircraft: aircraftDescendingAt(2_400),
+      apState: vsApState(3_000, -900),
+      flightPlan: null,
+      routeStatus: createNoRouteStatus(),
+    });
+    const farPast = resolveGuidanceTargets({
+      aircraft: aircraftDescendingAt(2_000),
+      apState: vsApState(3_000, -900),
+      flightPlan: null,
+      routeStatus: createNoRouteStatus(),
+    });
+
+    expect(justPast.truth.verticalActive).toBe('VS');
+    expect(justPast.vertical?.targetVerticalSpeedFpm).toBe(0);
+    expect(farPast.vertical?.targetVerticalSpeedFpm).toBe(0);
+  });
+
+  it('levels off a selected VS climb that overshoots the MCP altitude', () => {
+    const aircraft = aircraftDescendingAt(12_000);
+    aircraft.velocity.w = 15;
+    const shared = resolveGuidanceTargets({
+      aircraft,
+      apState: vsApState(11_000, 900),
+      flightPlan: null,
+      routeStatus: createNoRouteStatus(),
+    });
+
+    expect(shared.vertical?.targetVerticalSpeedFpm).toBe(0);
+  });
+
   it('filters shared guidance down to finite supported Flight Director targets', () => {
     const sharedTargets = {
       truth: {
