@@ -57,6 +57,36 @@ test.describe('RFS route and LNAV browser proof', () => {
     expect(result.samples.length).toBeGreaterThan(3);
   });
 
+  test('FMS route edit panel stages, undoes, and executes DIRECT TO through visible controls', async ({ page }) => {
+    await openRfs(page);
+
+    await page.getByLabel('Scenario', { exact: true }).selectOption('ksea-tutorial');
+    await page.getByRole('button', { name: /^LOAD PLAN$/ }).click();
+
+    const routeEdit = page.getByLabel('Route edit');
+    await expect(routeEdit.getByText('3 BTG')).toBeVisible();
+    await expect(routeEdit.getByRole('button', { name: 'Execute staged route edits' })).toBeDisabled();
+
+    await routeEdit.getByRole('button', { name: 'Insert discontinuity after OLM' }).click();
+    await expect(routeEdit.getByText('Draft modifications pending EXEC')).toBeVisible();
+    await expect(routeEdit.getByText('3 DISCONTINUITY')).toBeVisible();
+
+    await routeEdit.getByRole('button', { name: 'Undo staged route edit' }).click();
+    await expect(routeEdit.getByText('Draft modifications pending EXEC')).toHaveCount(0);
+    await expect(routeEdit.getByText('3 DISCONTINUITY')).toHaveCount(0);
+
+    const routeStatusBefore = page.getByLabel('Route status');
+    await expect(routeStatusBefore.getByText('KSEA → OLM')).toBeVisible();
+
+    await routeEdit.getByRole('button', { name: 'Direct to BTG' }).click();
+    await expect(routeEdit.getByText('Draft modifications pending EXEC')).toBeVisible();
+    await routeEdit.getByRole('button', { name: 'Execute staged route edits' }).click();
+    await expect(routeEdit.getByText('Draft modifications pending EXEC')).toHaveCount(0);
+
+    const routeStatus = page.getByLabel('Route status');
+    await expect(routeStatus.getByText('KSEA → BTG')).toBeVisible();
+  });
+
   test('KSEA sample route sequences from OLM to BTG while LNAV remains backed', async ({ page }) => {
     await openRfs(page);
 
