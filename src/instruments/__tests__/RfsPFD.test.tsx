@@ -554,6 +554,39 @@ describe('RfsPFD', () => {
     expect(screen.queryByLabelText('Flight director pitch bar')).toBeNull();
   });
 
+  it('shows LNAV armed for a position-incompatible route without a roll Flight Director command', () => {
+    const aircraft = structuredClone(useSimStore.getState().aircraft);
+    aircraft.position.alt = 30_000;
+    aircraft.velocity.u = 128.6;
+    const flightPlan = routeWithFutureDescentConstraint();
+    const routeStatus = {
+      ...computeRouteStatus(aircraft, flightPlan, 0),
+      routeValid: false,
+      positionIncompatible: true,
+      lnavAvailable: false,
+      lnavUnavailableReason: 'route is not compatible with current aircraft position',
+      activeLegIndex: null,
+      activeLegCount: 0,
+      fromIdent: null,
+      nextWaypointIdent: null,
+    };
+    useSimStore.setState({ aircraft, flightPlan, activeLegIndex: null, routeStatus });
+    const ap = apStateWithModes();
+    ap.truth.lateralActive = 'LNAV';
+    ap.truth.verticalActive = 'VNAV';
+    ap.boeing.lnav = true;
+    ap.boeing.vnav = true;
+    ap.boeing.fdLeft = true;
+    ap.boeing.fdRight = true;
+    useSimStore.getState().setApState(ap);
+
+    render(<RfsPFD />);
+
+    expect(screen.getByLabelText('FMA roll active').textContent).toBe('OFF');
+    expect(screen.getByRole('status', { name: 'PFD armed lateral mode' }).textContent).toBe('ARMED LNAV');
+    expect(screen.queryByLabelText('Flight director roll bar')).toBeNull();
+  });
+
   it('does not draw an unsupported VNAV Flight Director pitch command for route path guidance', () => {
     setAircraftOnKseaRoute();
     const ap = apStateWithModes();

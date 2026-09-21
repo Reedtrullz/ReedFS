@@ -9,6 +9,7 @@ import {
   selectPfdFlightPhase,
   selectPfdFlightPlan,
   selectPfdFmaArmedVerticalText,
+  selectPfdFmaArmedLateralText,
   selectPfdFmaText,
   selectPfdGroundAglFt,
   selectPfdGroundAltFt,
@@ -481,6 +482,10 @@ function useFmaArmedVerticalText() {
   return useSimStore(selectPfdFmaArmedVerticalText);
 }
 
+function useFmaArmedLateralText() {
+  return useSimStore(selectPfdFmaArmedLateralText);
+}
+
 function useManagedSpeedKt(): number | null {
   return useSimStore(selectPfdManagedSpeedKt);
 }
@@ -512,6 +517,7 @@ export function RfsPFD() {
   const lateralMode = useFmaText('lateralActive');
   const verticalMode = useFmaText('verticalActive');
   const armedVerticalMode = useFmaArmedVerticalText();
+  const armedLateralMode = useFmaArmedLateralText();
   const autopilotMode = useFmaText('autopilotStatus');
   const hasMcpTargets = useSimStore(selectPfdHasMcpTargets);
   const selectedSpeed = useSimStore(selectPfdSelectedSpeed);
@@ -600,6 +606,23 @@ export function RfsPFD() {
         <FmaCell label="PITCH" value={verticalMode} />
         <FmaCell label="AP" value={autopilotMode} />
       </div>
+      {armedLateralMode !== 'OFF' && (
+        <div
+          role="status"
+          aria-label="PFD armed lateral mode"
+          style={{
+            borderBottom: '1px solid rgba(120,180,210,0.24)',
+            background: 'rgba(0,0,0,0.38)',
+            color: '#9ddcff',
+            padding: '4px 10px',
+            fontSize: 11,
+            fontWeight: 900,
+            letterSpacing: 0.8,
+          }}
+        >
+          ARMED {armedLateralMode}
+        </div>
+      )}
       {armedVerticalMode !== 'OFF' && (
         <div
           role="status"

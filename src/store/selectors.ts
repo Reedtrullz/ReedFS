@@ -130,6 +130,14 @@ export function selectPfdFmaArmedVerticalText(s: SimStore): string {
   }).verticalArmed);
 }
 
+export function selectPfdFmaArmedLateralText(s: SimStore): string {
+  return modeText(deriveDisplayFmaTruth(s.apState, {
+    aircraft: s.aircraft,
+    flightPlan: s.flightPlan,
+    routeStatus: s.routeStatus,
+  }).lateralArmed);
+}
+
 export function selectPfdManagedSpeedKt(s: SimStore): number | null {
   const truth = deriveDisplayFmaTruth(s.apState, {
     aircraft: s.aircraft,
@@ -154,6 +162,7 @@ export interface McpModeAvailabilityState {
   autothrottleArmed: boolean;
   lnavAvailable: boolean;
   lnavUnavailableReason: string | null;
+  routeArmingEligible: boolean;
   vnavBackedMode: VerticalMode;
   approachAutolandAvailable: boolean;
   approachAutolandUnavailableReason: string | null;
@@ -201,7 +210,7 @@ export function mcpModeAvailability(state: McpModeAvailabilityState, mode: Enabl
 
   const thrustReason = isThrustMode(mode) ? mcpThrustAvailabilityReason(state) : null;
   const guidanceReason = isThrustMode(mode) ? null : mcpGuidanceAvailabilityReason(state);
-  const routeReason = mode === 'LNAV' && !state.lnavAvailable
+  const routeReason = mode === 'LNAV' && !state.lnavAvailable && !state.routeArmingEligible
     ? `LNAV unavailable: ${state.lnavUnavailableReason ?? 'route guidance unavailable'}`
     : null;
   const vnavReason = mode === 'VNAV' && state.vnavBackedMode === 'OFF'
@@ -269,6 +278,7 @@ export function selectMcpViewModel(s: SimStore): McpViewModel {
     autothrottleArmed: displayApState.boeing.autothrottleArm,
     lnavAvailable,
     lnavUnavailableReason: s.routeStatus.lnavUnavailableReason,
+    routeArmingEligible: !s.routeStatus.routeValid && s.flightPlan !== null,
     vnavBackedMode: backedVnavMode,
     approachAutolandAvailable,
     approachAutolandUnavailableReason: approachAutolandAvailable
