@@ -28,6 +28,7 @@ import { RouteStatus } from '../components/RouteStatus';
 import { SceneStatusOverlay } from '../components/SceneStatus';
 import { TakeoffSetupPanel } from '../components/TakeoffSetupPanel';
 import { RouteBuilderPanel } from '../components/RouteBuilderPanel';
+import { RouteEditPanel } from '../components/RouteEditPanel';
 import { BottomControlBar, type AudioUiStatus } from '../components/BottomControlBar';
 import { AudioSettings } from '../components/AudioSettings';
 import { RfsLayout } from '../components/layout/RfsLayout';
@@ -375,7 +376,12 @@ export function RfsShell() {
         />
       )}
       scenarioPanel={showFlightInstruments ? <ScenarioPanel /> : null}
-      routeBuilderPanel={showFlightInstruments ? <RouteBuilderPanel onRouteLoad={setRouteLoadMessage} /> : null}
+      routeBuilderPanel={showFlightInstruments ? (
+        <>
+          <RouteBuilderPanel onRouteLoad={setRouteLoadMessage} />
+          <RouteEditPanel />
+        </>
+      ) : null}
       routeStatus={showFlightInstruments ? <RouteStatus /> : null}
       takeoffSetupPanel={showFlightInstruments ? <TakeoffSetupPanel /> : null}
       engineStrip={<EngineStrip />}
