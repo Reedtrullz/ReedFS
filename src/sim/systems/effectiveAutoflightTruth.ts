@@ -348,6 +348,22 @@ function deriveVerticalArmedMode(
   return vnav?.available && vnav.verticalArmedMode === 'VNAV' ? 'VNAV' : undefined;
 }
 
+function deriveLateralArmedMode(
+  ap: AutopilotState,
+  routeStatus: RouteStatusSnapshot | null | undefined,
+  flightPlan: FlightPlan | null | undefined,
+  lateralActive: LateralMode,
+): LateralMode | undefined {
+  if (lateralActive !== 'OFF') return undefined;
+  if (!ap.boeing.lnav || ap.truth.lateralActive !== 'LNAV') return undefined;
+  if (routeStatus?.positionIncompatible) {
+    // Raw LNAV stays armed while the loaded route is position-incompatible;
+    // it captures for free once route guidance becomes available.
+    return 'LNAV';
+  }
+  return undefined;
+}
+
 export function deriveEffectiveAutoflightTruth(
   apState: AutopilotState | null | undefined,
   context: EffectiveAutoflightTruthContext = {},
@@ -367,6 +383,7 @@ export function deriveEffectiveAutoflightTruth(
   const verticalActive = deriveVerticalMode(apState, vnav, context.aircraft, context);
   const verticalArmed = deriveVerticalArmedMode(apState, vnav, verticalActive);
   const lateralActive = deriveLateralMode(apState, context.routeStatus, context);
+  const lateralArmed = deriveLateralArmedMode(apState, context.routeStatus, context.flightPlan, lateralActive);
   const lateralOnly = lateralActive !== 'OFF' && verticalActive === 'OFF';
   const baseTruth = omitManagedAltitudeCaptureMetadata(apState.truth);
 
@@ -375,6 +392,7 @@ export function deriveEffectiveAutoflightTruth(
     autopilotStatus: apState.truth.autopilotStatus,
     thrustActive,
     lateralActive,
+    lateralArmed,
     verticalActive,
     verticalArmed,
     ...(lateralOnly ? { lateralOnly: true } : {}),

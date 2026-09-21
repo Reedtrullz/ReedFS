@@ -573,4 +573,42 @@ describe('RfsMCP', () => {
     expect(ap?.truth.lateralActive).toBe('LNAV');
     expect(ap?.boeing.lnav).toBe(true);
   });
+
+  it('arms LNAV from a position-incompatible route and shows no active lateral mode', () => {
+    setAirborneRuntime();
+    useSimStore.setState((s) => ({
+      flightPlan: createKseaKpdxFlight(),
+      routeStatus: {
+        ...s.routeStatus,
+        routeName: 'KSEA→KPDX',
+        routeValid: false,
+        positionIncompatible: true,
+        lnavAvailable: false,
+        lnavUnavailableReason: 'route is not compatible with current aircraft position',
+        activeLegIndex: null,
+        activeLegCount: 0,
+        fromIdent: null,
+        nextWaypointIdent: null,
+        desiredTrackRad: null,
+        desiredTrackDegTrue: null,
+      },
+    }));
+    render(<RfsMCP />);
+
+    const lnav = screen.getByRole('button', { name: 'LNAV' });
+    expect(lnav).toHaveAttribute('aria-disabled', 'false');
+    fireEvent.click(lnav);
+
+    const ap = useSimStore.getState().apState;
+    expect(ap?.boeing.lnav).toBe(true);
+    expect(ap?.truth.lateralActive).toBe('LNAV');
+
+    const effective = deriveEffectiveAutoflightTruth(ap, {
+      aircraft: useSimStore.getState().aircraft,
+      flightPlan: useSimStore.getState().flightPlan,
+      routeStatus: useSimStore.getState().routeStatus,
+    });
+    expect(effective.lateralActive).toBe('OFF');
+    expect(effective.lateralArmed).toBe('LNAV');
+  });
 });

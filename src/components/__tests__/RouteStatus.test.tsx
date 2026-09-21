@@ -9,6 +9,7 @@ function routeStatus(overrides: Partial<RouteStatusSnapshot> = {}): RouteStatusS
   return {
     routeName: 'KSEA→KPDX',
     routeValid: true,
+    positionIncompatible: false,
     routeComplete: false,
     approachHandoff: 'none',
     lnavAvailable: true,

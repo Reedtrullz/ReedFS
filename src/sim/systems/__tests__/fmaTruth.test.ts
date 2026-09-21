@@ -122,6 +122,66 @@ describe('deriveDisplayFmaTruth', () => {
     expect(fma.thrustActive).toBe('SPEED');
   });
 
+  it('holds LNAV as armed while the loaded route is position-incompatible', () => {
+    const aircraft = aircraftAtRoute();
+    aircraft.position.lat = 61.0;
+    aircraft.position.lon = 9.0;
+    const flightPlan = unconstrainedRoute();
+
+    const routeStatus = computeRouteStatus(aircraft, flightPlan, 0);
+    const fma = deriveDisplayFmaTruth(apState(), { aircraft, flightPlan, routeStatus });
+
+    expect(fma.lateralActive).toBe('OFF');
+    expect(fma.lateralArmed).toBe('LNAV');
+  });
+
+  it('does not arm LNAV when no route is loaded or route guidance is unavailable beyond position', () => {
+    const noPlan = deriveDisplayFmaTruth(apState(), {
+      aircraft: aircraftAtRoute(),
+      flightPlan: null,
+      routeStatus: createNoRouteStatus(),
+    });
+    expect(noPlan.lateralArmed).toBeUndefined();
+
+    const aircraft = aircraftAtRoute();
+    const flightPlan = {
+      ...unconstrainedRoute(),
+      waypoints: [
+        { ident: 'KSEA', lat: 47.45, lon: -122.31, discontinuity: false },
+        { ident: 'BROKEN', lat: Number.NaN, lon: -122.9, discontinuity: false },
+      ],
+    };
+    const invalidRoute = deriveDisplayFmaTruth(apState(), {
+      aircraft,
+      flightPlan,
+      routeStatus: computeRouteStatus(aircraft, flightPlan, 0),
+    });
+    expect(invalidRoute.lateralArmed).toBeUndefined();
+  });
+
+  it('captures armed LNAV with no explicit apState mutation when the route becomes compatible', () => {
+    const aircraft = aircraftAtRoute();
+    const flightPlan = unconstrainedRoute();
+
+    const armedStatus = computeRouteStatus(aircraft, flightPlan, 0);
+    void armedStatus;
+    const incompatibleStatus = computeRouteStatus(
+      { ...aircraft, position: { ...aircraft.position, lat: 61.0, lon: 9.0 } },
+      flightPlan,
+      0,
+    );
+    const armed = deriveDisplayFmaTruth(apState(), { aircraft: { ...aircraft, position: { ...aircraft.position, lat: 61.0, lon: 9.0 } }, flightPlan, routeStatus: incompatibleStatus });
+    expect(armed.lateralArmed).toBe('LNAV');
+
+    const captured = deriveDisplayFmaTruth(apState(), {
+      aircraft,
+      flightPlan,
+      routeStatus: computeRouteStatus(aircraft, flightPlan, 0),
+    });
+    expect(captured.lateralActive).toBe('LNAV');
+    expect(captured.lateralArmed).toBeUndefined();
+  });
+
   it('uses the current VNAV lifecycle mode when VNAV is active and constraints are available', () => {
     const aircraft = aircraftAtRoute();
     const flightPlan = constrainedRoute();

@@ -23,6 +23,8 @@ export type ApproachHandoff = 'none' | 'final' | 'threshold' | 'complete';
 export interface RouteStatusSnapshot {
   routeName: string;
   routeValid: boolean;
+  /** True only when the route failed the position-compatibility gate (arming-eligible). */
+  positionIncompatible: boolean;
   routeComplete: boolean;
   approachHandoff: ApproachHandoff;
   lnavAvailable: boolean;
@@ -334,10 +336,12 @@ function clamp(value: number, min: number, max: number): number {
 export function createNoRouteStatus(
   flightPlan: FlightPlan | null = null,
   reason = 'no flight plan loaded',
+  positionIncompatible = false,
 ): RouteStatusSnapshot {
   return {
     routeName: routeNameFor(flightPlan),
     routeValid: false,
+    positionIncompatible,
     routeComplete: false,
     approachHandoff: 'none',
     lnavAvailable: false,
@@ -435,6 +439,7 @@ export function computeRouteStatus(
     return createNoRouteStatus(
       flightPlan,
       'route is not compatible with current aircraft position',
+      true,
     );
   }
 
@@ -497,6 +502,7 @@ export function computeRouteStatus(
   return {
     routeName: route.routeName,
     routeValid: true,
+    positionIncompatible: false,
     routeComplete,
     approachHandoff,
     lnavAvailable: lnavUnavailableReason === null,
