@@ -71,7 +71,9 @@ test.describe('RFS visible route descent proof', () => {
     await driveVisibleSimUntil(page, 'visible route progress toward KPDX and descent phase entry', async () => {
       const route = await readVisibleRouteStatus(page);
       if (route.distanceToGoNm === null || initialRoute.distanceToGoNm === null) return false;
-      return route.distanceToGoNm < initialRoute.distanceToGoNm - 0.5;
+      // DTG is per active leg; sequencing resets it to the next leg's length.
+      const legAdvanced = (route.activeLegIndex ?? 0) > (initialRoute.activeLegIndex ?? 0);
+      return legAdvanced || route.distanceToGoNm < initialRoute.distanceToGoNm - 0.5;
     }, {
       timeoutMs: 120_000,
       stepMs: 1000,
@@ -94,6 +96,12 @@ test.describe('RFS visible route descent proof', () => {
 
     const descentRoute = await readVisibleRouteStatus(page);
     expect(descentRoute.distanceToGoNm).not.toBeNull();
-    expect(descentRoute.distanceToGoNm as number).toBeLessThan(initialRoute.distanceToGoNm as number);
+    // Per-leg DTG resets at sequencing boundaries; require leg progress or a same-leg drop.
+    const madeLegProgress = (descentRoute.activeLegIndex ?? 0) > (initialRoute.activeLegIndex ?? 0);
+    if (madeLegProgress) {
+      expect(descentRoute.activeLegIndex as number).toBeGreaterThan(initialRoute.activeLegIndex as number);
+    } else {
+      expect(descentRoute.distanceToGoNm as number).toBeLessThan(initialRoute.distanceToGoNm as number);
+    }
   });
 });
