@@ -324,7 +324,7 @@ describe('computeAutopilotCommandsForState effective truth gating', () => {
     expect(commands.throttle2).toBe(commands.throttle1);
   });
 
-  it('keeps VNAV armed before TOD without commanding pitch or falling back to MCP altitude', () => {
+  it('holds cruise altitude with VNAV armed before TOD instead of commanding toward the MCP altitude', () => {
     const s = createInitialState(B737_800_SPEC);
     s.position.alt = 30000;
     s.velocity.u = 128.6;
@@ -340,9 +340,8 @@ describe('computeAutopilotCommandsForState effective truth gating', () => {
     const truth = deriveEffectiveAutoflightTruth(ap, { aircraft: s, flightPlan, routeStatus });
     const commands = computeAutopilotCommandsForState(s, ap, flightPlan, 1 / 60, 0, routeStatus);
 
-    expect(truth.verticalActive).toBe('OFF');
-    expect(truth.verticalArmed).toBe('VNAV');
-    expect(commands.elevator).toBeUndefined();
+    expect(truth.verticalActive).toBe('ALT_HOLD');
+    expect(commands.elevator).toBeDefined();
   });
 
   it('does not command VNAV pitch when the active leg has no actionable VNAV constraint', () => {
