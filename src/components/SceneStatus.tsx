@@ -13,6 +13,7 @@ interface SceneStatusProps {
 }
 
 const FAILURE_LABELS: Record<CesiumSceneFailure['stage'], string> = {
+  load: 'Cesium scene failed to initialize.',
   buildings: '3D buildings could not be loaded.',
   imagery: 'Globe imagery or terrain hit a render error.',
 };
