@@ -51,6 +51,8 @@ export function CesiumViewport({ onReady, onSceneFailure, scenePolicy }: CesiumV
     const policy = scenePolicy ?? getCesiumScenePolicy();
     rememberCesiumIonToken(policy.token);
     Cesium.Ion.defaultAccessToken = policy.token ?? '';
+    // Cesium's bundled blob workers cannot import their blob script under our CSP.
+    Reflect.set(globalThis, 'CESIUM_WORKERS', undefined);
     let disposed = false;
     const viewerOptions = {
       useDefaultRenderLoop: true,
