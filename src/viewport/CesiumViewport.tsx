@@ -14,6 +14,7 @@ export interface CesiumViewportProps {
 }
 
 export type CesiumSceneFailure =
+  | { stage: 'load'; error: unknown }
   | { stage: 'buildings'; error: unknown }
   | { stage: 'imagery'; error: unknown };
 
@@ -37,6 +38,13 @@ export function CesiumViewport({ onReady, onSceneFailure, scenePolicy }: CesiumV
 
   useEffect(() => {
     if (!containerRef.current) return;
+    if (typeof Cesium === 'undefined') {
+      onSceneFailure?.({
+        stage: 'load',
+        error: new Error('Cesium global unavailable after script load (check CSP).'),
+      });
+      return;
+    }
     if (viewerRef.current) return; // React StrictMode double-mount guard
 
     const policy = scenePolicy ?? getCesiumScenePolicy();
