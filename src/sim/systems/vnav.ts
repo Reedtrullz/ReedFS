@@ -10,6 +10,12 @@ const VNAV_ALT_HOLD_CAPTURE_FT = 50;
 const VNAV_ALT_ACQUIRE_FT = 250;
 const VNAV_DESCENT_PATH_FT_PER_NM = 318;
 const VNAV_TOD_CAPTURE_TOLERANCE_NM = 1;
+/**
+ * Climb guidance must command a sustainable climb, never the path-average VS
+ * toward a distant constraint: at heavy weight a ~250 fpm average command
+ * bleeds energy near the ground and the aircraft sinks back into it.
+ */
+const VNAV_MIN_CLIMB_VS_FPM = 1800;
 
 export type VnavAltitudeTargetSource = 'VNAV_CONSTRAINT';
 export type VnavManagedSpeedSource = 'VNAV_SPEED_CONSTRAINT';
@@ -105,7 +111,9 @@ function resolveAltitudeTarget(currentAltFt: number, constraint: AltitudeConstra
   const altitude = finiteNumber(constraint.altitude);
   if (altitude === undefined) return undefined;
 
-  if (constraint.type === 'AT') return altitude;
+  if (constraint.type === 'AT') {
+    return altitude;
+  }
   if (constraint.type === 'AT_OR_ABOVE') return currentAltFt < altitude ? altitude : undefined;
   if (constraint.type === 'AT_OR_BELOW') return currentAltFt > altitude ? altitude : undefined;
 
@@ -140,7 +148,13 @@ function findVnavAltitudeTarget(state: AircraftState, flightPlan: FlightPlan, na
   const activeIndex = activeWaypointIndexFor(flightPlan, nav);
   if (activeIndex === null) return null;
 
-  for (let index = activeIndex; index < flightPlan.waypoints.length; index += 1) {
+  // Waypoint 0 is the departure airport; its runway-elevation AT constraint is
+  // never a climb target once the route has onward waypoints.
+  const skipOriginWaypoint = activeIndex === 0
+    && flightPlan.waypoints.length > 1
+    && flightPlan.waypoints[0].ident === flightPlan.origin;
+  const firstIndex = skipOriginWaypoint ? 1 : activeIndex;
+  for (let index = firstIndex; index < flightPlan.waypoints.length; index += 1) {
     const waypoint = flightPlan.waypoints[index];
     if (waypoint.discontinuity) return null;
 
@@ -199,7 +213,9 @@ function lifecycleForAltitudeTarget(state: AircraftState, targetAltFt: number, d
     return { lifecycle: 'ALT_CAPTURE', verticalMode: 'ALT*', todDistanceNm, distanceToTodNm };
   }
   if (altitudeDeltaFt < 0 && distanceToTodNm > VNAV_TOD_CAPTURE_TOLERANCE_NM) {
-    return { lifecycle: 'ARMED', verticalMode: null, verticalArmedMode: 'VNAV', todDistanceNm, distanceToTodNm };
+    // Pre-TOD descent pending: hold present altitude with pitch guidance active.
+    // Pitch-OFF here let the aircraft sag into terrain during long cruise gaps.
+    return { lifecycle: 'ARMED', verticalMode: 'ALT_HOLD', verticalArmedMode: 'VNAV', todDistanceNm, distanceToTodNm };
   }
   return { lifecycle: 'PATH', verticalMode: 'VNAV_PTH', todDistanceNm, distanceToTodNm };
 }
@@ -232,16 +248,21 @@ export function computeVNAV(
   const altitudeLifecycle = hasAltitudeTarget
     ? lifecycleForAltitudeTarget(state, altitudeTarget.altitudeTarget as number, altitudeDistanceToConstraintNm)
     : { lifecycle: 'SPEED_ONLY' as VnavLifecycle, verticalMode: null, todDistanceNm: 0, distanceToTodNm: 0 };
-  const targetVs = hasAltitudeTarget && altitudeLifecycle.lifecycle !== 'ARMED'
+  const armedHoldAltFt = state.position.alt;
+  let targetVs = hasAltitudeTarget && altitudeLifecycle.lifecycle !== 'ARMED'
     ? requiredVerticalSpeedFpm(state, altitudeTarget.altitudeTarget as number, altitudeTarget.distanceM)
     : 0;
+  if (hasAltitudeTarget && altitudeLifecycle.lifecycle === 'PATH') {
+    const climbDeltaFt = (altitudeTarget.altitudeTarget as number) - state.position.alt;
+    if (climbDeltaFt > 0) targetVs = Math.max(targetVs, VNAV_MIN_CLIMB_VS_FPM);
+  }
 
   return {
-    targetAlt: altitudeTarget?.altitudeTarget ?? state.position.alt,
+    targetAlt: altitudeLifecycle.lifecycle === 'ARMED' ? armedHoldAltFt : altitudeTarget?.altitudeTarget ?? state.position.alt,
     targetVs,
     altitudeConstraint: hasAltitudeTarget,
     targetAltitudeSource: hasAltitudeTarget ? 'VNAV_CONSTRAINT' : undefined,
-    captureTargetAltFt: altitudeTarget?.altitudeTarget,
+    captureTargetAltFt: altitudeLifecycle.lifecycle === 'ARMED' ? armedHoldAltFt : altitudeTarget?.altitudeTarget,
     verticalMode: altitudeLifecycle.verticalMode,
     verticalArmedMode: altitudeLifecycle.verticalArmedMode,
     available: true,

@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react';
 import * as Cesium from 'cesium';
 import { getCesiumScenePolicy, rememberCesiumIonToken, type CesiumScenePolicy } from '../config/cesium';
 import { isVisualTestMode } from '../config/visualTest';
+import { applySunAwareLighting } from './sunLighting';
 
 export interface CesiumViewportProps {
   /** Overrides the resolved Cesium scene asset policy */
@@ -14,6 +15,7 @@ export interface CesiumViewportProps {
 }
 
 export type CesiumSceneFailure =
+  | { stage: 'load'; error: unknown }
   | { stage: 'buildings'; error: unknown }
   | { stage: 'imagery'; error: unknown };
 
@@ -37,11 +39,20 @@ export function CesiumViewport({ onReady, onSceneFailure, scenePolicy }: CesiumV
 
   useEffect(() => {
     if (!containerRef.current) return;
+    if (typeof Cesium === 'undefined') {
+      onSceneFailure?.({
+        stage: 'load',
+        error: new Error('Cesium global unavailable after script load (check CSP).'),
+      });
+      return;
+    }
     if (viewerRef.current) return; // React StrictMode double-mount guard
 
     const policy = scenePolicy ?? getCesiumScenePolicy();
     rememberCesiumIonToken(policy.token);
     Cesium.Ion.defaultAccessToken = policy.token ?? '';
+    // Cesium's bundled blob workers cannot import their blob script under our CSP.
+    Reflect.set(globalThis, 'CESIUM_WORKERS', undefined);
     let disposed = false;
     const viewerOptions = {
       useDefaultRenderLoop: true,
@@ -83,6 +94,7 @@ export function CesiumViewport({ onReady, onSceneFailure, scenePolicy }: CesiumV
     globe.terrainExaggeration = 1;
     if (!visualTest) {
       globe.enableLighting = true;
+      applySunAwareLighting(viewer);
       globe.showWaterEffect = true;
       viewer.scene.requestRenderMode = false;
       if (viewer.scene.skyAtmosphere) viewer.scene.skyAtmosphere.show = true;

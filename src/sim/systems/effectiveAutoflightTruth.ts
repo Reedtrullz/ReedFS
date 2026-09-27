@@ -6,7 +6,7 @@ import type {
   VerticalMode,
 } from '@shared/autopilot/autopilotTypes';
 import type { FlightPlan } from '@shared/types/fmc';
-import type { AircraftState } from '../types';
+import type { AircraftState, FlightPhase } from '../types';
 import { bodyToNed } from '../physics/frames';
 import { routeStatusToNavOutput, type RouteStatusSnapshot } from './navigation';
 import { computeVNAV, type VnavOutput } from './vnav';
@@ -17,6 +17,14 @@ const UNSUPPORTED_VERTICAL_MODES = new Set<VerticalMode>(['LVL_CHG']);
 const ALT_HOLD_CAPTURE_MAX_ERROR_FT = 80;
 const ALT_HOLD_CAPTURE_MAX_ABS_VS_FPM = 300;
 const RETARD_ARM_RADIO_ALT_FT = 35;
+const A_T_DISCONNECT_PHASES: ReadonlySet<FlightPhase> = new Set([
+  'TOUCHDOWN',
+  'DEROTATION',
+  'ROLLOUT',
+  'TAXI',
+  'STOPPED',
+  'LANDED',
+]);
 
 export interface AltitudeHoldCaptureInput {
   altitudeErrorFt: number;
@@ -162,7 +170,16 @@ function aircraftCanBackSyntheticApproach(aircraft: AircraftState | null | undef
 }
 
 function routeIsUsableForAutoland(routeStatus: RouteStatusSnapshot | null | undefined): boolean {
-  return Boolean(routeStatus?.routeValid && !routeStatus.routeComplete && routeStatus.lnavAvailable);
+  if (!routeStatus?.routeValid) return false;
+  // Sequencing the runway-threshold fix completes the route while the aircraft
+  // route and drops LNAV while the aircraft is still airborne short of the
+  // flare. A captured APP/G/S must survive that completion or the FMA
+  // collapses to OFF, the servos release, and RETARD can never fire. APP
+  // steering needs the synthetic approach profile, not route LNAV.
+  if (routeStatus.approachHandoff === 'final' || routeStatus.approachHandoff === 'threshold') {
+    return true;
+  }
+  return !routeStatus.routeComplete && routeStatus.lnavAvailable;
 }
 
 export function resolveSyntheticApproachProfile(
@@ -202,6 +219,11 @@ export function resolveSyntheticApproachProfile(
 export function hasSyntheticApproachAutolandCapability(
   context: EffectiveAutoflightTruthContext = {},
 ): boolean {
+  // Synthetic APP capture is only honest once established on the approach
+  // segment; capturing 40+ NM out flies the aircraft into terrain short of the
+  // field and freezes route sequencing behind the approach transition.
+  const approachHandoff = context.routeStatus?.approachHandoff;
+  if (approachHandoff !== 'final' && approachHandoff !== 'threshold') return false;
   return resolveSyntheticApproachProfile(context) !== null;
 }
 
@@ -286,6 +308,14 @@ function deriveThrustMode(ap: AutopilotState, context: EffectiveAutoflightTruthC
   if (approachBacked && (ap.truth.verticalActive === 'G_S' || ap.truth.lateralActive === 'APP') && retardWindowIsActive(context)) {
     return 'RETARD';
   }
+  // Autothrottle disengages at touchdown. A SPEED mode tracking zero ground
+  // speed after weight-on-wheels would spool the engines to takeoff power and
+  // fight the brakes during rollout. TAKEOFF is excluded because the takeoff
+  // roll is a legitimate weight-on-wheels N1 command, and the RETARD window
+  // above already returned because it commands idle thrust.
+  if (context.aircraft?.ground.weightOnWheels && A_T_DISCONNECT_PHASES.has(context.aircraft.flightPhase)) {
+    return 'OFF';
+  }
   if (ap.truth.thrustActive === 'RETARD') return approachBacked && retardWindowIsActive(context) ? 'RETARD' : 'OFF';
   if (ap.truth.thrustActive === 'SPEED') return ap.boeing.speedMode ? 'SPEED' : 'OFF';
   if (ap.truth.thrustActive === 'N1') return ap.boeing.n1 ? 'N1' : 'OFF';
@@ -332,7 +362,22 @@ function deriveVerticalMode(
   if (ap.truth.verticalActive === 'ALT_HOLD') {
     return ap.boeing.altHold ? altitudeHoldCaptureMode(aircraft, ap.boeing.altitude) : 'OFF';
   }
-  if (ap.truth.verticalActive === 'VS') return ap.boeing.vs ? 'VS' : 'OFF';
+  if (ap.truth.verticalActive === 'VS') {
+    if (!ap.boeing.vs) return 'OFF';
+    // Selected VS levels off at the MCP altitude: inside the capture window the
+    // FMA transitions to ALT* and the existing capture VS target takes over
+    // until the hold criteria are met, mirroring real autoflight behavior.
+    const selectedAltitudeFt = ap.boeing.altitude;
+    if (
+      aircraft
+      && Number.isFinite(selectedAltitudeFt)
+      && selectedAltitudeFt > 0
+      && Math.abs(selectedAltitudeFt - aircraft.position.alt) <= 500
+    ) {
+      return altitudeHoldCaptureMode(aircraft, selectedAltitudeFt);
+    }
+    return 'VS';
+  }
   if (ap.truth.verticalActive === 'G_S') return approachModeIsBacked(ap, context) ? 'G_S' : 'OFF';
   if (VNAV_FAMILY.has(ap.truth.verticalActive)) return deriveVnavMode(vnav, aircraft);
   return 'OFF';

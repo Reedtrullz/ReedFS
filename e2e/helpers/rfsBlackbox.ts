@@ -90,6 +90,19 @@ async function activateAlreadyVisibleControl(control: Locator): Promise<void> {
   await control.dispatchEvent('click');
 }
 
+async function readMcpTextUntilChange(
+  page: Page,
+  selector: (text: string) => number,
+  previous: number,
+): Promise<string> {
+  let text = await readMcpText(page);
+  for (let attempt = 0; attempt < 40 && selector(text) === previous; attempt += 1) {
+    await page.waitForTimeout(25);
+    text = await readMcpText(page);
+  }
+  return text;
+}
+
 export async function openRfsBlackbox(page: Page): Promise<void> {
   await page.goto('/');
 
@@ -640,8 +653,10 @@ export async function setVisibleMcpAltitude(page: Page, targetFt: number): Promi
   const mcp = page.getByRole('region', { name: 'Mode control panel' });
   const buttonName = targetFt >= readMcpAltitudeTarget(await readMcpText(page)) ? 'ALT +1000' : 'ALT -1000';
   const button = mcp.getByRole('button', { name: buttonName });
+  let lastSeen = readMcpAltitudeTarget(await readMcpText(page));
   for (let guard = 0; guard < 50; guard += 1) {
-    const current = readMcpAltitudeTarget(await readMcpText(page));
+    const current = readMcpAltitudeTarget(await readMcpTextUntilChange(page, readMcpAltitudeTarget, lastSeen));
+    lastSeen = current;
     if (current === targetFt) return;
     if ((buttonName === 'ALT +1000' && current > targetFt) || (buttonName === 'ALT -1000' && current < targetFt)) {
       throw new Error(`MCP altitude target stepped past ${targetFt}; current ${current}.`);
@@ -654,8 +669,10 @@ export async function setVisibleMcpAltitude(page: Page, targetFt: number): Promi
 export async function setVisibleMcpSpeedAtMost(page: Page, maxTargetKt: number): Promise<number> {
   const mcp = page.getByRole('region', { name: 'Mode control panel' });
   const button = mcp.getByRole('button', { name: 'SPD -5' });
+  let lastSeen = readMcpSpeedTarget(await readMcpText(page));
   for (let guard = 0; guard < 60; guard += 1) {
-    const current = readMcpSpeedTarget(await readMcpText(page));
+    const current = readMcpSpeedTarget(await readMcpTextUntilChange(page, readMcpSpeedTarget, lastSeen));
+    lastSeen = current;
     if (current <= maxTargetKt) return current;
     await activateAlreadyVisibleControl(button);
   }
@@ -665,8 +682,10 @@ export async function setVisibleMcpSpeedAtMost(page: Page, maxTargetKt: number):
 export async function setVisibleMcpSpeedAtLeast(page: Page, minTargetKt: number): Promise<number> {
   const mcp = page.getByRole('region', { name: 'Mode control panel' });
   const button = mcp.getByRole('button', { name: 'SPD +5' });
+  let lastSeen = readMcpSpeedTarget(await readMcpText(page));
   for (let guard = 0; guard < 60; guard += 1) {
-    const current = readMcpSpeedTarget(await readMcpText(page));
+    const current = readMcpSpeedTarget(await readMcpTextUntilChange(page, readMcpSpeedTarget, lastSeen));
+    lastSeen = current;
     if (current >= minTargetKt) return current;
     await activateAlreadyVisibleControl(button);
   }
@@ -676,8 +695,10 @@ export async function setVisibleMcpSpeedAtLeast(page: Page, minTargetKt: number)
 export async function setVisibleMcpAltitudeAtLeast(page: Page, minTargetFt: number): Promise<number> {
   const mcp = page.getByRole('region', { name: 'Mode control panel' });
   const button = mcp.getByRole('button', { name: 'ALT +1000' });
+  let lastSeen = readMcpAltitudeTarget(await readMcpText(page));
   for (let guard = 0; guard < 50; guard += 1) {
-    const current = readMcpAltitudeTarget(await readMcpText(page));
+    const current = readMcpAltitudeTarget(await readMcpTextUntilChange(page, readMcpAltitudeTarget, lastSeen));
+    lastSeen = current;
     if (current >= minTargetFt) return current;
     await activateAlreadyVisibleControl(button);
   }
@@ -687,9 +708,14 @@ export async function setVisibleMcpAltitudeAtLeast(page: Page, minTargetFt: numb
 export async function setVisibleMcpAltitudeAtMost(page: Page, maxTargetFt: number): Promise<number> {
   const mcp = page.getByRole('region', { name: 'Mode control panel' });
   const button = mcp.getByRole('button', { name: 'ALT -1000' });
+  let lastSeen = readMcpAltitudeTarget(await readMcpText(page));
   for (let guard = 0; guard < 50; guard += 1) {
-    const current = readMcpAltitudeTarget(await readMcpText(page));
+    const current = readMcpAltitudeTarget(await readMcpTextUntilChange(page, readMcpAltitudeTarget, lastSeen));
+    lastSeen = current;
     if (current <= maxTargetFt) return current;
+    if (current < lastSeen) {
+      throw new Error('MCP altitude target stepped past ' + maxTargetFt + '; current ' + current + '.');
+    }
     await activateAlreadyVisibleControl(button);
   }
   throw new Error(`Unable to set visible MCP altitude target at or below ${maxTargetFt}.`);
@@ -699,8 +725,10 @@ export async function setVisibleMcpVerticalSpeed(page: Page, targetFpm: number):
   const mcp = page.getByRole('region', { name: 'Mode control panel' });
   const buttonName = targetFpm >= readMcpVerticalSpeedTarget(await readMcpText(page)) ? 'VS +100' : 'VS -100';
   const button = mcp.getByRole('button', { name: buttonName });
+  let lastSeen = readMcpVerticalSpeedTarget(await readMcpText(page));
   for (let guard = 0; guard < 80; guard += 1) {
-    const current = readMcpVerticalSpeedTarget(await readMcpText(page));
+    const current = readMcpVerticalSpeedTarget(await readMcpTextUntilChange(page, readMcpVerticalSpeedTarget, lastSeen));
+    lastSeen = current;
     if (current === targetFpm) return;
     if ((buttonName === 'VS +100' && current > targetFpm) || (buttonName === 'VS -100' && current < targetFpm)) {
       throw new Error(`MCP vertical speed target stepped past ${targetFpm}; current ${current}.`);
