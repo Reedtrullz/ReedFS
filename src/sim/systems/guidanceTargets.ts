@@ -213,13 +213,21 @@ function verticalSpeedTargetWithAltitudeCapture(
   if (selectedAltitudeFt === undefined || selectedAltitudeFt <= 0) return targetVerticalSpeedFpm;
 
   const altitudeDeltaFt = selectedAltitudeFt - altitudeFt;
+  // Past the selected altitude the dive must level off for good: re-arming the
+  // raw command outside the capture window would dive a busted capture into
+  // terrain. Level-off state only re-arms when the aircraft is back above the
+  // selected altitude (climb) or below it (descent).
+  const overshot = (targetVerticalSpeedFpm > 0 && altitudeDeltaFt < 0)
+    || (targetVerticalSpeedFpm < 0 && altitudeDeltaFt > 0);
+  if (overshot) return 0;
+
   const captureWindowFt = 500;
   const enteringCaptureWindow = Math.abs(altitudeDeltaFt) < captureWindowFt * 2
     && ((targetVerticalSpeedFpm > 0 && altitudeDeltaFt <= captureWindowFt)
       || (targetVerticalSpeedFpm < 0 && altitudeDeltaFt >= -captureWindowFt));
   if (!enteringCaptureWindow) return targetVerticalSpeedFpm;
 
-  return targetVerticalSpeedFpm * Math.max(0, Math.abs(altitudeDeltaFt) / captureWindowFt);
+  return targetVerticalSpeedFpm * Math.min(1, Math.abs(altitudeDeltaFt) / captureWindowFt);
 }
 
 function altitudeCaptureVerticalSpeedTarget(targetAltitudeFt: number, altitudeFt: number): number {

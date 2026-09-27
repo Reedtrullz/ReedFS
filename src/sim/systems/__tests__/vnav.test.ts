@@ -151,12 +151,14 @@ describe('computeVNAV', () => {
     expect(v.speedTargetWaypointIdent).toBe('SPD');
     expect(v.speedTargetWaypointIndex).toBe(0);
     expect(v.altitudeConstraint).toBe(true);
-    expect(v.targetAlt).toBe(12000);
+    expect(v.targetAlt).toBe(s.position.alt);
     expect(v.targetAltitudeSource).toBe('VNAV_CONSTRAINT');
-    expect(v.captureTargetAltFt).toBe(12000);
+    expect(v.captureTargetAltFt).toBe(s.position.alt);
     expect(v.lifecycle).toBe('ARMED');
-    expect(v.verticalMode).toBeNull();
+    expect(v.verticalMode).toBe('ALT_HOLD');
     expect(v.verticalArmedMode).toBe('VNAV');
+    expect(v.targetAlt).toBe(s.position.alt);
+    expect(v.targetVs).toBe(0);
     expect(v.altitudeTargetWaypointIdent).toBe('ALT');
     expect(v.altitudeTargetWaypointIndex).toBe(1);
     expect(v.targetWaypointIdent).toBe('ALT');
@@ -183,13 +185,68 @@ describe('computeVNAV', () => {
 
     expect(v.available).toBe(true);
     expect(v.lifecycle).toBe('ARMED');
-    expect(v.verticalMode).toBeNull();
+    expect(v.verticalMode).toBe('ALT_HOLD');
     expect(v.verticalArmedMode).toBe('VNAV');
-    expect(v.targetAlt).toBe(12000);
+    expect(v.targetAlt).toBe(s.position.alt);
     expect(v.targetWaypointIdent).toBe('BTG');
     expect(v.targetWaypointIndex).toBe(2);
     expect(v.targetVs).toBe(0);
+    expect(v.captureTargetAltFt).toBe(s.position.alt);
     expect(v.distanceToTodNm).toBeGreaterThan(25);
+  });
+
+  it('holds cruise altitude with VNAV armed once an AT_OR_ABOVE enroute constraint is satisfied and descent TOD is far', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.position.alt = 12000;
+    s.velocity.u = 128.6;
+    const fp: FlightPlan = {
+      origin: 'KSEA',
+      destination: 'KPDX',
+      flightNumber: 'TST218',
+      route: 'KSEA ENR DES KPDX',
+      waypoints: [
+        { ident: 'ENR', lat: 46.5, lon: -122.8, discontinuity: false, altitudeConstraint: { type: 'AT_OR_ABOVE', altitude: 12000 } },
+        { ident: 'DES', lat: 45.9, lon: -122.6, discontinuity: false, altitudeConstraint: { type: 'AT_OR_BELOW', altitude: 8000 } },
+        { ident: 'KPDX', lat: 45.59, lon: -122.6, discontinuity: false },
+      ],
+    };
+
+    // Aircraft just above ENR (1 NM along), DES is 60 NM ahead: satisfied floor,
+    // next actionable constraint is the descent, TOD roughly 12.6 NM away.
+    const v = computeVNAV(s, fp, { ...navOut, activeWaypointIndex: 0, alongTrackDist: 1852 });
+
+    expect(v.available).toBe(true);
+    expect(v.lifecycle).toBe('ARMED');
+    expect(v.verticalMode).toBe('ALT_HOLD');
+    expect(v.verticalArmedMode).toBe('VNAV');
+    expect(v.targetAlt).toBe(12000);
+    expect(v.targetVs).toBe(0);
+  });
+
+  it('captures VNAV_PTH when TOD approaches a far descent constraint', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.position.alt = 12000;
+    s.velocity.u = 128.6;
+    const fp: FlightPlan = {
+      origin: 'KSEA',
+      destination: 'KPDX',
+      flightNumber: 'TST219',
+      route: 'KSEA DES KPDX',
+      waypoints: [
+        { ident: 'DES', lat: 45.9, lon: -122.6, discontinuity: false, altitudeConstraint: { type: 'AT_OR_BELOW', altitude: 8000 } },
+        { ident: 'KPDX', lat: 45.59, lon: -122.6, discontinuity: false },
+      ],
+    };
+
+    // DES 2.2 NM ahead: TOD (~12.6 NM back) is behind the aircraft, so path
+    // guidance is immediately actionable rather than a distant armed hold.
+    const v = computeVNAV(s, fp, { ...navOut, activeWaypointIndex: 0, alongTrackDist: 2.2 * M_PER_NM });
+
+    expect(v.available).toBe(true);
+    expect(v.lifecycle).toBe('PATH');
+    expect(v.verticalMode).toBe('VNAV_PTH');
+    expect(v.targetAlt).toBe(8000);
+    expect(v.targetVs).toBeLessThan(0);
   });
 
   it('captures VNAV_PTH at TOD for a descent constraint', () => {

@@ -26,6 +26,10 @@ export interface AutopilotControllerState {
   rollPid: AutopilotPidState;
   thrustPid: AutopilotPidState;
   pitchTargetIntegral: AutopilotPidState;
+  /** Rate-limited commanded vertical speed (fpm) used by the VS tracker. */
+  vsCommandFpm?: number;
+  /** Last commanded VS pitch target (deg), used for slew limiting. */
+  vsPitchTargetDeg?: number;
   throttleLimited: number;
 }
 
@@ -60,6 +64,21 @@ const PITCH_MIN_DEG = -10;
 const PITCH_MAX_DEG = 20;
 const BANK_MAX_DEG = 30;
 const THROTTLE_RATE_PER_SEC = 1.5;
+const VS_PITCH_TARGET_SLEW_DEG_PER_SEC = 3;
+// Rate-limit the VS setpoint: on engagement or retarget the commanded VS
+// starts at the current VS and ramps toward the target, so the tracker never
+// sees a multi-thousand-fpm error spike right after a mode change.
+const VS_CAPTURE_RAMP_FPM_PER_SEC = 1000;
+// Engagement seeding must never command *further* from the selected VS than a
+// bounded offset: seeding from a zooming current VS (e.g. +16000 fpm) told the
+// tracker to sustain the zoom for seconds before ramping down.
+const VS_ENGAGEMENT_SEED_MAX_OFFSET_FPM = 2_000;
+// Baseline nose-up allowance while tracking a commanded descent. The tracker
+// may exceed this only to arrest a large sink-rate error (dive protection),
+// where a flat cap would make a developed dive unrecoverable.
+const VS_DESCENT_MAX_NOSE_UP_DEG = 6;
+const VS_DIVE_ARREST_ERROR_FPM = 2_000;
+const VS_DIVE_ARREST_MAX_NOSE_UP_DEG = 15;
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 
@@ -218,10 +237,47 @@ function altitudeToPitch(controllerState: AutopilotControllerState, targetAltFt:
 }
 
 /** VS outer loop: adjusts pitch to track vertical speed. */
-function vsToPitch(controllerState: AutopilotControllerState, targetVerticalSpeedFpm: number, state: AircraftState, dt: number): number {
-  const err = targetVerticalSpeedFpm - currentVsFpm(state);
-  const pitchAdjustDeg = pid(controllerState.pitchTargetIntegral, err, 0.00015, 0.00003, 0, dt, 2);
-  return clamp(pitchAdjustDeg, -8, 15);
+function vsToPitch(
+  controllerState: AutopilotControllerState,
+  targetVerticalSpeedFpm: number,
+  state: AircraftState,
+  dt: number,
+  maxNoseUpDeg = 15,
+): number {
+  const currentVs = currentVsFpm(state);
+  // Engagement seeding: the first VS frame ramps from whatever VS the aircraft
+  // actually has instead of snapping the command to the MCP value.
+  const previousCommand = controllerState.vsCommandFpm
+    ?? clamp(
+      currentVs,
+      targetVerticalSpeedFpm - VS_ENGAGEMENT_SEED_MAX_OFFSET_FPM,
+      targetVerticalSpeedFpm + VS_ENGAGEMENT_SEED_MAX_OFFSET_FPM,
+    );
+  const rampedCommand = clamp(
+    targetVerticalSpeedFpm > previousCommand
+      ? Math.min(previousCommand + VS_CAPTURE_RAMP_FPM_PER_SEC * dt, targetVerticalSpeedFpm)
+      : Math.max(previousCommand - VS_CAPTURE_RAMP_FPM_PER_SEC * dt, targetVerticalSpeedFpm),
+    -6000,
+    6000,
+  );
+  controllerState.vsCommandFpm = rampedCommand;
+  const err = rampedCommand - currentVs;
+  // Gains sized so a 1000 fpm error commands roughly 1.5 deg of climb pitch,
+  // with integral action closing sustained offsets like energy-starved climbs.
+  // The pitch target slews at 3 deg/s so mode engagement never spikes the
+  // pitch-hold derivative and kicks the elevator.
+  // maxI bounds the integral *state* (fpm-seconds), not degrees; ki=0.0004 turns
+  // 15000 into 6 deg of sustained trim authority so the tracker can actually
+  // hold a commanded climb/descent instead of stalling at the P-only offset.
+  const rawPitchAdjustDeg = pid(controllerState.pitchTargetIntegral, err, 0.0012, 0.0004, 0, dt, 15000);
+  // Seed the slew from the aircraft's current attitude: starting from 0 deg
+  // while the AP engages in a climb would command an immediate bunt.
+  const previousPitchTarget = controllerState.vsPitchTargetDeg
+    ?? state.attitude.theta * 180 / Math.PI;
+  const maxSlewDeg = VS_PITCH_TARGET_SLEW_DEG_PER_SEC * dt;
+  const pitchAdjustDeg = clamp(rawPitchAdjustDeg - previousPitchTarget, -maxSlewDeg, maxSlewDeg) + previousPitchTarget;
+  controllerState.vsPitchTargetDeg = pitchAdjustDeg;
+  return clamp(pitchAdjustDeg, -8, maxNoseUpDeg);
 }
 
 // ── Main command computation ────────────────────────────────────────────
@@ -286,7 +342,23 @@ export function computeAutopilotCommandsWithControllerState(
       pitchTargetDeg = altitudeToPitch(nextControllerState, targetAltFt, state, dt);
     } else if (t.verticalActive === 'VS') {
       const vs = finiteOrUndefined(targetVerticalSpeedFpm) ?? finiteOrUndefined(ap.boeing.verticalSpeed) ?? 0;
-      pitchTargetDeg = vsToPitch(nextControllerState, vs, state, dt);
+      const commandedDescent = vs < -100;
+      const currentVs = currentVsFpm(state);
+      // Dive arrest: when tracking a descent and the actual sink rate exceeds
+      // the commanded descent by a large margin, the tracker gets full nose-up
+      // authority so a developed dive can be pulled out. The baseline cap only
+      // bounds ordinary tracking error.
+      const diveArrest = commandedDescent
+        && currentVs < vs - VS_DIVE_ARREST_ERROR_FPM;
+      pitchTargetDeg = vsToPitch(
+        nextControllerState,
+        vs,
+        state,
+        dt,
+        commandedDescent
+          ? (diveArrest ? VS_DIVE_ARREST_MAX_NOSE_UP_DEG : VS_DESCENT_MAX_NOSE_UP_DEG)
+          : 15,
+      );
     } else if (t.verticalActive === 'VNAV' || t.verticalActive === 'VNAV_PTH' || t.verticalActive === 'ALT*') {
       const vs = finiteOrUndefined(targetVerticalSpeedFpm);
       if (vs !== undefined) pitchTargetDeg = vsToPitch(nextControllerState, vs, state, dt);
@@ -332,10 +404,19 @@ export function computeAutopilotCommandsWithControllerState(
 
     if (state.ground.weightOnWheels) {
       minT = 0;
-    } else if (selectedVsDescent && deficit <= 10) {
-      minT = 0.15; // commanded descent while on/above speed: idle enough to let VS capture
+    } else if (deficit < -10 && (selectedVsDescent || t.verticalActive === 'ALT_HOLD')) {
+      // Well above the MCP bug in VS or ALT_HOLD: idle. The clamp floor is the
+      // commanded thrust at steady state, so a phase-keyed floor here would
+      // force the aircraft to accelerate until drag catches up.
+      minT = 0.05;
     } else if (selectedVsDescent) {
-      minT = 0.25; // selected descent and slow: avoid adding climb/cruise power
+      // VS + A/T SPEED: the thrust PID gains are too small to schedule
+      // mid-range thrust at small speed errors, so the floor is the descent
+      // energy scheduler. Underspeed gets climb-out thrust; near the bug a
+      // light floor lets the shallow descent hold speed without acceleration.
+      // The floor scales with the deficit: a flat mid floor left the aircraft
+      // energy-starved at altitude, bleeding into a stall despite A/T SPEED.
+      minT = deficit > 30 ? 0.85 : deficit > 10 ? 0.70 : deficit > 5 ? 0.55 : 0.15;
     } else if (aboveTarget && vsFpm < 0) {
       minT = 0.15; // descending toward target: let the dive do the work
     } else if (aboveTarget && deficit > 10) {
@@ -346,7 +427,7 @@ export function computeAutopilotCommandsWithControllerState(
       minT = 0.60;
     } else if (vsFpm < -500) {
       minT = 0.70;
-    } else if (state.flightPhase === 'CLIMB') {
+    } else if (state.flightPhase === 'CLIMB' && deficit >= -10) {
       minT = 0.55;
     } else if (altFt > 15000) {
       minT = 0.50;

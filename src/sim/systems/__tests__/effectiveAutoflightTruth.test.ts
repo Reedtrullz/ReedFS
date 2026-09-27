@@ -390,6 +390,59 @@ describe('effective autoflight truth', () => {
     expect(effective.thrustActive).toBe('SPEED');
   });
 
+  it('keeps APP and G_S backed after the threshold fix sequences and completes the route', () => {
+    const aircraft = aircraftOnEngmFinal(1200, 754);
+    const flightPlan = envaEngmSyntheticAutolandRoute();
+    const routeStatus = {
+      ...engmFinalRouteStatus(),
+      routeComplete: true,
+      lnavAvailable: false,
+      lnavUnavailableReason: 'route complete',
+      approachHandoff: 'threshold' as const,
+    };
+    const ap = makeAppAutolandAp();
+
+    const effective = deriveEffectiveAutoflightTruth(ap, { aircraft, flightPlan, routeStatus });
+
+    expect(hasSyntheticApproachAutolandCapability({ aircraft, flightPlan, routeStatus })).toBe(true);
+    expect(effective.autopilotStatus).toBe('CMD_AB');
+    expect(effective.lateralActive).toBe('APP');
+    expect(effective.verticalActive).toBe('G_S');
+    expect(effective.thrustActive).toBe('SPEED');
+  });
+
+  it('disengages autothrottle at touchdown instead of spooling to hold zero speed', () => {
+    const aircraft = aircraftOnEngmFinal();
+    aircraft.ground.weightOnWheels = true;
+    aircraft.ground.contact = 'gear';
+    aircraft.flightPhase = 'ROLLOUT';
+    const ap = makeAppAutolandAp();
+
+    const effective = deriveEffectiveAutoflightTruth(ap, { aircraft });
+
+    expect(effective.thrustActive).toBe('OFF');
+  });
+
+  it('keeps APP capability fail-closed before the approach segment is established', () => {
+    const aircraft = aircraftOnEngmFinal();
+    const flightPlan = envaEngmSyntheticAutolandRoute();
+    const routeStatus = {
+      ...engmFinalRouteStatus(),
+      activeLegIndex: 1,
+      toWaypointIndex: 2,
+      fromIdent: 'RFSNOR',
+      nextWaypointIdent: 'ENGM19R_IF',
+      approachHandoff: 'none' as const,
+    };
+    const ap = makeAppAutolandAp();
+
+    expect(hasSyntheticApproachAutolandCapability({ aircraft, flightPlan, routeStatus })).toBe(false);
+
+    const effective = deriveEffectiveAutoflightTruth(ap, { aircraft, flightPlan, routeStatus });
+    expect(effective.lateralActive).toBe('OFF');
+    expect(effective.verticalActive).toBe('OFF');
+  });
+
   it('keeps APP and G_S fail-closed when the route lacks recognizable synthetic approach metadata', () => {
     const aircraft = aircraftAtRoute(3000);
     aircraft.ground = { ...aircraft.ground, weightOnWheels: false, aglFt: 2500, contact: 'none', onRunway: false };
@@ -482,7 +535,7 @@ describe('effective autoflight truth', () => {
     expect(effective.verticalActive).toBe('VNAV_PTH');
   });
 
-  it('keeps pre-TOD VNAV armed out of active pitch command truth', () => {
+  it('holds cruise altitude with pitch guidance active while pre-TOD VNAV descent is armed', () => {
     const aircraft = aircraftAtRoute(30_000);
     const flightPlan = routeWithFutureDescentConstraint();
     const routeStatus = routeStatusBeforeTod(aircraft, flightPlan);
@@ -496,9 +549,9 @@ describe('effective autoflight truth', () => {
 
     expect(effective.autopilotStatus).toBe('CMD_A');
     expect(effective.lateralActive).toBe('LNAV');
-    expect(effective.verticalActive).toBe('OFF');
-    expect(effective.verticalArmed).toBe('VNAV');
-    expect((effective as { lateralOnly?: boolean }).lateralOnly).toBe(true);
+    expect(effective.verticalActive).toBe('ALT_HOLD');
+    expect(effective.verticalArmed).toBeUndefined();
+    expect((effective as { lateralOnly?: boolean }).lateralOnly).toBeUndefined();
   });
 
   it('derives ALT* near the active VNAV altitude constraint', () => {

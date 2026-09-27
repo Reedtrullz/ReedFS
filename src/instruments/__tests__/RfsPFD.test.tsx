@@ -512,7 +512,7 @@ describe('RfsPFD', () => {
     expect(screen.queryByLabelText('Flight director pitch bar')).toBeNull();
   });
 
-  it('hides the unsupported VS Flight Director pitch cue near MCP altitude capture', () => {
+  it('shows the VS Flight Director pitch cue during MCP altitude capture', () => {
     const aircraft = structuredClone(useSimStore.getState().aircraft);
     aircraft.position.alt = 9_990;
     aircraft.velocity.u = 128.6;
@@ -533,10 +533,11 @@ describe('RfsPFD', () => {
 
     render(<RfsPFD />);
 
-    expect(screen.queryByLabelText('Flight director pitch bar')).toBeNull();
+    const pitchBar = screen.getByLabelText('Flight director pitch bar');
+    expect(['ALT*', 'ALT_HOLD']).toContain(pitchBar.getAttribute('data-mode'));
   });
 
-  it('shows VNAV armed before TOD without drawing a pitch Flight Director command', () => {
+  it('shows pre-TOD VNAV as a pitch-active cruise hold with the descent armed', () => {
     setAircraftBeforeTodFutureConstraint();
     const ap = apStateWithModes();
     ap.truth.lateralActive = 'LNAV';
@@ -549,9 +550,9 @@ describe('RfsPFD', () => {
 
     render(<RfsPFD />);
 
-    expect(screen.getByLabelText('FMA pitch active').textContent).toBe('OFF');
-    expect(screen.getByRole('status', { name: 'PFD armed vertical mode' }).textContent).toBe('ARMED VNAV');
-    expect(screen.queryByLabelText('Flight director pitch bar')).toBeNull();
+    expect(screen.getByLabelText('FMA pitch active').textContent).toBe('ALT_HOLD');
+    expect(screen.queryByLabelText('PFD armed vertical mode')).toBeNull();
+    expect(screen.getByLabelText('Flight director pitch bar')).toBeTruthy();
   });
 
   it('shows LNAV armed for a position-incompatible route without a roll Flight Director command', () => {
