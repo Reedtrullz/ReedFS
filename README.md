@@ -285,7 +285,7 @@ publish job: docker build -> ghcr.io/reedtrullz/rfs:latest
 deploy job:  SSH to VPS -> pull -> canary :3004 -> health check -> promote :3005
 ```
 
-Set the repository variable `RFS_VPS_DEPLOY_ENABLED=0` at the Pages cutover to stop future VPS deploys; leave it unset while the VPS remains production. The manual Ansible playbook remains available for an explicit rollback.
+Keep the repository variable `RFS_VPS_DEPLOY_ENABLED=1` while the VPS remains production. Set it to `0` at the Pages cutover to stop future VPS deploys. The manual Ansible playbook remains available for an explicit rollback.
 
 Production path:
 
