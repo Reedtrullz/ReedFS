@@ -47,6 +47,8 @@ jobs:
       - name: Deploy preview
         if: ${{ !inputs.upload_only }}
         uses: cloudflare/wrangler-action@953926a2e2182532811c01a25e53647d93bf07c0 # v4
+        env:
+          npm_config_legacy_peer_deps: 'true'
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
