@@ -17,6 +17,12 @@
     deploy_image_ref: "{{ local_image_ref if (build_local_image | bool) else image_ref }}"
 
   tasks:
+    - name: Require explicit VPS deployment or rollback intent
+      assert:
+        that:
+          - lookup('env', 'RFS_VPS_DEPLOY_ENABLED') == '1' or lookup('env', 'RFS_VPS_ROLLBACK') == '1'
+        fail_msg: 'Set RFS_VPS_DEPLOY_ENABLED=1 while the VPS is production, or RFS_VPS_ROLLBACK=1 for an intentional rollback.'
+
     - name: Require immutable image ref unless explicitly building locally
       assert:
         that:
