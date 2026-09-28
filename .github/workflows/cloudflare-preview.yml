@@ -24,6 +24,7 @@ jobs:
         env:
           VITE_CESIUM_ION_TOKEN: ${{ secrets.VITE_CESIUM_ION_TOKEN }}
           RFS_COMMIT_SHA: ${{ github.sha }}
+          RFS_VERSION: ${{ github.sha }}
           RFS_IMAGE_REF: cloudflare-pages-preview
       - name: Check Pages asset limits
         run: |
