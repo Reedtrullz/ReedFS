@@ -1,0 +1,53 @@
+name: Cloudflare Pages preview
+
+on:
+  workflow_dispatch:
+    inputs:
+      upload_only:
+        description: Build a checked Pages artifact for local Wrangler deployment
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22
+          cache: npm
+      - name: Bootstrap pinned RFMS shared dependency
+        run: node scripts/bootstrap-rfms-shared.mjs
+      - name: Verify pinned RFMS revision
+        run: test "$(git -C ../RFMS rev-parse HEAD)" = 810fc9652da431eaf8978b85bf4af131605559b5
+      - run: npm ci --legacy-peer-deps
+      - run: npm run check
+        env:
+          VITE_CESIUM_ION_TOKEN: ${{ secrets.VITE_CESIUM_ION_TOKEN }}
+          RFS_COMMIT_SHA: ${{ github.sha }}
+          RFS_VERSION: ${{ github.sha }}
+          RFS_IMAGE_REF: cloudflare-pages-preview
+      - name: Check Pages asset limits
+        run: |
+          test "$(find dist -type f | wc -l)" -le 20000
+          test -z "$(find dist -type f -size +25M -print -quit)"
+          test -f dist/_headers
+          test -f dist/rfs-version.json
+      - name: Preserve checked Pages build
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: rfs-pages-${{ github.sha }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Deploy preview
+        if: ${{ !inputs.upload_only }}
+        uses: cloudflare/wrangler-action@953926a2e2182532811c01a25e53647d93bf07c0 # v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name=reidar-rfs --branch=cloudflare-preview
