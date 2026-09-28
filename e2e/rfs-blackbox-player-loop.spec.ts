@@ -154,7 +154,7 @@ test.describe('RFS black-box player loop proof', () => {
     await clickVisibleMcpMode(page, 'SPD');
     const currentAltitudeFt = (await readVisibleFlightNumbers(page)).altitudeFt;
     const altitudeTargetFt = Math.ceil((currentAltitudeFt + 1000) / 1000) * 1000;
-    await setVisibleMcpAltitudeAtLeast(page, altitudeTargetFt);
+    const selectedAltitudeFt = await setVisibleMcpAltitudeAtLeast(page, altitudeTargetFt);
     await clickVisibleMcpMode(page, 'ALT');
 
     const engagedFma = await waitForVisibleFmaModes(page, {
@@ -166,7 +166,12 @@ test.describe('RFS black-box player loop proof', () => {
     expect(`PITCH ${engagedFma.verticalActive} / ${engagedFma.autopilotStatus}`).not.toBe('PITCH OFF / CMD_A');
     expect(engagedFma.verticalActive).not.toBe('OFF');
     expect(engagedFma.verticalActive).toMatch(/^(ALT\*|ALT_HOLD)$/);
-    await expect(page.getByLabel('Altitude selected bug')).toBeVisible();
+    await expect(page.getByLabel('PFD MCP selected targets')).toContainText(`SEL ALT ${selectedAltitudeFt}`);
+    const altitudeAtEngagementFt = (await readVisibleFlightNumbers(page)).altitudeFt;
+    const bugDistanceFt = Math.abs(selectedAltitudeFt - altitudeAtEngagementFt);
+    // The tape intentionally hides a selected bug when its target is off scale.
+    if (bugDistanceFt <= 2000) await expect(page.getByLabel('Altitude selected bug')).toBeVisible();
+    if (bugDistanceFt >= 3000) await expect(page.getByLabel('Altitude selected bug')).toHaveCount(0);
     await expect(page.getByRole('status', { name: 'Autopilot authority warning' })).toHaveCount(0);
 
     await resetThroughVisibleControls(page);
