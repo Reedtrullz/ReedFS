@@ -4,7 +4,7 @@
 [![CodeQL](https://github.com/Reedtrullz/ReedFS/actions/workflows/codeql.yml/badge.svg?branch=master)](https://github.com/Reedtrullz/ReedFS/actions/workflows/codeql.yml?query=branch%3Amaster)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-RFS is a standalone web-based Boeing 737-800 flight simulator. It combines a TypeScript 6-DOF flight model, CesiumJS globe rendering, a Three.js aircraft layer, RFMS shared avionics/autopilot types, METAR-driven weather, cockpit instruments, audio cues, and a Docker/GHCR deployment pipeline.
+RFS is a standalone web-based Boeing 737-800 flight simulator. It combines a TypeScript 6-DOF flight model, CesiumJS globe rendering, a Three.js aircraft layer, RFMS shared avionics/autopilot types, METAR-driven weather, cockpit instruments, audio cues, and a Cloudflare Pages deployment pipeline.
 
 Live deployment: https://fly.reidar.tech
 Repository: https://github.com/Reedtrullz/ReedFS
@@ -46,7 +46,7 @@ Visual snapshots are not proof of audio, weather, PWA, or error-state behavior; 
 - Three.js aircraft/effects layer via `three-to-cesium`
 - RFMS shared types and avionics contracts from sibling repo `../RFMS/shared`
 - Docker + nginx image published to GHCR
-- GitHub Actions deploys to the VPS behind Caddy at `fly.reidar.tech`
+- GitHub Actions deploys Cloudflare Pages at `fly.reidar.tech`
 
 ## Repository layout
 
@@ -280,31 +280,23 @@ Audio is explicit and browser-autoplay-safe. The `AUDIO: OFF` cockpit control is
 Pushes to `master` trigger GitHub Actions:
 
 ```text
-test job:    install -> lint:ci -> typecheck -> test -> build
-publish job: docker build -> ghcr.io/reedtrullz/rfs:latest
-deploy job:  SSH to VPS -> pull -> canary :3004 -> health check -> promote :3005
+test job:         install -> lint:ci -> typecheck -> test -> build
+docker-smoke job: build and check the rollback image
+pages-deploy job: build with the Cesium ion token -> deploy to Cloudflare Pages
+publish job:      publish the GHCR rollback image
 ```
 
-Keep the repository variable `RFS_VPS_DEPLOY_ENABLED=1` while the VPS remains production. At the Pages cutover, set it to `0` and set `RFS_CLOUDFLARE_DEPLOY_ENABLED=1`. Successful `master` checks then deploy a Cesium-enabled build to Pages. The manual Ansible playbook requires `RFS_VPS_ROLLBACK=1` for an intentional rollback after cutover.
+Production uses `RFS_CLOUDFLARE_DEPLOY_ENABLED=1` and `RFS_VPS_DEPLOY_ENABLED=0`. Successful `master` checks deploy a Cesium-enabled build to Pages. The manual Ansible playbook requires `RFS_VPS_ROLLBACK=1` for an intentional VPS rollback. A rollback also requires restoring the saved Caddy route and changing `fly.reidar.tech` back to the VPS.
 
 Production path:
 
 ```text
 https://fly.reidar.tech
-  -> Cloudflare/Caddy on VPS 198.23.137.16
-    -> localhost:3005
-      -> Docker container rfs
+  -> proxied CNAME reidar-rfs.pages.dev
+    -> Cloudflare Pages
 ```
 
-VPS port map:
-
-- 3001: Heimdall
-- 3002: Frontpage
-- 3004: RFS canary
-- 3005: RFS production
-- 8082: RFMS/VirtualCDU
-
-Do not claim a deploy is complete until the GitHub Actions run is completed/successful and `curl https://fly.reidar.tech/` returns HTTP 200.
+Do not claim a deploy is complete until the GitHub Actions run succeeds and `https://fly.reidar.tech/rfs-version.json` reports that run's commit. Check the flight UI in a browser as well.
 
 ## Documentation
 
