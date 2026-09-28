@@ -2,6 +2,11 @@ name: Cloudflare Pages preview
 
 on:
   workflow_dispatch:
+    inputs:
+      upload_only:
+        description: Build a checked Pages artifact for local Wrangler deployment
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -32,7 +37,15 @@ jobs:
           test -z "$(find dist -type f -size +25M -print -quit)"
           test -f dist/_headers
           test -f dist/rfs-version.json
+      - name: Preserve checked Pages build
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: rfs-pages-${{ github.sha }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
       - name: Deploy preview
+        if: ${{ !inputs.upload_only }}
         uses: cloudflare/wrangler-action@953926a2e2182532811c01a25e53647d93bf07c0 # v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
