@@ -36,3 +36,7 @@ npm run test:e2e:full-flight
 Keep receipts pinned to the commit, shared dependency identity, runtime, command
 and result. Name unsupported or untested scope explicitly. Update this matrix as
 new gates land; preserve the existing ENVA, blackbox, CSP/PWA and release guards.
+
+## Worker validation bundle cost (2026-10-08)
+
+On Node22, unchanged application baseline was364.6KiB raw/114.9KiB gzip. Full finite worker boundary validation measured381.3/120.1; compact state shape measured380.6/119.8. Terser measured414.8/123.1 and was rejected. The app budget is rebaselined to400/126 with roughly5% headroom; all other category budgets and native security thresholds remain unchanged. This is an explicit feature allowance for duplicated app/worker validation, subject to independent review and native CI; it does not establish device performance. Real-browser protocol checks and existing worker/player flows remain required.

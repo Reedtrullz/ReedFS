@@ -1,4 +1,5 @@
 import type { SimulationStepInput, SimulationStepResult } from './simulationStep';
+import { assertSimulationStepInput, assertSimulationStepResult } from './simulationValidation';
 
 export const SIMULATION_WORKER_PROTOCOL_VERSION = 1 as const;
 export const SIMULATION_STEP_REQUEST_TYPE = 'simulation.step.request' as const;
@@ -156,6 +157,7 @@ export function encodeSimulationStepRequest(
   requestId: string,
   input: SimulationStepInput,
 ): SimulationStepRequestMessage {
+  assertSimulationStepInput(input);
   return {
     protocolVersion: SIMULATION_WORKER_PROTOCOL_VERSION,
     type: SIMULATION_STEP_REQUEST_TYPE,
@@ -170,11 +172,13 @@ export function decodeSimulationStepRequest(message: unknown): SimulationStepReq
     throw new TypeError(`Expected simulation step request, received ${envelope.type}`);
   }
 
+  const input = requirePayload(record, 'input');
+  assertSimulationStepInput(input);
   return {
     protocolVersion: envelope.protocolVersion,
     type: SIMULATION_STEP_REQUEST_TYPE,
     requestId: envelope.requestId,
-    input: cloneForWorker(requirePayload(record, 'input') as SimulationStepInput),
+    input: cloneForWorker(input),
   };
 }
 
@@ -182,6 +186,7 @@ export function encodeSimulationStepResult(
   requestId: string,
   result: SimulationStepResult,
 ): SimulationStepResultResponseMessage {
+  assertSimulationStepResult(result);
   return {
     protocolVersion: SIMULATION_WORKER_PROTOCOL_VERSION,
     type: SIMULATION_STEP_RESULT_TYPE,
@@ -206,11 +211,13 @@ export function decodeSimulationStepResponse(message: unknown): SimulationStepRe
   const { envelope, record } = readMessage(message);
 
   if (envelope.type === SIMULATION_STEP_RESULT_TYPE) {
+    const result = requirePayload(record, 'result');
+    assertSimulationStepResult(result);
     return {
       protocolVersion: envelope.protocolVersion,
       type: SIMULATION_STEP_RESULT_TYPE,
       requestId: envelope.requestId,
-      result: cloneForWorker(requirePayload(record, 'result') as SimulationStepResult),
+      result: cloneForWorker(result),
     };
   }
 

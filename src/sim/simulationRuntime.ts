@@ -5,6 +5,7 @@ import {
   type SimulationStepResult,
 } from './simulationStep';
 import { handleSimulationWorkerMessage } from './simulationWorker';
+import { assertSimulationStepInput, assertSimulationStepResult, isRecord } from './simulationValidation';
 import {
   decodeSimulationStepResponse,
   encodeSimulationStepRequest,
@@ -24,7 +25,9 @@ export interface AsyncSimulationRuntime extends SimulationRuntime {
 
 export interface SimulationWorkerLike {
   addEventListener(type: 'message', listener: (event: { data: unknown }) => void): void;
+  addEventListener(type: 'error' | 'messageerror', listener: () => void): void;
   removeEventListener(type: 'message', listener: (event: { data: unknown }) => void): void;
+  removeEventListener(type: 'error' | 'messageerror', listener: () => void): void;
   postMessage(message: unknown): void;
   terminate(): void;
 }
@@ -42,6 +45,7 @@ export interface CreateSimulationRuntimeOptions {
 interface PendingWorkerRequest {
   readonly input: SimulationStepInput;
   readonly resolve: (result: SimulationStepResult) => void;
+  readonly reject: (error: unknown) => void;
   readonly timeoutId: ReturnType<typeof setTimeout>;
 }
 
@@ -49,7 +53,10 @@ export class MainThreadSimulationRuntime implements SimulationRuntime {
   readonly kind = 'main-thread' as const;
 
   step(input: SimulationStepInput): SimulationStepResult {
-    return advanceSimulationBatch(input, input.steps ?? 1);
+    assertSimulationStepInput(input);
+    const result = advanceSimulationBatch(input, input.steps ?? 1);
+    assertSimulationStepResult(result);
+    return result;
   }
 }
 
@@ -76,6 +83,7 @@ export class BrowserWorkerSimulationRuntime implements AsyncSimulationRuntime {
   readonly kind = 'browser-worker' as const;
   #requestSeq = 0;
   #disposed = false;
+  #workerFailed = false;
   readonly #worker: SimulationWorkerLike;
   readonly #fallback: SimulationRuntime;
   readonly #timeoutMs: number;
@@ -93,29 +101,33 @@ export class BrowserWorkerSimulationRuntime implements AsyncSimulationRuntime {
     this.#timeoutMs = options.timeoutMs ?? 500;
     this.#maxPendingRequests = options.maxPendingRequests ?? 1;
     this.#worker.addEventListener('message', this.#handleMessage);
+    this.#worker.addEventListener('error', this.#handleFailure);
+    this.#worker.addEventListener('messageerror', this.#handleFailure);
   }
 
   step(input: SimulationStepInput): SimulationStepResult {
-    // The current store loop is synchronous. Until the frame scheduler becomes async-aware,
-    // a worker-selected runtime exposes the real Worker via stepAsync while sync callers
-    // retain a safe main-thread fallback instead of blocking on SharedArrayBuffer/Atomics.
-    return this.#fallback.step(input);
+    assertSimulationStepInput(input);
+    // Direct synchronous callers retain the validated main-thread path.
+    const result = this.#fallback.step(input);
+    assertSimulationStepResult(result);
+    return result;
   }
 
-  stepAsync(input: SimulationStepInput): Promise<SimulationStepResult> {
-    if (this.#disposed || this.#pending.size >= this.#maxPendingRequests) {
-      return Promise.resolve(this.#fallback.step(input));
-    }
-
+  async stepAsync(input: SimulationStepInput): Promise<SimulationStepResult> {
     this.#requestSeq += 1;
     const requestId = `browser-worker-step-${this.#requestSeq}`;
     const request = encodeSimulationStepRequest(requestId, input);
+    if (this.#disposed || this.#workerFailed || this.#pending.size >= this.#maxPendingRequests) {
+      const result = this.#fallback.step(request.input);
+      assertSimulationStepResult(result);
+      return result;
+    }
 
-    return new Promise<SimulationStepResult>((resolve) => {
+    return new Promise<SimulationStepResult>((resolve, reject) => {
       const timeoutId = setTimeout(() => {
         this.#resolvePendingWithFallback(requestId);
       }, this.#timeoutMs);
-      this.#pending.set(requestId, { input, resolve, timeoutId });
+      this.#pending.set(requestId, { input: request.input, resolve, reject, timeoutId });
 
       try {
         this.#worker.postMessage(request);
@@ -131,21 +143,34 @@ export class BrowserWorkerSimulationRuntime implements AsyncSimulationRuntime {
       this.#resolvePendingWithFallback(requestId);
     }
     this.#worker.removeEventListener('message', this.#handleMessage);
+    this.#worker.removeEventListener('error', this.#handleFailure);
+    this.#worker.removeEventListener('messageerror', this.#handleFailure);
     this.#worker.terminate();
   }
 
   readonly #handleMessage = (event: { data: unknown }): void => {
-    const response = decodeSimulationStepResponse(event.data);
-    const pending = this.#pending.get(response.requestId);
-    if (!pending) return;
-
-    clearTimeout(pending.timeoutId);
-    this.#pending.delete(response.requestId);
-    if (response.type === 'simulation.step.error') {
-      pending.resolve(this.#fallback.step(pending.input));
-      return;
+    // Ignore duplicate/late IDs before decoding their payloads.
+    if (isRecord(event.data) && typeof event.data.requestId === 'string' && !this.#pending.has(event.data.requestId)) return;
+    try {
+      const response = decodeSimulationStepResponse(event.data);
+      const pending = this.#pending.get(response.requestId);
+      if (!pending) return;
+      if (response.type === 'simulation.step.error') {
+        this.#resolvePendingWithFallback(response.requestId);
+        return;
+      }
+      if (response.result.guidance.scenarioId !== pending.input.selectedScenarioId) throw new TypeError('Worker result scenario identity mismatch');
+      clearTimeout(pending.timeoutId);
+      this.#pending.delete(response.requestId);
+      pending.resolve(response.result);
+    } catch {
+      this.#handleFailure();
     }
-    pending.resolve(response.result);
+  };
+
+  readonly #handleFailure = (): void => {
+    this.#workerFailed = true;
+    for (const requestId of this.#pending.keys()) this.#resolvePendingWithFallback(requestId);
   };
 
   #resolvePendingWithFallback(requestId: string): void {
@@ -153,7 +178,13 @@ export class BrowserWorkerSimulationRuntime implements AsyncSimulationRuntime {
     if (!pending) return;
     clearTimeout(pending.timeoutId);
     this.#pending.delete(requestId);
-    pending.resolve(this.#fallback.step(pending.input));
+    try {
+      const result = this.#fallback.step(pending.input);
+      assertSimulationStepResult(result);
+      pending.resolve(result);
+    } catch (error) {
+      pending.reject(error);
+    }
   }
 }
 

@@ -8,6 +8,7 @@ import { deriveRouteDrivenFlightPhase } from './flightPhasePredicates';
 import { rebuildGuidanceState, type GuidanceState } from './guidanceState';
 import { scenarioById, type FlightScenario } from './scenarios';
 import type { ScenarioWeatherMetadata } from './weather';
+import { assertSimulationExecutionBounds } from './simulationValidation';
 import {
   computeRouteStatus,
   createNoRouteStatus,
@@ -169,7 +170,8 @@ export function advanceSimulationBatch(
   input: SimulationStepInput,
   steps: number,
 ): SimulationStepResult {
-  const stepCount = Math.max(1, Math.floor(steps));
+  assertSimulationExecutionBounds(input.dt, steps);
+  const stepCount = steps;
   let current: SimulationStepInput = { ...input, steps: stepCount };
   let result: SimulationStepResult = advanceSimulationStep(current);
   for (let i = 1; i < stepCount; i++) {
