@@ -1,6 +1,7 @@
 import type { FlightPlan, FlightPlanWaypoint } from '@shared/types/fmc';
 import { createRouteSourceFromFlightPlan, type RouteSource } from './fms/routeAdapter';
 import type { FlightScenario } from './scenarios';
+import { hasValidCoordinates, interpolateRouteCoordinate, routeDistanceM } from './physics/routeGeometry';
 import {
   ENGM_AUTOLAND_APPROACH,
   KPDX_RUNWAY_10R_APPROACH,
@@ -136,18 +137,12 @@ function pointFromBearingDistance(origin: RunwayGeoPoint, bearingDeg: number, di
 }
 
 function interpolatePoint(from: RunwayGeoPoint, to: RunwayGeoPoint, fraction: number, altFt: number): RunwayGeoPoint {
-  return {
-    lat: roundCoordinate(from.lat + (to.lat - from.lat) * fraction),
-    lon: roundCoordinate(from.lon + (to.lon - from.lon) * fraction),
-    altFt,
-  };
+  const point = interpolateRouteCoordinate(from, to, fraction);
+  return { lat: roundCoordinate(point.lat), lon: roundCoordinate(point.lon), altFt };
 }
 
 function distanceNm(from: Pick<RunwayGeoPoint, 'lat' | 'lon'>, to: Pick<RunwayGeoPoint, 'lat' | 'lon'>): number {
-  const meanLat = toRad((from.lat + to.lat) / 2);
-  const dLat = toRad(to.lat - from.lat);
-  const dLon = toRad(to.lon - from.lon);
-  return Math.hypot(dLon * Math.cos(meanLat), dLat) * EARTH_RADIUS_M / M_PER_NM;
+  return routeDistanceM(from, to) / M_PER_NM;
 }
 
 function runwayWaypointIdent(airport: string, runway: string, suffix: string): string {
@@ -180,6 +175,10 @@ function resolveRunways(request: RunwayRouteRequest): RunwayRouteResolution {
   const destinationRunway = orientedRunwayByAirportAndId(request.destinationAirport.toUpperCase(), request.destinationRunway.toUpperCase());
   if (!originRunway) throw new Error(`Unsupported origin runway ${request.originAirport} ${request.originRunway}`);
   if (!destinationRunway) throw new Error(`Unsupported destination runway ${request.destinationAirport} ${request.destinationRunway}`);
+  if (![originRunway, destinationRunway].every((runway) => hasValidCoordinates(runway.start)
+    && (runway.end === undefined || hasValidCoordinates(runway.end)))) {
+    throw new TypeError('Invalid runway route coordinates');
+  }
   return { originRunway, destinationRunway };
 }
 

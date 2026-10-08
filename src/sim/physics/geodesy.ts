@@ -24,6 +24,10 @@ export function geodeticToEcef(lat: number, lon: number, alt: number): Ecef {
 
 export function ecefToGeodetic(x: number, y: number, z: number): Geodetic {
   const p = Math.sqrt(x * x + y * y);
+  if (p === 0) {
+    if (!Number.isFinite(z) || z === 0) throw new RangeError('Undefined geodetic position at ECEF origin');
+    return { lat: Math.sign(z) * 90, lon: 0, alt: Math.abs(z) - A * (1 - F) };
+  }
   const lon = Math.atan2(y, x);
   let lat = Math.atan2(z, p * (1 - E2));
   // Iterate for altitude (3 iterations for cm accuracy)
