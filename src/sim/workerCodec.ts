@@ -1,5 +1,5 @@
 import type { SimulationStepInput, SimulationStepResult } from './simulationStep';
-import { assertSimulationStepInput, assertSimulationStepResult } from './simulationValidation';
+import { assertSimulationStepInput, assertSimulationStepResult, InvalidSimulationStateError, isFiniteSimulationData } from './simulationValidation';
 
 export const SIMULATION_WORKER_PROTOCOL_VERSION = 1 as const;
 export const SIMULATION_STEP_REQUEST_TYPE = 'simulation.step.request' as const;
@@ -22,6 +22,7 @@ export interface SimulationWorkerErrorPayload {
   name: string;
   message: string;
   stack?: string;
+  invalidResult?: unknown;
 }
 
 export interface SimulationStepRequestMessage {
@@ -120,6 +121,7 @@ function errorPayloadFrom(error: unknown): SimulationWorkerErrorPayload {
       message: error.message,
     };
     if (typeof error.stack === 'string') payload.stack = error.stack;
+    if (error instanceof InvalidSimulationStateError) payload.invalidResult = error.result;
     return payload;
   }
 
@@ -150,6 +152,10 @@ function decodeErrorPayload(error: unknown): SimulationWorkerErrorPayload {
     message: record.message,
   };
   if (typeof record.stack === 'string') payload.stack = record.stack;
+  if (record.name === 'InvalidSimulationStateError' && 'invalidResult' in record) {
+    if (!isFiniteSimulationData(record.invalidResult, true)) throw new TypeError('Unbounded worker diagnostic result');
+    payload.invalidResult = structuredClone(record.invalidResult);
+  }
   return payload;
 }
 

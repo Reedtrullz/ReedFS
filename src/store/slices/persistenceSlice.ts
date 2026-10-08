@@ -25,7 +25,7 @@ function defaultScenarioStorage(): ScenarioPersistenceStorage | null {
   return typeof globalThis.localStorage === 'undefined' ? null : globalThis.localStorage;
 }
 
-function restoreSnapshotSlice(snapshot: ScenarioSnapshot, slotName = 'Saved scenario'): Partial<SimStore> {
+export function restoreSnapshotSlice(snapshot: ScenarioSnapshot, slotName = 'Saved scenario'): Partial<SimStore> {
   const aircraft = structuredClone(snapshot.aircraft);
   aircraft.config = normalizeAircraftConfig(aircraft.config);
   const apState = structuredClone(snapshot.apState);
@@ -131,6 +131,8 @@ export function createPersistenceSlice(set: SimStoreSet): Pick<SimStore, 'saveSc
           ...restoreSnapshotSlice(loaded.snapshot, loaded.metadata.id === DEFAULT_SCENARIO_SAVE_SLOT_ID ? 'Saved scenario' : loaded.metadata.name),
           asyncPhysicsGeneration: s.asyncPhysicsGeneration + 1,
           asyncPhysicsInFlight: false,
+          lastValidCheckpoint: loaded.snapshot,
+          simulationFailure: s.simulationFailure ? { ...s.simulationFailure, recovered: true } : null,
           scenarioSaveSlots: listScenarioSaveSlots(targetStorage),
         };
       } catch (error) {

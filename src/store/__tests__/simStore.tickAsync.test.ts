@@ -25,7 +25,7 @@ function asyncRuntimeStub() {
           routeStatus: createNoRouteStatus(),
           activeLegIndex: null,
           apCommands: {},
-          controls: { pilotInputs: {} as never, apCommands: {}, effectiveControls: {} as never, inputs: {} as never },
+          controls: { pilotInputs: input.pilotInputs, apCommands: {}, effectiveControls: input.pilotInputs, inputs: input.pilotInputs },
           guidance: input.guidance,
           apControllerState: input.apControllerState ?? createAutopilotControllerState(),
         };
@@ -55,11 +55,10 @@ function seedRunningScenario() {
     routeStatus: createNoRouteStatus(),
     guidance: buildGuidanceState({ scenario: ENVA_TUTORIAL_SCENARIO, status: 'running', aircraft, controls: pilotInputs }),
     apState: null,
-    apControllerState: {
-      pitch: { integrator: 0, lastMeasurement: 0 },
-      roll: { integrator: 0, lastMeasurement: 0 },
-      thrust: { integrator: 0, lastMeasurement: 0 },
-    } as never,
+    apControllerState: createAutopilotControllerState(),
+    simulationFailure: null,
+    asyncPhysicsGeneration: 0,
+    asyncPhysicsInFlight: false,
   });
 }
 

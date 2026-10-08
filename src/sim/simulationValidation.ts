@@ -5,6 +5,7 @@ import { B737_800_SPEC, createInitialState, type AircraftState, type ControlInpu
 import type { ScenarioWeatherMetadata, WindInfo } from './weather';
 import type { AutopilotControllerState } from './systems/autopilot';
 import { SCENARIOS } from './scenarios';
+import { eulerToQuat } from './physics/quaternion';
 
 type RecordValue = Record<string, unknown>;
 export const MAX_SIMULATION_BATCH_STEPS = 4096;
@@ -15,12 +16,12 @@ export function isRecord(value: unknown): value is RecordValue {
 }
 
 // Check once per boundary, with bounded traversal; never inside each substep.
-export function isFiniteSimulationData(value: unknown): boolean {
+export function isFiniteSimulationData(value: unknown, allowNonfinite = false): boolean {
   let remaining = 50_000;
   const active = new Set<object>();
   function visit(item: unknown, depth: number): boolean {
     if (--remaining < 0 || depth > 24) return false;
-    if (typeof item === 'number') return Number.isFinite(item);
+    if (typeof item === 'number') return allowNonfinite || Number.isFinite(item);
     if (typeof item === 'string') return item.length <= 32_768;
     if (item == null || typeof item === 'boolean') return true;
     if (typeof item !== 'object' || active.has(item)) return false;
@@ -156,12 +157,33 @@ export function assertSimulationStepInput(value: unknown): asserts value is Simu
     || (value.cloneAircraft !== undefined && typeof value.cloneAircraft !== 'boolean')) throw new TypeError('Invalid simulation step input');
   assertSimulationExecutionBounds(value.dt as number, (value.steps ?? 1) as number);
 }
+export class InvalidSimulationStateError extends TypeError {
+  readonly result: unknown;
+  constructor(message: string, result: unknown) {
+    super(message);
+    this.name = 'InvalidSimulationStateError';
+    this.result = isFiniteSimulationData(result, true) ? structuredClone(result) : { omitted: 'Unbounded or uncloneable result' };
+  }
+}
+
+export function assertCommittedSimulationResult(value: unknown, scenarioId: string): asserts value is SimulationStepResult {
+  assertSimulationStepResult(value);
+  if (value.guidance.scenarioId !== scenarioId) throw new InvalidSimulationStateError('Simulation result scenario identity mismatch', value);
+  const { attitude, quaternion } = value.aircraft;
+  const expected = eulerToQuat(attitude.phi, attitude.theta, attitude.psi);
+  const dot = Math.abs(expected.q0 * quaternion.q0 + expected.q1 * quaternion.q1 + expected.q2 * quaternion.q2 + expected.q3 * quaternion.q3);
+  if (Math.abs(Math.hypot(quaternion.q0, quaternion.q1, quaternion.q2, quaternion.q3) - 1) > 1e-6 || Math.abs(dot - 1) > 1e-6) {
+    throw new InvalidSimulationStateError('Simulation result attitude representations disagree', value);
+  }
+}
+
 export function assertSimulationStepResult(value: unknown): asserts value is SimulationStepResult {
   if (!isRecord(value) || !isFiniteSimulationData(value) || !isAircraftState(value.aircraft) || !isRouteStatus(value.routeStatus)
     || !index(value.activeLegIndex) || value.activeLegIndex !== (value.routeStatus as RecordValue).activeLegIndex
     || !isAutopilotCommands(value.apCommands) || !isRecord(value.controls)
     || !['pilotInputs', 'effectiveControls', 'inputs'].every((key) => isControlInputs((value.controls as RecordValue)[key]))
     || !isAutopilotCommands(value.controls.apCommands) || !isGuidance(value.guidance) || !isAutopilotControllerState(value.apControllerState)) {
+    if (isRecord(value) && isRecord(value.aircraft)) throw new InvalidSimulationStateError('Invalid simulation step result', value);
     throw new TypeError('Invalid simulation step result');
   }
 }

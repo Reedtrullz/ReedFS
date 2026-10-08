@@ -286,3 +286,26 @@ it('ignores duplicate and late replies while a newer request is pending', async 
   await expect(second).resolves.toEqual(mainThreadSimulationRuntime.step(input()));
   expect(fallbacks).toBe(0); runtime.dispose();
 });
+
+it('preserves a numerical worker fault and rejects instead of recomputing it through fallback', async () => {
+  const worker = new FaultWorker(); let fallbacks = 0;
+  const runtime = new BrowserWorkerSimulationRuntime({ worker, fallback: { kind: 'main-thread', step: (data) => { fallbacks++; return mainThreadSimulationRuntime.step(data); } } });
+  const data = input(); data.aircraft.velocity.u = 1e300;
+  const pending = runtime.stepAsync(data);
+  const expected = expect(pending).rejects.toMatchObject({ name: 'InvalidSimulationStateError', result: { aircraft: { velocity: { u: NaN } } } });
+  worker.emit('message', handleSimulationWorkerMessage(worker.messages[0]));
+  await expected;
+  expect(fallbacks).toBe(0); runtime.dispose();
+});
+
+it('rejects an invalid numerical result supplied as a success reply with its original evidence', async () => {
+  const worker = new FaultWorker(); let fallbacks = 0;
+  const runtime = new BrowserWorkerSimulationRuntime({ worker, fallback: { kind: 'main-thread', step: (data) => { fallbacks++; return mainThreadSimulationRuntime.step(data); } } });
+  const pending = runtime.stepAsync(input());
+  const response = handleSimulationWorkerMessage(worker.messages[0]);
+  if (response.type !== 'simulation.step.result') throw new Error('valid result required');
+  response.result.aircraft.velocity.u = NaN;
+  const expected = expect(pending).rejects.toMatchObject({ name: 'InvalidSimulationStateError', result: response.result });
+  worker.emit('message', response); await expected;
+  expect(fallbacks).toBe(0); runtime.dispose();
+});

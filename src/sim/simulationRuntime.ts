@@ -5,7 +5,7 @@ import {
   type SimulationStepResult,
 } from './simulationStep';
 import { handleSimulationWorkerMessage } from './simulationWorker';
-import { assertSimulationStepInput, assertSimulationStepResult, isRecord } from './simulationValidation';
+import { assertSimulationStepInput, assertSimulationStepResult, InvalidSimulationStateError, isRecord } from './simulationValidation';
 import {
   decodeSimulationStepResponse,
   encodeSimulationStepRequest,
@@ -69,6 +69,7 @@ export class WorkerHandlerSimulationRuntime implements SimulationRuntime {
     const request = encodeSimulationStepRequest(`runtime-step-${this.#requestSeq}`, input);
     const response = decodeSimulationStepResponse(handleSimulationWorkerMessage(request));
     if (response.type === 'simulation.step.error') {
+      if (response.error.name === 'InvalidSimulationStateError') throw new InvalidSimulationStateError(response.error.message, response.error.invalidResult);
       throw new Error(`Simulation worker runtime failed: ${response.error.message}`);
     }
     return response.result;
@@ -156,15 +157,23 @@ export class BrowserWorkerSimulationRuntime implements AsyncSimulationRuntime {
       const pending = this.#pending.get(response.requestId);
       if (!pending) return;
       if (response.type === 'simulation.step.error') {
+        if (response.error.name === 'InvalidSimulationStateError') throw new InvalidSimulationStateError(response.error.message, response.error.invalidResult);
         this.#resolvePendingWithFallback(response.requestId);
         return;
       }
-      if (response.result.guidance.scenarioId !== pending.input.selectedScenarioId) throw new TypeError('Worker result scenario identity mismatch');
+      if (response.result.guidance.scenarioId !== pending.input.selectedScenarioId) throw new InvalidSimulationStateError('Worker result scenario identity mismatch', response.result);
       clearTimeout(pending.timeoutId);
       this.#pending.delete(response.requestId);
       pending.resolve(response.result);
-    } catch {
-      this.#handleFailure();
+    } catch (error) {
+      if (error instanceof InvalidSimulationStateError) {
+        this.#workerFailed = true;
+        for (const [id, pending] of this.#pending) {
+          clearTimeout(pending.timeoutId);
+          this.#pending.delete(id);
+          pending.reject(error);
+        }
+      } else this.#handleFailure();
     }
   };
 

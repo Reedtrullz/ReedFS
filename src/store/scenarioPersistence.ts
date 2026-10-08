@@ -250,8 +250,9 @@ function slotFromCollection(collection: ScenarioSaveCollection, slotId: string):
   return { ok: true, snapshot: rawSlot.snapshot, metadata };
 }
 
-export function createScenarioSnapshot(state: SimStore): ScenarioSnapshot {
-  return structuredClone({
+/** Read-only capture of store-owned immutable objects; clone before external use. */
+export function captureScenarioSnapshot(state: SimStore): ScenarioSnapshot {
+  return {
     version: SCENARIO_SAVE_VERSION,
     savedAtIso: new Date().toISOString(),
     selectedScenarioId: state.selectedScenarioId,
@@ -268,7 +269,11 @@ export function createScenarioSnapshot(state: SimStore): ScenarioSnapshot {
     weather: state.weather ?? scenarioById(state.selectedScenarioId).weather,
     identities: SCENARIO_SNAPSHOT_IDENTITIES,
     simulationTimeSeconds: state.simulationTimeSeconds,
-  });
+  };
+}
+
+export function createScenarioSnapshot(state: SimStore): ScenarioSnapshot {
+  return structuredClone(captureScenarioSnapshot(state));
 }
 
 export function saveScenarioSnapshot(
