@@ -16,6 +16,7 @@ const FAILURE_LABELS: Record<CesiumSceneFailure['stage'], string> = {
   load: 'Cesium scene failed to initialize.',
   buildings: '3D buildings could not be loaded.',
   imagery: 'Globe imagery or terrain hit a render error.',
+  context: '3D view unavailable. Flight instruments and simulation remain active.',
 };
 
 export function SceneStatusOverlay({ policy, failure, retryKey, onRetry }: SceneStatusProps) {
@@ -27,7 +28,7 @@ export function SceneStatusOverlay({ policy, failure, retryKey, onRetry }: Scene
 
   return (
     <div role="status" aria-live="polite" style={statusStyle}>
-      <span style={titleStyle}>{failureMessage ? 'SCENERY ERROR' : 'SCENERY DEGRADED'}</span>
+      <span style={titleStyle}>{failure?.stage === 'context' ? 'GRAPHICS UNAVAILABLE' : failureMessage ? 'SCENERY ERROR' : 'SCENERY DEGRADED'}</span>
       <span style={reasonStyle}>
         {failureMessage ?? policy.reason ?? 'Cesium Ion scenery is unavailable.'}
       </span>
@@ -38,7 +39,7 @@ export function SceneStatusOverlay({ policy, failure, retryKey, onRetry }: Scene
           data-rfs-retry-scenery={retryKey ?? 0}
           style={retryButtonStyle}
         >
-          RETRY SCENERY
+          {failure?.stage === 'context' ? 'RESTORE 3D VIEW' : 'RETRY SCENERY'}
         </button>
       ) : null}
     </div>

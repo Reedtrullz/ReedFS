@@ -6,12 +6,15 @@ import { useSimStore } from '../store/simStore';
 import { computeSunPosition, sunLightIntensity } from '../sim/sun';
 import { isCesiumResourceDestroyed } from './cesiumLifecycle';
 import { AircraftRenderer } from './AircraftRenderer';
+import { disposeThreeBridge } from './disposeThreeBridge';
+import type { CesiumSceneFailure } from './CesiumViewport';
 
 export interface ThreeLayerProps {
   viewerRef: RefObject<Cesium.Viewer | null>;
+  onSceneFailure?: (failure: CesiumSceneFailure) => void;
 }
 
-export function ThreeLayer({ viewerRef }: ThreeLayerProps) {
+export function ThreeLayer({ viewerRef, onSceneFailure }: ThreeLayerProps) {
   const ttcRef = useRef<ReturnType<typeof ThreeToCesium> | null>(null);
 
   useEffect(() => {
@@ -21,10 +24,14 @@ export function ThreeLayer({ viewerRef }: ThreeLayerProps) {
     if (!scene) return;
     if (ttcRef.current) return;
 
-    const ttc = ThreeToCesium(viewer, {
-      cameraFar: 10000000,
-      cameraNear: 0.1,
-    });
+    let ttc: ReturnType<typeof ThreeToCesium>;
+    try {
+      ttc = ThreeToCesium(viewer, { cameraFar: 10000000, cameraNear: 0.1 });
+    } catch (error: unknown) {
+      onSceneFailure?.({ stage: 'context', surface: 'three', error });
+      return;
+    }
+    ttc.threeRenderer.domElement.dataset.rfsSurface = 'three';
     ttcRef.current = ttc;
 
     // Add lights (persistent)
@@ -69,13 +76,13 @@ export function ThreeLayer({ viewerRef }: ThreeLayerProps) {
         // Three/Cesium bridge internals may already be partially torn down.
       }
       try {
-        ttc.destroy();
+        disposeThreeBridge(ttc);
       } catch {
         // Cesium may have already torn down the container during React cleanup.
       }
       ttcRef.current = null;
     };
-  }, [viewerRef]);
+  }, [viewerRef, onSceneFailure]);
 
   return null;
 }
