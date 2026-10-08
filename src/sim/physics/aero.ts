@@ -49,13 +49,21 @@ function cgPitchMomentCoefficient(state: AircraftState, spec: AircraftSpec, cl: 
 }
 
 function flapPolarForSetting(aeroModel: AeroModel, flapSetting: number): FlapPolar {
-  for (let i = aeroModel.flapPolars.length - 1; i >= 0; i -= 1) {
-    if (flapSetting >= aeroModel.flapPolars[i].detent) {
-      return aeroModel.flapPolars[i];
-    }
+  const polars = aeroModel.flapPolars;
+  const setting = finiteOrDefault(flapSetting, polars[0].detent);
+  if (setting <= polars[0].detent) return polars[0];
+  for (let i = 1; i < polars.length; i += 1) {
+    const upper = polars[i]; const lower = polars[i - 1];
+    if (setting > upper.detent) continue;
+    if (setting === upper.detent) return upper;
+    const fraction = (setting - lower.detent) / (upper.detent - lower.detent);
+    const interpolate = (key: Exclude<keyof FlapPolar, 'detent'>) => lower[key] + fraction * (upper[key] - lower[key]);
+    // Interpolate the existing gameplay polars; no calibrated data is inferred.
+    return { detent: setting, alphaZeroLiftRad: interpolate('alphaZeroLiftRad'), clAlpha: interpolate('clAlpha'),
+      clMax: interpolate('clMax'), cd0: interpolate('cd0'), k: interpolate('k'),
+      deltaCm: interpolate('deltaCm'), stallDragRise: interpolate('stallDragRise') };
   }
-
-  return aeroModel.flapPolars[0];
+  return polars[polars.length - 1];
 }
 
 function liftCoefficientAtAoA(aoa: number, mach: number, polar: FlapPolar): { cl: number; stallFraction: number } {
