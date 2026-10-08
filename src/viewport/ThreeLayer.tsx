@@ -6,6 +6,8 @@ import { useSimStore } from '../store/simStore';
 import { computeSunPosition, sunLightIntensity } from '../sim/sun';
 import { isCesiumResourceDestroyed } from './cesiumLifecycle';
 import { AircraftRenderer } from './AircraftRenderer';
+import { scenarioUtcMs } from '../sim/scenarioClock';
+import { solarDirectionEcef } from './solarDirection';
 import { disposeThreeBridge } from './disposeThreeBridge';
 import type { CesiumSceneFailure } from './CesiumViewport';
 
@@ -40,6 +42,7 @@ export function ThreeLayer({ viewerRef, onSceneFailure }: ThreeLayerProps) {
     dirLight.position.set(1000, 2000, 500);
     ttc.threeScene.add(ambient);
     ttc.threeScene.add(dirLight);
+    ttc.threeScene.add(dirLight.target);
 
     const aircraftRenderer = new AircraftRenderer(ttc);
 
@@ -49,16 +52,16 @@ export function ThreeLayer({ viewerRef, onSceneFailure }: ThreeLayerProps) {
       const { lat, lon } = aircraft.position;
 
       // Update lighting from sun position
-      const sun = computeSunPosition(lat, lon, aircraft.timeOfDay ?? 12);
+      const sun = computeSunPosition(lat, lon, scenarioUtcMs(aircraft));
       const light = sunLightIntensity(sun.elevation);
       ambient.intensity = light.ambient;
       ambient.color.set(light.color);
       dirLight.intensity = light.directional;
-      dirLight.position.set(
-        2000 * Math.sin(sun.azimuth) * Math.cos(sun.elevation),
-        2000 * Math.sin(sun.elevation),
-        2000 * Math.cos(sun.azimuth) * Math.cos(sun.elevation),
-      );
+      const position = Cesium.Cartesian3.fromDegrees(lon, lat, aircraft.position.alt * 0.3048);
+      const direction = solarDirectionEcef(lat, lon, sun);
+      dirLight.target.position.set(position.x, position.y, position.z);
+      dirLight.position.set(position.x + 2000 * direction.x, position.y + 2000 * direction.y, position.z + 2000 * direction.z);
+      dirLight.target.updateMatrixWorld();
 
       aircraftRenderer.render(aircraft, effectiveControls);
     };

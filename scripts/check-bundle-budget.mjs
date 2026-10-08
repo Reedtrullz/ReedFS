@@ -9,11 +9,11 @@ import { fileURLToPath, URL } from 'node:url';
 const DIST_DIR = fileURLToPath(new URL('../dist/assets/', import.meta.url));
 
 const BUDGETS = {
-  // Node 22 route boundary increment: 414.5 / 130.8 KiB, including input guards.
-  // Adds 3.4 raw / 1.2 gzip KiB over the refreshed air-data stack (411.1 / 129.6).
-  // Bounded feature allowance retains about 1-2% headroom; other budgets stay fixed.
+  // Node 22 UTC/legacy-save/shared-solar increment: 421.6 / 133.4 KiB.
+  // Adds 4.8 raw / 1.9 gzip KiB over restored weather (416.8 / 131.5).
+  // Bounded feature allowance retains about 2% headroom; other budgets stay fixed.
   // Lazy diagnostics and the physics worker remain counted in this whole app allowance.
-  app: { rawBytes: 420 * 1024, gzipBytes: 133 * 1024, required: true },
+  app: { rawBytes: 430 * 1024, gzipBytes: 136 * 1024, required: true },
   // React/Zustand framework chunk baseline: raw 182.4 KiB / gzip 56.7 KiB.
   vendorReact: { rawBytes: 212 * 1024, gzipBytes: 66 * 1024, required: true },
   // Generic vendor chunk baseline: raw 3.5 KiB / gzip 1.5 KiB.

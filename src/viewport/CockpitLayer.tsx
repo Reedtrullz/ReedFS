@@ -8,6 +8,9 @@ import { AircraftRenderer } from './AircraftRenderer';
 import { createCockpitModel } from './CockpitModel';
 import { useCockpitInteractions } from './useCockpitInteractions';
 import { installCockpitPointerInteractions } from './cockpitPointerInteractions';
+import { scenarioUtcMs } from '../sim/scenarioClock';
+import { computeSunPosition, daylightBlend } from '../sim/sun';
+import { enuDirectionEcef } from './solarDirection';
 import { disposeThreeBridge } from './disposeThreeBridge';
 import type { CesiumSceneFailure } from './CesiumViewport';
 
@@ -38,6 +41,7 @@ export function CockpitLayer({ viewerRef, onSceneFailure }: CockpitLayerProps) {
     panelLight.position.set(0, 3, 4);
     ttc.threeScene.add(ambient);
     ttc.threeScene.add(panelLight);
+    ttc.threeScene.add(panelLight.target);
     const cockpitRenderer = new AircraftRenderer(ttc, createCockpitModel);
     const pointerCleanup = installCockpitPointerInteractions({
       scene: ttc.threeScene,
@@ -48,6 +52,14 @@ export function CockpitLayer({ viewerRef, onSceneFailure }: CockpitLayerProps) {
 
     const sync = () => {
       const { aircraft, effectiveControls } = useSimStore.getState();
+      const { lat, lon, alt } = aircraft.position;
+      const sun = computeSunPosition(lat, lon, scenarioUtcMs(aircraft));
+      ambient.intensity = 0.25 + 0.4 * daylightBlend(sun.elevation);
+      const position = Cesium.Cartesian3.fromDegrees(lon, lat, alt * 0.3048);
+      const fill = enuDirectionEcef(lat, lon, 0, 3, 4);
+      panelLight.target.position.set(position.x, position.y, position.z);
+      panelLight.position.set(position.x + fill.x, position.y + fill.y, position.z + fill.z);
+      panelLight.target.updateMatrixWorld();
       cockpitRenderer.render(aircraft, effectiveControls);
     };
 

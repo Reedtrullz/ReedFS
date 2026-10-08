@@ -10,20 +10,27 @@ import { B737_800_AIRCRAFT_DATA } from '../sim/data/aircraft/b737-800.v1';
 import { B737_800_FDM_DATA_VERSION } from '../sim/data/aircraft/b737-800-fdm.v1';
 import { isAircraftState, hasCoherentAttitude, isAutopilotCommands, isAutopilotControllerState, isAutopilotState, isControlInputs, isFiniteSimulationData, isFlightPlan, isWeather, isWind } from '../sim/simulationValidation';
 import type { SimStatus, SimStore } from './simStore';
+import { LEGACY_SCENARIO_MIDNIGHT_MS, SCENARIO_CLOCK_ID } from '../sim/scenarioClock';
+import { USSA_1976_ID, USSA_1976_DATA_VERSION } from '../sim/data/atmosphere/ussa-1976.v1';
 
 export const MAX_SCENARIO_SAVE_BYTES = 1024 * 1024;
 const MAX_SCENARIO_SAVE_SLOTS = 32;
 export const SCENARIO_SAVE_KEY = 'rfs.scenarioSnapshot.v1';
 export const DEFAULT_SCENARIO_SAVE_SLOT_ID = 'default';
-const SCENARIO_SAVE_VERSION = 3;
+const SCENARIO_SAVE_VERSION = 4;
 const SCENARIO_SAVE_COLLECTION_VERSION = 3;
-type ScenarioSaveVersion = 1 | 2 | typeof SCENARIO_SAVE_VERSION;
-export const SCENARIO_SNAPSHOT_IDENTITIES = {
+type ScenarioSaveVersion = 1 | 2 | 3 | typeof SCENARIO_SAVE_VERSION;
+export const LEGACY_V3_SNAPSHOT_IDENTITIES = {
   aircraft: B737_800_AIRCRAFT_DATA.id,
   aircraftData: B737_800_AIRCRAFT_DATA.dataVersion,
   fdmData: B737_800_FDM_DATA_VERSION,
   sharedCommit: '810fc9652da431eaf8978b85bf4af131605559b5',
   clock: 'sim-time-ms/time-of-day-hours/v1',
+} as const;
+export const SCENARIO_SNAPSHOT_IDENTITIES = {
+  ...LEGACY_V3_SNAPSHOT_IDENTITIES,
+  clock: SCENARIO_CLOCK_ID,
+  atmosphere: `${USSA_1976_ID}/${USSA_1976_DATA_VERSION}`,
 } as const;
 
 export type ScenarioPersistenceStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
@@ -43,7 +50,7 @@ export interface ScenarioSnapshot {
   activeLegIndex: number | null;
   wind: WindInfo | null;
   weather?: ScenarioWeatherMetadata;
-  identities?: typeof SCENARIO_SNAPSHOT_IDENTITIES;
+  identities?: typeof SCENARIO_SNAPSHOT_IDENTITIES | typeof LEGACY_V3_SNAPSHOT_IDENTITIES;
   simulationTimeSeconds: number;
 }
 
@@ -85,15 +92,29 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+function aircraftForSnapshot(value: Record<string, unknown>): unknown {
+  const raw = value.aircraft;
+  if (!isRecord(raw) || !isRecord(raw.config)) return raw;
+  if (value.version === 4) return raw;
+  if (![1, 2, 3].includes(Number(value.version)) || raw.utcEpochMs !== undefined
+    || typeof raw.simTime !== 'number' || !Number.isFinite(raw.simTime) || raw.simTime < 0
+    || typeof raw.timeOfDay !== 'number' || !Number.isFinite(raw.timeOfDay) || raw.timeOfDay < 0 || raw.timeOfDay >= 24) return null;
+  return {
+    ...raw,
+    utcEpochMs: LEGACY_SCENARIO_MIDNIGHT_MS + raw.timeOfDay * 3_600_000 - raw.simTime,
+    config: value.version !== 3 && raw.config.gearPosition === undefined
+      ? { ...raw.config, gearPosition: raw.config.gearDown === true ? 1 : 0 } : raw.config,
+  };
+}
+
 function isValidSnapshot(value: unknown): value is ScenarioSnapshot {
   if (!isRecord(value) || !isFiniteSimulationData(value)) return false;
-  const supportedVersion = value.version === 1 || value.version === 2 || value.version === SCENARIO_SAVE_VERSION;
+  const supportedVersion = [1, 2, 3, SCENARIO_SAVE_VERSION].includes(Number(value.version)) && typeof value.version === 'number';
   const validControllerState = value.version === 1
     ? (value.apControllerState === undefined || isAutopilotControllerState(value.apControllerState))
     : isAutopilotControllerState(value.apControllerState);
-  const aircraft = isRecord(value.aircraft) && isRecord(value.aircraft.config) && value.version !== 3 && value.aircraft.config.gearPosition === undefined
-    ? { ...value.aircraft, config: { ...value.aircraft.config, gearPosition: value.aircraft.config.gearDown === true ? 1 : 0 } }
-    : value.aircraft;
+  const aircraft = aircraftForSnapshot(value);
+  const expectedIdentities = value.version === 3 ? LEGACY_V3_SNAPSHOT_IDENTITIES : SCENARIO_SNAPSHOT_IDENTITIES;
   return (
     supportedVersion &&
     typeof value.savedAtIso === 'string' && Number.isFinite(Date.parse(value.savedAtIso)) &&
@@ -110,7 +131,7 @@ function isValidSnapshot(value: unknown): value is ScenarioSnapshot {
     isAutopilotState(value.apState) && isFlightPlan(value.flightPlan) &&
     (value.activeLegIndex === null || (typeof value.activeLegIndex === 'number' && Number.isSafeInteger(value.activeLegIndex) && value.activeLegIndex >= 0 && value.flightPlan !== null && value.activeLegIndex < value.flightPlan.waypoints.length)) &&
     isWind(value.wind) &&
-    (value.version !== 3 || (isWeather(value.weather) && isRecord(value.identities) && Object.entries(SCENARIO_SNAPSHOT_IDENTITIES).every(([key, expected]) => (value.identities as Record<string, unknown>)[key] === expected))) &&
+    ((value.version !== 3 && value.version !== 4) || (isWeather(value.weather) && isRecord(value.identities) && Object.entries(expectedIdentities).every(([key, expected]) => (value.identities as Record<string, unknown>)[key] === expected))) &&
     (value.weather === undefined || isWeather(value.weather)) &&
     typeof value.simulationTimeSeconds === 'number' && value.simulationTimeSeconds >= 0
   );
@@ -253,7 +274,7 @@ function slotFromCollection(collection: ScenarioSaveCollection, slotId: string):
     return { ok: false, reason: `saved slot "${slotName}" has invalid metadata` };
   }
   if (metadata.id !== slotId || metadata.selectedScenarioId !== rawSlot.snapshot.selectedScenarioId || metadata.savedAtIso !== rawSlot.snapshot.savedAtIso || metadata.status !== rawSlot.snapshot.status || metadata.restoreStatus !== restoreStatusFor(rawSlot.snapshot)) return { ok: false, reason: 'saved slot metadata disagrees with snapshot' };
-  return { ok: true, snapshot: rawSlot.snapshot, metadata };
+  return { ok: true, snapshot: { ...rawSlot.snapshot, aircraft: aircraftForSnapshot(rawSlot.snapshot as unknown as Record<string, unknown>) as AircraftState }, metadata };
 }
 
 /** Read-only capture of store-owned immutable objects; clone before external use. */

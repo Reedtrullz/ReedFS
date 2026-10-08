@@ -23,6 +23,7 @@ import { hasValidCoordinates } from '../../sim/physics/routeGeometry';
 import { inputManagerForScenario, inputsForScenario } from '../simStoreInputReducers';
 import type { SimStore } from '../simStore';
 import type { SimStoreSet } from './aircraftSlice';
+import { scenarioUtcMs, utcHours } from '../../sim/scenarioClock';
 
 function gustSeedForRunway(runway: RunwayReference): number {
   const sourceIdSeed = runway.sourceId ? Number(runway.sourceId) % 10_000 : Number.NaN;
@@ -81,6 +82,9 @@ export function createRouteSlice(set: SimStoreSet): Pick<SimStore, 'setFlightPla
       }
       const scenario = scenarioById(s.selectedScenarioId);
       const aircraft = createAircraftStateForRunway(B737_800_SPEC, originRunway, scenario);
+      const utc = scenarioUtcMs(s.aircraft);
+      aircraft.utcEpochMs = utc - aircraft.simTime;
+      aircraft.timeOfDay = utcHours(utc);
       const runwayStartTemplate = {
         ...scenario,
         flapSetting: 5,

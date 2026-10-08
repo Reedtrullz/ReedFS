@@ -4,6 +4,8 @@ import * as Cesium from 'cesium';
 import { getCesiumScenePolicy, rememberCesiumIonToken, type CesiumScenePolicy } from '../config/cesium';
 import { isVisualTestMode } from '../config/visualTest';
 import { applySunAwareLighting } from './sunLighting';
+import { useSimStore } from '../store/simStore';
+import { scenarioUtcMs } from '../sim/scenarioClock';
 
 export interface CesiumViewportProps {
   /** Overrides the resolved Cesium scene asset policy */
@@ -70,6 +72,14 @@ export function CesiumViewport({ onReady, onSceneFailure, scenePolicy }: CesiumV
       return;
     }
     viewerRef.current = viewer;
+    viewer.clock.shouldAnimate = false;
+    const syncUtc = () => {
+      const date = new Date(scenarioUtcMs(useSimStore.getState().aircraft));
+      Cesium.JulianDate.fromDate(date, viewer.clock.currentTime);
+      return date;
+    };
+    syncUtc();
+    const removeClockTick = viewer.clock.onTick.addEventListener(syncUtc);
     viewer.scene.screenSpaceCameraController.enableInputs = false;
     if (viewer.canvas) viewer.canvas.dataset.rfsSurface = 'cesium';
     const reportRenderError = (_scene: unknown, error: unknown) => {
@@ -102,10 +112,22 @@ export function CesiumViewport({ onReady, onSceneFailure, scenePolicy }: CesiumV
     // Scene enhancements
     const globe = viewer.scene.globe as GlobeWithOptionalEffects;
     const visualTest = isVisualTestMode();
+    let removeSolar: (() => void) | undefined;
     globe.terrainExaggeration = 1;
     if (!visualTest) {
       globe.enableLighting = true;
-      applySunAwareLighting(viewer);
+      const baseColor = globe.baseColor.clone();
+      const dimmedColor = baseColor.clone();
+      removeSolar = applySunAwareLighting(viewer, syncUtc, (brightness) => {
+        for (let i = 0; i < viewer.imageryLayers.length; i++) viewer.imageryLayers.get(i).brightness = brightness;
+        dimmedColor.red = baseColor.red * brightness;
+        dimmedColor.green = baseColor.green * brightness;
+        dimmedColor.blue = baseColor.blue * brightness;
+        globe.baseColor = dimmedColor;
+        // The night-side visibility guard disables physical globe lighting;
+        // keep its sky atmosphere on the same bounded scenario twilight blend.
+        if (viewer.scene.skyAtmosphere) viewer.scene.skyAtmosphere.brightnessShift = brightness - 1;
+      });
       globe.showWaterEffect = true;
       viewer.scene.requestRenderMode = false;
       if (viewer.scene.skyAtmosphere) viewer.scene.skyAtmosphere.show = true;
@@ -122,6 +144,8 @@ export function CesiumViewport({ onReady, onSceneFailure, scenePolicy }: CesiumV
 
     return () => {
       disposed = true;
+      removeClockTick();
+      removeSolar?.();
       container.removeEventListener('webglcontextlost', contextLost, true);
       removeRenderError?.();
       delete container.dataset.rfsReady;

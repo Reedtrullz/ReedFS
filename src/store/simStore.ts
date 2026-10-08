@@ -101,6 +101,7 @@ export interface SimStore {
    */
   tickAsync: (timestamp: number) => void;
   cycleSimRate: () => void;
+  setScenarioUtc: (utc: string) => boolean;
   start: () => void;
   startTakeoffRoll: () => void;
   abortTakeoff: () => void;
