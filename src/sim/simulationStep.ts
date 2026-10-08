@@ -263,6 +263,7 @@ export function advanceSimulationStep(input: SimulationStepInput): SimulationSte
       routeBeforeTick,
       input.wind,
       controllerStateBeforeStep,
+      weather,
     )
     : { commands: {}, controllerState: controllerStateBeforeStep };
   const apCommands = apCommandResult.commands;

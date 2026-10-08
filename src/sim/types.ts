@@ -31,8 +31,11 @@ export interface AngularVelocity {
 // ── Derived (computed from state) ──
 
 export interface DerivedState {
-  ias: number;     // indicated airspeed, knots
+  ias: number;     // ideal IAS = CAS, knots; zero fallback requires airDataValid
   tas: number;     // true airspeed, knots
+  eas: number;     // equivalent airspeed, knots (dynamic-pressure quantity)
+  cas: number | null; // calibrated airspeed, knots; null outside supported pitot domain
+  airDataValid: boolean;
   gs: number;      // ground speed, knots
   mach: number;
   vs: number;      // vertical speed, ft/min

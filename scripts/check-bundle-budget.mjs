@@ -9,9 +9,10 @@ import { fileURLToPath, URL } from 'node:url';
 const DIST_DIR = fileURLToPath(new URL('../dist/assets/', import.meta.url));
 
 const BUDGETS = {
-  // Node 22 measured baseline including command/observation boundaries and local diagnostics: 402.8 / 127.5 KiB.
-  // Keep roughly two percent headroom; lazy diagnostics remain counted in the whole app allowance.
-  app: { rawBytes: 410 * 1024, gzipBytes: 130 * 1024, required: true },
+  // Node 22 measured baseline with qualified subsonic air data: 411.3 / 129.6 KiB.
+  // Adds 1.8 raw / 0.7 gzip KiB over the engine boundary; keep the gzip ceiling.
+  // Lazy diagnostics and the physics worker remain counted in this whole app allowance.
+  app: { rawBytes: 414 * 1024, gzipBytes: 130 * 1024, required: true },
   // React/Zustand framework chunk baseline: raw 182.4 KiB / gzip 56.7 KiB.
   vendorReact: { rawBytes: 212 * 1024, gzipBytes: 66 * 1024, required: true },
   // Generic vendor chunk baseline: raw 3.5 KiB / gzip 1.5 KiB.

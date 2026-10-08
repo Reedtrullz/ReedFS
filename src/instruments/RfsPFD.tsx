@@ -341,6 +341,7 @@ function Tape({
   ticks,
   align,
   selectedBug,
+  valid = true,
 }: {
   label: string;
   value: number;
@@ -348,6 +349,7 @@ function Tape({
   ticks: number[];
   align: 'left' | 'right';
   selectedBug?: { ariaLabel: string; label: string; value: number | null | undefined };
+  valid?: boolean;
 }) {
   const selectedBugValue = Number.isFinite(selectedBug?.value) ? Math.round(selectedBug?.value as number) : null;
   const selectedBugTop = selectedBugValue === null ? null : targetBugPositionPercent(selectedBugValue, ticks);
@@ -355,6 +357,7 @@ function Tape({
   return (
     <div
       aria-label={label === 'IAS' ? 'Airspeed tape' : 'Altitude tape'}
+      data-valid={valid}
       style={{
         ...glass,
         width: 104,
@@ -366,7 +369,7 @@ function Tape({
       }}
     >
       <div style={{ padding: '7px 8px 4px', color: '#9ddcff', fontSize: 13, fontWeight: 800, letterSpacing: 1.2 }}>
-        {label}
+        {valid ? label : `${label} INVALID`}
       </div>
       <div
         aria-label={label === 'IAS' ? 'Observed airspeed' : 'Observed altitude'}
@@ -383,7 +386,7 @@ function Tape({
           lineHeight: 1.1,
         }}
       >
-        {Math.round(value)}
+        {valid ? Math.round(value) : '---'}
       </div>
       <div style={{ color: '#7fa6b7', fontSize: 10, textAlign: align, padding: '2px 10px 4px' }}>{unit}</div>
       <div style={{ position: 'relative', flex: 1, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
@@ -419,7 +422,7 @@ function Tape({
             </div>
           ))}
         </div>
-        {selectedBug && selectedBugValue !== null && selectedBugTop !== null && (
+        {valid && selectedBug && selectedBugValue !== null && selectedBugTop !== null && (
           <div
             aria-label={selectedBug.ariaLabel}
             style={{
@@ -457,7 +460,7 @@ export function RfsPFD() {
   const observation = observationStatus({ simulationCommit, commandRevisions, status, invalid }, now);
   const committed = useSimStore(pfdObservation);
   const { aircraft: aircraftForVnav, flightPlan, routeStatus, apState: apStateForGuidance, weather, wind } = committed;
-  const derived = computeDerived(aircraftForVnav, wind);
+  const derived = computeDerived(aircraftForVnav, wind, weather);
   const attitude = quatToEuler(aircraftForVnav.quaternion);
   const ias = Math.max(0, derived.ias); const vs = derived.vs;
   const trueAltitude = Math.max(0, aircraftForVnav.position.alt);
@@ -482,7 +485,7 @@ export function RfsPFD() {
   const flightDirectorEnabled = Boolean(apStateForGuidance?.boeing.fdLeft || apStateForGuidance?.boeing.fdRight);
   const selectedScenarioId = useSimStore(selectPfdSelectedScenarioId);
   const flightPhase = aircraftForVnav.flightPhase;
-  const takeoffCue = takeoffCueText(aircraftForVnav, ias, selectedScenarioId);
+  const takeoffCue = derived.airDataValid ? takeoffCueText(aircraftForVnav, ias, selectedScenarioId) : null;
   const vSpeeds = maybeFindPerformanceCardForScenario(selectedScenarioId)?.vSpeeds;
   const showTakeoffReference = takeoffCue != null || flightPhase === 'PARKED' || flightPhase === 'TAKEOFF';
   const sharedGuidanceTargets = resolveGuidanceTargets({
@@ -624,9 +627,10 @@ export function RfsPFD() {
       <div style={{ display: 'flex', gap: 8, padding: 10, alignItems: 'stretch' }}>
         <Tape
           label="IAS"
+          valid={derived.airDataValid}
           value={ias}
           unit="KT"
-          ticks={tapeTicks(ias, 10, 7)}
+          ticks={derived.airDataValid ? tapeTicks(ias, 10, 7) : []}
           align="right"
           selectedBug={hasMcpTargets ? {
             ariaLabel: displaySpeedIsManaged ? 'Airspeed managed bug' : 'Airspeed selected bug',

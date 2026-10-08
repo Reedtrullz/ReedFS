@@ -1,12 +1,12 @@
 import type { AircraftState, BodyVelocity } from '../../types';
 import { isaAtAltitude } from '../atmosphere';
-import { ktToMs } from '../units';
-
-const SEA_LEVEL_DENSITY_KG_M3 = 1.225;
+import { ktToMs, msToKt } from '../units';
+import { trueAirspeedFromCasMs } from '../airData';
 
 export function tasKtForIasAtAltitude(iasKt: number, altitudeFt: number): number {
-  const rhoRatio = isaAtAltitude(altitudeFt).density / SEA_LEVEL_DENSITY_KG_M3;
-  return iasKt / Math.sqrt(Math.max(0.05, rhoRatio));
+  const tasMs = trueAirspeedFromCasMs(ktToMs(iasKt), isaAtAltitude(altitudeFt));
+  if (tasMs === null) throw new Error("IAS fixture outside supported subsonic CAS domain");
+  return msToKt(tasMs);
 }
 
 export function bodyVelocityForIasAtAltitude(
