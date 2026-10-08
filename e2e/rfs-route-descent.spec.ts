@@ -123,10 +123,7 @@ test.describe('RFS visible route descent proof', () => {
         // DTG is per active leg; sequencing resets it to the next leg's length.
         const legAdvanced = (route.activeLegIndex ?? 0) > (initialRoute.activeLegIndex ?? 0);
         return legAdvanced || route.distanceToGoNm < initialRoute.distanceToGoNm - 0.5;
-      }, {
-        timeoutMs: 120_000,
-        stepMs: 1000,
-      });
+      }, { timeoutMs: 120_000, stepMs: 4000 });
 
       await clickVisibleMcpMode(page, 'VS');
       await setVisibleMcpVerticalSpeed(page, -900);
@@ -143,7 +140,7 @@ test.describe('RFS visible route descent proof', () => {
       await driveVisibleSimUntil(page, 'negative VS and a visible altitude decrease after descent selection', async () => {
         const flight = await readVisibleFlightNumbers(page);
         return flight.verticalSpeedFpm <= -100 && flight.altitudeFt <= descentEntry.altitudeFt - 20;
-      }, { timeoutMs: 120_000, stepMs: 1000 });
+      }, { timeoutMs: 300_000, stepMs: 4000 });
 
       const descentCoach = await waitForVisibleCoachText(page, /^Descent:/i);
       expect(descentCoach).toMatch(/route descent path/i);

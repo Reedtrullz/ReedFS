@@ -213,21 +213,23 @@ function verticalSpeedTargetWithAltitudeCapture(
   if (selectedAltitudeFt === undefined || selectedAltitudeFt <= 0) return targetVerticalSpeedFpm;
 
   const altitudeDeltaFt = selectedAltitudeFt - altitudeFt;
-  // Past the selected altitude the dive must level off for good: re-arming the
-  // raw command outside the capture window would dive a busted capture into
-  // terrain. Level-off state only re-arms when the aircraft is back above the
-  // selected altitude (climb) or below it (descent).
+  const captureWindowFt = 500;
+  const captureEngagementFt = captureWindowFt * 2;
+  if (Math.abs(altitudeDeltaFt) >= captureEngagementFt) return targetVerticalSpeedFpm;
+
+  // Inside the capture band a command pointing past the selected altitude must
+  // level off for good: re-arming the raw command would dive a busted capture
+  // into terrain. Outside the band the raw command stands, so a descent
+  // selected while the MCP still holds the climb altitude keeps flying.
   const overshot = (targetVerticalSpeedFpm > 0 && altitudeDeltaFt < 0)
     || (targetVerticalSpeedFpm < 0 && altitudeDeltaFt > 0);
   if (overshot) return 0;
 
-  const captureWindowFt = 500;
-  const enteringCaptureWindow = Math.abs(altitudeDeltaFt) < captureWindowFt * 2
-    && ((targetVerticalSpeedFpm > 0 && altitudeDeltaFt <= captureWindowFt)
-      || (targetVerticalSpeedFpm < 0 && altitudeDeltaFt >= -captureWindowFt));
-  if (!enteringCaptureWindow) return targetVerticalSpeedFpm;
-
-  return targetVerticalSpeedFpm * Math.min(1, Math.abs(altitudeDeltaFt) / captureWindowFt);
+  const enteringCaptureWindow = (targetVerticalSpeedFpm > 0 && altitudeDeltaFt <= captureWindowFt)
+    || (targetVerticalSpeedFpm < 0 && altitudeDeltaFt >= -captureWindowFt);
+  return enteringCaptureWindow
+    ? targetVerticalSpeedFpm * Math.min(1, Math.abs(altitudeDeltaFt) / captureWindowFt)
+    : targetVerticalSpeedFpm;
 }
 
 function altitudeCaptureVerticalSpeedTarget(targetAltitudeFt: number, altitudeFt: number): number {
