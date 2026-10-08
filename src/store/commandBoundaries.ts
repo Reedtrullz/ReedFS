@@ -30,13 +30,13 @@ export function appliedCommandLatency(state: SimStore, now: number): number {
 }
 
 /** Product actions record acceptance separately from the physics commit. */
-export function commandBoundaryPatch(state: SimStore, patch: Partial<SimStore>): Partial<SimStore> {
+export function commandBoundaryPatch(state: SimStore, patch: Partial<SimStore>, trimIntentOnly = false): Partial<SimStore> {
   const trimChanged = patch.inputManager !== undefined && patch.inputManager.stabilizerTrimUnits !== state.inputManager.stabilizerTrimUnits;
   const pilot = trimChanged || (patch.pilotInputs !== undefined && (Object.keys(patch.pilotInputs) as Array<keyof SimStore['pilotInputs']>).some((key) => patch.pilotInputs?.[key] !== state.pilotInputs[key]));
   const autoflight = patch.apState !== undefined && patch.apState !== state.apState;
   const route = patch.flightPlan !== undefined && patch.flightPlan !== state.flightPlan;
   const environment = (patch.wind !== undefined && patch.wind !== state.wind) || (patch.weather !== undefined && patch.weather !== state.weather);
-  const aircraftReplaced = patch.aircraft !== undefined && patch.aircraft !== state.aircraft && !trimChanged;
+  const aircraftReplaced = patch.aircraft !== undefined && patch.aircraft !== state.aircraft && !(trimIntentOnly && trimChanged);
   const fence = autoflight || route || environment || aircraftReplaced;
   const epochChanged = fence || (patch.asyncPhysicsGeneration !== undefined && patch.asyncPhysicsGeneration !== state.asyncPhysicsGeneration);
   const result = { ...patch };

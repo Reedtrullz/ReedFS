@@ -43,10 +43,11 @@ test('commands accepted during actual worker turns fence stale modes, routes, pa
       const deadline = performance.now() + 10000;
       while (!predicate()) { if (performance.now() > deadline) throw new Error('runtime fixture deadline'); await new Promise((resolve) => setTimeout(resolve, 5)); }
     };
-    for (const command of ['disconnect', 'exec', 'throttle', 'pause', 'reset']) {
+    for (const command of ['disconnect', 'exec', 'throttle', 'pause', 'reset', 'takeoff-config']) {
       useSimStore.getState().reset(); useSimStore.getState().start();
       const ap = createDefaultAutopilotState(); ap.truth.autopilotStatus = 'CMD_A'; ap.boeing.cmdA = true;
       useSimStore.getState().setApState(ap);
+      if (command === 'takeoff-config') { useSimStore.getState().setApState(null); useSimStore.getState().applyInputActions({ trimDelta: 1 }, 1 / 60); }
       useSimStore.getState().setFlightPlan(createRunwayToRunwayFlight({ originAirport: 'KSEA', originRunway: '16L', destinationAirport: 'KPDX', destinationRunway: '10R' }));
       useSimStore.setState({ fixedStepAccumulatorSeconds: 32 / 60, lastFrameTime: 16, simRate: 64 });
       let nativeResponses = 0; let fallbackCalls = 0;
@@ -71,6 +72,7 @@ test('commands accepted during actual worker turns fence stale modes, routes, pa
         if (command === 'throttle') useSimStore.getState().setInput({ throttle1: 0.8, throttle2: 0.8 });
         if (command === 'pause') useSimStore.getState().pause();
         if (command === 'reset') useSimStore.getState().reset();
+        if (command === 'takeoff-config') useSimStore.getState().setTakeoffConfig();
         const accepted = useSimStore.getState(); const aircraft = accepted.aircraft; const route = accepted.routeStatus; const controller = accepted.apControllerState;
         // Artificial delivery barrier lets commands race a real worker result.
         // It is distinct from the production watchdog and a performance claim.
@@ -88,6 +90,7 @@ test('commands accepted during actual worker turns fence stale modes, routes, pa
           receipts.push({ command, fenced: s.asyncPhysicsGeneration > generation, unchangedAircraft: s.aircraft === aircraft,
             unchangedRoute: s.routeStatus === route, unchangedController: s.apControllerState === controller,
             oldCommitRejected: s.simulationCommit === null, status: s.status, apDisconnected: command !== 'disconnect' || s.apState === null,
+            reservedTimeRetained: command !== 'takeoff-config' || Math.abs(s.fixedStepAccumulatorSeconds - 32 / 60) < 1e-9,
             nativeResponses, fallbackCalls });
         }
       } finally { restore(); runtime.dispose(); }
@@ -103,6 +106,7 @@ test('commands accepted during actual worker turns fence stale modes, routes, pa
     } else {
       expect(row.fenced).toBe(true); expect(row.unchangedAircraft).toBe(true); expect(row.unchangedRoute).toBe(true);
       expect(row.unchangedController).toBe(true); expect(row.oldCommitRejected).toBe(true); expect(row.apDisconnected).toBe(true);
+      expect(row.reservedTimeRetained).toBe(true);
       if (row.command === 'pause') expect(row.status).toBe('paused');
       if (row.command === 'reset') expect(row.status).toBe('stopped');
     }

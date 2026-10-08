@@ -102,6 +102,32 @@ describe('accepted commands at simulation boundaries', () => {
     stub.complete(1);
     await vi.waitFor(() => expect(useSimStore.getState().asyncPhysicsInFlight).toBe(false));
   });
+  it('takeoff configuration replacement fences old aircraft and controllers even when trim changes', async () => {
+    useSimStore.getState().setApState(null);
+    useSimStore.getState().applyInputActions({ trimDelta: 1 }, 1 / 60);
+    useSimStore.setState({ fixedStepAccumulatorSeconds: 32 / 60, lastFrameTime: 16, simRate: 4 });
+    const stub = delayed(); await dispatch(stub);
+    const generation = useSimStore.getState().asyncPhysicsGeneration;
+    useSimStore.getState().setTakeoffConfig();
+    const replacement = useSimStore.getState();
+    expect(replacement.asyncPhysicsGeneration).toBeGreaterThan(generation);
+    expect(replacement.fixedStepAccumulatorSeconds).toBeCloseTo(32 / 60);
+    const result = advanceSimulationBatch({ ...stub.calls[0].input, cloneAircraft: true }, 16);
+    result.apControllerState.rollPid.value = 123; stub.calls[0].finish(result);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(useSimStore.getState().aircraft).toBe(replacement.aircraft);
+    expect(useSimStore.getState().apControllerState).toBe(replacement.apControllerState);
+    expect(useSimStore.getState().simulationCommit).toBeNull();
+  });
+  it('defines latency as first application of the latest accepted change across staggered families', () => {
+    const clock = vi.spyOn(performance, 'now'); clock.mockReturnValue(1000);
+    useSimStore.getState().setApState(createDefaultAutopilotState());
+    clock.mockReturnValue(2000); useSimStore.getState().setInput({ throttle1: 0.6 });
+    const accepted = useSimStore.getState().commandRevisions;
+    clock.mockReturnValue(2200); useSimStore.getState().tick(16);
+    expect(useSimStore.getState().simulationCommit?.revisions).toEqual(accepted);
+    expect(useSimStore.getState().simulationCommit?.commandLatencyMs).toBe(200);
+  });
   it('excludes paused wall time from achieved rate and clears commits on reset', () => {
     const clock = vi.spyOn(performance, 'now'); clock.mockReturnValue(1000);
     useSimStore.getState().tick(16);

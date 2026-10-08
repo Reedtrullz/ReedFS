@@ -14,7 +14,7 @@ import {
   inputsForScenario,
 } from '../simStoreInputReducers';
 
-export type SimStoreSet = (partial: Partial<SimStore> | ((state: SimStore) => Partial<SimStore>)) => void;
+export type SimStoreSet = (partial: Partial<SimStore> | ((state: SimStore) => Partial<SimStore>), options?: { trimIntentOnly: boolean }) => void;
 
 export function cloneWind(wind: WindInfo): WindInfo {
   return { ...wind };

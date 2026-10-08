@@ -139,7 +139,7 @@ function maxStepsPerRenderedFrame(simRate: number): number {
 }
 
 export const useSimStore = create<SimStore>((set, get) => {
-  const storeSet: SimStoreSet = (partial) => set((state) => commandBoundaryPatch(state, typeof partial === 'function' ? partial(state) : partial));
+  const storeSet: SimStoreSet = (partial, options) => set((state) => commandBoundaryPatch(state, typeof partial === 'function' ? partial(state) : partial, options?.trimIntentOnly));
   const containFailure = (error: unknown, input: unknown, result: unknown) => {
     const current = get();
     const checkpoint = current.lastValidCheckpoint ? structuredClone(current.lastValidCheckpoint) : null;
