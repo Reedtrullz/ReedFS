@@ -70,6 +70,8 @@ test('actual worker flight keeps true orientation and targets while magnetic sur
   await page.getByRole('button', { name: 'OVL: FLIGHT', exact: true }).click();
   await page.getByRole('button', { name: 'OVL: MINIMAL', exact: true }).click();
   await expect(page.getByRole('button', { name: 'OVL: DEBUG', exact: true })).toBeVisible();
+  // Overlay mode changes before its lazy telemetry panel is delivered.
+  await page.getByLabel('Flight telemetry', { exact: true }).waitFor({ state: 'visible', timeout: 30000 });
   await expect(page.getByLabel('Flight telemetry', { exact: true })).toContainText('HDG TRUE');
   await page.getByLabel('Save slot name').fill('Heading practice');
   await page.getByRole('button', { name: 'Save scenario state', exact: true }).click();
