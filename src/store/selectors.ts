@@ -360,6 +360,9 @@ export interface TelemetryViewModel {
   takeoffCue: string | null;
   simRate: number;
   droppedSimTimeSeconds: number;
+  achievedSimRate: number | null;
+  batchDurationMs: number | null;
+  commandLatencyMs: number | null;
   altitudeFt: number;
   iasKt: number;
   tasKt: number;
@@ -388,6 +391,9 @@ export function selectTelemetryViewModel(s: SimStore): TelemetryViewModel {
     takeoffCue: takeoffCueText(s.aircraft, d.ias, s.selectedScenarioId),
     simRate: s.simRate,
     droppedSimTimeSeconds: s.droppedSimulationTimeSeconds,
+    achievedSimRate: s.simulationCommit?.achievedSimRate ?? null,
+    batchDurationMs: s.simulationCommit?.batchDurationMs ?? null,
+    commandLatencyMs: s.simulationCommit?.commandLatencyMs ?? null,
     altitudeFt: s.aircraft.position.alt,
     iasKt: d.ias,
     tasKt: d.tas,

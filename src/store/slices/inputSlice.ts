@@ -174,6 +174,6 @@ export function createInputSlice(set: SimStoreSet): Pick<SimStore, 'setInput' | 
             : s.controlFeedbackMessage,
           guidance: syncGuidanceState(s.guidance, scenario, s.status, aircraft, controlsSlice.effectiveControls),
         };
-      }),
+      }, { trimIntentOnly: true }),
   };
 }

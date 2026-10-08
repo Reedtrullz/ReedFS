@@ -19,8 +19,10 @@ export function Telemetry() {
       <div style={{ fontWeight: 'bold', marginBottom: 4 }}>SIM: {vm.status.toUpperCase()}</div>
       <div style={{ opacity: 0.7 }}>
         RATE {vm.simRate}x
+        {` | ACHIEVED ${vm.achievedSimRate === null ? 'measuring' : `${vm.achievedSimRate.toFixed(2)}x`}`}
         {vm.droppedSimTimeSeconds > 0.01 ? ` | DROPPED ${vm.droppedSimTimeSeconds.toFixed(1)}s` : ''}
       </div>
+      {vm.batchDurationMs !== null && <div style={{ opacity: 0.7 }}>BATCH {vm.batchDurationMs.toFixed(0)}ms | LATEST COMMAND {vm.commandLatencyMs?.toFixed(0)}ms</div>}
       {vm.takeoffCue && <div style={{ fontWeight: 'bold', color: '#ff0', marginBottom: 4 }}>{vm.takeoffCue}</div>}
       {row('ALT', `${vm.altitudeFt.toFixed(0)} ft`)}
       {row('IAS', `${vm.iasKt.toFixed(0)} kt`)}
