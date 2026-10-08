@@ -11,7 +11,7 @@ describe('atmosphere source ownership', () => {
     expect(packet.dataGroup).toBe('weather/atmosphere');
     expect(packet.confidence).toBe('derived-from-source');
     expect(packet.sourceQuality).toBe('public-reference');
-    expect(packet.url).toMatch(/^https:\/\/ntrs.nasa.gov\/citations\//);
+    expect(packet.url).toBe('https://ntrs.nasa.gov/citations/19770009539');
     expect(packet.permission).toContain('Public Use Permitted');
     expect(packet.citation).toContain('Eq.18');
     expect(packet.claimBoundary).toContain('engineering approximations');
