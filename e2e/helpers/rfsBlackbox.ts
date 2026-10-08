@@ -93,9 +93,11 @@ async function activateAlreadyVisibleControl(control: Locator): Promise<void> {
 async function readMcpTextUntilChange(
   page: Page,
   selector: (text: string) => number,
-  previous: number,
+  previous: number | null,
 ): Promise<string> {
   let text = await readMcpText(page);
+  // First observe the current target; a readback change follows a real click.
+  if (previous === null) return text;
   for (let attempt = 0; attempt < 40 && selector(text) === previous; attempt += 1) {
     await page.waitForTimeout(25);
     text = await readMcpText(page);
@@ -653,7 +655,7 @@ export async function setVisibleMcpAltitude(page: Page, targetFt: number): Promi
   const mcp = page.getByRole('region', { name: 'Mode control panel' });
   const buttonName = targetFt >= readMcpAltitudeTarget(await readMcpText(page)) ? 'ALT +1000' : 'ALT -1000';
   const button = mcp.getByRole('button', { name: buttonName });
-  let lastSeen = readMcpAltitudeTarget(await readMcpText(page));
+  let lastSeen: number | null = null;
   for (let guard = 0; guard < 50; guard += 1) {
     const current = readMcpAltitudeTarget(await readMcpTextUntilChange(page, readMcpAltitudeTarget, lastSeen));
     lastSeen = current;
@@ -669,7 +671,7 @@ export async function setVisibleMcpAltitude(page: Page, targetFt: number): Promi
 export async function setVisibleMcpSpeedAtMost(page: Page, maxTargetKt: number): Promise<number> {
   const mcp = page.getByRole('region', { name: 'Mode control panel' });
   const button = mcp.getByRole('button', { name: 'SPD -5' });
-  let lastSeen = readMcpSpeedTarget(await readMcpText(page));
+  let lastSeen: number | null = null;
   for (let guard = 0; guard < 60; guard += 1) {
     const current = readMcpSpeedTarget(await readMcpTextUntilChange(page, readMcpSpeedTarget, lastSeen));
     lastSeen = current;
@@ -682,7 +684,7 @@ export async function setVisibleMcpSpeedAtMost(page: Page, maxTargetKt: number):
 export async function setVisibleMcpSpeedAtLeast(page: Page, minTargetKt: number): Promise<number> {
   const mcp = page.getByRole('region', { name: 'Mode control panel' });
   const button = mcp.getByRole('button', { name: 'SPD +5' });
-  let lastSeen = readMcpSpeedTarget(await readMcpText(page));
+  let lastSeen: number | null = null;
   for (let guard = 0; guard < 60; guard += 1) {
     const current = readMcpSpeedTarget(await readMcpTextUntilChange(page, readMcpSpeedTarget, lastSeen));
     lastSeen = current;
@@ -695,7 +697,7 @@ export async function setVisibleMcpSpeedAtLeast(page: Page, minTargetKt: number)
 export async function setVisibleMcpAltitudeAtLeast(page: Page, minTargetFt: number): Promise<number> {
   const mcp = page.getByRole('region', { name: 'Mode control panel' });
   const button = mcp.getByRole('button', { name: 'ALT +1000' });
-  let lastSeen = readMcpAltitudeTarget(await readMcpText(page));
+  let lastSeen: number | null = null;
   for (let guard = 0; guard < 50; guard += 1) {
     const current = readMcpAltitudeTarget(await readMcpTextUntilChange(page, readMcpAltitudeTarget, lastSeen));
     lastSeen = current;
@@ -708,7 +710,7 @@ export async function setVisibleMcpAltitudeAtLeast(page: Page, minTargetFt: numb
 export async function setVisibleMcpAltitudeAtMost(page: Page, maxTargetFt: number): Promise<number> {
   const mcp = page.getByRole('region', { name: 'Mode control panel' });
   const button = mcp.getByRole('button', { name: 'ALT -1000' });
-  let lastSeen = readMcpAltitudeTarget(await readMcpText(page));
+  let lastSeen: number | null = null;
   for (let guard = 0; guard < 50; guard += 1) {
     const current = readMcpAltitudeTarget(await readMcpTextUntilChange(page, readMcpAltitudeTarget, lastSeen));
     lastSeen = current;
@@ -725,7 +727,7 @@ export async function setVisibleMcpVerticalSpeed(page: Page, targetFpm: number):
   const mcp = page.getByRole('region', { name: 'Mode control panel' });
   const buttonName = targetFpm >= readMcpVerticalSpeedTarget(await readMcpText(page)) ? 'VS +100' : 'VS -100';
   const button = mcp.getByRole('button', { name: buttonName });
-  let lastSeen = readMcpVerticalSpeedTarget(await readMcpText(page));
+  let lastSeen: number | null = null;
   for (let guard = 0; guard < 80; guard += 1) {
     const current = readMcpVerticalSpeedTarget(await readMcpTextUntilChange(page, readMcpVerticalSpeedTarget, lastSeen));
     lastSeen = current;

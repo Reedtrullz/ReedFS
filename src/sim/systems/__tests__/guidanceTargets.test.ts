@@ -450,19 +450,11 @@ describe('resolveGuidanceTargets', () => {
       flightPlan: null,
       routeStatus: createNoRouteStatus(),
     });
-    const farPast = resolveGuidanceTargets({
-      aircraft: aircraftDescendingAt(2_000),
-      apState: vsApState(3_000, -900),
-      flightPlan: null,
-      routeStatus: createNoRouteStatus(),
-    });
-
     expect(justPast.truth.verticalActive).toBe('VS');
     expect(justPast.vertical?.targetVerticalSpeedFpm).toBe(0);
-    expect(farPast.vertical?.targetVerticalSpeedFpm).toBe(0);
   });
 
-  it('levels off a selected VS climb that overshoots the MCP altitude', () => {
+  it('keeps a selected VS climb flying while it is far below the MCP altitude', () => {
     const aircraft = aircraftDescendingAt(12_000);
     aircraft.velocity.w = 15;
     const shared = resolveGuidanceTargets({
@@ -472,7 +464,7 @@ describe('resolveGuidanceTargets', () => {
       routeStatus: createNoRouteStatus(),
     });
 
-    expect(shared.vertical?.targetVerticalSpeedFpm).toBe(0);
+    expect(shared.vertical?.targetVerticalSpeedFpm).toBe(900);
   });
 
   it('filters shared guidance down to finite supported Flight Director targets', () => {

@@ -18,6 +18,8 @@ import {
 } from '../../sim/systems/navigation';
 import { createAircraftStateForRunway, scenarioById } from '../../sim/scenarios';
 import { createAutopilotControllerState } from '../../sim/systems/autopilot';
+import { isFlightPlan } from '../../sim/simulationValidation';
+import { hasValidCoordinates } from '../../sim/physics/routeGeometry';
 import { inputManagerForScenario, inputsForScenario } from '../simStoreInputReducers';
 import type { SimStore } from '../simStore';
 import type { SimStoreSet } from './aircraftSlice';
@@ -53,6 +55,7 @@ function routeEditSessionFor(fp: FlightPlan): RouteEditSession {
 export function createRouteSlice(set: SimStoreSet): Pick<SimStore, 'setFlightPlan' | 'setFlightPlanAtRunway' | 'setWind' | 'setWeather' | 'stageDirectTo' | 'stageInsertDiscontinuity' | 'undoRouteEditOperation' | 'executeRouteEdit'> {
   return {
     setFlightPlan: (fp) => set((s) => {
+      if (!isFlightPlan(fp)) throw new TypeError('Invalid flight plan coordinates or data');
       const { activeLegIndex, routeStatus } = createRouteState(s, fp);
       const controlsSlice = composeControlsSlice(s.pilotInputs, s.apCommands, s.apState, {
         aircraft: s.aircraft,
@@ -72,6 +75,10 @@ export function createRouteSlice(set: SimStoreSet): Pick<SimStore, 'setFlightPla
     }),
 
     setFlightPlanAtRunway: (fp: FlightPlan, originRunway: RunwayReference) => set((s) => {
+      if (!fp || !isFlightPlan(fp) || !hasValidCoordinates(originRunway.start)
+        || (originRunway.end !== undefined && !hasValidCoordinates(originRunway.end))) {
+        throw new TypeError('Invalid flight plan or runway coordinates');
+      }
       const scenario = scenarioById(s.selectedScenarioId);
       const aircraft = createAircraftStateForRunway(B737_800_SPEC, originRunway, scenario);
       const runwayStartTemplate = {
