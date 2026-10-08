@@ -7,7 +7,7 @@ import type { ScenarioWeatherMetadata } from '../sim/weather';
 import type { RunwayReference } from '../viewport/runwayData';
 import type { GuidanceState } from '../sim/guidanceState';
 import type { RouteEditSession } from '../sim/fms/routeAdapter';
-import { composeControlsSlice, type SimulationStepInput, type SimulationStepResult } from '../sim/simulationStep';
+import { composeControlsSlice, type SimulationStepInput } from '../sim/simulationStep';
 import { getSimulationRuntime, type AsyncSimulationRuntime } from '../sim/simulationRuntime';
 import type { SimulationStatus } from '../sim/simulationStatus';
 import type { RouteStatusSnapshot } from '../sim/systems/navigation';
@@ -27,6 +27,8 @@ import { createPersistenceSlice, restoreSnapshotSlice } from './slices/persisten
 import { captureScenarioSnapshot, type ScenarioSnapshot } from './scenarioPersistence';
 import { assertCommittedSimulationResult, assertSimulationStepInput, InvalidSimulationStateError } from '../sim/simulationValidation';
 
+import { appliedCommandLatency, commandBoundaryPatch, commitRate, type CommandRevisions, type SimulationCommit } from './commandBoundaries';
+
 export type SimStatus = SimulationStatus;
 
 export interface SimulationFailureEvidence {
@@ -39,6 +41,10 @@ export interface SimulationFailureEvidence {
 }
 
 export interface SimStore {
+  commandRevisions: CommandRevisions;
+  commandAcceptedAtMs: number;
+  simulationCommit: SimulationCommit | null;
+  asyncReservedSteps: number;
   simulationFailure: SimulationFailureEvidence | null;
   lastValidCheckpoint: ScenarioSnapshot | null;
   restoreLastValidCheckpoint: () => void;
@@ -129,17 +135,17 @@ function nextSimRate(current: number): SimRate {
 
 function maxStepsPerRenderedFrame(simRate: number): number {
   if (simRate <= 1) return MAX_STEPS_PER_FRAME;
-  return Math.max(MAX_STEPS_PER_FRAME, Math.ceil(MAX_ACCELERATED_FRAME_SECONDS * Math.max(1, simRate) / FIXED_STEP_SECONDS));
+  return Math.min(128, Math.max(MAX_STEPS_PER_FRAME, Math.ceil(MAX_ACCELERATED_FRAME_SECONDS * Math.max(1, simRate) / FIXED_STEP_SECONDS)));
 }
 
 export const useSimStore = create<SimStore>((set, get) => {
-  const storeSet = set as SimStoreSet;
+  const storeSet: SimStoreSet = (partial) => set((state) => commandBoundaryPatch(state, typeof partial === 'function' ? partial(state) : partial));
   const containFailure = (error: unknown, input: unknown, result: unknown) => {
     const current = get();
     const checkpoint = current.lastValidCheckpoint ? structuredClone(current.lastValidCheckpoint) : null;
     set({
       lastValidCheckpoint: checkpoint,
-      status: 'paused', asyncPhysicsInFlight: false,
+      status: 'paused', asyncPhysicsInFlight: false, asyncReservedSteps: 0,
       asyncPhysicsGeneration: current.asyncPhysicsGeneration + 1,
       fixedStepAccumulatorSeconds: 0, lastFrameTime: 0,
       simulationFailure: {
@@ -152,6 +158,8 @@ export const useSimStore = create<SimStore>((set, get) => {
   };
 
   return {
+    commandRevisions: { pilot: 0, autoflight: 0, route: 0, environment: 0 },
+    commandAcceptedAtMs: 0, simulationCommit: null, asyncReservedSteps: 0,
     ...createAircraftSlice(storeSet),
     ...createInputSlice(storeSet),
     simulationFailure: null,
@@ -159,7 +167,7 @@ export const useSimStore = create<SimStore>((set, get) => {
     restoreLastValidCheckpoint: () => {
       const current = get();
       if (!current.lastValidCheckpoint) return;
-      set({
+      storeSet({
         ...restoreSnapshotSlice(current.lastValidCheckpoint, 'Last valid checkpoint'),
         status: 'paused', asyncPhysicsInFlight: false,
         asyncPhysicsGeneration: current.asyncPhysicsGeneration + 1,
@@ -218,6 +226,8 @@ export const useSimStore = create<SimStore>((set, get) => {
         return;
       }
 
+      const boundaryState = get();
+      const startedAt = performance.now();
       let nextAircraft = structuredClone(aircraft);
       let nextActiveLegIndex = activeLegIndex;
       let nextRouteStatus = routeStatus;
@@ -279,6 +289,14 @@ export const useSimStore = create<SimStore>((set, get) => {
         activeLegIndex: nextActiveLegIndex,
         routeStatus: nextRouteStatus,
         guidance: nextGuidance,
+        simulationCommit: {
+          ...commitRate(boundaryState.simulationCommit, performance.now(), simulationTimeSeconds + stepCount * FIXED_STEP_SECONDS),
+          stepIndex: (boundaryState.simulationCommit?.stepIndex ?? Math.round(simulationTimeSeconds / FIXED_STEP_SECONDS)) + stepCount,
+          revisions: boundaryState.commandRevisions, committedAtMs: performance.now(), batchSteps: stepCount,
+          batchDurationMs: performance.now() - startedAt,
+          commandLatencyMs: appliedCommandLatency(boundaryState, performance.now()),
+          observation: { aircraft: nextAircraft, apState, flightPlan, routeStatus: nextRouteStatus, wind, weather, guidance: nextGuidance, apCommands: nextControls.apCommands },
+        },
       });
     },
 
@@ -328,108 +346,66 @@ export const useSimStore = create<SimStore>((set, get) => {
       }
 
       const generation = state.asyncPhysicsGeneration;
-      const {
-        aircraft,
-        spec,
-      pilotInputs,
-      apState,
-      flightPlan,
-        activeLegIndex,
-        routeStatus,
-        wind,
-        weather,
-        selectedScenarioId,
-        guidance,
-        apControllerState,
-      } = state;
-      let nextAircraft = structuredClone(aircraft);
-      let nextActiveLegIndex = activeLegIndex;
-      let nextRouteStatus = routeStatus;
-      let nextGuidance = guidance;
-      let nextApControllerState = apControllerState;
       let remainingSteps = stepCount;
+      // Reserve only this frame's bounded work. Frames arriving during a worker
+      // turn bank new time independently; a commit never overwrites that bank.
+      accumulator -= stepCount * FIXED_STEP_SECONDS;
+      if (Math.abs(accumulator) < 1e-12) accumulator = 0;
+      set({ asyncPhysicsInFlight: true, asyncReservedSteps: remainingSteps,
+        lastFrameTime: timestamp, fixedStepAccumulatorSeconds: accumulator, droppedSimulationTimeSeconds: droppedTime });
 
-      const checkpoint = captureScenarioSnapshot(state);
       let diagnosticInput: unknown;
       let diagnosticResult: unknown;
-      const committedSteps = () => stepCount - remainingSteps;
-
-      const applyBatch = (result: SimulationStepResult) => {
-        if (get().asyncPhysicsGeneration !== generation) return;
-        accumulator -= (stepCount - remainingSteps) * FIXED_STEP_SECONDS;
-        if (Math.abs(accumulator) < 1e-12) accumulator = 0;
-        // Inputs may change while a batch is in flight. Physics echoes the
-        // dispatch-time pilot inputs back in result.controls, so committing
-        // them verbatim would revert any lever moved mid-batch. Pilot-owned
-        // axes stay authoritative from the live store; AP commands still come
-        // from physics because only it integrates autopilot servo state.
-        const current = get();
-        const pilotInputs = current.pilotInputs;
-        const controls = composeControlsSlice(pilotInputs, result.apCommands, apState, {
-          aircraft: result.aircraft,
-          flightPlan,
-          routeStatus: result.routeStatus,
-        });
-        set({
-          aircraft: result.aircraft,
-          lastFrameTime: timestamp,
-          fixedStepAccumulatorSeconds: accumulator,
-          simulationTimeSeconds: state.simulationTimeSeconds + committedSteps() * FIXED_STEP_SECONDS,
-          droppedSimulationTimeSeconds: droppedTime,
-          pilotInputs,
-          apCommands: controls.apCommands,
-          effectiveControls: controls.effectiveControls,
-          inputs: controls.effectiveControls,
-          apControllerState: result.apControllerState,
-          activeLegIndex: result.activeLegIndex,
-          routeStatus: result.routeStatus,
-          guidance: result.guidance,
-          asyncPhysicsInFlight: false,
-        });
-      };
-
-      const runBatch = (): Promise<void> => {
-        if (remainingSteps <= 0) return Promise.resolve();
-        const batchSteps = remainingSteps;
-        const input: SimulationStepInput = {
-          aircraft: nextAircraft,
-          spec,
-          pilotInputs,
-          apState,
-          flightPlan,
-          activeLegIndex: nextActiveLegIndex,
-          routeStatus: nextRouteStatus,
-          wind,
-          weather,
-          dt: FIXED_STEP_SECONDS,
-          status: state.status,
-          selectedScenarioId,
-          guidance: nextGuidance,
-          apControllerState: nextApControllerState,
-          cloneAircraft: false,
-          steps: batchSteps,
-        };
-        diagnosticInput = { ...input, aircraft: checkpoint.aircraft, pilotInputs: checkpoint.pilotInputs, apControllerState: checkpoint.apControllerState, apState: checkpoint.apState, flightPlan: checkpoint.flightPlan, weather: checkpoint.weather, wind: checkpoint.wind };
-        return Promise.resolve().then(() => {
+      const runBatch = async (): Promise<void> => {
+        while (remainingSteps > 0) {
+          // Commands accepted before dispatch belong to this boundary.
+          await Promise.resolve();
           if (get().asyncPhysicsGeneration !== generation) return;
+          const current = get();
+          const batchSteps = Math.min(16, remainingSteps);
+          const checkpoint = captureScenarioSnapshot(current);
+          const input: SimulationStepInput = {
+            aircraft: current.aircraft, spec: current.spec, pilotInputs: current.pilotInputs,
+            apState: current.apState, flightPlan: current.flightPlan, activeLegIndex: current.activeLegIndex,
+            routeStatus: current.routeStatus, wind: current.wind, weather: current.weather,
+            dt: FIXED_STEP_SECONDS, status: current.status, selectedScenarioId: current.selectedScenarioId,
+            guidance: current.guidance, apControllerState: current.apControllerState,
+            cloneAircraft: true, steps: batchSteps,
+          };
+          diagnosticInput = { ...input, aircraft: checkpoint.aircraft };
           assertSimulationStepInput(input);
           set({ lastValidCheckpoint: checkpoint });
-          return asyncRuntime.stepAsync(input);
-        }).then((result) => {
+          const startedAt = performance.now();
+          const result = await asyncRuntime.stepAsync(input);
           if (get().asyncPhysicsGeneration !== generation) return;
           diagnosticResult = result;
-          assertCommittedSimulationResult(result, selectedScenarioId);
-          nextAircraft = result.aircraft;
-          nextActiveLegIndex = result.activeLegIndex;
-          nextRouteStatus = result.routeStatus;
-          nextGuidance = result.guidance;
-          nextApControllerState = result.apControllerState;
-          remainingSteps = 0;
-          applyBatch(result);
-        });
+          assertCommittedSimulationResult(result, current.selectedScenarioId);
+          remainingSteps -= batchSteps;
+          const live = get();
+          const controls = composeControlsSlice(live.pilotInputs, result.apCommands, current.apState, {
+            aircraft: result.aircraft, flightPlan: current.flightPlan, routeStatus: result.routeStatus,
+          });
+          const committedAtMs = performance.now();
+          // Trim intent, like live pilot levers, must not be replaced by an old
+          // echo. The observation below retains the trim actually simulated.
+          const aircraft = live.inputManager.stabilizerTrimUnits === result.aircraft.config.stabilizerTrimUnits
+            ? result.aircraft : { ...result.aircraft, config: { ...result.aircraft.config, stabilizerTrimUnits: live.inputManager.stabilizerTrimUnits } };
+          set({
+            aircraft, simulationTimeSeconds: live.simulationTimeSeconds + batchSteps * FIXED_STEP_SECONDS,
+            pilotInputs: live.pilotInputs, apCommands: controls.apCommands, effectiveControls: controls.effectiveControls, inputs: controls.effectiveControls,
+            apControllerState: result.apControllerState, activeLegIndex: result.activeLegIndex, routeStatus: result.routeStatus, guidance: result.guidance,
+            asyncPhysicsInFlight: remainingSteps > 0, asyncReservedSteps: remainingSteps,
+            simulationCommit: {
+              ...commitRate(live.simulationCommit, committedAtMs, live.simulationTimeSeconds + batchSteps * FIXED_STEP_SECONDS),
+              stepIndex: (live.simulationCommit?.stepIndex ?? Math.round(live.simulationTimeSeconds / FIXED_STEP_SECONDS)) + batchSteps,
+              revisions: current.commandRevisions, committedAtMs, batchSteps, batchDurationMs: committedAtMs - startedAt,
+              commandLatencyMs: appliedCommandLatency(current, committedAtMs),
+              observation: { aircraft: result.aircraft, apState: current.apState, flightPlan: current.flightPlan, routeStatus: result.routeStatus,
+                wind: current.wind, weather: current.weather, guidance: result.guidance, apCommands: result.apCommands },
+            },
+          });
+        }
       };
-
-      set({ asyncPhysicsInFlight: true });
       runBatch().catch((error) => {
         if (get().asyncPhysicsGeneration !== generation) return;
         containFailure(error, diagnosticInput, diagnosticResult);
