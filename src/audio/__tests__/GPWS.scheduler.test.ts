@@ -63,3 +63,27 @@ describe('warning delivery', () => {
     expect(onCaption).toHaveBeenCalledTimes(1);
   });
 });
+
+it('preserves each identity cooldown across rapid A to B to A changes', () => {
+  const onCaption = vi.fn();
+  updateGPWS(alertState(), { nowMs: 4000, onCaption });
+  updateGPWS(alertState(true), { nowMs: 4010, onCaption });
+  updateGPWS(alertState(), { nowMs: 4020, onCaption });
+  expect(spoken.map((item) => item.text)).toEqual(['TOO LOW GEAR', 'PULL UP']);
+  // Captions still track the current condition even if speech is cooling down.
+  expect(onCaption).toHaveBeenLastCalledWith(expect.objectContaining({ text: 'TOO LOW GEAR', timestampMs: 4020, delivery: 'caption' }));
+});
+
+it('keeps caption access when the browser has no speech API', () => {
+  vi.stubGlobal('speechSynthesis', undefined);
+  vi.stubGlobal('SpeechSynthesisUtterance', undefined);
+  const onCaption = vi.fn();
+  expect(() => updateGPWS(alertState(true), { nowMs: 20, onCaption })).not.toThrow();
+  expect(onCaption).toHaveBeenCalledWith(expect.objectContaining({ text: 'PULL UP', delivery: 'caption' }));
+});
+it('does not label empty-voice caption access as audible delivery', () => {
+  vi.stubGlobal('speechSynthesis', { speak, cancel, getVoices: () => [] });
+  const onCaption = vi.fn();
+  updateGPWS(alertState(true), { nowMs: 20, onCaption });
+  expect(onCaption).toHaveBeenCalledWith(expect.objectContaining({ text: 'PULL UP', delivery: 'caption' }));
+});

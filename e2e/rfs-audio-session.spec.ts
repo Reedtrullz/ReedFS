@@ -50,6 +50,17 @@ async function verifyAudioSession(page: Page) {
   });
   expect(levels.context).toBe('running');
   expect(levels.peak).toBeLessThan(0.0001);
+  await page.getByRole('button', { name: 'RESUME', exact: true }).click();
+  const resumedPeak = await page.evaluate(async () => {
+    const path = '/src/audio/AudioEngine.ts'; const { getAudioEngine } = await import(/* @vite-ignore */ path);
+    const engine = getAudioEngine(); const analyser = engine.ctx.createAnalyser(); engine.engineBus.connect(analyser);
+    await new Promise((resolve) => setTimeout(resolve, 160));
+    const samples = new Float32Array(analyser.fftSize); analyser.getFloatTimeDomainData(samples);
+    engine.engineBus.disconnect(analyser); return Math.max(...samples.map(Math.abs));
+  });
+  expect(resumedPeak).toBeGreaterThan(0.01);
+  await page.getByRole('button', { name: 'PAUSE', exact: true }).click();
+  await page.getByRole('button', { name: 'RESET', exact: true }).click();
   await page.getByRole('button', { name: 'AUDIO: ON', exact: true }).click();
   await expect.poll(() => page.evaluate(() => (window as unknown as { audioProbe: { counts: () => { live: number } } }).audioProbe.counts().live)).toBe(0);
   await page.getByRole('button', { name: 'AUDIO: OFF', exact: true }).click();

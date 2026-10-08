@@ -93,18 +93,24 @@ const captionTimes = new Map<GpwsAlert, number>();
 const speechTimes = new Map<GpwsAlert, number>();
 const GPWS_REPEAT_INTERVAL_MS = 3000;
 let active: { alert: GpwsAlert; utterance: SpeechSynthesisUtterance; volume: number } | null = null;
+let captionAlert: GpwsAlert | null = null;
 
-export function cancelGPWSSpeech(): void {
+function cancelActiveSpeech(): void {
   if (active) {
     active = null;
     try { globalThis.speechSynthesis?.cancel(); } catch { /* Captions remain independent of browser speech failures. */ }
   }
+}
+
+export function cancelGPWSSpeech(): void {
+  cancelActiveSpeech();
   speechTimes.clear();
 }
 
 export function resetGPWS(): void {
   cancelGPWSSpeech();
   captionTimes.clear();
+  captionAlert = null;
 }
 
 function due(times: Map<GpwsAlert, number>, alert: GpwsAlert, now: number): boolean {
@@ -120,9 +126,15 @@ export function updateGPWS(state: AircraftState, options: GpwsUpdateOptions = {}
   const shouldSpeak = (options.speechEnabled ?? true) && volume > 0;
   // Only the currently selected condition can own speech. Repeats never enqueue
   // while it is active; changes replace obsolete speech, including urgent alerts.
-  if (!alert || !shouldSpeak || (active && (active.alert !== alert || active.volume !== volume))) cancelGPWSSpeech();
-  if (!alert) return;
-  if ((options.captionsEnabled ?? true) && due(captionTimes, alert, now)) {
+  if (!alert || !shouldSpeak) cancelGPWSSpeech();
+  else if (active && (active.alert !== alert || active.volume !== volume)) {
+    if (active.volume !== volume) speechTimes.delete(active.alert);
+    cancelActiveSpeech();
+  }
+  if (!alert) { captionAlert = null; return; }
+  if (!(options.captionsEnabled ?? true)) captionAlert = null;
+  else if (captionAlert !== alert || due(captionTimes, alert, now)) {
+    captionAlert = alert;
     captionTimes.set(alert, now);
     options.onCaption?.({ kind: 'gpws', delivery: 'caption', text: alert, timestampMs: now });
   }

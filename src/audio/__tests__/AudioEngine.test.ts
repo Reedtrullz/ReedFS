@@ -106,3 +106,15 @@ it('does not report running when resume rejects or leaves the context suspended'
   await expect(engine.start()).rejects.toThrow(/running/);
   expect(engine.started).toBe(false);
 });
+
+it('coalesces concurrent starts while the native resume request is pending', async () => {
+  const context = createFakeAudioContext();
+  let finish!: () => void;
+  context.resume = vi.fn(() => new Promise<void>((resolve) => { finish = () => { context.state = 'running'; resolve(); }; }));
+  const engine = new AudioEngine({ contextFactory: () => context as unknown as AudioContext });
+  const first = engine.start(); const second = engine.start();
+  expect(context.resume).toHaveBeenCalledTimes(1);
+  expect(engine.started).toBe(false);
+  finish(); await Promise.all([first, second]);
+  expect(engine.sessionState).toBe('running');
+});
