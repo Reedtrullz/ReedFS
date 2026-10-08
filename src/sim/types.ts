@@ -88,6 +88,8 @@ export interface ControlInputs {
   rudder: number;     // -1 (full left) to +1 (full right)
   throttle1: number;  // 0 (idle) to 1 (TOGA)
   throttle2: number;
+  fuelCutoff1?: boolean; // explicit combustion cutoff; omitted legacy value means fuel on
+  fuelCutoff2?: boolean;
   flapLever: number;  // detent: 0, 1, 2, 5, 10, 15, 25, 30, 40
   gearLever: 'UP' | 'DOWN';
   spoilers: number;   // 0 to 1

@@ -59,6 +59,7 @@ export function isControlInputs(value: unknown): value is ControlInputs {
   return ['elevator', 'aileron', 'rudder'].every((key) => range(value[key], -1, 1))
     && ['throttle1', 'throttle2', 'spoilers', 'brake'].every((key) => range(value[key], 0, 1))
     && ['leftBrake', 'rightBrake'].every((key) => value[key] === undefined || range(value[key], 0, 1))
+    && ['fuelCutoff1', 'fuelCutoff2'].every((key) => value[key] === undefined || typeof value[key] === 'boolean')
     && range(value.flapLever, 0, 40) && ['UP', 'DOWN'].includes(String(value.gearLever));
 }
 export function isAutopilotCommands(value: unknown): value is AutopilotCommands {

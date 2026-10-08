@@ -157,6 +157,19 @@ export function TakeoffSetupPanel() {
           Set takeoff config
         </button>
       </div>
+      <details style={{ marginTop: 8, fontSize: 12 }}>
+        <summary style={{ cursor: 'pointer' }}>Engine fuel</summary>
+        <div style={buttonsStyle}>
+          <button style={buttonStyle} type="button" aria-label="Engine 1 fuel cutoff" aria-pressed={inputs.fuelCutoff1 ?? false}
+            onClick={() => setInput({ fuelCutoff1: !inputs.fuelCutoff1 })}>
+            L fuel: {inputs.fuelCutoff1 ? 'CUTOFF' : 'ON'}
+          </button>
+          <button style={buttonStyle} type="button" aria-label="Engine 2 fuel cutoff" aria-pressed={inputs.fuelCutoff2 ?? false}
+            onClick={() => setInput({ fuelCutoff2: !inputs.fuelCutoff2 })}>
+            R fuel: {inputs.fuelCutoff2 ? 'CUTOFF' : 'ON'}
+          </button>
+        </div>
+      </details>
     </section>
   );
 }

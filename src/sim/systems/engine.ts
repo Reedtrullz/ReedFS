@@ -1,7 +1,7 @@
 import type { AircraftState, AircraftSpec, ControlInputs } from '../types';
 import { B737_800_FDM } from '../data/aircraft/b737-800-fdm.v1';
 import type { EngineModelData, EngineThrustLapsePointData } from '../data/aircraft/fdmTypes';
-import { isaAtAltitude } from '../physics/atmosphere';
+import { atmosphereForDensityAltitude, isaAtAltitude, type AtmoConditions, type DensityAltitudeWeather } from '../physics/atmosphere';
 import { lbfToN } from '../physics/units';
 import { computeAirRelativeVelocity } from './environment';
 import type { WindInfo } from '../weather';
@@ -10,10 +10,10 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
-function machFromState(state: AircraftState, wind: WindInfo | null = null): number {
+function machFromState(state: AircraftState, wind: WindInfo | null, atmosphere: AtmoConditions): number {
   const airRelative = computeAirRelativeVelocity(state, wind);
   const speedMs = Math.sqrt(airRelative.u ** 2 + airRelative.v ** 2 + airRelative.w ** 2);
-  return speedMs / isaAtAltitude(state.position.alt).speedOfSound;
+  return speedMs / atmosphere.speedOfSound;
 }
 
 function fuelAvailableKg(state: AircraftState): number {
@@ -105,11 +105,11 @@ export function computeEngineThrustN(
 }
 
 /**
- * Twin-spool turbofan engine model.
+ * Simplified twin-spool turbofan placeholder model.
  * N1 (fan/low-pressure): slow spool, tc = 1.5-3.0s depending on power.
  * N2 (core/high-pressure): fast spool, tc = 0.6s.
  * EGT is a function of N2 and fuel flow.
- * Fuel flow = SFC * thrust, with SFC varying by altitude/power.
+ * Fuel flow = the versioned placeholder SFC * thrust.
  */
 export function updateEngines(
   state: AircraftState,
@@ -117,8 +117,13 @@ export function updateEngines(
   spec: AircraftSpec,
   dt: number,
   wind: WindInfo | null = null,
+  weather: DensityAltitudeWeather | null = null,
 ): void {
-  const mach = machFromState(state, wind);
+  const atmosphere = atmosphereForDensityAltitude(state.position.alt, weather);
+  const mach = machFromState(state, wind, atmosphere);
+  // Generic weather sensitivity around the existing ISA altitude/Mach table.
+  // This relative-density approximation is not a qualified CFM56 lapse map.
+  const relativeDensity = atmosphere.density / isaAtAltitude(state.position.alt).density;
   const engineModel = B737_800_FDM.engine;
   const fuelAvailable = fuelAvailableKg(state) > 1e-6;
   // Internal sub-stepping for numerical stability with large dt
@@ -128,10 +133,12 @@ export function updateEngines(
   for (let step = 0; step < subSteps; step++) {
     for (let i = 0; i < 2; i++) {
       const eng = state.engines[i];
-      const throttle = i === 0 ? inputs.throttle1 : inputs.throttle2;
+      const throttle = clamp(i === 0 ? inputs.throttle1 : inputs.throttle2, 0, 1);
+      const fuelCutoff = i === 0 ? inputs.fuelCutoff1 : inputs.fuelCutoff2;
+      const combusting = fuelAvailable && fuelCutoff !== true;
 
-      // Target N1: non-linear throttle mapping (idle to TOGA) when fuel is available.
-      const n1Target = fuelAvailable && throttle > 0.01
+      // Fuel-on throttle spans idle to TOGA; shutdown is a separate command.
+      const n1Target = combusting
         ? engineModel.idleN1Percent + throttle * (engineModel.togaN1Percent - engineModel.idleN1Percent)
         : 0;
 
@@ -150,18 +157,18 @@ export function updateEngines(
       eng.n2 = Math.max(0, Math.min(110, eng.n2));
 
       // EGT: driven by combustion/core speed, cools toward ambient when fuel-starved.
-      eng.egt = fuelAvailable && eng.n2 > 5
+      eng.egt = combusting && eng.n2 > 5
         ? engineModel.idleEgtC
           + eng.n2 * engineModel.egtPerN2PercentC
           - (eng.n2 > engineModel.highN2EgtReliefStartPercent
             ? (eng.n2 - engineModel.highN2EgtReliefStartPercent) * engineModel.highN2EgtReliefPerPercentC
             : 0)
-        : 20;
+        : atmosphere.tempC;
 
       // Fuel flow (kg/hr): SFC-based, using the same table-backed thrust source exposed to physics.
-      eng.thrust = fuelAvailable ? computeEngineThrustN(eng.n1, spec, state.position.alt, mach, engineModel) : 0;
-      eng.fuelFlow = fuelAvailable ? eng.thrust * engineModel.fuelSfcKgPerNewtonHour : 0;
-      eng.running = fuelAvailable && eng.n1 > 0.5;
+      eng.thrust = combusting ? computeEngineThrustN(eng.n1, spec, state.position.alt, mach, engineModel) * relativeDensity : 0;
+      eng.fuelFlow = combusting ? eng.thrust * engineModel.fuelSfcKgPerNewtonHour : 0;
+      eng.running = combusting && eng.n1 > 0.5;
     }
   }
 

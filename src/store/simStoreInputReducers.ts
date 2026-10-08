@@ -15,6 +15,8 @@ export const defaultInputs: ControlInputs = {
   rudder: 0,
   throttle1: 0,
   throttle2: 0,
+  fuelCutoff1: false,
+  fuelCutoff2: false,
   flapLever: 0,
   gearLever: 'DOWN',
   spoilers: 0,
@@ -26,6 +28,8 @@ export const defaultInputs: ControlInputs = {
 export function normalizeControlInputs(inputs: ControlInputs): ControlInputs {
   return {
     ...inputs,
+    fuelCutoff1: inputs.fuelCutoff1 ?? false,
+    fuelCutoff2: inputs.fuelCutoff2 ?? false,
     leftBrake: 0,
     rightBrake: 0,
   };

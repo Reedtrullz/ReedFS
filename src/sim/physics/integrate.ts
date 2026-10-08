@@ -209,7 +209,7 @@ export function integrate(
   // Pilot-facing configuration controls must be visible to the same tick's aero solve.
   // Ground contact re-applies the gear safety rule after liftoff/contact resolution.
   applyPilotConfiguration(state, controls, dt);
-  updateEngines(state, controls, spec, dt, wind ?? null);
+  updateEngines(state, controls, spec, dt, wind ?? null, weather ?? null);
   updateFuel(state, spec, dt);
   updateElectrical(state, dt);
   updateHydraulic(state, dt);
