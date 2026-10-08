@@ -2,6 +2,17 @@ import { writeFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
 
 // Native renderer lifecycle integration, seeded approach; separate from full-flight proof.
+async function waitForNativeScene(page: Page, surface: 'three' | 'cockpit' = 'three') {
+  // Cesium readiness precedes the lazy aircraft layer. Bound that startup phase
+  // separately before asserting ownership or deliberately losing a context.
+  await page.waitForFunction((owner) =>
+    document.querySelector('[data-testid="cesium-viewport"]')?.getAttribute('data-rfs-ready') === 'true'
+    && document.querySelector('[data-rfs-surface="cesium"]') !== null
+    && document.querySelector(`[data-rfs-surface="${owner}"]`) !== null,
+  surface, { timeout: 30_000 });
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+}
+
 async function session(page: Page) {
   return page.evaluate(async () => {
     const path = '/src/store/simStore.ts'; const { useSimStore } = await import(/* @vite-ignore */ path);
@@ -45,7 +56,13 @@ test('native Cesium and Three context loss preserves approach and bounded render
       handles: resources.reduce((n, owned) => n + owned.size, 0), draws,
     })));
   });
+  // Controlled cold lazy-module delivery, before renderer fault injection.
+  await page.route('**/src/viewport/ThreeLayer.tsx', async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 6000));
+    await route.continue();
+  });
   await page.goto('/');
+  await waitForNativeScene(page);
   await expect(page.locator('[data-rfs-surface="three"]')).toHaveCount(1);
   await page.evaluate(async () => {
     const path = '/src/store/simStore.ts'; const scenariosPath = '/src/sim/scenarios.ts'; const plansPath = '/src/sim/flightPlanLoader.ts';
@@ -83,6 +100,7 @@ test('native Cesium and Three context loss preserves approach and bounded render
     await expect.poll(async () => (await session(page)).status).toBe('paused');
     const before = await session(page);
     await page.getByRole('button', { name: 'RESTORE 3D VIEW', exact: true }).click();
+    await waitForNativeScene(page, surface === 'cockpit' ? 'cockpit' : 'three');
     await expect(page.locator('[data-rfs-surface="cesium"]')).toHaveCount(1);
     await expect(page.locator(`[data-rfs-surface="${surface === 'cockpit' ? 'cockpit' : 'three'}"]`)).toHaveCount(1);
     await expect(page.getByText('GRAPHICS UNAVAILABLE', { exact: true })).toHaveCount(0);
@@ -117,6 +135,7 @@ test('unavailable native WebGL leaves flight controls alive and permits explicit
   await page.getByRole('button', { name: 'PAUSE', exact: true }).click(); const before = await session(page);
   await page.evaluate(() => Reflect.set(window, '__denyGraphics', false));
   await page.getByRole('button', { name: 'RETRY SCENERY', exact: true }).click();
+  await waitForNativeScene(page);
   await expect(page.locator('[data-rfs-surface="cesium"]')).toHaveCount(1);
   await expect(page.locator('[data-rfs-surface="three"]')).toHaveCount(1);
   expect(await session(page)).toEqual(before);
