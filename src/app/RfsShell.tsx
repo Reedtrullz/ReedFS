@@ -1,4 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { DiagnosticExport } from '../components/DiagnosticExport';
 import type { Viewer as CesiumViewer } from 'cesium';
 import { getCesiumScenePolicy } from '../config/cesium';
 import type { RunwayLayerProps } from '../viewport/RunwayLayer';
@@ -370,6 +371,7 @@ export function RfsShell() {
           <div data-rfs-debug-panel="telemetry"><Suspense fallback={null}><Telemetry /></Suspense></div>
           <div data-rfs-debug-panel="help"><Suspense fallback={null}><ControlsHelp /></Suspense></div>
           <div data-rfs-debug-panel="settings"><Suspense fallback={null}><ControlsSettings /></Suspense></div>
+          <div data-rfs-debug-panel="diagnostics"><DiagnosticExport /></div>
           <div data-rfs-debug-panel="attitude"><Suspense fallback={null}><AttitudeIndicator /></Suspense></div>
         </>
       ) : null}

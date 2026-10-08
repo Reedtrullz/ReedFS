@@ -283,8 +283,8 @@ export async function expectDebugUiAppearsOnlyAfterExplicitOverlayControl(page: 
   await page.getByRole('button', { name: /OVL:\s*MINIMAL/i }).click();
   await expect(page.getByRole('button', { name: /OVL:\s*DEBUG/i }), 'second overlay click explicitly enables debug mode').toBeVisible();
   await expect(page.locator('[data-rfs-panel="debug"]')).toBeVisible();
-  await expect(page.locator('[data-rfs-debug-panel]'), 'debug subpanels are mounted after opt-in').toHaveCount(4, { timeout: 15_000 });
-  for (const panel of ['telemetry', 'help', 'settings', 'attitude']) {
+  await expect(page.locator('[data-rfs-debug-panel]'), 'debug subpanels are mounted after opt-in').toHaveCount(5, { timeout: 15_000 });
+  for (const panel of ['telemetry', 'help', 'settings', 'diagnostics', 'attitude']) {
     await expect(page.locator(`[data-rfs-debug-panel="${panel}"]`), `debug ${panel} panel appears after opt-in`).toBeVisible({ timeout: 15_000 });
   }
 }

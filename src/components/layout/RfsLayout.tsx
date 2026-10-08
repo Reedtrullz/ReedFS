@@ -122,7 +122,7 @@ const layoutCss = `
 }
 
 .rfs-layout [data-rfs-panel] > *,
-.rfs-layout [data-rfs-debug-panel] > * {
+.rfs-layout [data-rfs-debug-panel] > :not(dialog) {
   position: static !important;
   top: auto !important;
   right: auto !important;

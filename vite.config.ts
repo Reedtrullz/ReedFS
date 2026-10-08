@@ -3,9 +3,24 @@ import react from '@vitejs/plugin-react';
 import cesium from 'vite-plugin-cesium';
 import { VitePWA } from 'vite-plugin-pwa';
 import path from 'path';
+import { execFileSync } from 'node:child_process';
 import { rfsManualChunk } from './manualChunks.config';
+import { createBuildCohort } from './buildCohort.config';
+
+const configuredCommit = process.env.RFS_COMMIT_SHA || process.env.GITHUB_SHA;
+let local: { commit: string; dirty: boolean } | undefined;
+if (!configuredCommit) {
+  try {
+    local = {
+      commit: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim(),
+      dirty: execFileSync('git', ['status', '--porcelain', '-uno'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim().length > 0,
+    };
+  } catch { /* Source archives and the default Docker context have no Git metadata. */ }
+}
+const buildCohort = createBuildCohort(configuredCommit, local);
 
 export default defineConfig({
+  define: { __RFS_BUILD_COHORT__: JSON.stringify(buildCohort) },
   plugins: [react(), cesium(), VitePWA({
     registerType: 'autoUpdate',
     includeAssets: ['manifest.json', 'icons/*'],

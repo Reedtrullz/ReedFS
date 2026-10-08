@@ -1,0 +1,11 @@
+# Local diagnostic bundle
+
+The debug overlay and React error screen offer **Diagnostic export**. Opening it captures one bounded snapshot and previews the exact JSON before a local download. Each opening starts with **Include flight position** unchecked. Changing that option uses the already captured numeric position. Exporting does not resume, reset, or mutate the flight.
+
+`rfs-diagnostic/v1` allows only build/data/clock identities, configured runtime kind, finite timing/rate counters, simulation status, and fault/checkpoint availability booleans. It never traverses raw errors, input/result payloads, stacks, routes, names, browser identifiers, credentials, or owner identifiers. Invalid numeric values become `null`; the complete UTF-8 output must fit 8 KiB before download. Optional position contains only latitude, longitude, and altitude in feet.
+
+For a clean checkout or explicit CI/Docker SHA, the app cohort is the full build commit. A dirty local build adds `-dirty-` and a fresh random nonce. A source archive or default Docker build with commit `unknown` uses `unversioned-` and a fresh random nonce. A nonce identifies one compilation and never claims Git provenance; release metadata continues to report `unknown` when no commit was supplied. Malformed explicit commits are rejected. The configured runtime kind describes the selected runtime, not proof that a worker executed every step. Worker protocol is recorded; observed worker cohort remains `unavailable` until the independent cohort handshake is implemented in #118. No observed identity is inferred from configuration.
+
+The download is data. There is no bundle import, code execution, replay, upload, or automatic issue submission. A future diagnostic reader must validate the schema and treat strings as data. A re-simulation capsule is separate recorder work in #126.
+
+Verification includes planted token/name and recursive-error exclusion, the UTF-8 limit, frozen optional position, exact preview/download bytes, native dialog focus/Escape behavior, keyboard isolation, and preservation of a paused session. This diagnostic lane uses explicit state seeding and does not certify full flight or physical-device acceptance.

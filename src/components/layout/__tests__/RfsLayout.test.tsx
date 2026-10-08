@@ -40,7 +40,7 @@ describe('RfsLayout', () => {
     expect(css).toContain('.rfs-layout [data-rfs-panel] > *');
     expect(css).toContain('position: static !important');
     expect(css).toContain('bottom: auto !important');
-    expect(css).toContain('.rfs-layout [data-rfs-debug-panel] > *');
+    expect(css).toContain('.rfs-layout [data-rfs-debug-panel] > :not(dialog)');
   });
 
   it('keeps Cesium attribution above scene canvases but below product panels', () => {

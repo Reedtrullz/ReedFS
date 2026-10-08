@@ -1,4 +1,5 @@
 import { Component, type ReactNode } from 'react';
+import { DiagnosticExport } from './DiagnosticExport';
 
 interface Props {
   children: ReactNode;
@@ -44,6 +45,7 @@ export class ErrorBoundary extends Component<Props, State> {
           >
             Try Again
           </button>
+          <DiagnosticExport uiFailure />
         </div>
       );
     }
