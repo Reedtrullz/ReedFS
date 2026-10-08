@@ -114,7 +114,7 @@ export function RfsShell() {
   const status = useSimStore((s) => s.status);
   const selectedScenarioId = useSimStore((s) => s.selectedScenarioId);
   const setInput = useSimStore((s) => s.setInput);
-  const { activeScenario, metarData } = useScenarioWeather(selectedScenarioId);
+  const { metarData, effectiveWeather } = useScenarioWeather(selectedScenarioId);
 
   const [camMode, setCamMode] = useState<CameraMode>('chase');
   const [overlayMode, setOverlayMode] = useState<OverlayMode>('flight');
@@ -364,8 +364,8 @@ export function RfsShell() {
             <CloudLayer
               viewerRef={viewerRef}
               metar={metarData}
-              cloudSeed={activeScenario.weather.cloudSeed}
-              cloudAnchor={activeScenario.weather.cloudAnchor}
+              cloudSeed={effectiveWeather.cloudSeed}
+              cloudAnchor={effectiveWeather.cloudAnchor}
             />
             <ContrailLayer viewerRef={viewerRef} registerFrameEffect={registerFrameEffect} />
           </Suspense>
