@@ -36,7 +36,7 @@ describe('read-only shared dependency preflight', () => {
       const git = (...args) => spawnSync('git', args, { cwd: pair.rfms, encoding: 'utf8' });
       expect(git('init', '-q').status).toBe(0);
       expect(git('add', '.').status).toBe(0);
-      expect(git('-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-qm', 'fixture').status).toBe(0);
+      expect(git('-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', '-c', 'commit.gpgsign=false', 'commit', '-qm', 'fixture').status).toBe(0);
       const head = git('rev-parse', 'HEAD').stdout;
       writeFileSync(path.join(pair.rfms, 'shared/local-wip.txt'), 'preserve me');
       const status = git('status', '--porcelain').stdout;
