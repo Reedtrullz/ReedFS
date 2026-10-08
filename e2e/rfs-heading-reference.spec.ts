@@ -124,7 +124,8 @@ test('actual worker flight keeps true orientation and targets while magnetic sur
     };
     return { headingLines: textLines(heading), selectedLines: textLines(selected),
       headingRight: heading.getBoundingClientRect().right, selectedRight: selected.getBoundingClientRect().right,
-      verticalSpeedLeft: right.getBoundingClientRect().left, rowLeft: row.getBoundingClientRect().left,
+      verticalSpeedLeft: right.getBoundingClientRect().left, verticalSpeedRight: right.getBoundingClientRect().right,
+      rowRight: row.getBoundingClientRect().right, rowLeft: row.getBoundingClientRect().left,
       headingLeft: heading.getBoundingClientRect().left };
   });
   await page.screenshot({ path: testInfo.outputPath('native-magnetic-surface-heading.png') });
@@ -134,4 +135,5 @@ test('actual worker flight keeps true orientation and targets while magnetic sur
   expect(readoutLayout.headingLines).toBe(1); expect(readoutLayout.selectedLines).toBe(1);
   expect(readoutLayout.headingLeft).toBeGreaterThanOrEqual(readoutLayout.rowLeft);
   expect(Math.max(readoutLayout.headingRight, readoutLayout.selectedRight)).toBeLessThanOrEqual(readoutLayout.verticalSpeedLeft);
+  expect(readoutLayout.verticalSpeedRight).toBeLessThanOrEqual(readoutLayout.rowRight);
 });
