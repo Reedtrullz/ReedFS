@@ -6,6 +6,7 @@ import { useSimStore } from '../../../store/simStore';
 import { createDirectFlight, createKseaKpdxFlight } from '../../flightPlanLoader';
 import { ecefToGeodetic, geodeticToEcef } from '../../physics/geodesy';
 import { createRouteSourceFromFlightPlan } from '../../fms/routeAdapter';
+import { isFlightPlan } from '../../simulationValidation';
 import { KSEA_RUNWAY_16L } from '../../../viewport/runwayData';
 
 afterEach(() => useSimStore.getState().reset());
@@ -100,4 +101,26 @@ it('retains existing WGS84 near-pole round trips and rejects the undefined ECEF 
     expect(geo.lat).toBeCloseTo(lat, 8); expect(geo.alt).toBeCloseTo(250, 2);
   }
   expect(() => ecefToGeodetic(0, 0, 0)).toThrow(/Undefined/);
+});
+
+
+it('rejects either partial coordinate pair at every shared import boundary without mutation', () => {
+  for (const missing of ['lat', 'lon'] as const) {
+    const partial = route([[0, 0], [0, 1]]); delete partial.waypoints[0][missing];
+    expect(isFlightPlan(partial)).toBe(false);
+    const before = useSimStore.getState();
+    expect(() => before.setFlightPlan(partial)).toThrow(/flight plan/i);
+    expect(useSimStore.getState()).toBe(before);
+    expect(() => before.setFlightPlanAtRunway(partial, KSEA_RUNWAY_16L)).toThrow(/flight plan/i);
+    expect(useSimStore.getState()).toBe(before);
+    expect(() => createRouteSourceFromFlightPlan(partial, { id: 'partial', type: 'manual', label: 'Partial' })).toThrow(/flight plan/i);
+  }
+});
+
+it('preserves existing coordinate-free discontinuities while guidance stays unavailable', () => {
+  const plan = route([[0, 0], [0, 1]]);
+  plan.waypoints[0] = { ident: 'DISCO', discontinuity: true };
+  expect(isFlightPlan(plan)).toBe(true);
+  expect(() => useSimStore.getState().setFlightPlan(plan)).not.toThrow();
+  expect(useSimStore.getState().routeStatus.lnavAvailable).toBe(false);
 });

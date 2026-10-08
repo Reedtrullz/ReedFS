@@ -48,3 +48,23 @@ it('bounds the nominal sphere against independently published ellipsoidal long-r
     expect(hasValidCoordinates(interpolateRouteCoordinate(from, to, .5))).toBe(true);
   }
 });
+
+
+it('projects polar off-track points against the meridian plane with signed distance', () => {
+  // The -90/+90 meridians form the y-z great-circle plane. At lon0 the
+  // nearest point is the north pole: independently its arc is 90-lat degrees.
+  const from = { lat: 89, lon: -90 }; const to = { lat: 89, lon: 90 };
+  const oneDegreeM = 6371000 * Math.PI / 180;
+  for (const [lon, sign] of [[0, 1], [180, -1]] as const) {
+    const p = routeProjectionM(from, to, { lat: 89.5, lon })!;
+    expect(p.crossTrackM).toBeCloseTo(sign * .5 * oneDegreeM, 6);
+    expect(p.alongTrackM).toBeCloseTo(oneDegreeM, 6);
+  }
+});
+
+it('refuses numerically indistinguishable near-antipodes but supports a resolved near-antipode', () => {
+  const from = { lat: 0, lon: 0 };
+  // Haversine rounds this separation to pi at double precision.
+  expect(() => interpolateRouteCoordinate(from, { lat: 0, lon: 179.9999999 }, .5)).toThrow(/Antipodal/);
+  expect(hasValidCoordinates(interpolateRouteCoordinate(from, { lat: 0, lon: 179.999 }, .5))).toBe(true);
+});

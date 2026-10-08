@@ -23,7 +23,7 @@ test('actual worker preserves short dateline and polar routes, duplicates and co
       ] as const) {
         useSimStore.getState().reset(); const s = useSimStore.getState();
         const aircraft = structuredClone(s.aircraft); aircraft.position = { lat: points[0][0], lon: points[0][1], alt: 10000 };
-        aircraft.onGround = false;
+        aircraft.ground.weightOnWheels = false; aircraft.ground.contact = 'none';
         const flightPlan = { origin: 'ORIG', destination: 'DEST', flightNumber: 'GEOTEST', route: 'ORIG DEST',
           waypoints: points.map(([lat, lon], index) => ({ ident: `P${index}`, lat, lon, discontinuity: false })) };
         const routeStatus = computeRouteStatus(aircraft, flightPlan, 0);
@@ -62,7 +62,7 @@ test('malformed browser route imports reject before changing the active session'
   const results = await page.evaluate(async () => {
     const path = '/src/store/simStore.ts'; const { useSimStore } = await import(/* @vite-ignore */ path);
     useSimStore.getState().start(); useSimStore.getState().pause();
-    return [[91, 0], [0, -181], [0, NaN]].map(([lat, lon]) => {
+    return [[91, 0], [0, -181], [0, NaN], [undefined, 0], [0, undefined]].map(([lat, lon]) => {
       const before = useSimStore.getState(); let rejected = false;
       try { before.setFlightPlan({ origin: 'BAD', destination: 'DEST', flightNumber: '', route: 'BAD DEST',
         waypoints: [{ ident: 'BAD', lat, lon, discontinuity: false }, { ident: 'DEST', lat: 0, lon: 1, discontinuity: false }] }); }
@@ -70,5 +70,5 @@ test('malformed browser route imports reject before changing the active session'
       return { rejected, sameState: useSimStore.getState() === before };
     });
   });
-  expect(results).toEqual(Array.from({ length: 3 }, () => ({ rejected: true, sameState: true })));
+  expect(results).toEqual(Array.from({ length: 5 }, () => ({ rejected: true, sameState: true })));
 });

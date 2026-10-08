@@ -104,6 +104,7 @@ export function isWind(value: unknown): value is WindInfo | null {
 export function isFlightPlan(value: unknown): value is FlightPlan | null {
   return value === null || (fields(value, '', '', 'origin destination flightNumber route') && Array.isArray(value.waypoints)
     && value.waypoints.length <= 2048 && value.waypoints.every((waypoint) => fields(waypoint, '', 'discontinuity', 'ident')
+      && (waypoint.lat === undefined) === (waypoint.lon === undefined)
       && optionalNumbers(waypoint, 'lat lon') && (waypoint.lat == null || range(waypoint.lat, -90, 90))
       && (waypoint.lon == null || range(waypoint.lon, -180, 180))) && isFiniteSimulationData(value));
 }
