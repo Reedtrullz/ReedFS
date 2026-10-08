@@ -3,6 +3,7 @@ import type { FlightPlan } from '@shared/types/fmc';
 import type { SimulationStepInput, SimulationStepResult } from './simulationStep';
 import { B737_800_SPEC, createInitialState, type AircraftState, type ControlInputs, type AutopilotCommands } from './types';
 import type { ScenarioWeatherMetadata, WindInfo } from './weather';
+import type { AutopilotControllerState } from './systems/autopilot';
 import { SCENARIOS } from './scenarios';
 
 type RecordValue = Record<string, unknown>;
@@ -83,6 +84,7 @@ export function isAircraftState(value: unknown): value is AircraftState {
     && range(aircraft.config.flapSetting, 0, 40) && range(aircraft.config.gearPosition, 0, 1)
     && range(aircraft.config.speedBrake, 0, 1) && range(aircraft.config.stabilizerTrimUnits, 0, 15)
     && aircraft.grossWeight > 0 && aircraft.zeroFuelWeight > 0 && aircraft.payloadWeight >= 0 && aircraft.simTime >= 0
+    && Object.values(aircraft.fuel).every((number) => number >= 0)
     && range(aircraft.timeOfDay, 0, 24) && ['none', 'gear', 'belly', 'crashed'].includes(aircraft.ground.contact)
     && ['PARKED', 'TAXI', 'TAKEOFF', 'CLIMB', 'CRUISE', 'DESCENT', 'APPROACH', 'TOUCHDOWN', 'DEROTATION', 'ROLLOUT', 'STOPPED', 'LANDED'].includes(aircraft.flightPhase);
 }
@@ -118,7 +120,7 @@ export function isAutopilotState(value: unknown): value is AutopilotState | null
     && ['OFF', 'CMD_A', 'CMD_B', 'CMD_AB', 'CWS_A', 'CWS_B', 'AP1', 'AP2', 'AP1_AP2'].includes(String(value.truth.autopilotStatus))
     && fields(value.truth.lastModeChangeTimestamps, 'thrust lateral vertical') && isFiniteSimulationData(value));
 }
-function isController(value: unknown): boolean {
+export function isAutopilotControllerState(value: unknown): value is AutopilotControllerState {
   return fields(value, 'throttleLimited') && ['pitchPid', 'rollPid', 'thrustPid', 'pitchTargetIntegral'].every((key) => fields(value[key], 'value prevError'));
 }
 function isRouteStatus(value: unknown): boolean {
@@ -150,7 +152,7 @@ export function assertSimulationStepInput(value: unknown): asserts value is Simu
     || !isFlightPlan(value.flightPlan) || !index(value.activeLegIndex) || !isRouteStatus(value.routeStatus) || !isWind(value.wind)
     || (value.weather != null && !isWeather(value.weather)) || !['running', 'paused', 'stopped'].includes(String(value.status))
     || !SCENARIOS.some((scenario) => scenario.id === value.selectedScenarioId) || !isGuidance(value.guidance)
-    || value.guidance.scenarioId !== value.selectedScenarioId || (value.apControllerState !== undefined && !isController(value.apControllerState))
+    || value.guidance.scenarioId !== value.selectedScenarioId || (value.apControllerState !== undefined && !isAutopilotControllerState(value.apControllerState))
     || (value.cloneAircraft !== undefined && typeof value.cloneAircraft !== 'boolean')) throw new TypeError('Invalid simulation step input');
   assertSimulationExecutionBounds(value.dt as number, (value.steps ?? 1) as number);
 }
@@ -159,7 +161,7 @@ export function assertSimulationStepResult(value: unknown): asserts value is Sim
     || !index(value.activeLegIndex) || value.activeLegIndex !== (value.routeStatus as RecordValue).activeLegIndex
     || !isAutopilotCommands(value.apCommands) || !isRecord(value.controls)
     || !['pilotInputs', 'effectiveControls', 'inputs'].every((key) => isControlInputs((value.controls as RecordValue)[key]))
-    || !isAutopilotCommands(value.controls.apCommands) || !isGuidance(value.guidance) || !isController(value.apControllerState)) {
+    || !isAutopilotCommands(value.controls.apCommands) || !isGuidance(value.guidance) || !isAutopilotControllerState(value.apControllerState)) {
     throw new TypeError('Invalid simulation step result');
   }
 }

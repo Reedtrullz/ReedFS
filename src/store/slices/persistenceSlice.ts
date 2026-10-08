@@ -61,14 +61,16 @@ function restoreSnapshotSlice(snapshot: ScenarioSnapshot, slotName = 'Saved scen
     activeLegIndex: routeSlice.routeStatus.activeLegIndex,
     routeStatus: routeSlice.routeStatus,
     wind: structuredClone(snapshot.wind),
-    weather: cloneWeather(scenario.weather),
+    weather: cloneWeather(snapshot.weather ?? scenario.weather),
     guidance: buildGuidanceState({
       scenario,
       status: restoredStatus,
       aircraft,
       controls: controlsSlice.effectiveControls,
     }),
-    scenarioPersistenceMessage,
+    scenarioPersistenceMessage: snapshot.weather === undefined
+      ? `${scenarioPersistenceMessage} Legacy save has no atmosphere record; scenario defaults restored.`
+      : scenarioPersistenceMessage,
   };
 }
 

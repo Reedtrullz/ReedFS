@@ -115,10 +115,13 @@ describe('scenario persistence', () => {
     storage.setItem(SCENARIO_SAVE_KEY, JSON.stringify(legacySnapshot));
 
     const loaded = loadScenarioSnapshot(storage, 'default');
+    expect(storage.getItem(SCENARIO_SAVE_KEY)).toBe(JSON.stringify(legacySnapshot));
+    saveScenarioSnapshot(storage, createScenarioSnapshot(useSimStore.getState()), { slotId: 'second-slot' });
     const migrated = JSON.parse(storage.getItem(SCENARIO_SAVE_KEY) ?? 'null');
 
     expect(loaded.ok).toBe(true);
     expect(migrated.version).toBe(3);
+    expect(migrated.slots['second-slot']).toBeDefined();
     expect(migrated.slots.default.metadata).toEqual(expect.objectContaining({
       id: 'default',
       name: 'Default save',
@@ -192,4 +195,65 @@ describe('scenario persistence', () => {
     if (!loaded.ok) expect(loaded.reason).toMatch(/invalid/i);
     expect(useSimStore.getState().scenarioPersistenceMessage).toMatch(/ignored/i);
   });
+});
+
+describe('save trust boundary regressions', () => {
+  beforeEach(() => { useSimStore.getState().setScenario(KSEA_TUTORIAL_SCENARIO.id); useSimStore.getState().reset(); });
+  it('restores the effective atmosphere and pauses a running flight', () => {
+    const storage = memoryStorage();
+    const weather = { ...KSEA_TUTORIAL_SCENARIO.weather, qnhHpa: 850, surfaceTemperatureC: 42, visibilityM: 900 };
+    useSimStore.setState({ weather, status: 'running' });
+    useSimStore.getState().saveScenarioState(storage);
+    useSimStore.getState().reset(); useSimStore.getState().loadScenarioState(storage);
+    expect(useSimStore.getState().weather).toEqual(weather);
+    expect(useSimStore.getState().status).toBe('paused');
+  });
+  it.each(['{broken', '{"version":99,"slots":{}}'])('preserves an unreadable collection instead of overwriting it: %s', (raw) => {
+    const storage = memoryStorage(); storage.setItem(SCENARIO_SAVE_KEY, raw);
+    expect(() => saveScenarioSnapshot(storage, createScenarioSnapshot(useSimStore.getState()), { slotId: 'new-slot' })).toThrow();
+    expect(storage.getItem(SCENARIO_SAVE_KEY)).toBe(raw);
+  });
+  it.each([
+    (x: Record<string, unknown>) => { x.aircraft = {}; },
+    (x: Record<string, unknown>) => { x.pilotInputs = { throttle1: 4 }; },
+    (x: Record<string, unknown>) => { x.selectedScenarioId = 'unknown'; },
+    (x: Record<string, unknown>) => { x.status = 'unknown'; },
+    (x: Record<string, unknown>) => { x.activeLegIndex = -1; },
+    (x: Record<string, unknown>) => { x.simulationTimeSeconds = 'not-time'; },
+  ])('rejects malformed saved state without altering the active aircraft', (corrupt) => {
+    const storage = memoryStorage(); const snapshot = createScenarioSnapshot(useSimStore.getState());
+    saveScenarioSnapshot(storage, snapshot);
+    const parsed = JSON.parse(storage.getItem(SCENARIO_SAVE_KEY)!);
+    corrupt(parsed.slots.default.snapshot); storage.setItem(SCENARIO_SAVE_KEY, JSON.stringify(parsed));
+    const before = structuredClone(useSimStore.getState().aircraft);
+    expect(loadScenarioSnapshot(storage).ok).toBe(false);
+    useSimStore.getState().loadScenarioState(storage);
+    expect(useSimStore.getState().aircraft).toEqual(before);
+  });
+  it('refuses a new save containing nonfinite values', () => {
+    const snapshot = createScenarioSnapshot(useSimStore.getState()); snapshot.aircraft.velocity.u = NaN;
+    expect(() => saveScenarioSnapshot(memoryStorage(), snapshot)).toThrow();
+  });
+  it('keeps the previous collection when quota blocks a new save', () => {
+    const storage = memoryStorage(); saveScenarioSnapshot(storage, createScenarioSnapshot(useSimStore.getState()));
+    const before = storage.getItem(SCENARIO_SAVE_KEY);
+    storage.setItem = () => { throw new DOMException('full', 'QuotaExceededError'); };
+    useSimStore.getState().saveScenarioState(storage, { slotId: 'quota-slot' });
+    expect(storage.getItem(SCENARIO_SAVE_KEY)).toBe(before);
+    expect(useSimStore.getState().scenarioPersistenceMessage).toMatch(/failed/i);
+  });
+  it('contains denied reads rather than throwing from store actions', () => {
+    const storage = memoryStorage(); storage.getItem = () => { throw new DOMException('denied', 'SecurityError'); };
+    expect(() => useSimStore.getState().loadScenarioState(storage)).not.toThrow();
+    expect(() => useSimStore.getState().saveScenarioState(storage)).not.toThrow();
+    expect(() => useSimStore.getState().refreshScenarioSaveSlots(storage)).not.toThrow();
+  });
+});
+
+it('rejects unsupported saved contract identities', () => {
+  const storage = memoryStorage(); const snapshot = createScenarioSnapshot(useSimStore.getState());
+  saveScenarioSnapshot(storage, snapshot); const parsed = JSON.parse(storage.getItem(SCENARIO_SAVE_KEY)!);
+  parsed.slots.default.snapshot.identities = { aircraft: 'different-pack', sharedCommit: 'different-commit' };
+  storage.setItem(SCENARIO_SAVE_KEY, JSON.stringify(parsed));
+  expect(loadScenarioSnapshot(storage).ok).toBe(false);
 });
