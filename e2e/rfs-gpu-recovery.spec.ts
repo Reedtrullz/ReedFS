@@ -23,7 +23,10 @@ async function session(page: Page) {
 }
 
 test('native Cesium and Three context loss preserves approach and bounded renderer ownership', async ({ page }, testInfo) => {
-  test.setTimeout(120_000);
+  // Three actual loss/recovery cycles plus cold layer delivery completed in
+  //2.3minutes at CPU6. Keep original assertion/readiness limits and retries;
+  // bound only this repeated transaction, not the unavailable-WebGL case.
+  test.setTimeout(240_000);
   await page.addInitScript(() => {
     const getContext = HTMLCanvasElement.prototype.getContext;
     const seen = new WeakSet<object>();
