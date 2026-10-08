@@ -69,7 +69,8 @@ async function receipt(testInfo: TestInfo, name: string, evidence: Record<string
 
 // Each case completes an installed-worker transaction. The former single case
 // spent its240s budget before quota discard in CI; every acceptance assertion is
-// retained below, with original assertion deadlines/retries and finite case caps.
+// retained below, with finite case caps and unchanged retries. The two-page
+// transaction has a separate measured readiness window and whole-case budget.
 test('installed update stays deferred while the current flight runs', async ({ page, request }, testInfo) => {
   test.setTimeout(240000);
   await installV1(page, request);
@@ -140,7 +141,9 @@ test('installed update recovers from quota refusal and restores the saved offlin
 });
 
 test('explicit installed update preserves another running v1 flight and paused restoration', async ({ page, context, request }, testInfo) => {
-  test.setTimeout(240000);
+  // CI reached restoration after roughly230s with two real rendered tabs;
+  // keep every transaction assertion and bound only this case at360s.
+  test.setTimeout(360000);
   await installV1(page, request);
   await page.getByRole('button', { name: 'LOAD PLAN', exact: true }).click();
   await page.getByRole('button', { name: 'START ROLL', exact: true }).click();
@@ -148,9 +151,17 @@ test('explicit installed update preserves another running v1 flight and paused r
   await page.getByRole('button', { name: 'PAUSE', exact: true }).click();
   await expect(page.getByRole('button', { name: 'RESUME', exact: true })).toBeVisible();
   const other = await context.newPage(); await other.goto('/');
+  await other.bringToFront();
+  await expect.poll(() => other.evaluate(() => document.visibilityState)).toBe('visible');
   await other.getByRole('button', { name: 'START ROLL', exact: true }).click();
   await expect(other.getByRole('button', { name: 'PAUSE', exact: true })).toBeVisible();
-  await expect.poll(async () => (await runtimeObservation(other))?.observedWorkerCohort).toBe('a'.repeat(40));
+  // A recorded worker observation consumed3.7s inside a5s outer CI poll.
+  // Bound this startup separately and require an actual committed PFD step.
+  await expect.poll(() => runtimeObservation(other), { timeout: 15000 }).toEqual({
+    executionBackend: 'browser-worker', observedWorkerCohort: 'a'.repeat(40),
+  });
+  await expect.poll(async () => Number(await other.getByLabel('Primary flight display', { exact: true }).getAttribute('data-observation-step')),
+    { timeout: 15000 }).toBeGreaterThan(0);
   let otherNavigations = 0; other.on('framenavigated', (frame) => { if (frame === other.mainFrame()) otherNavigations++; });
   await page.bringToFront();
   await stageV2(page, request);
@@ -160,6 +171,7 @@ test('explicit installed update preserves another running v1 flight and paused r
   const continuing = await diagnostic(other);
   expect(continuing.identities.appCohort).toBe('a'.repeat(40));
   expect(continuing.identities.observedWorkerCohort).toBe('a'.repeat(40));
+  expect(continuing.runtime.lastValidatedBackend).toBe('browser-worker');
   expect(continuing.runtime.simulationSeconds).toBeGreaterThan(0);
   await restoreUpdatedSave(page, id);
   await receipt(testInfo, 'staged-pwa-other-flight', { scope: 'Actual v1→v2 activation with no navigation of the other running v1 tab and explicit paused save restoration; no continuous/full-flight claim', v2, continuing, otherNavigations });
