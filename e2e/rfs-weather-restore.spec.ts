@@ -6,10 +6,13 @@ import { openRfs } from './helpers/rfsPage';
 // No claim about a live weather provider or continuous flight.
 test('saved atmosphere survives a late browser METAR and reset starts a new weather session', async ({ page }, testInfo) => {
   test.setTimeout(120_000);
+  const POST_RESET_THROTTLE_MS = 1_500;
+  const RESET_QNH_OBSERVATION_TIMEOUT_MS = 15_000;
   const held: Array<() => void> = [];
   let released = false;
   let requests = 0;
   let completed = 0;
+  let postResetReplyDelays = 0;
   page.on('response', (response) => {
     if (response.url().includes('/__e2e_metar')) void response.finished().then(() => { completed++; });
   });
@@ -17,6 +20,10 @@ test('saved atmosphere survives a late browser METAR and reset starts a new weat
     requests++;
     const initial = !released;
     if (initial) await new Promise<void>((resolve) => { held.push(resolve); });
+    if (!initial) {
+      postResetReplyDelays++;
+      await new Promise<void>((resolve) => { setTimeout(resolve, POST_RESET_THROTTLE_MS); });
+    }
     await route.fulfill({ contentType: 'application/json', body: JSON.stringify([{
       wdir: 280, wspd: 20, wgst: 28, tmp: 25, altim: initial ? 1030 : 1004,
       visib: 9000, clouds: [],
@@ -53,13 +60,19 @@ test('saved atmosphere survives a late browser METAR and reset starts a new weat
   expect(restored).toEqual({ ...saved, status: 'paused', restored: true });
   await expect(page.getByLabel('Primary flight display', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'RESET', exact: true }).click();
+  const resetRequestedAtMs = Date.now();
   await expect.poll(() => requests).toBeGreaterThan(initialRequests);
+  const firstPostResetRequestAtMs = Date.now();
   await expect.poll(async () => page.evaluate(async () => {
     const path = '/src/store/simStore.ts'; const { useSimStore } = await import(/* @vite-ignore */ path);
     return useSimStore.getState().weather?.qnhHpa;
-  })).toBe(1004);
+  }), { timeout: RESET_QNH_OBSERVATION_TIMEOUT_MS }).toBe(1004);
+  const qnhObservedAtMs = Date.now();
   const receipt = testInfo.outputPath('native-weather-restore.json');
   await writeFile(receipt, JSON.stringify({ scope: 'Controlled local HTTP METAR; actual browser restore/reset, no live-provider/full-flight claim',
-    restored, initialRequests, requests, userAgent: await page.evaluate(() => navigator.userAgent) }, null, 2));
+    restored, initialRequests, requests, completed, postResetReplyDelays,
+    resetToQnhObservationMs: qnhObservedAtMs - resetRequestedAtMs,
+    requestToQnhObservationMs: qnhObservedAtMs - firstPostResetRequestAtMs,
+    userAgent: await page.evaluate(() => navigator.userAgent) }, null, 2));
   await testInfo.attach('native-weather-restore', { path: receipt, contentType: 'application/json' });
 });
