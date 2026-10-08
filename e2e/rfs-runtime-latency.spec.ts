@@ -76,7 +76,11 @@ test('commands accepted during actual worker turns fence stale modes, routes, pa
         const accepted = useSimStore.getState(); const aircraft = accepted.aircraft; const route = accepted.routeStatus; const controller = accepted.apControllerState;
         // Artificial delivery barrier lets commands race a real worker result.
         // It is distinct from the production watchdog and a performance claim.
-        turns[0].release(); await waitFor(() => nativeResponses === 1);
+        turns[0].release();
+        // Exercise a late observer: both real replies may precede the first poll.
+        // The second publication still waits on its barrier; no receipt is faked.
+        if (command === 'throttle') await waitFor(() => nativeResponses >= 2);
+        await waitFor(() => nativeResponses >= 1);
         if (command === 'throttle') {
           await waitFor(() => turns.length === 2); turns[1].release();
           await waitFor(() => !useSimStore.getState().asyncPhysicsInFlight);
@@ -98,7 +102,7 @@ test('commands accepted during actual worker turns fence stale modes, routes, pa
     return receipts;
   });
   for (const row of evidence) {
-    expect(row.fallbackCalls).toBe(0); expect(row.nativeResponses).toBeGreaterThan(0);
+    expect(row.fallbackCalls).toBe(0); expect(row.nativeResponses).toBe(row.command === 'throttle' ? 2 : 1);
     if (row.command === 'throttle') {
       expect(row.newerThrottle).toBe(0.8); expect(row.applied).toBe(row.accepted);
       expect(row.steps).toEqual([16, 16]); expect(row.stepIndex).toBe(32);
