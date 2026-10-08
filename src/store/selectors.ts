@@ -52,12 +52,14 @@ function shallowEqualRecord<T extends object>(a: T | null, b: T): boolean {
   return keys.every((key) => Object.is(a[key], b[key]));
 }
 
+export const pfdObservation = (s: SimStore) => s.simulationCommit?.observation ?? s;
+
 // ── PFD primitive selectors ─────────────────────────────────────────────
 
-export const selectPfdFlightPlan = (s: SimStore) => s.flightPlan;
-export const selectPfdRouteStatus = (s: SimStore) => s.routeStatus;
-export const selectPfdApStateForGuidance = (s: SimStore) => s.apState;
-export const selectPfdIas = (s: SimStore) => Math.max(0, computeDerived(s.aircraft, s.wind).ias);
+export const selectPfdFlightPlan = (s: SimStore) => pfdObservation(s).flightPlan;
+export const selectPfdRouteStatus = (s: SimStore) => pfdObservation(s).routeStatus;
+export const selectPfdApStateForGuidance = (s: SimStore) => pfdObservation(s).apState;
+export const selectPfdIas = (s: SimStore) => Math.max(0, computeDerived(pfdObservation(s).aircraft, pfdObservation(s).wind).ias);
 const STANDARD_PRESSURE_HPA = 1013.25;
 const FEET_PER_HPA = 27;
 
@@ -67,36 +69,38 @@ export function baroIndicatedAltitudeFt(trueAltitudeFt: number, qnhHpa: number):
 }
 
 export const selectPfdAltitude = (s: SimStore) => {
-  const qnhHpa = s.weather?.qnhHpa ?? null;
-  const indicated = baroIndicatedAltitudeFt(s.aircraft.position.alt, qnhHpa ?? STANDARD_PRESSURE_HPA);
+  const qnhHpa = pfdObservation(s).weather?.qnhHpa ?? null;
+  const indicated = baroIndicatedAltitudeFt(pfdObservation(s).aircraft.position.alt, qnhHpa ?? STANDARD_PRESSURE_HPA);
   return Math.max(0, indicated);
 };
 
-export const selectPfdTrueAltitude = (s: SimStore) => Math.max(0, s.aircraft.position.alt);
+export const selectPfdTrueAltitude = (s: SimStore) => Math.max(0, pfdObservation(s).aircraft.position.alt);
 
-export const selectPfdQnhHpa = (s: SimStore): number | null =>
-  s.weather && Number.isFinite(s.weather.qnhHpa) ? s.weather.qnhHpa : null;
-export const selectPfdLatitude = (s: SimStore) => s.aircraft.position.lat;
-export const selectPfdLongitude = (s: SimStore) => s.aircraft.position.lon;
-export const selectPfdVelocityU = (s: SimStore) => s.aircraft.velocity.u;
-export const selectPfdVelocityV = (s: SimStore) => s.aircraft.velocity.v;
-export const selectPfdVelocityW = (s: SimStore) => s.aircraft.velocity.w;
-export const selectPfdGroundAglFt = (s: SimStore) => s.aircraft.ground.aglFt;
-export const selectPfdGroundAltFt = (s: SimStore) => s.aircraft.ground.groundAltFt;
-export const selectPfdGroundWeightOnWheels = (s: SimStore) => s.aircraft.ground.weightOnWheels;
-export const selectPfdGroundNormalForceN = (s: SimStore) => s.aircraft.ground.normalForceN;
-export const selectPfdGroundOnRunway = (s: SimStore) => s.aircraft.ground.onRunway;
-export const selectPfdGroundContact = (s: SimStore) => s.aircraft.ground.contact;
-export const selectPfdVerticalSpeed = (s: SimStore) => computeDerived(s.aircraft, s.wind).vs;
-export const selectPfdPitchDeg = (s: SimStore) => (quatToEuler(s.aircraft.quaternion).theta * 180) / Math.PI;
-export const selectPfdRollDeg = (s: SimStore) => (quatToEuler(s.aircraft.quaternion).phi * 180) / Math.PI;
-export const selectPfdHeadingDeg = (s: SimStore) => ((quatToEuler(s.aircraft.quaternion).psi * 180) / Math.PI + 360) % 360;
+export const selectPfdQnhHpa = (s: SimStore): number | null => {
+  const weather = pfdObservation(s).weather;
+  return weather && Number.isFinite(weather.qnhHpa) ? weather.qnhHpa : null;
+};
+export const selectPfdLatitude = (s: SimStore) => pfdObservation(s).aircraft.position.lat;
+export const selectPfdLongitude = (s: SimStore) => pfdObservation(s).aircraft.position.lon;
+export const selectPfdVelocityU = (s: SimStore) => pfdObservation(s).aircraft.velocity.u;
+export const selectPfdVelocityV = (s: SimStore) => pfdObservation(s).aircraft.velocity.v;
+export const selectPfdVelocityW = (s: SimStore) => pfdObservation(s).aircraft.velocity.w;
+export const selectPfdGroundAglFt = (s: SimStore) => pfdObservation(s).aircraft.ground.aglFt;
+export const selectPfdGroundAltFt = (s: SimStore) => pfdObservation(s).aircraft.ground.groundAltFt;
+export const selectPfdGroundWeightOnWheels = (s: SimStore) => pfdObservation(s).aircraft.ground.weightOnWheels;
+export const selectPfdGroundNormalForceN = (s: SimStore) => pfdObservation(s).aircraft.ground.normalForceN;
+export const selectPfdGroundOnRunway = (s: SimStore) => pfdObservation(s).aircraft.ground.onRunway;
+export const selectPfdGroundContact = (s: SimStore) => pfdObservation(s).aircraft.ground.contact;
+export const selectPfdVerticalSpeed = (s: SimStore) => computeDerived(pfdObservation(s).aircraft, pfdObservation(s).wind).vs;
+export const selectPfdPitchDeg = (s: SimStore) => (quatToEuler(pfdObservation(s).aircraft.quaternion).theta * 180) / Math.PI;
+export const selectPfdRollDeg = (s: SimStore) => (quatToEuler(pfdObservation(s).aircraft.quaternion).phi * 180) / Math.PI;
+export const selectPfdHeadingDeg = (s: SimStore) => ((quatToEuler(pfdObservation(s).aircraft.quaternion).psi * 180) / Math.PI + 360) % 360;
 export const selectPfdRadioAltitude = (s: SimStore): number | null => {
-  const ground = s.aircraft.ground;
+  const ground = pfdObservation(s).aircraft.ground;
   if (!ground) return null;
   const aglFt = Number.isFinite(ground.aglFt)
     ? ground.aglFt
-    : s.aircraft.position.alt - ground.groundAltFt;
+    : pfdObservation(s).aircraft.position.alt - ground.groundAltFt;
   if (!Number.isFinite(aglFt) || aglFt < 0 || aglFt >= 2500) return null;
   return Math.floor(aglFt);
 };
@@ -105,44 +109,44 @@ export const selectPfdSelectedSpeed = (s: SimStore) => s.apState?.boeing.speed ?
 export const selectPfdSelectedHeading = (s: SimStore) => s.apState?.boeing.heading ?? null;
 export const selectPfdSelectedAltitude = (s: SimStore) => s.apState?.boeing.altitude ?? null;
 export const selectPfdSelectedVerticalSpeed = (s: SimStore) => s.apState?.boeing.verticalSpeed ?? null;
-export const selectPfdFlightDirectorEnabled = (s: SimStore) => Boolean(s.apState?.boeing.fdLeft || s.apState?.boeing.fdRight);
+export const selectPfdFlightDirectorEnabled = (s: SimStore) => Boolean(pfdObservation(s).apState?.boeing.fdLeft || pfdObservation(s).apState?.boeing.fdRight);
 export const selectPfdSelectedScenarioId = (s: SimStore) => s.selectedScenarioId;
-export const selectPfdFlightPhase = (s: SimStore) => s.aircraft.flightPhase;
+export const selectPfdFlightPhase = (s: SimStore) => pfdObservation(s).aircraft.flightPhase;
 export const selectPfdTakeoffCue = (s: SimStore): string | null => {
-  if (!s.aircraft.ground) return null;
-  const derived = computeDerived(s.aircraft, s.wind);
-  return takeoffCueText(s.aircraft, derived.ias, s.selectedScenarioId);
+  if (!pfdObservation(s).aircraft.ground) return null;
+  const derived = computeDerived(pfdObservation(s).aircraft, pfdObservation(s).wind);
+  return takeoffCueText(pfdObservation(s).aircraft, derived.ias, s.selectedScenarioId);
 };
 
 export function selectPfdFmaText(kind: 'thrustActive' | 'lateralActive' | 'verticalActive' | 'autopilotStatus') {
-  return (s: SimStore) => modeText(deriveDisplayFmaTruth(s.apState, {
-    aircraft: s.aircraft,
-    flightPlan: s.flightPlan,
-    routeStatus: s.routeStatus,
+  return (s: SimStore) => modeText(deriveDisplayFmaTruth(pfdObservation(s).apState, {
+    aircraft: pfdObservation(s).aircraft,
+    flightPlan: pfdObservation(s).flightPlan,
+    routeStatus: pfdObservation(s).routeStatus,
   })[kind]);
 }
 
 export function selectPfdFmaArmedVerticalText(s: SimStore): string {
-  return modeText(deriveDisplayFmaTruth(s.apState, {
-    aircraft: s.aircraft,
-    flightPlan: s.flightPlan,
-    routeStatus: s.routeStatus,
+  return modeText(deriveDisplayFmaTruth(pfdObservation(s).apState, {
+    aircraft: pfdObservation(s).aircraft,
+    flightPlan: pfdObservation(s).flightPlan,
+    routeStatus: pfdObservation(s).routeStatus,
   }).verticalArmed);
 }
 
 export function selectPfdFmaArmedLateralText(s: SimStore): string {
-  return modeText(deriveDisplayFmaTruth(s.apState, {
-    aircraft: s.aircraft,
-    flightPlan: s.flightPlan,
-    routeStatus: s.routeStatus,
+  return modeText(deriveDisplayFmaTruth(pfdObservation(s).apState, {
+    aircraft: pfdObservation(s).aircraft,
+    flightPlan: pfdObservation(s).flightPlan,
+    routeStatus: pfdObservation(s).routeStatus,
   }).lateralArmed);
 }
 
 export function selectPfdManagedSpeedKt(s: SimStore): number | null {
-  const truth = deriveDisplayFmaTruth(s.apState, {
-    aircraft: s.aircraft,
-    flightPlan: s.flightPlan,
-    routeStatus: s.routeStatus,
+  const truth = deriveDisplayFmaTruth(pfdObservation(s).apState, {
+    aircraft: pfdObservation(s).aircraft,
+    flightPlan: pfdObservation(s).flightPlan,
+    routeStatus: pfdObservation(s).routeStatus,
   }) as ReturnType<typeof deriveDisplayFmaTruth> & { managedSpeedKt?: number };
   return finiteNumber(truth.managedSpeedKt);
 }

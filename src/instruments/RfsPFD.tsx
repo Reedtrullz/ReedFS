@@ -1,43 +1,15 @@
-import type { CSSProperties } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
+import { observationStatus } from './observationStatus';
 import { useSimStore } from '../store/simStore';
 import {
-  selectPfdAltitude,
-  selectPfdApStateForGuidance,
-  selectPfdFlightDirectorEnabled,
-  selectPfdQnhHpa,
-  selectPfdTrueAltitude,
-  selectPfdFlightPhase,
-  selectPfdFlightPlan,
-  selectPfdFmaArmedVerticalText,
-  selectPfdFmaArmedLateralText,
-  selectPfdFmaText,
-  selectPfdGroundAglFt,
-  selectPfdGroundAltFt,
-  selectPfdGroundContact,
-  selectPfdGroundNormalForceN,
-  selectPfdGroundOnRunway,
-  selectPfdGroundWeightOnWheels,
-  selectPfdHasMcpTargets,
-  selectPfdHeadingDeg,
-  selectPfdIas,
-  selectPfdLatitude,
-  selectPfdLongitude,
-  selectPfdManagedSpeedKt,
-  selectPfdPitchDeg,
-  selectPfdRadioAltitude,
-  selectPfdRollDeg,
-  selectPfdRouteStatus,
-  selectPfdSelectedAltitude,
-  selectPfdSelectedHeading,
-  selectPfdSelectedScenarioId,
-  selectPfdSelectedSpeed,
-  selectPfdSelectedVerticalSpeed,
-  selectPfdTakeoffCue,
-  selectPfdVelocityU,
-  selectPfdVelocityV,
-  selectPfdVelocityW,
-  selectPfdVerticalSpeed,
+  pfdObservation, baroIndicatedAltitudeFt,
+  selectPfdHasMcpTargets, selectPfdSelectedSpeed, selectPfdSelectedHeading,
+  selectPfdSelectedAltitude, selectPfdSelectedVerticalSpeed, selectPfdSelectedScenarioId,
 } from '../store/selectors';
+import { computeDerived } from '../sim/physics/derived';
+import { quatToEuler } from '../sim/physics/quaternion';
+import { deriveDisplayFmaTruth } from '../sim/systems/fmaTruth';
+import { takeoffCueText } from '../sim/takeoffCue';
 import type { RouteStatusSnapshot } from '../sim/systems/navigation';
 import {
   resolveFlightDirectorGuidanceTargets,
@@ -397,6 +369,7 @@ function Tape({
         {label}
       </div>
       <div
+        aria-label={label === 'IAS' ? 'Observed airspeed' : 'Observed altitude'}
         style={{
           margin: '0 8px',
           padding: '3px 6px',
@@ -474,82 +447,44 @@ function Tape({
   );
 }
 
-function useFmaText(kind: 'thrustActive' | 'lateralActive' | 'verticalActive' | 'autopilotStatus') {
-  return useSimStore(selectPfdFmaText(kind));
-}
-
-function useFmaArmedVerticalText() {
-  return useSimStore(selectPfdFmaArmedVerticalText);
-}
-
-function useFmaArmedLateralText() {
-  return useSimStore(selectPfdFmaArmedLateralText);
-}
-
-function useManagedSpeedKt(): number | null {
-  return useSimStore(selectPfdManagedSpeedKt);
-}
-
 export function RfsPFD() {
-  const flightPlan = useSimStore(selectPfdFlightPlan);
-  const routeStatus = useSimStore(selectPfdRouteStatus);
-  const apStateForGuidance = useSimStore(selectPfdApStateForGuidance);
-  const ias = useSimStore(selectPfdIas);
-  const trueAltitude = useSimStore(selectPfdTrueAltitude);
-  const indicatedAltitude = useSimStore(selectPfdAltitude);
-  const latitude = useSimStore(selectPfdLatitude);
-  const longitude = useSimStore(selectPfdLongitude);
-  const velocityU = useSimStore(selectPfdVelocityU);
-  const velocityV = useSimStore(selectPfdVelocityV);
-  const velocityW = useSimStore(selectPfdVelocityW);
-  const vs = useSimStore(selectPfdVerticalSpeed);
-  const pitch = useSimStore(selectPfdPitchDeg);
-  const roll = useSimStore(selectPfdRollDeg);
-  const hdg = useSimStore(selectPfdHeadingDeg);
-  const radioAltitude = useSimStore(selectPfdRadioAltitude);
-  const groundAglFt = useSimStore(selectPfdGroundAglFt);
-  const groundAltFt = useSimStore(selectPfdGroundAltFt);
-  const groundWeightOnWheels = useSimStore(selectPfdGroundWeightOnWheels);
-  const groundNormalForceN = useSimStore(selectPfdGroundNormalForceN);
-  const groundOnRunway = useSimStore(selectPfdGroundOnRunway);
-  const groundContact = useSimStore(selectPfdGroundContact);
-  const thrustMode = useFmaText('thrustActive');
-  const lateralMode = useFmaText('lateralActive');
-  const verticalMode = useFmaText('verticalActive');
-  const armedVerticalMode = useFmaArmedVerticalText();
-  const armedLateralMode = useFmaArmedLateralText();
-  const autopilotMode = useFmaText('autopilotStatus');
+  const simulationCommit = useSimStore((s) => s.simulationCommit);
+  const commandRevisions = useSimStore((s) => s.commandRevisions);
+  const status = useSimStore((s) => s.status);
+  const invalid = useSimStore((s) => Boolean(s.simulationFailure && !s.simulationFailure.recovered));
+  const [now, setNow] = useState(() => performance.now());
+  useEffect(() => { const timer = setInterval(() => setNow(performance.now()), 250); return () => clearInterval(timer); }, []);
+  const observation = observationStatus({ simulationCommit, commandRevisions, status, invalid }, now);
+  const committed = useSimStore(pfdObservation);
+  const { aircraft: aircraftForVnav, flightPlan, routeStatus, apState: apStateForGuidance, weather, wind } = committed;
+  const derived = computeDerived(aircraftForVnav, wind);
+  const attitude = quatToEuler(aircraftForVnav.quaternion);
+  const ias = Math.max(0, derived.ias); const vs = derived.vs;
+  const trueAltitude = Math.max(0, aircraftForVnav.position.alt);
+  const qnhHpa = weather && Number.isFinite(weather.qnhHpa) ? weather.qnhHpa : null;
+  const indicatedAltitude = Math.max(0, baroIndicatedAltitudeFt(aircraftForVnav.position.alt, qnhHpa ?? 1013.25));
+  const pitch = attitude.theta * 180 / Math.PI; const roll = attitude.phi * 180 / Math.PI;
+  const hdg = (attitude.psi * 180 / Math.PI + 360) % 360;
+  const agl = aircraftForVnav.ground.aglFt;
+  const radioAltitude = Number.isFinite(agl) && agl >= 0 && agl < 2500 ? Math.floor(agl) : null;
+  const fma = deriveDisplayFmaTruth(apStateForGuidance, { aircraft: aircraftForVnav, flightPlan, routeStatus });
+  const thrustMode = fma.thrustActive || 'OFF'; const lateralMode = fma.lateralActive || 'OFF';
+  const verticalMode = fma.verticalActive || 'OFF'; const autopilotMode = fma.autopilotStatus || 'OFF';
+  const armedVerticalMode = fma.verticalArmed || 'OFF'; const armedLateralMode = fma.lateralArmed || 'OFF';
   const hasMcpTargets = useSimStore(selectPfdHasMcpTargets);
   const selectedSpeed = useSimStore(selectPfdSelectedSpeed);
-  const managedSpeed = useManagedSpeedKt();
+  const managedSpeed = finiteNumber((fma as typeof fma & { managedSpeedKt?: number }).managedSpeedKt);
   const displaySpeed = finiteNumber(selectedSpeed) ?? managedSpeed;
   const displaySpeedIsManaged = finiteNumber(selectedSpeed) === null && managedSpeed !== null;
   const selectedHeading = useSimStore(selectPfdSelectedHeading);
   const selectedAltitude = useSimStore(selectPfdSelectedAltitude);
   const selectedVerticalSpeed = useSimStore(selectPfdSelectedVerticalSpeed);
-  const flightDirectorEnabled = useSimStore(selectPfdFlightDirectorEnabled);
-  const qnhHpa = useSimStore(selectPfdQnhHpa);
+  const flightDirectorEnabled = Boolean(apStateForGuidance?.boeing.fdLeft || apStateForGuidance?.boeing.fdRight);
   const selectedScenarioId = useSimStore(selectPfdSelectedScenarioId);
-  const flightPhase = useSimStore(selectPfdFlightPhase);
-  const takeoffCue = useSimStore(selectPfdTakeoffCue);
+  const flightPhase = aircraftForVnav.flightPhase;
+  const takeoffCue = takeoffCueText(aircraftForVnav, ias, selectedScenarioId);
   const vSpeeds = maybeFindPerformanceCardForScenario(selectedScenarioId)?.vSpeeds;
   const showTakeoffReference = takeoffCue != null || flightPhase === 'PARKED' || flightPhase === 'TAKEOFF';
-  const aircraftForVnav = {
-    position: { lat: latitude, lon: longitude, alt: trueAltitude },
-    velocity: { u: velocityU, v: velocityV, w: velocityW },
-    ground: {
-      aglFt: groundAglFt,
-      groundAltFt,
-      weightOnWheels: groundWeightOnWheels,
-      normalForceN: groundNormalForceN,
-      lastTouchdownSinkRateMps: 0,
-      onRunway: groundOnRunway,
-      contact: groundContact,
-      tailstrike: false,
-      gearStations: [],
-    },
-    flightPhase,
-  } as unknown as AircraftState;
   const sharedGuidanceTargets = resolveGuidanceTargets({
     aircraft: aircraftForVnav,
     apState: apStateForGuidance,
@@ -566,9 +501,9 @@ export function RfsPFD() {
     currentPitchDeg: pitch,
     currentVerticalSpeedFpm: vs,
     altitudeFt: trueAltitude,
-    selectedHeadingDeg: selectedHeading,
-    selectedAltitudeFt: selectedAltitude,
-    selectedVerticalSpeedFpm: selectedVerticalSpeed,
+    selectedHeadingDeg: apStateForGuidance?.boeing.heading,
+    selectedAltitudeFt: apStateForGuidance?.boeing.altitude,
+    selectedVerticalSpeedFpm: apStateForGuidance?.boeing.verticalSpeed,
     aircraft: aircraftForVnav,
     flightPlan,
     routeStatus,
@@ -578,6 +513,8 @@ export function RfsPFD() {
   return (
     <section
       aria-label="Primary flight display"
+      data-observation-step={observation.stepIndex ?? 'preview'}
+      data-observation-state={observation.state}
       style={{
         ...glass,
         position: 'fixed',
@@ -658,8 +595,6 @@ export function RfsPFD() {
         </div>
       )}
       <div
-        role="status"
-        aria-label="PFD flight phase"
         style={{
           borderBottom: '1px solid rgba(120,180,210,0.22)',
           background: 'rgba(0,0,0,0.32)',
@@ -668,9 +603,13 @@ export function RfsPFD() {
           fontSize: 11,
           fontWeight: 900,
           letterSpacing: 0.8,
+          display: 'flex', justifyContent: 'space-between', gap: 8,
         }}
       >
-        PHASE {flightPhase}
+        <span role="status" aria-label="PFD flight phase">PHASE {flightPhase}</span>
+        <span aria-label="PFD observation state" style={{ minWidth: 202, textAlign: 'right', letterSpacing: 0, color: observation.state === 'CURRENT' || observation.state === 'PAUSED' ? '#9ddcff' : '#ffd84a' }}>
+          FLIGHT DATA {observation.state}{observation.ageMs === null ? '' : ` · ${(observation.ageMs / 1000).toFixed(1)}s`}
+        </span>
       </div>
       <McpTargetStrip
         visible={hasMcpTargets}
