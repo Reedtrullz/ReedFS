@@ -12,7 +12,10 @@ import {
   rotateToVisiblePositiveRate,
   selectKseaScenarioThroughVisibleControls,
   setVisibleMcpAltitudeAtLeast,
+  setVisibleMcpSpeedAtLeast,
+  setVisibleMcpSpeedAtMost,
   setVisibleMcpVerticalSpeed,
+  setVisibleSimRateTarget,
   startRollThroughVisibleControls,
   toggleVisibleGearThroughVisibleControls,
   waitForVisibleCoachText,
@@ -25,7 +28,9 @@ test.describe('RFS visible route descent proof', () => {
     test.setTimeout(480_000);
     const stages: unknown[] = [];
     const record = async (stage: string) => {
-      stages.push({ stage, wallUtc: new Date().toISOString(), flight: await readVisibleFlightNumbers(page),
+      const flight = await readVisibleFlightNumbers(page);
+      console.info('Route proof stage', stage, JSON.stringify(flight));
+      stages.push({ stage, wallUtc: new Date().toISOString(), flight,
         configuration: await page.getByRole('region', { name: 'Takeoff setup' }).getByLabel('Current takeoff configuration').textContent(),
         phase: await page.getByLabel('PFD flight phase', { exact: true }).textContent(),
         mcp: await page.getByRole('region', { name: 'Mode control panel' }).textContent(),
@@ -35,10 +40,7 @@ test.describe('RFS visible route descent proof', () => {
 
       await page.clock.install();
       await openRfsBlackbox(page);
-      await page.getByRole('button', { name: /Cycle simulator rate/ }).click();
-      await expect(page.getByRole('button', { name: /Cycle simulator rate/ })).toHaveText('SIM RATE TARGET: 4X');
-      await page.getByRole('button', { name: /Cycle simulator rate/ }).click();
-      await expect(page.getByRole('button', { name: /Cycle simulator rate/ })).toHaveText('SIM RATE TARGET: 16X');
+      await setVisibleSimRateTarget(page, 4);
       await selectKseaScenarioThroughVisibleControls(page);
       await expect(page.getByLabel('Route status')).toContainText('NO ROUTE');
 
@@ -57,8 +59,17 @@ test.describe('RFS visible route descent proof', () => {
         stepMs: 1000,
       });
 
+      // Keep rotation at pilot cadence; 650ms of held elevator at16X is
+      // over ten simulator seconds and can produce a low-energy zoom.
+      await setVisibleSimRateTarget(page, 1);
       await rotateToVisiblePositiveRate(page);
       expect(await waitForVisibleFlightPhase(page, /^(CLIMB|CRUISE)$/)).toMatch(/^(CLIMB|CRUISE)$/);
+      // Freeze the flight while the pilot configures targets; otherwise full
+      // manual takeoff thrust accelerates through the knob-click sequence.
+      const pause = page.getByRole('button', { name: /^PAUSE$/ });
+      await expect(pause).toBeVisible();
+      await pause.dispatchEvent('click');
+      await expect(page.getByRole('button', { name: /^RESUME$/ })).toBeVisible();
       await toggleVisibleGearThroughVisibleControls(page, 'UP');
       await cleanUpAirframeThroughVisibleControls(page);
       await expect(currentConfig).toContainText('Gear UP');
@@ -73,20 +84,38 @@ test.describe('RFS visible route descent proof', () => {
 
       const climbTargetFt = await setVisibleMcpAltitudeAtLeast(page, 15_000);
       expect(climbTargetFt).toBeGreaterThanOrEqual(15_000);
+      await setVisibleMcpSpeedAtLeast(page, 250);
+      const speedTargetKt = await setVisibleMcpSpeedAtMost(page, 250);
+      // Knob steps preserve the existing target's five-knot offset.
+      expect(speedTargetKt).toBeGreaterThanOrEqual(245);
+      expect(speedTargetKt).toBeLessThanOrEqual(250);
+      const resume = page.getByRole('button', { name: /^RESUME$/ });
+      await expect(resume).toBeVisible();
+      await resume.dispatchEvent('click');
       await clickVisibleMcpMode(page, 'LNAV');
+      await clickVisibleMcpMode(page, 'SPD');
       await clickVisibleMcpMode(page, 'ALT');
       await waitForVisibleFmaModes(page, {
+        thrustActive: 'SPEED',
         lateralActive: 'LNAV',
         verticalActive: /^(ALT\*|ALT_HOLD)$/,
         autopilotStatus: 'CMD_A',
       });
+      await record('autoflight-engaged');
+      await setVisibleSimRateTarget(page, 4);
       // A per-leg distance decrease alone does not establish an airborne descent entry.
       await driveVisibleSimUntil(page, 'airborne climb above the KSEA descent-entry floor', async () => {
         const flight = await readVisibleFlightNumbers(page);
+        if (flight.iasKt < 80 || flight.altitudeFt < 500) {
+          await record('climb-energy-failure');
+          throw new Error('Visible climb lost takeoff energy or returned near the ground.');
+        }
         return flight.altitudeFt >= 2500 && flight.verticalSpeedFpm > 0;
       }, { timeoutMs: 120_000, stepMs: 1000 });
       expect(await waitForVisibleFlightPhase(page, /^(CLIMB|CRUISE)$/)).toMatch(/^(CLIMB|CRUISE)$/);
       await record('airborne-route-climb');
+      await setVisibleSimRateTarget(page, 16);
+      await expect(page.getByRole('button', { name: /Cycle simulator rate/ })).toHaveText('SIM RATE TARGET: 16X');
 
       await driveVisibleSimUntil(page, 'visible route progress toward KPDX and descent phase entry', async () => {
         const route = await readVisibleRouteStatus(page);
@@ -102,13 +131,19 @@ test.describe('RFS visible route descent proof', () => {
       await clickVisibleMcpMode(page, 'VS');
       await setVisibleMcpVerticalSpeed(page, -900);
       await waitForVisibleFmaModes(page, {
+        thrustActive: 'SPEED',
         lateralActive: 'LNAV',
         verticalActive: 'VS',
         autopilotStatus: 'CMD_A',
       });
       await expect(page.getByLabel('PFD MCP selected targets')).toContainText('SEL VS -900');
       await record('descent-selected');
+      const descentEntry = await readVisibleFlightNumbers(page);
       await advanceVisibleSimTime(page, 1_000);
+      await driveVisibleSimUntil(page, 'negative VS and a visible altitude decrease after descent selection', async () => {
+        const flight = await readVisibleFlightNumbers(page);
+        return flight.verticalSpeedFpm <= -100 && flight.altitudeFt <= descentEntry.altitudeFt - 20;
+      }, { timeoutMs: 120_000, stepMs: 1000 });
 
       const descentCoach = await waitForVisibleCoachText(page, /^Descent:/i);
       expect(descentCoach).toMatch(/route descent path/i);
@@ -128,7 +163,7 @@ test.describe('RFS visible route descent proof', () => {
     } finally {
       try { if (!page.isClosed()) await record('final-observation'); }
       catch (error) { stages.push({ stage: 'final-observation-unavailable', error: String(error) }); }
-      await testInfo.attach('native-visible-route-descent', { body: JSON.stringify({ scope: 'Visible controls and readouts; KSEA takeoff/climb/route/descent workflow, unchanged480s cap, no direct state seeding or full-flight qualification', stages }, null, 2), contentType: 'application/json' });
+      await testInfo.attach('native-visible-route-descent', { body: JSON.stringify({ scope: 'Visible controls and readouts; KSEA pilot-cadence takeoff,4X climb and16X route/actual negative-VS descent with at least20ft altitude decrease, unchanged480s cap, no direct state seeding or full-flight qualification', stages }, null, 2), contentType: 'application/json' });
     }
   });
 });
