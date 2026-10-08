@@ -26,6 +26,9 @@ test('error recovery survives unavailable later chunks and exports the UI-failur
 });
 
 test('native preview downloads exact private-default data and keeps the paused flight unchanged', async ({ page }) => {
+  // Full rendered export/opt-in/Escape/reopen transaction: CPU6 trace completes in78s.
+  // Keep individual assertion deadlines; this only bounds the complete transaction.
+  test.setTimeout(120_000);
   await page.goto('/');
   await page.getByRole('button', { name: /OVL:\s*FLIGHT/i }).click();
   await page.getByRole('button', { name: /OVL:\s*MINIMAL/i }).click();

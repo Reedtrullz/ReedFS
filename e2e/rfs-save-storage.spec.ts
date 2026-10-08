@@ -94,6 +94,9 @@ test('stale overwrite and delete confirmations preserve another session version'
 });
 
 test('discard cancels a queued save without replacing an earlier pending payload', async ({ page, context }) => {
+  // Two real tabs/lock arbitration/rendered controls complete unchanged assertions
+  // in44s at CPU6; retain per-assertion deadlines and bound the whole transaction.
+  test.setTimeout(120_000);
   const other = await context.newPage();
   await page.goto('/'); await other.goto('/');
   await page.getByLabel('Save slot name').waitFor();
