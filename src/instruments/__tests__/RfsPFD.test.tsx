@@ -332,7 +332,7 @@ describe('RfsPFD', () => {
 
     expect(screen.getByLabelText('PFD MCP selected targets')).toBeTruthy();
     expect(screen.getByText('SEL SPD 245')).toBeTruthy();
-    expect(screen.getByText('SEL HDG 272')).toBeTruthy();
+    expect(screen.getByText('SEL HDG 272T')).toBeTruthy();
     expect(screen.getByText('SEL ALT 12000')).toBeTruthy();
     expect(screen.getByText('SEL VS -800')).toBeTruthy();
   });
@@ -385,7 +385,7 @@ describe('RfsPFD', () => {
     render(<RfsPFD />);
 
     expect(screen.getByLabelText('Heading selected bug')).toBeTruthy();
-    expect(screen.getByText('HDG BUG 185')).toBeTruthy();
+    expect(screen.getByText('HDG BUG 185T')).toBeTruthy();
     expect(screen.getByLabelText('Vertical speed selected bug')).toBeTruthy();
     expect(screen.getByText('VS BUG +700')).toBeTruthy();
   });

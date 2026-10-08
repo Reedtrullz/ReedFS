@@ -1,6 +1,8 @@
 import { useEffect, useState, type CSSProperties } from 'react';
 import { observationStatus } from './observationStatus';
 import { useSimStore } from '../store/simStore';
+import { useHeadingReferenceStore } from '../store/headingReferenceStore';
+import { headingDisplayContext, headingDisplayText } from '../sim/headingDisplay';
 import {
   pfdObservation, baroIndicatedAltitudeFt,
   selectPfdHasMcpTargets, selectPfdSelectedSpeed, selectPfdSelectedHeading,
@@ -95,12 +97,6 @@ function TakeoffReferenceStrip({ cue, vSpeeds }: { cue: string | null; vSpeeds: 
 
 function finiteTargetText(value: number | null | undefined, empty: string): string {
   return Number.isFinite(value) ? `${Math.round(value as number)}` : empty;
-}
-
-function headingTargetText(value: number | null | undefined): string {
-  if (!Number.isFinite(value)) return '---';
-  const wrapped = ((Math.round(value as number) % 360) + 360) % 360;
-  return String(wrapped).padStart(3, '0');
 }
 
 function verticalSpeedTargetText(value: number | null | undefined): string {
@@ -287,7 +283,7 @@ function McpTargetStrip({
   visible: boolean;
   speed: number | null | undefined;
   speedLabel?: string;
-  heading: number | null | undefined;
+  heading: string;
   altitude: number | null | undefined;
   verticalSpeed: number | null | undefined;
 }) {
@@ -295,7 +291,7 @@ function McpTargetStrip({
 
   const items = [
     `${speedLabel} ${finiteTargetText(speed, '---')}`,
-    `SEL HDG ${headingTargetText(heading)}`,
+    `SEL HDG ${heading}`,
     `SEL ALT ${finiteTargetText(altitude, '-----')}`,
     `SEL VS ${verticalSpeedTargetText(verticalSpeed)}`,
   ];
@@ -467,7 +463,9 @@ export function RfsPFD() {
   const qnhHpa = weather && Number.isFinite(weather.qnhHpa) ? weather.qnhHpa : null;
   const indicatedAltitude = Math.max(0, baroIndicatedAltitudeFt(aircraftForVnav.position.alt, qnhHpa ?? 1013.25));
   const pitch = attitude.theta * 180 / Math.PI; const roll = attitude.phi * 180 / Math.PI;
-  const hdg = (attitude.psi * 180 / Math.PI + 360) % 360;
+  const hdgTrue = (attitude.psi * 180 / Math.PI + 360) % 360;
+  const headingReference = useHeadingReferenceStore((s) => s.reference);
+  const headingContext = headingDisplayContext(aircraftForVnav, headingReference);
   const agl = aircraftForVnav.ground.aglFt;
   const radioAltitude = Number.isFinite(agl) && agl >= 0 && agl < 2500 ? Math.floor(agl) : null;
   const fma = deriveDisplayFmaTruth(apStateForGuidance, { aircraft: aircraftForVnav, flightPlan, routeStatus });
@@ -499,7 +497,7 @@ export function RfsPFD() {
     enabled: flightDirectorEnabled,
     lateralMode,
     verticalMode,
-    currentHeadingDeg: hdg,
+    currentHeadingDeg: hdgTrue,
     currentRollDeg: roll,
     currentPitchDeg: pitch,
     currentVerticalSpeedFpm: vs,
@@ -618,10 +616,13 @@ export function RfsPFD() {
         visible={hasMcpTargets}
         speed={displaySpeed}
         speedLabel={displaySpeedIsManaged ? 'MAN SPD' : 'SEL SPD'}
-        heading={selectedHeading}
+        heading={headingDisplayText(selectedHeading, headingContext)}
         altitude={selectedAltitude}
         verticalSpeed={selectedVerticalSpeed}
       />
+      {(headingContext.unavailableReason || headingContext.caution) && <div aria-label="PFD heading reference warning" style={{ color: '#ffd84a', padding: '3px 10px', fontSize: 10 }}>
+        {headingContext.unavailableReason ? `MAG unavailable: ${headingContext.unavailableReason}; displaying TRUE` : 'MAG SFC caution: weak horizontal field'}
+      </div>}
       {showTakeoffReference && <TakeoffReferenceStrip cue={takeoffCue} vSpeeds={vSpeeds} />}
 
       <div style={{ display: 'flex', gap: 8, padding: 10, alignItems: 'stretch' }}>
@@ -723,10 +724,10 @@ export function RfsPFD() {
           >
             <span style={{ color: '#9ddcff', fontSize: 13, fontWeight: 800 }}>HDG</span>
             <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1.05 }}>
-              <span style={{ color: '#ffffff', fontSize: 26, fontWeight: 900 }}>{hdg.toFixed(0).padStart(3, '0')}°</span>
+              <span aria-label="PFD heading" style={{ color: '#ffffff', fontSize: headingContext.reference === 'magnetic' ? 20 : 26, fontWeight: 900 }}>{headingDisplayText(hdgTrue, headingContext)}</span>
               {hasMcpTargets && Number.isFinite(selectedHeading) && (
                 <span aria-label="Heading selected bug" style={{ color: '#ff4df3', fontSize: 10, fontWeight: 900 }}>
-                  HDG BUG {headingTargetText(selectedHeading)}
+                  HDG BUG {headingDisplayText(selectedHeading, headingContext)}
                 </span>
               )}
             </span>

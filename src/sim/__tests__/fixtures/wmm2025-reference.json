@@ -1,0 +1,199 @@
+{
+  "source": "https://www.ncei.noaa.gov/sites/default/files/2025-02/WMM2025_TEST_VALUES.txt",
+  "sourceSha256": "ae289c94e2200e4deeae2dfdedf543a8a0e93096512b30d6a754199731f570d0",
+  "notes": "Independent NOAA printed facts. Longitude240 represented as equivalent-120. Fields rounded0.1nT/0.01degrees; no derivative/grid or model-accuracy claim.",
+  "cases": [
+    {
+      "decimalYear": 2025.0,
+      "heightAboveEllipsoidKm": 0.0,
+      "latitudeDeg": 80.0,
+      "longitudeDeg": 0.0,
+      "publishedLongitudeDeg": 0.0,
+      "expected": {
+        "northNt": 6521.6,
+        "eastNt": 145.9,
+        "downNt": 54791.5,
+        "horizontalNt": 6523.2,
+        "totalNt": 55178.5,
+        "inclinationDeg": 83.21,
+        "declinationEastDeg": 1.28
+      }
+    },
+    {
+      "decimalYear": 2025.0,
+      "heightAboveEllipsoidKm": 0.0,
+      "latitudeDeg": 0.0,
+      "longitudeDeg": 120.0,
+      "publishedLongitudeDeg": 120.0,
+      "expected": {
+        "northNt": 39677.8,
+        "eastNt": -109.6,
+        "downNt": -10580.2,
+        "horizontalNt": 39677.9,
+        "totalNt": 41064.3,
+        "inclinationDeg": -14.93,
+        "declinationEastDeg": -0.16
+      }
+    },
+    {
+      "decimalYear": 2025.0,
+      "heightAboveEllipsoidKm": 0.0,
+      "latitudeDeg": -80.0,
+      "longitudeDeg": -120.0,
+      "publishedLongitudeDeg": 240.0,
+      "expected": {
+        "northNt": 6117.5,
+        "eastNt": 15751.9,
+        "downNt": -52022.5,
+        "horizontalNt": 16898.1,
+        "totalNt": 54698.2,
+        "inclinationDeg": -72.0,
+        "declinationEastDeg": 68.78
+      }
+    },
+    {
+      "decimalYear": 2025.0,
+      "heightAboveEllipsoidKm": 100.0,
+      "latitudeDeg": 80.0,
+      "longitudeDeg": 0.0,
+      "publishedLongitudeDeg": 0.0,
+      "expected": {
+        "northNt": 6216.0,
+        "eastNt": 92.4,
+        "downNt": 52598.8,
+        "horizontalNt": 6216.7,
+        "totalNt": 52964.9,
+        "inclinationDeg": 83.26,
+        "declinationEastDeg": 0.85
+      }
+    },
+    {
+      "decimalYear": 2025.0,
+      "heightAboveEllipsoidKm": 100.0,
+      "latitudeDeg": 0.0,
+      "longitudeDeg": 120.0,
+      "publishedLongitudeDeg": 120.0,
+      "expected": {
+        "northNt": 37688.6,
+        "eastNt": -96.2,
+        "downNt": -10152.1,
+        "horizontalNt": 37688.7,
+        "totalNt": 39032.1,
+        "inclinationDeg": -15.08,
+        "declinationEastDeg": -0.15
+      }
+    },
+    {
+      "decimalYear": 2025.0,
+      "heightAboveEllipsoidKm": 100.0,
+      "latitudeDeg": -80.0,
+      "longitudeDeg": -120.0,
+      "publishedLongitudeDeg": 240.0,
+      "expected": {
+        "northNt": 5907.6,
+        "eastNt": 14780.3,
+        "downNt": -49540.7,
+        "horizontalNt": 15917.1,
+        "totalNt": 52035.0,
+        "inclinationDeg": -72.19,
+        "declinationEastDeg": 68.21
+      }
+    },
+    {
+      "decimalYear": 2027.5,
+      "heightAboveEllipsoidKm": 0.0,
+      "latitudeDeg": 80.0,
+      "longitudeDeg": 0.0,
+      "publishedLongitudeDeg": 0.0,
+      "expected": {
+        "northNt": 6500.8,
+        "eastNt": 294.5,
+        "downNt": 54869.4,
+        "horizontalNt": 6507.5,
+        "totalNt": 55253.9,
+        "inclinationDeg": 83.24,
+        "declinationEastDeg": 2.59
+      }
+    },
+    {
+      "decimalYear": 2027.5,
+      "heightAboveEllipsoidKm": 0.0,
+      "latitudeDeg": 0.0,
+      "longitudeDeg": 120.0,
+      "publishedLongitudeDeg": 120.0,
+      "expected": {
+        "northNt": 39701.6,
+        "eastNt": -167.4,
+        "downNt": -10381.8,
+        "horizontalNt": 39702.0,
+        "totalNt": 41036.9,
+        "inclinationDeg": -14.65,
+        "declinationEastDeg": -0.24
+      }
+    },
+    {
+      "decimalYear": 2027.5,
+      "heightAboveEllipsoidKm": 0.0,
+      "latitudeDeg": -80.0,
+      "longitudeDeg": -120.0,
+      "publishedLongitudeDeg": 240.0,
+      "expected": {
+        "northNt": 6200.7,
+        "eastNt": 15730.3,
+        "downNt": -51783.7,
+        "horizontalNt": 16908.3,
+        "totalNt": 54474.2,
+        "inclinationDeg": -71.92,
+        "declinationEastDeg": 68.49
+      }
+    },
+    {
+      "decimalYear": 2027.5,
+      "heightAboveEllipsoidKm": 100.0,
+      "latitudeDeg": 80.0,
+      "longitudeDeg": 0.0,
+      "publishedLongitudeDeg": 0.0,
+      "expected": {
+        "northNt": 6196.7,
+        "eastNt": 233.8,
+        "downNt": 52670.5,
+        "horizontalNt": 6201.1,
+        "totalNt": 53034.3,
+        "inclinationDeg": 83.29,
+        "declinationEastDeg": 2.16
+      }
+    },
+    {
+      "decimalYear": 2027.5,
+      "heightAboveEllipsoidKm": 100.0,
+      "latitudeDeg": 0.0,
+      "longitudeDeg": 120.0,
+      "publishedLongitudeDeg": 120.0,
+      "expected": {
+        "northNt": 37711.5,
+        "eastNt": -148.7,
+        "downNt": -9969.8,
+        "horizontalNt": 37711.8,
+        "totalNt": 39007.4,
+        "inclinationDeg": -14.81,
+        "declinationEastDeg": -0.23
+      }
+    },
+    {
+      "decimalYear": 2027.5,
+      "heightAboveEllipsoidKm": 100.0,
+      "latitudeDeg": -80.0,
+      "longitudeDeg": -120.0,
+      "publishedLongitudeDeg": 240.0,
+      "expected": {
+        "northNt": 5984.0,
+        "eastNt": 14760.1,
+        "downNt": -49317.7,
+        "horizontalNt": 15927.0,
+        "totalNt": 51825.7,
+        "inclinationDeg": -72.1,
+        "declinationEastDeg": 67.93
+      }
+    }
+  ]
+}

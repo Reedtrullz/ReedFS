@@ -30,7 +30,7 @@ export function Telemetry() {
       {row('GS', `${vm.groundSpeedKt.toFixed(0)} kt`)}
       {row('VS', `${vm.verticalSpeedFpm.toFixed(0)} fpm`)}
       {row('MACH', `M${vm.mach.toFixed(3)}`)}
-      {row('HDG', `${vm.headingDeg.toFixed(1)}°`)}
+      {row('HDG TRUE', `${vm.headingDeg.toFixed(1)}°T`)}
       {row('PTCH', `${vm.pitchDeg.toFixed(1)}°`)}
       {row('ROLL', `${vm.rollDeg.toFixed(1)}°`)}
       {row('AOA', `${(vm.aoaRad * 180 / Math.PI).toFixed(1)}°`)}
