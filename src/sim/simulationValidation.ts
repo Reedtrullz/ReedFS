@@ -6,6 +6,7 @@ import type { ScenarioWeatherMetadata, WindInfo } from './weather';
 import type { AutopilotControllerState } from './systems/autopilot';
 import { SCENARIOS } from './scenarios';
 import { eulerToQuat } from './physics/quaternion';
+import { hasCoherentScenarioClock } from './scenarioClock';
 
 type RecordValue = Record<string, unknown>;
 export const MAX_SIMULATION_BATCH_STEPS = 4096;
@@ -87,7 +88,7 @@ export function isAircraftState(value: unknown): value is AircraftState {
     && range(aircraft.config.speedBrake, 0, 1) && range(aircraft.config.stabilizerTrimUnits, 0, 15)
     && aircraft.grossWeight > 0 && aircraft.zeroFuelWeight > 0 && aircraft.payloadWeight >= 0 && aircraft.simTime >= 0
     && Object.values(aircraft.fuel).every((number) => number >= 0)
-    && range(aircraft.timeOfDay, 0, 24) && ['none', 'gear', 'belly', 'crashed'].includes(aircraft.ground.contact)
+    && hasCoherentScenarioClock(aircraft) && ['none', 'gear', 'belly', 'crashed'].includes(aircraft.ground.contact)
     && ['PARKED', 'TAXI', 'TAKEOFF', 'CLIMB', 'CRUISE', 'DESCENT', 'APPROACH', 'TOUCHDOWN', 'DEROTATION', 'ROLLOUT', 'STOPPED', 'LANDED'].includes(aircraft.flightPhase);
 }
 export function isWeather(value: unknown): value is ScenarioWeatherMetadata {

@@ -1,4 +1,6 @@
 // Generic dry-air reference, separate from the aircraft's placeholder FDM groups.
+export const USSA_1976_ID = 'ussa-1976-lower-atmosphere';
+export const USSA_1976_DATA_VERSION = '1.0.0';
 export const USSA_1976_CONSTANTS = {
   seaLevelTemperatureK: 288.15,
   seaLevelPressurePa: 101325,
@@ -20,8 +22,8 @@ export const USSA_1976_LAYERS = [
 
 export const USSA_1976_DATA = {
   schemaVersion: 1,
-  dataVersion: '1.0.0',
-  id: 'ussa-1976-lower-atmosphere',
+  dataVersion: USSA_1976_DATA_VERSION,
+  id: USSA_1976_ID,
   sourcePacket: {
     id: 'noaa-nasa-usaf-ussa-1976-lower-atmosphere',
     title: 'U.S. Standard Atmosphere, 1976',

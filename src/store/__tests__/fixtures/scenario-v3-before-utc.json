@@ -1,0 +1,239 @@
+{
+  "version": 3,
+  "savedAtIso": "2026-09-24T12:00:00.000Z",
+  "selectedScenarioId": "ksea-tutorial",
+  "status": "paused",
+  "aircraft": {
+    "position": {
+      "lat": 47.47799999999255,
+      "lon": -122.29139999999721,
+      "alt": 432
+    },
+    "velocity": {
+      "u": 0,
+      "v": -6.255247797808794e-22,
+      "w": 0
+    },
+    "attitude": {
+      "phi": 0,
+      "theta": 0,
+      "psi": 2.844886680750757
+    },
+    "quaternion": {
+      "q0": 0.14780941112961077,
+      "q1": 0,
+      "q2": 0,
+      "q3": 0.9890158633619168
+    },
+    "angularVel": {
+      "p": 0,
+      "q": 0,
+      "r": -2.9748879169610127e-24
+    },
+    "config": {
+      "flapSetting": 5,
+      "gearDown": true,
+      "gearPosition": 1,
+      "spoilersArmed": false,
+      "spoilersDeployed": false,
+      "speedBrake": 0,
+      "stabilizerTrimUnits": 5
+    },
+    "engines": [
+      {
+        "n1": 1.5046533249414746,
+        "n2": 3.937349200637354,
+        "egt": 14.144139328237259,
+        "fuelFlow": 1.5292265015887097,
+        "thrust": 27.266066935209604,
+        "running": true
+      },
+      {
+        "n1": 1.5046533249414746,
+        "n2": 3.937349200637354,
+        "egt": 14.144139328237259,
+        "fuelFlow": 1.5292265015887097,
+        "thrust": 27.266066935209604,
+        "running": true
+      }
+    ],
+    "fuel": {
+      "centerTank": 7999.999958907966,
+      "leftTank": 2000,
+      "rightTank": 2000,
+      "totalFuel": 11999.999958907967,
+      "fuelFlowTotal": 3.0584530031774193
+    },
+    "electrical": {
+      "gen1Online": false,
+      "gen2Online": false,
+      "acBusPowered": false,
+      "batteryVolts": 27.999027777777787
+    },
+    "hydraulic": {
+      "systemAPsi": 0,
+      "systemBPsi": 0,
+      "standbyPsi": 3000
+    },
+    "zeroFuelWeight": 49913,
+    "zeroFuelCg": 25.080139442630177,
+    "grossWeight": 61912.99995890797,
+    "payloadWeight": 8500,
+    "cg": 25.00000000199112,
+    "ground": {
+      "aglFt": 0,
+      "groundAltFt": 432,
+      "weightOnWheels": true,
+      "normalForceN": 607159.1669545616,
+      "lastTouchdownSinkRateMps": 0,
+      "onRunway": true,
+      "contact": "gear",
+      "tailstrike": false,
+      "gearStations": [
+        {
+          "id": "nose",
+          "label": "Nose gear",
+          "positionBodyM": {
+            "x": 15.2,
+            "y": 0,
+            "z": 2.25
+          },
+          "wheelRadiusM": 0.43,
+          "strutRestLengthM": 1.05,
+          "maxCompressionM": 0.32,
+          "springStiffnessNPerM": 400000,
+          "staticLoadFraction": 0.1,
+          "brakeCapable": false,
+          "steerable": true,
+          "compressionM": 0.15178980321552463,
+          "normalForceN": 60715.92128620985,
+          "weightOnWheel": true,
+          "steeringAngleRad": 0
+        },
+        {
+          "id": "leftMain",
+          "label": "Left main gear",
+          "positionBodyM": {
+            "x": -2.8,
+            "y": -3.15,
+            "z": 2.45
+          },
+          "wheelRadiusM": 0.58,
+          "strutRestLengthM": 1.25,
+          "maxCompressionM": 0.5,
+          "springStiffnessNPerM": 800000,
+          "staticLoadFraction": 0.45,
+          "brakeCapable": true,
+          "steerable": false,
+          "compressionM": 0.3415270285427199,
+          "normalForceN": 273221.6228341759,
+          "weightOnWheel": true,
+          "steeringAngleRad": 0
+        },
+        {
+          "id": "rightMain",
+          "label": "Right main gear",
+          "positionBodyM": {
+            "x": -2.8,
+            "y": 3.15,
+            "z": 2.45
+          },
+          "wheelRadiusM": 0.58,
+          "strutRestLengthM": 1.25,
+          "maxCompressionM": 0.5,
+          "springStiffnessNPerM": 800000,
+          "staticLoadFraction": 0.45,
+          "brakeCapable": true,
+          "steerable": false,
+          "compressionM": 0.3415270285427199,
+          "normalForceN": 273221.6228341759,
+          "weightOnWheel": true,
+          "steeringAngleRad": 0
+        }
+      ]
+    },
+    "simTime": 116.66666666666669,
+    "timeOfDay": 12.00388888888889,
+    "flightPhase": "PARKED",
+    "flightPhaseStartedMs": 0
+  },
+  "pilotInputs": {
+    "elevator": 0,
+    "aileron": 0,
+    "rudder": 0,
+    "throttle1": 0,
+    "throttle2": 0,
+    "fuelCutoff1": false,
+    "fuelCutoff2": false,
+    "flapLever": 5,
+    "gearLever": "DOWN",
+    "spoilers": 0,
+    "brake": 0,
+    "leftBrake": 0,
+    "rightBrake": 0
+  },
+  "apCommands": {},
+  "apControllerState": {
+    "pitchPid": {
+      "value": 0,
+      "prevError": 0
+    },
+    "rollPid": {
+      "value": 0,
+      "prevError": 0
+    },
+    "thrustPid": {
+      "value": 0,
+      "prevError": 0
+    },
+    "pitchTargetIntegral": {
+      "value": 0,
+      "prevError": 0
+    },
+    "throttleLimited": 0
+  },
+  "inputManager": {
+    "elevator": 0,
+    "aileron": 0,
+    "rudder": 0,
+    "throttle": 0,
+    "stabilizerTrimUnits": 5,
+    "brake": 0,
+    "leftBrake": 0,
+    "rightBrake": 0
+  },
+  "apState": null,
+  "flightPlan": null,
+  "activeLegIndex": null,
+  "wind": {
+    "dir": 180,
+    "speed": 0,
+    "gustSeed": 1601
+  },
+  "weather": {
+    "stationIcao": "KSEA",
+    "surfaceTemperatureC": 15,
+    "qnhHpa": 1013.25,
+    "visibilityM": 9999,
+    "clouds": [
+      {
+        "cover": "BKN",
+        "base": 4500
+      }
+    ],
+    "cloudSeed": 1601,
+    "gustSeed": 1601,
+    "cloudAnchor": {
+      "lat": 47.478,
+      "lon": -122.2914
+    }
+  },
+  "identities": {
+    "aircraft": "b737-800",
+    "aircraftData": "1.0.0",
+    "fdmData": "1.0.0",
+    "sharedCommit": "810fc9652da431eaf8978b85bf4af131605559b5",
+    "clock": "sim-time-ms/time-of-day-hours/v1"
+  },
+  "simulationTimeSeconds": 0.11666666666666667
+}

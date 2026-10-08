@@ -3,6 +3,7 @@
 import { eulerToQuat, type Quaternion } from './physics/quaternion';
 import { B737_800_AIRCRAFT_DATA } from './data/aircraft/b737-800.v1';
 import { B737_800_FDM } from './data/aircraft/b737-800-fdm.v1';
+import { DEFAULT_SCENARIO_UTC_MS } from './scenarioClock';
 
 export interface GeoPosition {
   lat: number; // decimal degrees
@@ -208,7 +209,8 @@ export interface AircraftState {
   cg: number; // % MAC
   ground: GroundState;
   simTime: number; // ms
-  timeOfDay: number; // hours (0-24)
+  utcEpochMs: number; // UTC at simTime0; resolved UTC is anchor + committed simTime
+  timeOfDay: number; // derived UTC hours (0-24)
   flightPhase: FlightPhase;
   flightPhaseStartedMs?: number;
 }
@@ -310,6 +312,7 @@ export function createInitialState(spec: AircraftSpec): AircraftState {
       gearStations: createB737GearStations(grossWeight * 9.80665, true),
     },
     simTime: 0,
+    utcEpochMs: DEFAULT_SCENARIO_UTC_MS,
     timeOfDay: 12,
     flightPhase: 'PARKED',
     flightPhaseStartedMs: 0,

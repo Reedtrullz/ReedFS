@@ -71,9 +71,10 @@ export function restoreSnapshotSlice(snapshot: ScenarioSnapshot, slotName = 'Sav
       aircraft,
       controls: controlsSlice.effectiveControls,
     }),
-    scenarioPersistenceMessage: snapshot.weather === undefined
-      ? `${scenarioPersistenceMessage} Legacy save has no atmosphere record; scenario defaults restored.`
-      : `${scenarioPersistenceMessage} Saved weather retained until reset or scenario selection.`,
+    scenarioPersistenceMessage: `${scenarioPersistenceMessage} ${snapshot.weather === undefined
+      ? 'Legacy save has no atmosphere record; scenario defaults restored.'
+      : 'Saved weather retained until reset or scenario selection.'}${snapshot.version < 4
+      ? ' Legacy clock mapped to 24 September 2026 UTC; previous date and atmosphere model cannot be reproduced.' : ''}`,
   };
 }
 

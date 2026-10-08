@@ -4,6 +4,7 @@ import { advanceSimulationBatch, type SimulationStepInput, type SimulationStepRe
 import { mainThreadSimulationRuntime, workerHandlerSimulationRuntime, setSimulationRuntimeForTests, type AsyncSimulationRuntime } from '../../sim/simulationRuntime';
 import { createDefaultAutopilotState } from '../../instruments/defaultAutopilotState';
 import { createRunwayToRunwayFlight } from '../../sim/flightPlanLoader';
+import { scenarioUtcMs, utcHours } from '../../sim/scenarioClock';
 
 beforeEach(() => { useSimStore.getState().reset(); useSimStore.getState().start(); });
 afterEach(() => { setSimulationRuntimeForTests(mainThreadSimulationRuntime); vi.restoreAllMocks(); });
@@ -24,6 +25,31 @@ async function dispatch(stub: ReturnType<typeof delayed>) {
 }
 
 describe('accepted commands at simulation boundaries', () => {
+  it('a paused UTC edit survives a delayed valid result from the earlier flight clock', async () => {
+    const stub = delayed(); await dispatch(stub);
+    useSimStore.getState().pause();
+    expect(useSimStore.getState().setScenarioUtc('2026-12-31T23:59:59Z')).toBe(true);
+    const changed = useSimStore.getState();
+    stub.complete(0); await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(useSimStore.getState().aircraft).toBe(changed.aircraft);
+    expect(useSimStore.getState().status).toBe('paused');
+    expect(useSimStore.getState().asyncPhysicsGeneration).toBe(changed.asyncPhysicsGeneration);
+    expect(scenarioUtcMs(useSimStore.getState().aircraft)).toBe(Date.UTC(2026, 11, 31, 23, 59, 59));
+  });
+
+  it('accelerated UTC follows committed steps while dropped wall time never advances it', () => {
+    useSimStore.setState({ simRate: 64, lastFrameTime: 16, fixedStepAccumulatorSeconds: 0 });
+    const before = useSimStore.getState().aircraft;
+    useSimStore.getState().tick(116);
+    const state = useSimStore.getState();
+    expect(state.droppedSimulationTimeSeconds).toBeGreaterThan(4);
+    expect(state.aircraft.simTime - before.simTime).toBeCloseTo(128 * 1000 / 60, 6);
+    expect(scenarioUtcMs(state.aircraft)).toBe(before.utcEpochMs + state.aircraft.simTime);
+    expect(state.aircraft.timeOfDay).toBe(utcHours(scenarioUtcMs(state.aircraft)));
+    useSimStore.getState().pause(); const paused = state.aircraft;
+    useSimStore.getState().tick(1000000); expect(useSimStore.getState().aircraft).toBe(paused);
+  });
+
   it('AP disconnect fences an in-flight controller result', async () => {
     const ap = createDefaultAutopilotState(); ap.truth.autopilotStatus = 'CMD_A'; ap.boeing.cmdA = true;
     useSimStore.getState().setApState(ap);

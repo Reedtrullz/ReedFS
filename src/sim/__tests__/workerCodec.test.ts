@@ -56,6 +56,7 @@ function realisticStepInput(): SimulationStepInput {
     { ...aircraft.engines[1], running: true, n1: 87.5, n2: 91.8, egt: 608, fuelFlow: 1205, thrust: 90_700 },
   ];
   aircraft.simTime = 42_000;
+  aircraft.timeOfDay = 12 + 42 / 3600;
   aircraft.flightPhase = 'TAKEOFF';
 
   const pilotInputs = takeoffControls();
