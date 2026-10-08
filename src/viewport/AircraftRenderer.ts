@@ -9,6 +9,7 @@ import { createBoeing737Model } from './AircraftModel';
 
 type ThreeToCesiumBridge = Pick<ReturnType<typeof ThreeToCesium>, 'add' | 'remove' | 'update'>;
 
+/** The factory creates resources owned by this renderer; cached/shared packs need their own release contract. */
 type AircraftModelFactory = () => THREE.Group;
 
 function cesiumMatrixToThreeMatrix(matrix: Cesium.Matrix4): THREE.Matrix4 {
@@ -70,9 +71,25 @@ export class AircraftRenderer {
     if (this.disposed) return;
     this.disposed = true;
 
-    if (this.wrapper) {
-      this.bridge.remove(this.model);
+    try {
+      if (this.wrapper) this.bridge.remove(this.model);
+    } finally {
       this.wrapper = null;
+      const geometries = new Set<THREE.BufferGeometry>();
+      const materials = new Set<THREE.Material>();
+      const textures = new Set<THREE.Texture>();
+      this.model.traverse((object) => {
+        if (!(object instanceof THREE.Mesh || object instanceof THREE.Line || object instanceof THREE.Points)) return;
+        geometries.add(object.geometry);
+        const owned = Array.isArray(object.material) ? object.material : [object.material];
+        for (const material of owned) {
+          materials.add(material);
+          for (const value of Object.values(material)) if (value instanceof THREE.Texture) textures.add(value);
+        }
+      });
+      textures.forEach((texture) => texture.dispose());
+      materials.forEach((material) => material.dispose());
+      geometries.forEach((geometry) => geometry.dispose());
     }
   }
 }

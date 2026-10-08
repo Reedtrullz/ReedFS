@@ -191,13 +191,15 @@ export function RfsShell() {
       const cameraManager = new CameraManager(viewer);
 
       const updateCamera = () => {
+        if (viewerRef.current !== viewer || viewer.isDestroyed()) return;
         const { status: currentStatus, aircraft: a } = useSimStore.getState();
         cameraManager.update({ status: currentStatus, mode: camMode, aircraft: a });
       };
 
       updateCamera();
-      viewer.scene.preRender.addEventListener(updateCamera);
-      cleanup = () => viewer.scene.preRender.removeEventListener(updateCamera);
+      const preRender = viewer.scene.preRender;
+      preRender.addEventListener(updateCamera);
+      cleanup = () => preRender.removeEventListener(updateCamera);
     });
 
     return () => {
@@ -219,10 +221,12 @@ export function RfsShell() {
   }, []);
 
   const handleSceneFailure = useCallback((failure: CesiumSceneFailure) => {
-    setSceneFailure((current) => current ?? failure);
+    setSceneFailure((current) => current?.stage === 'context' ? current : failure.stage === 'context' ? failure : current ?? failure);
   }, []);
 
   const handleSceneRetry = useCallback(() => {
+    viewerRef.current = null;
+    setViewerGeneration(0);
     setSceneFailure(null);
     setRetryKey((key) => key + 1);
   }, []);
@@ -354,7 +358,7 @@ export function RfsShell() {
             </Suspense>
           )}
           <Suspense key={`aircraft-${viewerGeneration}-${camMode}`} fallback={null}>
-            {camMode === 'cockpit' ? <CockpitLayer viewerRef={viewerRef} /> : <ThreeLayer viewerRef={viewerRef} />}
+            {camMode === 'cockpit' ? <CockpitLayer viewerRef={viewerRef} onSceneFailure={handleSceneFailure} /> : <ThreeLayer viewerRef={viewerRef} onSceneFailure={handleSceneFailure} />}
           </Suspense>
           <Suspense key={`weather-${viewerGeneration}`} fallback={null}>
             <CloudLayer

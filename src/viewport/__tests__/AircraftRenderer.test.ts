@@ -49,6 +49,25 @@ function createBridge() {
 }
 
 describe('AircraftRenderer', () => {
+  it('releases owned resources even when an already-retired bridge cannot remove the model', () => {
+    const { bridge } = createBridge(); const geometry = new THREE.BoxGeometry(); const material = new THREE.MeshBasicMaterial();
+    const released = vi.spyOn(geometry, 'dispose'); const releasedMaterial = vi.spyOn(material, 'dispose');
+    const renderer = new AircraftRenderer(bridge, () => new THREE.Group().add(new THREE.Mesh(geometry, material)));
+    renderer.render(aircraftAt()); bridge.remove.mockImplementation(() => { throw new Error('Retired bridge'); });
+    expect(() => renderer.dispose()).toThrow('Retired bridge');
+    expect(released).toHaveBeenCalledTimes(1); expect(releasedMaterial).toHaveBeenCalledTimes(1);
+    renderer.dispose(); expect(released).toHaveBeenCalledTimes(1);
+  });
+  it('releases renderer-owned geometry, materials and shared texture once across recovery', () => {
+    const { bridge } = createBridge(); const model = new THREE.Group();
+    const geometry = new THREE.BoxGeometry(); const texture = new THREE.Texture();
+    const first = new THREE.MeshStandardMaterial({ map: texture }); const second = new THREE.MeshStandardMaterial({ map: texture });
+    model.add(new THREE.Mesh(geometry, first), new THREE.Mesh(geometry, [first, second]));
+    const dispose = [geometry, texture, first, second].map((resource) => vi.spyOn(resource, 'dispose'));
+    const renderer = new AircraftRenderer(bridge, () => model); renderer.render(aircraftAt()); renderer.dispose(); renderer.dispose();
+    expect(dispose.map((spy) => spy.mock.calls.length)).toEqual([1, 1, 1, 1]);
+    renderer.render(aircraftAt()); expect(bridge.add).toHaveBeenCalledTimes(1); expect(bridge.remove).toHaveBeenCalledTimes(1);
+  });
   it('adds one aircraft model and updates it in place across frames', () => {
     const { bridge } = createBridge();
     const renderer = new AircraftRenderer(bridge);

@@ -12,7 +12,6 @@ export async function openRfs(page: Page) {
 
 export async function clickButton(page: Page, name: string | RegExp) {
   await page.getByRole('button', { name }).click();
-  await page.waitForFunction(() => document.fonts?.status === 'loaded');
 }
 
 export async function startRoll(page: Page) {

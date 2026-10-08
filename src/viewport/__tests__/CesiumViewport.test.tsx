@@ -222,6 +222,30 @@ describe('CesiumViewport scene policy', () => {
     expect(onSceneFailure).toHaveBeenCalledWith({ stage: 'imagery', error: undefined });
   });
 
+  it('reports non-bubbling loss from Cesium and overlay canvases and permits restoration', () => {
+    const onSceneFailure = vi.fn();
+    const { getByTestId, unmount } = render(<CesiumViewport scenePolicy={degradedPolicy} onSceneFailure={onSceneFailure} />);
+    const container = getByTestId('cesium-viewport');
+    for (const surface of ['cesium', 'three', 'cockpit']) {
+      const canvas = document.createElement('canvas'); canvas.dataset.rfsSurface = surface; container.append(canvas);
+      const event = new Event('webglcontextlost', { cancelable: true, bubbles: false });
+      act(() => { canvas.dispatchEvent(event); });
+      expect(event.defaultPrevented).toBe(true);
+      expect(onSceneFailure).toHaveBeenLastCalledWith(expect.objectContaining({ stage: 'context', surface }));
+    }
+    const retired = container.querySelector('canvas')!; unmount(); onSceneFailure.mockClear();
+    retired.dispatchEvent(new Event('webglcontextlost', { cancelable: true }));
+    mockRenderErrorListeners[0]();
+    expect(onSceneFailure).not.toHaveBeenCalled();
+  });
+
+  it('reports renderer initialization failure without unmounting the application', () => {
+    const onSceneFailure = vi.fn(); const failure = new Error('WebGL unavailable');
+    vi.mocked(Cesium.Viewer).mockImplementationOnce(function Viewer() { throw failure; });
+    expect(() => render(<CesiumViewport scenePolicy={degradedPolicy} onSceneFailure={onSceneFailure} />)).not.toThrow();
+    expect(onSceneFailure).toHaveBeenCalledWith({ stage: 'load', error: failure });
+  });
+
   it('stops reporting failures after the viewer is disposed', async () => {
     const onSceneFailure = vi.fn();
     const deferred = createDeferred<{ kind: string }>();

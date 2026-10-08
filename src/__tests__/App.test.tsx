@@ -370,7 +370,10 @@ vi.mock('three-to-cesium', () => ({
     threeScene: { add: vi.fn(), children: [] },
     threeCamera: {},
     threeRenderer: {
+      forceContextLoss: vi.fn(),
       domElement: {
+        dataset: {},
+        remove: vi.fn(),
         style: { pointerEvents: 'none' },
         addEventListener: vi.fn(),
         removeEventListener: vi.fn(),

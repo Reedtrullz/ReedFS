@@ -8,12 +8,15 @@ import { AircraftRenderer } from './AircraftRenderer';
 import { createCockpitModel } from './CockpitModel';
 import { useCockpitInteractions } from './useCockpitInteractions';
 import { installCockpitPointerInteractions } from './cockpitPointerInteractions';
+import { disposeThreeBridge } from './disposeThreeBridge';
+import type { CesiumSceneFailure } from './CesiumViewport';
 
 export interface CockpitLayerProps {
   viewerRef: RefObject<Cesium.Viewer | null>;
+  onSceneFailure?: (failure: CesiumSceneFailure) => void;
 }
 
-export function CockpitLayer({ viewerRef }: CockpitLayerProps) {
+export function CockpitLayer({ viewerRef, onSceneFailure }: CockpitLayerProps) {
   const { activateCockpitInteraction } = useCockpitInteractions();
 
   useEffect(() => {
@@ -22,10 +25,14 @@ export function CockpitLayer({ viewerRef }: CockpitLayerProps) {
     const scene = viewer.scene;
     if (!scene) return;
 
-    const ttc = ThreeToCesium(viewer, {
-      cameraFar: 10000000,
-      cameraNear: 0.1,
-    });
+    let ttc: ReturnType<typeof ThreeToCesium>;
+    try {
+      ttc = ThreeToCesium(viewer, { cameraFar: 10000000, cameraNear: 0.1 });
+    } catch (error: unknown) {
+      onSceneFailure?.({ stage: 'context', surface: 'cockpit', error });
+      return;
+    }
+    ttc.threeRenderer.domElement.dataset.rfsSurface = 'cockpit';
     const ambient = new THREE.AmbientLight(0xffffff, 0.65);
     const panelLight = new THREE.DirectionalLight(0xffffff, 0.7);
     panelLight.position.set(0, 3, 4);
@@ -62,12 +69,12 @@ export function CockpitLayer({ viewerRef }: CockpitLayerProps) {
         // three-to-cesium may already be partially torn down.
       }
       try {
-        ttc.destroy();
+        disposeThreeBridge(ttc);
       } catch {
         // Cesium may have already torn down the container during React cleanup.
       }
     };
-  }, [viewerRef, activateCockpitInteraction]);
+  }, [viewerRef, activateCockpitInteraction, onSceneFailure]);
 
   return null;
 }
