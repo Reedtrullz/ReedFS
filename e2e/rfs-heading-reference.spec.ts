@@ -68,6 +68,7 @@ test('actual worker flight keeps true orientation and targets while magnetic sur
   expect((await observe(page)).trueTarget).toBe(stepped.trueTarget);
   await expect(mcp).toContainText(`HDG ${stepped.trueLabel}`);
   await page.getByRole('button', { name: 'OVL: FLIGHT', exact: true }).click();
+  await page.getByRole('button', { name: 'OVL: MINIMAL', exact: true }).click();
   await expect(page.getByRole('button', { name: 'OVL: DEBUG', exact: true })).toBeVisible();
   await expect(page.getByLabel('Flight telemetry', { exact: true })).toContainText('HDG TRUE');
   await page.getByLabel('Save slot name').fill('Heading practice');
