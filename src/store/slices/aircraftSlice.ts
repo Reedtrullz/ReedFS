@@ -51,6 +51,8 @@ export function createAircraftSlice(set: SimStoreSet): Pick<
   | 'routeStatus'
   | 'wind'
   | 'weather'
+  | 'weatherEpoch'
+  | 'weatherRestored'
   | 'selectedScenarioId'
   | 'asyncPhysicsGeneration'
   | 'asyncPhysicsInFlight'
@@ -98,6 +100,8 @@ export function createAircraftSlice(set: SimStoreSet): Pick<
     routeStatus: initialRouteStatus,
     wind: cloneWind(ENVA_TUTORIAL_SCENARIO.wind),
     weather: cloneWeather(ENVA_TUTORIAL_SCENARIO.weather),
+    weatherEpoch: 0,
+    weatherRestored: false,
     asyncPhysicsGeneration: 0,
     asyncPhysicsInFlight: false,
     selectedScenarioId: ENVA_TUTORIAL_SCENARIO.id,
@@ -239,6 +243,8 @@ export function createAircraftSlice(set: SimStoreSet): Pick<
         routeEditMessage: null,
         wind: cloneWind(scenario.wind),
         weather: cloneWeather(scenario.weather),
+        weatherEpoch: s.weatherEpoch + 1,
+        weatherRestored: false,
         asyncPhysicsGeneration: s.asyncPhysicsGeneration + 1,
         asyncPhysicsInFlight: false,
         controlFeedbackMessage: null,
@@ -279,6 +285,8 @@ export function createAircraftSlice(set: SimStoreSet): Pick<
         routeEditMessage: null,
         wind: cloneWind(scenario.wind),
         weather: cloneWeather(scenario.weather),
+        weatherEpoch: s.weatherEpoch + 1,
+        weatherRestored: false,
         asyncPhysicsGeneration: s.asyncPhysicsGeneration + 1,
         asyncPhysicsInFlight: false,
         controlFeedbackMessage: null,

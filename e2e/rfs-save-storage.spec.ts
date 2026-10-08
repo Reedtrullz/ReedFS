@@ -1,6 +1,9 @@
 import { expect, test } from '@playwright/test';
 
 test('actual browser saves wait for the origin lock and preserve concurrent new slots', async ({ page, context }) => {
+  // The complete two-tab lock/save transaction measured57s with tracing.
+  // Preserve per-assertion deadlines and concurrent clicks within a finite cap.
+  test.setTimeout(90_000);
   const other = await context.newPage();
   await page.goto('/'); await other.goto('/');
   await page.getByLabel('Save slot name').waitFor(); await other.getByLabel('Save slot name').waitFor();

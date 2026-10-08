@@ -76,6 +76,10 @@ export interface SimStore {
   wind: WindInfo | null;
   /** Live weather (scenario seed updated by METAR QNH/temperature) fed to physics. */
   weather: ScenarioWeatherMetadata | null;
+  /** A scenario/reset/restore epoch fences asynchronous weather requests. */
+  weatherEpoch: number;
+  /** Saved conditions remain authoritative until reset or scenario selection. */
+  weatherRestored: boolean;
   /** Bumped whenever aircraft state is replaced or the loop is paused/reset; in-flight async physics batches with an older generation are discarded. */
   asyncPhysicsGeneration: number;
   /** True while one worker physics batch is awaited by the async frame bridge. */
@@ -169,6 +173,7 @@ export const useSimStore = create<SimStore>((set, get) => {
       if (!current.lastValidCheckpoint) return;
       storeSet({
         ...restoreSnapshotSlice(current.lastValidCheckpoint, 'Last valid checkpoint'),
+        weatherEpoch: current.weatherEpoch + 1,
         status: 'paused', asyncPhysicsInFlight: false,
         asyncPhysicsGeneration: current.asyncPhysicsGeneration + 1,
         simulationFailure: current.simulationFailure ? { ...current.simulationFailure, recovered: true } : null,

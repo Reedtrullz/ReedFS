@@ -64,6 +64,7 @@ export function restoreSnapshotSlice(snapshot: ScenarioSnapshot, slotName = 'Sav
     routeStatus: routeSlice.routeStatus,
     wind: structuredClone(snapshot.wind),
     weather: cloneWeather(snapshot.weather ?? scenario.weather),
+    weatherRestored: true,
     guidance: buildGuidanceState({
       scenario,
       status: restoredStatus,
@@ -72,7 +73,7 @@ export function restoreSnapshotSlice(snapshot: ScenarioSnapshot, slotName = 'Sav
     }),
     scenarioPersistenceMessage: snapshot.weather === undefined
       ? `${scenarioPersistenceMessage} Legacy save has no atmosphere record; scenario defaults restored.`
-      : scenarioPersistenceMessage,
+      : `${scenarioPersistenceMessage} Saved weather retained until reset or scenario selection.`,
   };
 }
 
@@ -155,6 +156,7 @@ export function createPersistenceSlice(set: SimStoreSet, get: () => SimStore): P
       try {
         return {
           ...restoreSnapshotSlice(loaded.snapshot, loaded.metadata.id === DEFAULT_SCENARIO_SAVE_SLOT_ID ? 'Saved scenario' : loaded.metadata.name),
+          weatherEpoch: s.weatherEpoch + 1,
           asyncPhysicsGeneration: s.asyncPhysicsGeneration + 1,
           asyncPhysicsInFlight: false,
           lastValidCheckpoint: loaded.snapshot,
