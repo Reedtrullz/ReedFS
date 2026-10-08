@@ -36,8 +36,8 @@ function rfmsHead() {
 
 function rfmsStatus() {
   if (!rfmsIsGitRepo()) return '';
-  const result = runGit(['-C', RFMS_DIR, 'status', '--porcelain'], { allowFailure: true });
-  return result.status === 0 ? result.stdout.trim() : '';
+  const result = runGit(['-C', RFMS_DIR, 'status', '--porcelain']);
+  return result.stdout.trim();
 }
 
 function assertSharedPackage() {

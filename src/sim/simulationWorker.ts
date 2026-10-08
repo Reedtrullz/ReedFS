@@ -35,15 +35,12 @@ function requestIdFromUnknownMessage(message: unknown): string {
 }
 
 export function handleSimulationWorkerMessage(message: unknown): SimulationStepResponseMessage {
+  let request;
+  try { request = decodeSimulationStepRequest(message); }
+  catch (error) { return encodeSimulationStepError(requestIdFromUnknownMessage(message), error, 'protocol'); }
   try {
-    const request = decodeSimulationStepRequest(message);
-    return encodeSimulationStepResult(
-      request.requestId,
-      advanceSimulationBatch(request.input, request.input.steps ?? 1),
-    );
-  } catch (error) {
-    return encodeSimulationStepError(requestIdFromUnknownMessage(message), error);
-  }
+    return encodeSimulationStepResult(request.requestId, advanceSimulationBatch(request.input, request.input.steps ?? 1));
+  } catch (error) { return encodeSimulationStepError(request.requestId, error, 'execution'); }
 }
 
 export function registerSimulationWorker(scope: SimulationWorkerScopeLike): void {

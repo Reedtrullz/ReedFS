@@ -8,7 +8,7 @@ export function SimulationRecovery() {
   const restore = useSimStore((state) => state.restoreLastValidCheckpoint);
   const reset = useSimStore((state) => state.reset);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
-  if (!failure || failure.recovered) return null;
+  if (!failure) return null;
   const exportEvidence = () => {
     try {
       const url = URL.createObjectURL(new Blob([serializeSimulationFailure(failure)], { type: 'application/json' }));
@@ -20,6 +20,12 @@ export function SimulationRecovery() {
       setExportMessage('Evidence exported locally. Review before sharing.');
     } catch { setExportMessage('Export unavailable. Evidence remains in this session.'); }
   };
+  if (failure.recovered) return <details aria-label="Previous simulation failure">
+    <summary>Previous failure evidence</summary>
+    <button onClick={exportEvidence}>Export failure evidence</button>
+    <div>Export includes flight position and route. Review before sharing.</div>
+    {exportMessage && <div role="status">{exportMessage}</div>}
+  </details>;
   return <div role="alert" aria-label="Simulation recovery" style={{ background: '#251b12', color: '#ffe1ae', padding: 8, border: '1px solid #ffe1ae' }}>
     <strong>Simulation paused: invalid result.</strong> Instruments show the last valid state.
     <div>{failure.message}</div>

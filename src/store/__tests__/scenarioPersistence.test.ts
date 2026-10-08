@@ -12,6 +12,8 @@ import {
 } from '../scenarioPersistence';
 import { useSimStore } from '../simStore';
 
+beforeEach(() => { useSimStore.getState().discardPendingScenarioSave(); });
+
 function memoryStorage(): Storage {
   const entries = new Map<string, string>();
   return {
@@ -304,4 +306,20 @@ it('rejects a stored incoherent attitude before publishing it', () => {
   collection.slots.default.snapshot.aircraft.attitude.phi += 0.5;
   storage.setItem(SCENARIO_SAVE_KEY, JSON.stringify(collection));
   expect(loadScenarioSnapshot(storage).ok).toBe(false);
+});
+
+it('preserves an earlier pending payload until explicit discard even if a later save succeeds', () => {
+  const full = memoryStorage();
+  full.setItem = () => { throw new DOMException('full', 'QuotaExceededError'); };
+  useSimStore.getState().saveScenarioState(full);
+  const pending = useSimStore.getState().pendingScenarioSave;
+  useSimStore.getState().setInput({ throttle1: 0.8 });
+  const writable = memoryStorage();
+  useSimStore.getState().saveScenarioState(writable);
+  expect(useSimStore.getState().pendingScenarioSave).toBe(pending);
+  expect(writable.getItem(SCENARIO_SAVE_KEY)).toBeNull();
+  expect(useSimStore.getState().scenarioPersistenceMessage).toMatch(/export or discard/i);
+  useSimStore.getState().discardPendingScenarioSave();
+  useSimStore.getState().saveScenarioState(writable);
+  expect(loadScenarioSnapshot(writable).ok).toBe(true);
 });

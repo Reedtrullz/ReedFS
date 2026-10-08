@@ -85,6 +85,7 @@ function requestedSlotName(options?: ScenarioSaveOptions): string {
 }
 
 export function createPersistenceSlice(set: SimStoreSet, get: () => SimStore): Pick<SimStore, 'saveScenarioState' | 'loadScenarioState' | 'refreshScenarioSaveSlots' | 'pendingScenarioSave' | 'discardPendingScenarioSave' | 'deleteScenarioSaveState'> {
+  let saveAttempt = 0;
   const reportFailure = (error: unknown, snapshot?: ScenarioSnapshot) => {
     set({
       ...(snapshot ? { pendingScenarioSave: snapshot } : {}),
@@ -93,10 +94,20 @@ export function createPersistenceSlice(set: SimStoreSet, get: () => SimStore): P
   };
   return {
     pendingScenarioSave: null,
-    discardPendingScenarioSave: () => set({ pendingScenarioSave: null, scenarioPersistenceMessage: 'Pending save discarded. Existing saves preserved.' }),
+    discardPendingScenarioSave: () => { saveAttempt++; set({ pendingScenarioSave: null, scenarioPersistenceMessage: 'Pending save discarded. Existing saves preserved.' }); },
     saveScenarioState: (storage, options) => {
-      const snapshot = createScenarioSnapshot(get());
+      if (get().pendingScenarioSave) {
+        set({ scenarioPersistenceMessage: 'Export or discard the pending save before saving another payload.' });
+        return;
+      }
+      let snapshot: ScenarioSnapshot;
+      try { snapshot = createScenarioSnapshot(get()); }
+      catch (error) { reportFailure(error); return; }
+      const attempt = ++saveAttempt;
+      set({ pendingScenarioSave: snapshot });
+      const failed = (error: unknown) => { if (attempt === saveAttempt) reportFailure(error, snapshot); };
       const save = (targetStorage: ScenarioPersistenceStorage) => {
+        if (attempt !== saveAttempt) return;
         const slotId = requestedSlotId(options);
         const existing = listScenarioSaveSlots(targetStorage).find((slot) => slot.id === slotId);
         if (!storage && existing && options?.overwrite && options.expectedRevision === undefined) throw new Error('Review the current slot before confirming overwrite');
@@ -110,10 +121,10 @@ export function createPersistenceSlice(set: SimStoreSet, get: () => SimStore): P
         });
       };
       if (storage) {
-        try { save(storage); } catch (error) { reportFailure(error, snapshot); }
+        try { save(storage); } catch (error) { failed(error); }
       } else {
         set({ scenarioPersistenceMessage: 'Waiting for save lock…' });
-        void withBrowserScenarioSaveLock(save).catch((error) => reportFailure(error, snapshot));
+        void withBrowserScenarioSaveLock(save).catch(failed);
       }
     },
     deleteScenarioSaveState: (slotId, expectedRevision) => {

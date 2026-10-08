@@ -153,6 +153,7 @@ describe('workerCodec', () => {
       type: 'simulation.step.error',
       requestId: 'step-64c-error',
       error: {
+        kind: 'execution',
         name: 'SimulationWorkerError',
         message: 'physics worker failed before integration',
         stack: 'SimulationWorkerError: physics worker failed before integration',

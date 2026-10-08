@@ -145,7 +145,7 @@ export function assertSimulationExecutionBounds(dt: number, steps: number): void
   if (!Number.isSafeInteger(steps) || steps < 1 || steps > MAX_SIMULATION_BATCH_STEPS) throw new TypeError('Simulation batch steps must be an integer within [1, 4096]');
 }
 export function assertSimulationStepInput(value: unknown): asserts value is SimulationStepInput {
-  if (!isRecord(value) || !isFiniteSimulationData(value) || !isAircraftState(value.aircraft)
+  if (!isRecord(value) || !isFiniteSimulationData(value) || !isAircraftState(value.aircraft) || !hasCoherentAttitude(value.aircraft)
     || !fields(value.spec, 'emptyWeight maxFuel maxTakeoffWeight wingArea wingSpan meanChord aerodynamicCenterPercentMac maxThrust engineCount vStall maxFlaps ixx iyy izz ixz')
     || !fields(value.spec.fuelCapacity, 'center left right') || !Array.isArray(value.spec.cgLimits) || value.spec.cgLimits.length !== 2 || !value.spec.cgLimits.every((limit) => typeof limit === 'number')
     || !['emptyWeight', 'wingArea', 'wingSpan', 'meanChord', 'ixx', 'iyy', 'izz'].every((key) => Number(value.spec && (value.spec as RecordValue)[key]) > 0)

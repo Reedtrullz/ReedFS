@@ -89,3 +89,28 @@ test('stale overwrite and delete confirmations preserve another session version'
   await expect(other.getByText('Surviving saved.', { exact: true })).toBeVisible();
   expect(await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('rfs.scenarioSnapshot.v1')!).slots))).toEqual(['surviving']);
 });
+
+test('discard cancels a queued save without replacing an earlier pending payload', async ({ page, context }) => {
+  const other = await context.newPage();
+  await page.goto('/'); await other.goto('/');
+  await page.getByLabel('Save slot name').waitFor();
+  await other.evaluate(() => {
+    const state = window as unknown as { held?: boolean; release?: () => void };
+    void navigator.locks.request('rfs-scenario-saves', async () => {
+      state.held = true; await new Promise<void>((resolve) => { state.release = resolve; });
+    });
+  });
+  await other.waitForFunction(() => (window as unknown as { held?: boolean }).held);
+  try {
+    await page.getByLabel('Save slot name').fill('Queued');
+    await page.getByRole('button', { name: 'Save scenario state', exact: true }).click();
+    await expect(page.getByText(/Waiting for save lock/)).toBeVisible();
+    await page.getByRole('button', { name: 'Save scenario state', exact: true }).click();
+    await expect(page.getByText(/Export or discard the pending save/)).toBeVisible();
+    await page.getByRole('button', { name: 'Discard pending save' }).click();
+  } finally { await other.evaluate(() => (window as unknown as { release?: () => void }).release?.()); }
+  await page.getByLabel('Save slot name').fill('After discard');
+  await page.getByRole('button', { name: 'Save scenario state', exact: true }).click();
+  await expect(page.getByText('After discard saved.', { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('rfs.scenarioSnapshot.v1')!).slots))).toEqual(['after-discard']);
+});

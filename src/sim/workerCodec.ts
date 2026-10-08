@@ -19,6 +19,7 @@ interface SimulationWorkerEnvelope {
 }
 
 export interface SimulationWorkerErrorPayload {
+  kind: 'protocol' | 'execution';
   name: string;
   message: string;
   stack?: string;
@@ -114,10 +115,10 @@ function requirePayload(record: MessageRecord, key: string): unknown {
   return record[key];
 }
 
-function errorPayloadFrom(error: unknown): SimulationWorkerErrorPayload {
+function errorPayloadFrom(error: unknown, kind: SimulationWorkerErrorPayload['kind']): SimulationWorkerErrorPayload {
   if (error instanceof Error) {
     const payload: SimulationWorkerErrorPayload = {
-      name: error.name || 'Error',
+      kind, name: error.name || 'Error',
       message: error.message,
     };
     if (typeof error.stack === 'string') payload.stack = error.stack;
@@ -126,19 +127,19 @@ function errorPayloadFrom(error: unknown): SimulationWorkerErrorPayload {
   }
 
   if (typeof error === 'string') {
-    return { name: 'Error', message: error };
+    return { kind, name: 'Error', message: error };
   }
 
   if (isRecord(error)) {
     const payload: SimulationWorkerErrorPayload = {
-      name: typeof error.name === 'string' && error.name.length > 0 ? error.name : 'Error',
+      kind, name: typeof error.name === 'string' && error.name.length > 0 ? error.name : 'Error',
       message: typeof error.message === 'string' ? error.message : 'Unknown simulation worker error',
     };
     if (typeof error.stack === 'string') payload.stack = error.stack;
     return payload;
   }
 
-  return { name: 'Error', message: error == null ? 'Unknown simulation worker error' : String(error) };
+  return { kind, name: 'Error', message: error == null ? 'Unknown simulation worker error' : String(error) };
 }
 
 function decodeErrorPayload(error: unknown): SimulationWorkerErrorPayload {
@@ -148,6 +149,7 @@ function decodeErrorPayload(error: unknown): SimulationWorkerErrorPayload {
   }
 
   const payload: SimulationWorkerErrorPayload = {
+    kind: record.kind === 'protocol' ? 'protocol' : 'execution',
     name: typeof record.name === 'string' && record.name.length > 0 ? record.name : 'Error',
     message: record.message,
   };
@@ -204,12 +206,13 @@ export function encodeSimulationStepResult(
 export function encodeSimulationStepError(
   requestId: string,
   error: unknown,
+  kind: SimulationWorkerErrorPayload['kind'] = 'execution',
 ): SimulationStepErrorResponseMessage {
   return {
     protocolVersion: SIMULATION_WORKER_PROTOCOL_VERSION,
     type: SIMULATION_STEP_ERROR_TYPE,
     requestId: assertRequestId(requestId),
-    error: cloneForWorker(errorPayloadFrom(error)),
+    error: cloneForWorker(errorPayloadFrom(error, kind)),
   };
 }
 

@@ -33,4 +33,9 @@ test('actual worker overflow pauses before publication and supports explicit che
   await page.getByRole('button', { name: 'RESUME', exact: true }).click();
   await expect(page.getByRole('button', { name: 'PAUSE', exact: true })).toBeVisible();
   await expect(recovery).toHaveCount(0);
+  await page.getByText('Previous failure evidence', { exact: true }).click();
+  const retainedDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export failure evidence' }).click();
+  await retainedDownload;
+  await expect(page.getByRole('button', { name: 'PAUSE', exact: true })).toBeVisible();
 });

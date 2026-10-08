@@ -49,6 +49,8 @@ interface PendingWorkerRequest {
   readonly timeoutId: ReturnType<typeof setTimeout>;
 }
 
+class SimulationWorkerExecutionError extends Error {}
+
 export class MainThreadSimulationRuntime implements SimulationRuntime {
   readonly kind = 'main-thread' as const;
 
@@ -158,6 +160,7 @@ export class BrowserWorkerSimulationRuntime implements AsyncSimulationRuntime {
       if (!pending) return;
       if (response.type === 'simulation.step.error') {
         if (response.error.name === 'InvalidSimulationStateError') throw new InvalidSimulationStateError(response.error.message, response.error.invalidResult);
+        if (response.error.kind !== 'protocol') throw new SimulationWorkerExecutionError(response.error.message);
         this.#resolvePendingWithFallback(response.requestId);
         return;
       }
@@ -166,7 +169,7 @@ export class BrowserWorkerSimulationRuntime implements AsyncSimulationRuntime {
       this.#pending.delete(response.requestId);
       pending.resolve(response.result);
     } catch (error) {
-      if (error instanceof InvalidSimulationStateError) {
+      if (error instanceof InvalidSimulationStateError || error instanceof SimulationWorkerExecutionError) {
         this.#workerFailed = true;
         for (const [id, pending] of this.#pending) {
           clearTimeout(pending.timeoutId);

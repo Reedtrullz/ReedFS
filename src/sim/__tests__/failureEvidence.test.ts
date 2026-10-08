@@ -12,3 +12,9 @@ describe('local failure evidence', () => {
     expect(JSON.parse(serializeSimulationFailure({ message: 'invalid', detectedAtIso: '2026-10-08T01:00:00Z', input: {}, result, recovered: false, checkpoint: null })).evidence.result.cycle).toBe('[repeated reference]');
   });
 });
+
+it('enforces an aggregate export byte cap even with many individually bounded strings', () => {
+  const output = serializeSimulationFailure({ message: 'invalid', detectedAtIso: '2026-10-08T01:00:00Z', input: {}, result: Array(4096).fill('x'.repeat(2048)), recovered: false, checkpoint: null });
+  expect(new TextEncoder().encode(output).length).toBeLessThanOrEqual(256 * 1024);
+  expect(JSON.parse(output).truncated).toBe(true);
+});

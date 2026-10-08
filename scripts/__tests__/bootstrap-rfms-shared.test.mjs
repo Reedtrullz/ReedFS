@@ -48,3 +48,19 @@ describe('read-only shared dependency preflight', () => {
     } finally { rmSync(pair.root, { recursive: true, force: true }); }
   });
 });
+
+it('fails closed when git cannot verify sibling cleanliness', () => {
+  const pair = unpinnedPair();
+  try {
+    mkdirSync(path.join(pair.rfms, '.git'));
+    const bin = path.join(pair.root, 'bin'); mkdirSync(bin);
+    // Fault injection at the actual process boundary: identity succeeds,
+    // status exits nonzero. --check must not interpret that as a clean tree.
+    writeFileSync(path.join(bin, 'git'), '#!/bin/sh\nfor arg in "$@"; do\n  if [ "$arg" = "rev-parse" ]; then echo 810fc9652da431eaf8978b85bf4af131605559b5; exit 0; fi\n  if [ "$arg" = "status" ]; then exit 128; fi\ndone\nexit 1\n', { mode: 0o755 });
+    const before = readFileSync(path.join(pair.rfms, 'shared/package.json'), 'utf8');
+    const result = spawnSync(process.execPath, ['scripts/bootstrap-rfms-shared.mjs', '--check'], { cwd: pair.rfs, encoding: 'utf8', env: { ...process.env, PATH: `${bin}:${process.env.PATH}` } });
+    expect(result.status).toBe(1);
+    expect(result.stderr).toMatch(/status.*failed/);
+    expect(readFileSync(path.join(pair.rfms, 'shared/package.json'), 'utf8')).toBe(before);
+  } finally { rmSync(pair.root, { recursive: true, force: true }); }
+});

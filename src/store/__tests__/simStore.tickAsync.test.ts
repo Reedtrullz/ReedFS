@@ -109,6 +109,8 @@ describe('tickAsync bridge', () => {
     useSimStore.setState({ fixedStepAccumulatorSeconds: 3 * (1 / 60) });
     useSimStore.getState().tickAsync(16);
     const inFlight = useSimStore.getState().asyncPhysicsInFlight;
+    await Promise.resolve();
+    expect(stub.calls).toHaveLength(1);
     useSimStore.getState().reset();
     expect(useSimStore.getState().asyncPhysicsGeneration).toBe(1);
     expect(useSimStore.getState().asyncPhysicsInFlight).toBe(false);
