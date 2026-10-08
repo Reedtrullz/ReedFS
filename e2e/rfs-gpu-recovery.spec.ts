@@ -107,7 +107,10 @@ test('native Cesium and Three context loss preserves approach and bounded render
   const approach = await session(page); expect(approach.aircraft.ground.weightOnWheels).toBe(false); expect(approach.route).not.toBeNull(); expect(approach.save).not.toBeNull();
   const samples = [];
   for (const surface of ['cesium', 'three', 'cockpit']) {
-    if (surface === 'cockpit') await page.keyboard.press('c');
+    if (surface === 'cockpit') {
+      await page.keyboard.press('c');
+      await waitForNativeScene(page, 'cockpit');
+    }
     await expect(page.locator(`[data-rfs-surface="${surface}"]`)).toHaveCount(1);
     const cycle = await session(page);
     const contextCount = await page.evaluate(() => Reflect.get(window, '__gpuOwnership')().length);
@@ -126,7 +129,23 @@ test('native Cesium and Three context loss preserves approach and bounded render
     // Library restoration alone is not claimed to restore a valid frame; fallback remains explicit.
     await expect(page.getByText('GRAPHICS UNAVAILABLE', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'PAUSE', exact: true }).click();
-    await expect.poll(async () => (await session(page)).status).toBe('paused');
+    const pauseStarted = performance.now(); const pauseObservations: unknown[] = [];
+    try {
+      await expect.poll(async () => {
+        const callbackStarted = performance.now();
+        const observed = await page.evaluate(async () => {
+          const path = '/src/store/simStore.ts'; const { useSimStore } = await import(/* @vite-ignore */ path);
+          const s = useSimStore.getState();
+          return { status: s.status, time: s.simulationTimeSeconds, workerInFlight: s.asyncPhysicsInFlight, fault: Boolean(s.simulationFailure) };
+        });
+        pauseObservations.push({ elapsedMs: performance.now() - pauseStarted, callbackMs: performance.now() - callbackStarted, ...observed });
+        return observed.status;
+      }, { timeout: 15_000 }).toBe('paused');
+    } finally {
+      const path = testInfo.outputPath(`gpu-${surface}-pause-progress.json`);
+      await writeFile(path, JSON.stringify({ surface, scope: 'Actual post-loss paused store readback before explicit renderer recreation; bounded15s observation, unchanged whole-cycle240s cap', elapsedMs: performance.now() - pauseStarted, pauseObservations }, null, 2));
+      await testInfo.attach(`gpu-${surface}-pause-progress`, { path, contentType: 'application/json' });
+    }
     const before = await session(page);
     await page.getByRole('button', { name: 'RESTORE 3D VIEW', exact: true }).click();
     await waitForNativeScene(page, surface === 'cockpit' ? 'cockpit' : 'three');
