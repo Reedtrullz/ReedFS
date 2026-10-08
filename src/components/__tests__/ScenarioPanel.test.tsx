@@ -9,6 +9,7 @@ import { SCENARIO_SAVE_KEY } from '../../store/scenarioPersistence';
 describe('ScenarioPanel', () => {
   beforeEach(() => {
     window.localStorage.clear();
+    Object.defineProperty(navigator, 'locks', { configurable: true, value: { request: (_name: string, _options: unknown, callback: () => void) => Promise.resolve(callback()) } });
     useSimStore.getState().setScenario(KSEA_TUTORIAL_SCENARIO.id);
     useSimStore.getState().reset();
     useSimStore.setState({

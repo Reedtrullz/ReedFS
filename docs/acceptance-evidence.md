@@ -40,3 +40,24 @@ new gates land; preserve the existing ENVA, blackbox, CSP/PWA and release guards
 ## Worker validation bundle cost (2026-10-08)
 
 On Node22, unchanged application baseline was364.6KiB raw/114.9KiB gzip. Full finite worker boundary validation measured381.3/120.1; compact state shape measured380.6/119.8. Terser measured414.8/123.1 and was rejected. The app budget is rebaselined to400/126 with roughly5% headroom; all other category budgets and native security thresholds remain unchanged. This is an explicit feature allowance for duplicated app/worker validation, subject to independent review and native CI; it does not establish device performance. Real-browser protocol checks and existing worker/player flows remain required.
+
+## Save arbitration and recovery
+
+Product browser save/delete operations use the origin-wide `rfs-scenario-saves`
+Web Lock; the collection is read and changed while the lock is held. Confirmed
+replacements/deletions compare the exact previously observed serialized slot,
+so a stale confirmation cannot discard another session's version. Browsers
+without Web Locks fail closed and retain a pending local export. The explicitly
+injected Storage adapter used by unit callers requires caller-owned arbitration;
+it does not establish cross-tab atomicity.
+
+Collections are capped at32 slots and1MiB of serialized UTF-16 data. Corrupt,
+unsupported, denied or full storage preserves the previous collection. Pending
+saves can be exported locally or discarded; export includes flight position and
+route. Storage events refresh other views without changing confirmation identity.
+Companion windows named `rfs-companion` are read-only save participants.
+
+The actual Chromium tests cover a held Web Lock, concurrent slot creation, stale
+replacement/deletion, concurrent create/delete, genuine QuotaExceededError and
+pending export/cancel. Denied getter and unsupported-lock guards have unit
+coverage; installed companion/mobile browser acceptance belongs to its own lane.

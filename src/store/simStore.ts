@@ -108,6 +108,9 @@ export interface SimStore {
   executeRouteEdit: () => void;
   setWind: (w: WindInfo | null) => void;
   setWeather: (w: ScenarioWeatherMetadata | null) => void;
+  pendingScenarioSave: ScenarioSnapshot | null;
+  discardPendingScenarioSave: () => void;
+  deleteScenarioSaveState: (slotId: string, expectedRevision: string) => void;
   saveScenarioState: (storage?: ScenarioPersistenceStorage, options?: ScenarioSaveOptions) => void;
   loadScenarioState: (storage?: ScenarioPersistenceStorage, slotId?: string) => void;
   refreshScenarioSaveSlots: (storage?: ScenarioPersistenceStorage) => void;
@@ -428,6 +431,6 @@ export const useSimStore = create<SimStore>((set, get) => {
 
     ...createAutoflightSlice(storeSet),
     ...createRouteSlice(storeSet),
-    ...createPersistenceSlice(storeSet),
+    ...createPersistenceSlice(storeSet, get),
   };
 });

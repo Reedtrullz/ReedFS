@@ -169,12 +169,14 @@ export class InvalidSimulationStateError extends TypeError {
 export function assertCommittedSimulationResult(value: unknown, scenarioId: string): asserts value is SimulationStepResult {
   assertSimulationStepResult(value);
   if (value.guidance.scenarioId !== scenarioId) throw new InvalidSimulationStateError('Simulation result scenario identity mismatch', value);
-  const { attitude, quaternion } = value.aircraft;
+  if (!hasCoherentAttitude(value.aircraft)) throw new InvalidSimulationStateError('Simulation result attitude representations disagree', value);
+}
+
+export function hasCoherentAttitude(aircraft: AircraftState): boolean {
+  const { attitude, quaternion } = aircraft;
   const expected = eulerToQuat(attitude.phi, attitude.theta, attitude.psi);
   const dot = Math.abs(expected.q0 * quaternion.q0 + expected.q1 * quaternion.q1 + expected.q2 * quaternion.q2 + expected.q3 * quaternion.q3);
-  if (Math.abs(Math.hypot(quaternion.q0, quaternion.q1, quaternion.q2, quaternion.q3) - 1) > 1e-6 || Math.abs(dot - 1) > 1e-6) {
-    throw new InvalidSimulationStateError('Simulation result attitude representations disagree', value);
-  }
+  return Math.abs(Math.hypot(quaternion.q0, quaternion.q1, quaternion.q2, quaternion.q3) - 1) <= 1e-6 && Math.abs(dot - 1) <= 1e-6;
 }
 
 export function assertSimulationStepResult(value: unknown): asserts value is SimulationStepResult {

@@ -12,6 +12,7 @@ import {
   listScenarioSaveSlots,
   loadScenarioSnapshot,
   saveScenarioSnapshot,
+  deleteScenarioSaveSlot,
   scenarioSaveSlotIdFromName,
   type ScenarioPersistenceStorage,
   type ScenarioSaveOptions,
@@ -20,6 +21,7 @@ import {
 import type { SimStoreSet } from './aircraftSlice';
 import { cloneWeather } from './aircraftSlice';
 import { createRouteState } from './routeSlice';
+import { withBrowserScenarioSaveLock } from '../browserScenarioStorage';
 
 function defaultScenarioStorage(): ScenarioPersistenceStorage | null {
   return typeof globalThis.localStorage === 'undefined' ? null : globalThis.localStorage;
@@ -82,38 +84,50 @@ function requestedSlotName(options?: ScenarioSaveOptions): string {
   return options?.slotName?.trim() || (requestedSlotId(options) === DEFAULT_SCENARIO_SAVE_SLOT_ID ? 'Default save' : requestedSlotId(options));
 }
 
-export function createPersistenceSlice(set: SimStoreSet): Pick<SimStore, 'saveScenarioState' | 'loadScenarioState' | 'refreshScenarioSaveSlots'> {
+export function createPersistenceSlice(set: SimStoreSet, get: () => SimStore): Pick<SimStore, 'saveScenarioState' | 'loadScenarioState' | 'refreshScenarioSaveSlots' | 'pendingScenarioSave' | 'discardPendingScenarioSave' | 'deleteScenarioSaveState'> {
+  const reportFailure = (error: unknown, snapshot?: ScenarioSnapshot) => {
+    set({
+      ...(snapshot ? { pendingScenarioSave: snapshot } : {}),
+      scenarioPersistenceMessage: `Scenario save failed: ${typeof error === 'object' && error !== null && 'message' in error && typeof error.message === 'string' ? error.message : 'storage unavailable'}`,
+    });
+  };
   return {
-    saveScenarioState: (storage, options) => set((s) => {
-      const targetStorage = storage ?? defaultScenarioStorage();
-      if (!targetStorage) {
-        return { scenarioPersistenceMessage: 'Scenario save unavailable: localStorage is not available.' };
-      }
-
-      try {
+    pendingScenarioSave: null,
+    discardPendingScenarioSave: () => set({ pendingScenarioSave: null, scenarioPersistenceMessage: 'Pending save discarded. Existing saves preserved.' }),
+    saveScenarioState: (storage, options) => {
+      const snapshot = createScenarioSnapshot(get());
+      const save = (targetStorage: ScenarioPersistenceStorage) => {
         const slotId = requestedSlotId(options);
         const existing = listScenarioSaveSlots(targetStorage).find((slot) => slot.id === slotId);
-        const metadata = saveScenarioSnapshot(targetStorage, createScenarioSnapshot(s), {
-          slotId,
-          slotName: requestedSlotName(options),
-          overwrite: options?.overwrite,
+        if (!storage && existing && options?.overwrite && options.expectedRevision === undefined) throw new Error('Review the current slot before confirming overwrite');
+        const metadata = saveScenarioSnapshot(targetStorage, snapshot, {
+          slotId, slotName: requestedSlotName(options), overwrite: options?.overwrite, expectedRevision: options?.expectedRevision,
         });
-        const overwritten = Boolean(existing) && Boolean(options?.overwrite);
-        return {
+        set({
+          pendingScenarioSave: null,
           scenarioSaveSlots: listScenarioSaveSlots(targetStorage),
-          scenarioPersistenceMessage: overwritten ? `${metadata.name} overwritten.` : `${metadata.name} saved.`,
-        };
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'unknown storage error';
-        return {
-          scenarioSaveSlots: listScenarioSaveSlots(targetStorage),
-          scenarioPersistenceMessage: `Scenario save failed: ${message}`,
-        };
+          scenarioPersistenceMessage: existing && options?.overwrite ? `${metadata.name} overwritten.` : `${metadata.name} saved.`,
+        });
+      };
+      if (storage) {
+        try { save(storage); } catch (error) { reportFailure(error, snapshot); }
+      } else {
+        set({ scenarioPersistenceMessage: 'Waiting for save lock…' });
+        void withBrowserScenarioSaveLock(save).catch((error) => reportFailure(error, snapshot));
       }
-    }),
+    },
+    deleteScenarioSaveState: (slotId, expectedRevision) => {
+      set({ scenarioPersistenceMessage: 'Waiting for save lock…' });
+      void withBrowserScenarioSaveLock((storage) => {
+        deleteScenarioSaveSlot(storage, slotId, expectedRevision);
+        set({ scenarioSaveSlots: listScenarioSaveSlots(storage), scenarioPersistenceMessage: 'Saved slot deleted.' });
+      }).catch((error) => reportFailure(error));
+    },
 
     loadScenarioState: (storage, slotId) => set((s) => {
-      const targetStorage = storage ?? defaultScenarioStorage();
+      let targetStorage: ScenarioPersistenceStorage | null;
+      try { targetStorage = storage ?? defaultScenarioStorage(); }
+      catch (error) { return { scenarioPersistenceMessage: `Ignored saved scenario: ${error instanceof Error ? error.message : 'storage access denied'}` }; }
       if (!targetStorage) {
         return { scenarioPersistenceMessage: 'Ignored saved scenario: localStorage is not available.' };
       }
@@ -145,8 +159,10 @@ export function createPersistenceSlice(set: SimStoreSet): Pick<SimStore, 'saveSc
     }),
 
     refreshScenarioSaveSlots: (storage) => set(() => {
-      const targetStorage = storage ?? defaultScenarioStorage();
-      return { scenarioSaveSlots: targetStorage ? listScenarioSaveSlots(targetStorage) : [] };
+      try {
+        const targetStorage = storage ?? defaultScenarioStorage();
+        return { scenarioSaveSlots: targetStorage ? listScenarioSaveSlots(targetStorage) : [] };
+      } catch { return { scenarioPersistenceMessage: 'Saved slots unavailable: storage access denied.' }; }
     }),
   };
 }

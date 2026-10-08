@@ -8,9 +8,11 @@ import type { ScenarioWeatherMetadata } from '../sim/weather';
 import { SCENARIOS, scenarioById } from '../sim/scenarios';
 import { B737_800_AIRCRAFT_DATA } from '../sim/data/aircraft/b737-800.v1';
 import { B737_800_FDM_DATA_VERSION } from '../sim/data/aircraft/b737-800-fdm.v1';
-import { isAircraftState, isAutopilotCommands, isAutopilotControllerState, isAutopilotState, isControlInputs, isFiniteSimulationData, isFlightPlan, isWeather, isWind } from '../sim/simulationValidation';
+import { isAircraftState, hasCoherentAttitude, isAutopilotCommands, isAutopilotControllerState, isAutopilotState, isControlInputs, isFiniteSimulationData, isFlightPlan, isWeather, isWind } from '../sim/simulationValidation';
 import type { SimStatus, SimStore } from './simStore';
 
+export const MAX_SCENARIO_SAVE_BYTES = 1024 * 1024;
+const MAX_SCENARIO_SAVE_SLOTS = 32;
 export const SCENARIO_SAVE_KEY = 'rfs.scenarioSnapshot.v1';
 export const DEFAULT_SCENARIO_SAVE_SLOT_ID = 'default';
 const SCENARIO_SAVE_VERSION = 3;
@@ -46,6 +48,8 @@ export interface ScenarioSnapshot {
 }
 
 export interface ScenarioSaveSlotMetadata {
+  /** Exact serialized slot observed by the reader; never persisted as metadata. */
+  revision?: string;
   id: string;
   name: string;
   savedAtIso: string;
@@ -70,6 +74,7 @@ export interface ScenarioSaveOptions {
   slotId?: string;
   slotName?: string;
   overwrite?: boolean;
+  expectedRevision?: string | null;
 }
 
 export type ScenarioSnapshotLoadResult =
@@ -94,7 +99,7 @@ function isValidSnapshot(value: unknown): value is ScenarioSnapshot {
     typeof value.savedAtIso === 'string' && Number.isFinite(Date.parse(value.savedAtIso)) &&
     SCENARIOS.some((scenario) => scenario.id === value.selectedScenarioId) &&
     ['stopped', 'running', 'paused'].includes(String(value.status)) &&
-    isAircraftState(aircraft) &&
+    isAircraftState(aircraft) && hasCoherentAttitude(aircraft) &&
     isControlInputs(value.pilotInputs) &&
     isAutopilotCommands(value.apCommands) &&
     validControllerState &&
@@ -209,6 +214,7 @@ function parseStoredSave(storage: ScenarioPersistenceStorage):
   catch (error) { return { ok: false, reason: `storage read failed: ${error instanceof Error ? error.message : 'access denied'}` }; }
   if (raw === null) return { ok: false, reason: 'no saved scenario state found', empty: true };
 
+  if (raw.length * 2 > MAX_SCENARIO_SAVE_BYTES) return { ok: false, reason: 'saved collection exceeds the storage size limit; data preserved' };
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
@@ -287,11 +293,15 @@ export function saveScenarioSnapshot(
   if (collection.slots[metadata.id] && !options?.overwrite) {
     throw new Error(`save slot "${metadata.name}" already exists; confirm overwrite to replace it`);
   }
+  const currentRevision = collection.slots[metadata.id] ? JSON.stringify(collection.slots[metadata.id]) : null;
+  if (options?.expectedRevision !== undefined && options.expectedRevision !== currentRevision) throw new Error('Save slot changed in another session; review the current version before overwriting');
   collection.slots[metadata.id] = {
     metadata,
     snapshot: structuredClone(snapshot),
   };
-  storage.setItem(SCENARIO_SAVE_KEY, JSON.stringify(collection));
+  const serialized = JSON.stringify(collection);
+  if (Object.keys(collection.slots).length > MAX_SCENARIO_SAVE_SLOTS || serialized.length * 2 > MAX_SCENARIO_SAVE_BYTES) throw new Error('Save collection limit reached; export or remove a reviewed slot');
+  storage.setItem(SCENARIO_SAVE_KEY, serialized);
   return metadata;
 }
 
@@ -308,7 +318,14 @@ export function listScenarioSaveSlots(storage: ScenarioPersistenceStorage): Scen
   const parsed = parseStoredSave(storage);
   if (!parsed.ok) return [];
   return Object.values(parsed.collection.slots)
-    .map((slot) => isRecord(slot) && isValidSlotMetadata(slot.metadata) ? slot.metadata : null)
-    .filter((metadata): metadata is ScenarioSaveSlotMetadata => metadata !== null)
+    .map((slot) => isRecord(slot) && isValidSlotMetadata(slot.metadata) ? { ...slot.metadata, revision: JSON.stringify(slot) } : null)
+    .filter((metadata) => metadata !== null)
     .sort((a, b) => b.savedAtIso.localeCompare(a.savedAtIso));
+}
+
+export function deleteScenarioSaveSlot(storage: ScenarioPersistenceStorage, slotId: string, expectedRevision: string): void {
+  const collection = collectionForWrite(storage);
+  if (!Object.hasOwn(collection.slots, slotId) || JSON.stringify(collection.slots[slotId]) !== expectedRevision) throw new Error('Save slot changed in another session; review before deleting');
+  delete collection.slots[slotId];
+  storage.setItem(SCENARIO_SAVE_KEY, JSON.stringify(collection));
 }

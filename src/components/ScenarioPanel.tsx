@@ -68,11 +68,17 @@ export function ScenarioPanel() {
   const setScenario = useSimStore((s) => s.setScenario);
   const setTutorialStep = useSimStore((s) => s.setTutorialStep);
   const saveScenarioState = useSimStore((s) => s.saveScenarioState);
+  const pendingSave = useSimStore((s) => s.pendingScenarioSave);
+  const discardPendingSave = useSimStore((s) => s.discardPendingScenarioSave);
+  const deleteSave = useSimStore((s) => s.deleteScenarioSaveState);
   const loadScenarioState = useSimStore((s) => s.loadScenarioState);
   const refreshScenarioSaveSlots = useSimStore((s) => s.refreshScenarioSaveSlots ?? noopRefreshScenarioSaveSlots);
   const persistenceMessage = useSimStore((s) => s.scenarioPersistenceMessage);
+  const [exportMessage, setExportMessage] = useState<string | null>(null);
   const [slotName, setSlotName] = useState('Default save');
   const [selectedSlotId, setSelectedSlotId] = useState('default');
+  const [pendingOverwriteRevision, setPendingOverwriteRevision] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string; revision: string } | null>(null);
   const [pendingOverwriteSlotId, setPendingOverwriteSlotId] = useState<string | null>(null);
   const tutorial = guidance.tutorial;
   const currentStep = guidance.activeTutorialStep;
@@ -88,6 +94,9 @@ export function ScenarioPanel() {
 
   useEffect(() => {
     refreshScenarioSaveSlots();
+    const refresh = (event: StorageEvent) => { if (event.key === 'rfs.scenarioSnapshot.v1' || event.key === null) refreshScenarioSaveSlots(); };
+    window.addEventListener('storage', refresh);
+    return () => window.removeEventListener('storage', refresh);
   }, [refreshScenarioSaveSlots]);
 
   function saveSlot(overwrite = false) {
@@ -95,12 +104,23 @@ export function ScenarioPanel() {
     const slotId = scenarioSaveSlotIdFromName(name);
     const existing = scenarioSaveSlots.find((slot) => slot.id === slotId);
     if (existing && !overwrite) {
+      setPendingOverwriteRevision(existing.revision ?? null);
       setPendingOverwriteSlotId(slotId);
       return;
     }
-    saveScenarioState(undefined, { slotId, slotName: name, overwrite });
+    saveScenarioState(undefined, { slotId, slotName: name, overwrite, expectedRevision: overwrite ? pendingOverwriteRevision : null });
     setSelectedSlotId(slotId);
     setPendingOverwriteSlotId(null);
+  }
+
+  function exportPendingSave() {
+    if (!pendingSave) return;
+    try {
+      const url = URL.createObjectURL(new Blob([JSON.stringify(pendingSave, null, 2)], { type: 'application/json' }));
+      const anchor = document.createElement('a'); anchor.href = url; anchor.download = 'rfs-pending-save.json'; anchor.click();
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+      setExportMessage('Pending save exported locally.');
+    } catch { setExportMessage('Export unavailable. Pending save remains available.'); }
   }
 
   function loadSelectedSlot() {
@@ -162,6 +182,16 @@ export function ScenarioPanel() {
             LOAD
           </button>
         </div>
+        {selectedSlot && <button aria-label={`Delete saved slot ${selectedSlot.name}`} style={buttonStyle} onClick={() => setPendingDelete({ id: selectedSlot.id, name: selectedSlot.name, revision: selectedSlot.revision ?? '' })}>DELETE SLOT</button>}
+        {pendingDelete && <div>Delete {pendingDelete.name}?
+          <button aria-label={`Confirm delete ${pendingDelete.name}`} style={buttonStyle} onClick={() => { deleteSave(pendingDelete.id, pendingDelete.revision); setPendingDelete(null); }}>CONFIRM DELETE</button>
+          <button aria-label="Cancel delete" style={buttonStyle} onClick={() => setPendingDelete(null)}>CANCEL</button>
+        </div>}
+        {pendingSave && <div>Pending save retained. Export includes position and route; review before sharing.
+          <button onClick={exportPendingSave} style={buttonStyle}>Export pending save</button>
+          <button onClick={discardPendingSave} style={buttonStyle}>Discard pending save</button>
+          {exportMessage && <div role="status">{exportMessage}</div>}
+        </div>}
         {pendingOverwriteSlot ? (
           <div style={{ color: '#ffd84a', fontSize: 11 }}>
             <div>Overwrite {pendingOverwriteSlot.name}?</div>
