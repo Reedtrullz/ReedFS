@@ -2,6 +2,7 @@ import type { AircraftState, ControlInputs } from './types';
 import type { FlightScenario } from './scenarios';
 import type { SimStatus } from './simulationStatus';
 import { isPositiveRateEstablished } from './flightPhasePredicates';
+import { bodyToNed } from './physics/frames';
 
 type GuidanceChecklistPhase =
   | 'preflight'
@@ -33,6 +34,22 @@ function nearlyEqual(a: number, b: number, epsilon = 0.15): boolean {
 
 const MS_TO_KT = 1.94384449;
 const LANDED_RESET_READY_SPEED_KT = 15;
+const MS_TO_FPM = 196.850394;
+
+// Safety invariant (#87): Descent established reflects observed NED descent motion,
+// never DESCENT phase intent or body-axis w. Exclusive 100 fpm actual-down threshold
+// while airborne; ground contact and non-finite velocity/attitude never complete it.
+const OBSERVED_DESCENT_MIN_DOWN_FPM = 100;
+
+function isObservedDescentEstablished(aircraft: AircraftState): boolean {
+  if (aircraft.ground.weightOnWheels) return false;
+  const { velocity, attitude } = aircraft;
+  const values = [velocity.u, velocity.v, velocity.w, attitude.phi, attitude.theta, attitude.psi];
+  if (!values.every((value) => Number.isFinite(value))) return false;
+  const ned = bodyToNed(velocity, attitude);
+  if (!Number.isFinite(ned.down)) return false;
+  return ned.down * MS_TO_FPM > OBSERVED_DESCENT_MIN_DOWN_FPM;
+}
 
 export function buildTakeoffChecklist(
   scenario: FlightScenario,
@@ -95,7 +112,7 @@ export function buildGuidanceChecklist(
       {
         id: 'descent-established',
         label: 'Descent established',
-        complete: aircraft.velocity.w > 0 || aircraft.flightPhase === 'DESCENT',
+        complete: isObservedDescentEstablished(aircraft),
         detail: 'Follow the route descent path toward the approach fix',
       },
       {
