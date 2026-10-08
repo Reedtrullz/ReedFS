@@ -50,6 +50,9 @@ test('actual worker preserves independent idle, cutoff, depletion and effective-
 });
 
 test('visible fuel commands remain independent through throttle and takeoff setup changes', async ({ page }) => {
+  // Renderer startup plus this complete control transaction measured 48s with
+  // CPU6 and tracing. Assertion deadlines and retries remain unchanged.
+  test.setTimeout(90_000);
   await openRfs(page);
   const setup = page.getByRole('region', { name: 'Takeoff setup' });
   await setup.getByText('Engine fuel', { exact: true }).click();
