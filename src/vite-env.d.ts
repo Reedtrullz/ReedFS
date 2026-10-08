@@ -1,4 +1,5 @@
 /// <reference types="vite/client" />
+declare const __RFS_BUILD_COHORT__: string;
 
 declare module 'three-to-cesium' {
   import * as Cesium from 'cesium';

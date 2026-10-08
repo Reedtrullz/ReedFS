@@ -3,9 +3,17 @@ import react from '@vitejs/plugin-react';
 import cesium from 'vite-plugin-cesium';
 import { VitePWA } from 'vite-plugin-pwa';
 import path from 'path';
+import { execFileSync } from 'node:child_process';
 import { rfsManualChunk } from './manualChunks.config';
 
+const configuredCommit = process.env.RFS_COMMIT_SHA || process.env.GITHUB_SHA;
+const localCommit = configuredCommit || execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+if (!/^[a-f0-9]{40}$/i.test(localCommit)) throw new Error('RFS build requires a full commit identity');
+const dirty = !configuredCommit && execFileSync('git', ['status', '--porcelain', '-uno'], { encoding: 'utf8' }).trim().length > 0;
+const buildCohort = `${localCommit}${dirty ? '-dirty' : ''}`;
+
 export default defineConfig({
+  define: { __RFS_BUILD_COHORT__: JSON.stringify(buildCohort) },
   plugins: [react(), cesium(), VitePWA({
     registerType: 'autoUpdate',
     includeAssets: ['manifest.json', 'icons/*'],
