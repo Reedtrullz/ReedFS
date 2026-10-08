@@ -15,6 +15,9 @@ async function diagnostic(page: Page) {
 }
 
 test('installed update waits for a verified save and preserves another flight and the offline cohort', async ({ page, context, request }, testInfo) => {
+  // Two installed cohorts, live tabs, quota recovery, restore and offline reload.
+  // The measured CPU6 probe exceeds120s; individual assertion gates stay5s.
+  test.setTimeout(240000);
   expect((await request.post('/__fixture/version/1')).status()).toBe(204);
   await page.goto('/');
   await page.evaluate(async () => { await navigator.serviceWorker.ready; });
