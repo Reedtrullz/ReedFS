@@ -1,4 +1,5 @@
 import type { SimStore } from '../store/simStore';
+import { computeDerived } from './physics/derived';
 import { SCENARIO_SNAPSHOT_IDENTITIES } from '../store/scenarioPersistence';
 import { APP_BUILD_COHORT } from '../config/buildIdentity';
 import { getSimulationRuntime } from './simulationRuntime';
@@ -14,6 +15,8 @@ export function captureDiagnosticSnapshot(state: SimStore, options: { nowMs: num
   const commit = state.simulationCommit;
   const runtime = getSimulationRuntime(); const configuredBackend = runtime.kind;
   const health = runtime.diagnosticState?.();
+  const observed = commit?.observation ?? state;
+  const air = computeDerived(observed.aircraft, observed.wind, observed.weather);
   return {
     bundle: {
       schema: 'rfs-diagnostic/v1', capturedAtUtc: new Date().toISOString(),
@@ -29,6 +32,8 @@ export function captureDiagnosticSnapshot(state: SimStore, options: { nowMs: num
         batchMs: number(commit?.batchDurationMs), latestCommandMs: number(commit?.commandLatencyMs),
         workerInFlight: Boolean(state.asyncPhysicsInFlight),
       },
+      airData: { quantity: 'ideal-ias-equals-cas', valid: air.airDataValid, tasKt: number(air.tas), easKt: number(air.eas),
+        casKt: number(air.cas ?? undefined), iasKt: air.airDataValid ? number(air.ias) : null, mach: number(air.mach) },
       fault: { present: Boolean(state.simulationFailure), recovered: Boolean(state.simulationFailure?.recovered),
         checkpointAvailable: Boolean(state.lastValidCheckpoint), uiFailure: Boolean(options.uiFailure) },
       omissions: ['raw-errors', 'credentials', 'names', 'route', 'owner-identifiers', 'replay-state'],

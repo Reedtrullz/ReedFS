@@ -297,7 +297,7 @@ describe('RfsMCP', () => {
     const aircraft = structuredClone(useSimStore.getState().aircraft);
     aircraft.velocity = { u: ktToMs(149), v: 0, w: 0 };
     useSimStore.setState({ aircraft, wind: null });
-    const expectedSpeed = Math.round(Math.max(0, computeDerived(aircraft).ias));
+    const expectedSpeed = Math.round(Math.max(0, computeDerived(aircraft, null, useSimStore.getState().weather).ias));
     render(
       <>
         <RfsMCP />
@@ -390,7 +390,7 @@ describe('RfsMCP', () => {
     aircraft.quaternion = eulerToQuat(aircraft.attitude.phi, aircraft.attitude.theta, aircraft.attitude.psi);
     aircraft.velocity = { u: ktToMs(149), v: 0, w: 0 };
     useSimStore.setState({ aircraft, wind: null });
-    const expectedSpeed = Math.round(Math.max(0, computeDerived(aircraft).ias));
+    const expectedSpeed = Math.round(Math.max(0, computeDerived(aircraft, null, useSimStore.getState().weather).ias));
 
     render(<RfsMCP />);
 

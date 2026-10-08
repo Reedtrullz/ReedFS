@@ -12,6 +12,7 @@ import {
 } from './guidanceTargets';
 import { bodyToNed } from '../physics/frames';
 import { computeDerived } from '../physics/derived';
+import type { DensityAltitudeWeather } from '../physics/atmosphere';
 import { deriveEffectiveAutoflightTruth } from './effectiveAutoflightTruth';
 
 // ── Serializable controller state ───────────────────────────────────────
@@ -98,9 +99,6 @@ function headingErrorRad(target: number, current: number): number {
 function currentVsFpm(state: AircraftState): number {
   const ned = bodyToNed(state.velocity, state.attitude);
   return -ned.down * 196.850394;
-}
-function currentIasKt(state: AircraftState, wind: WindInfo | null = null): number {
-  return computeDerived(state, wind).ias;
 }
 function pid(
   s: { value: number; prevError: number },
@@ -294,6 +292,7 @@ export function computeAutopilotCommands(
   wind: WindInfo | null = null,
   targetPitchDeg?: number,
   targetThrottle?: number,
+  weather: DensityAltitudeWeather | null = null,
 ): AutopilotCommands {
   return computeAutopilotCommandsWithControllerState(
     state,
@@ -308,6 +307,7 @@ export function computeAutopilotCommands(
     undefined,
     targetPitchDeg,
     targetThrottle,
+    weather,
   ).commands;
 }
 
@@ -324,6 +324,7 @@ export function computeAutopilotCommandsWithControllerState(
   controllerState: AutopilotControllerState = createAutopilotControllerState(),
   targetPitchDeg?: number,
   targetThrottle?: number,
+  weather: DensityAltitudeWeather | null = null,
 ): AutopilotCommandResult {
   const t = ap.truth;
   const autopilotEngaged = isAutopilotEngaged(ap);
@@ -388,8 +389,9 @@ export function computeAutopilotCommandsWithControllerState(
   }
 
   // ── Thrust ──
-  if (t.thrustActive === 'SPEED') {
-    const iasKt = currentIasKt(state, wind);
+  const airData = t.thrustActive === 'SPEED' ? computeDerived(state, wind, weather) : null;
+  if (t.thrustActive === 'SPEED' && airData?.airDataValid) {
+    const iasKt = airData.ias;
     const spdErr = targetSpeedKt - iasKt;
     const altFt = state.position.alt;
     const deficit = targetSpeedKt - iasKt;
@@ -471,6 +473,7 @@ export function computeAutopilotCommandsForState(
   activeLegIndex?: number | null,
   routeStatus?: RouteStatusSnapshot | null,
   wind: WindInfo | null = null,
+  weather: DensityAltitudeWeather | null = null,
 ): AutopilotCommands {
   return computeAutopilotCommandsForStateWithControllerState(
     state,
@@ -480,6 +483,8 @@ export function computeAutopilotCommandsForState(
     activeLegIndex,
     routeStatus,
     wind,
+    undefined,
+    weather,
   ).commands;
 }
 
@@ -492,6 +497,7 @@ export function computeAutopilotCommandsForStateWithControllerState(
   routeStatus?: RouteStatusSnapshot | null,
   wind: WindInfo | null = null,
   controllerState: AutopilotControllerState = createAutopilotControllerState(),
+  weather: DensityAltitudeWeather | null = null,
 ): AutopilotCommandResult {
   const nextControllerState = cloneAutopilotControllerState(controllerState);
   if (!ap) return { commands: {}, controllerState: nextControllerState };
@@ -522,6 +528,7 @@ export function computeAutopilotCommandsForStateWithControllerState(
     nextControllerState,
     tgts.targetPitchDeg,
     tgts.targetThrottle,
+    weather,
   );
 }
 

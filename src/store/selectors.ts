@@ -59,7 +59,7 @@ export const pfdObservation = (s: SimStore) => s.simulationCommit?.observation ?
 export const selectPfdFlightPlan = (s: SimStore) => pfdObservation(s).flightPlan;
 export const selectPfdRouteStatus = (s: SimStore) => pfdObservation(s).routeStatus;
 export const selectPfdApStateForGuidance = (s: SimStore) => pfdObservation(s).apState;
-export const selectPfdIas = (s: SimStore) => Math.max(0, computeDerived(pfdObservation(s).aircraft, pfdObservation(s).wind).ias);
+export const selectPfdIas = (s: SimStore) => Math.max(0, computeDerived(pfdObservation(s).aircraft, pfdObservation(s).wind, pfdObservation(s).weather).ias);
 const STANDARD_PRESSURE_HPA = 1013.25;
 const FEET_PER_HPA = 27;
 
@@ -91,7 +91,7 @@ export const selectPfdGroundWeightOnWheels = (s: SimStore) => pfdObservation(s).
 export const selectPfdGroundNormalForceN = (s: SimStore) => pfdObservation(s).aircraft.ground.normalForceN;
 export const selectPfdGroundOnRunway = (s: SimStore) => pfdObservation(s).aircraft.ground.onRunway;
 export const selectPfdGroundContact = (s: SimStore) => pfdObservation(s).aircraft.ground.contact;
-export const selectPfdVerticalSpeed = (s: SimStore) => computeDerived(pfdObservation(s).aircraft, pfdObservation(s).wind).vs;
+export const selectPfdVerticalSpeed = (s: SimStore) => computeDerived(pfdObservation(s).aircraft, pfdObservation(s).wind, pfdObservation(s).weather).vs;
 export const selectPfdPitchDeg = (s: SimStore) => (quatToEuler(pfdObservation(s).aircraft.quaternion).theta * 180) / Math.PI;
 export const selectPfdRollDeg = (s: SimStore) => (quatToEuler(pfdObservation(s).aircraft.quaternion).phi * 180) / Math.PI;
 export const selectPfdHeadingDeg = (s: SimStore) => ((quatToEuler(pfdObservation(s).aircraft.quaternion).psi * 180) / Math.PI + 360) % 360;
@@ -114,7 +114,7 @@ export const selectPfdSelectedScenarioId = (s: SimStore) => s.selectedScenarioId
 export const selectPfdFlightPhase = (s: SimStore) => pfdObservation(s).aircraft.flightPhase;
 export const selectPfdTakeoffCue = (s: SimStore): string | null => {
   if (!pfdObservation(s).aircraft.ground) return null;
-  const derived = computeDerived(pfdObservation(s).aircraft, pfdObservation(s).wind);
+  const derived = computeDerived(pfdObservation(s).aircraft, pfdObservation(s).wind, pfdObservation(s).weather);
   return takeoffCueText(pfdObservation(s).aircraft, derived.ias, s.selectedScenarioId);
 };
 
@@ -305,7 +305,7 @@ export function selectMcpViewModel(s: SimStore): McpViewModel {
 
   const selectedSpeed = finiteNumber(displayApState.boeing.speed);
   const managedSpeed = finiteNumber((effectiveTruth as { managedSpeedKt?: number }).managedSpeedKt);
-  const currentIasSpeed = speedBugKt(computeDerived(s.aircraft, s.wind).ias, 250);
+  const currentIasSpeed = speedBugKt(computeDerived(s.aircraft, s.wind, s.weather).ias, 250);
   const speedTargetManaged = selectedSpeed === null && managedSpeed !== null;
   const speedTarget = speedBugKt(selectedSpeed ?? managedSpeed ?? currentIasSpeed, currentIasSpeed);
   const speedTargetLabel = `${speedTargetManaged ? 'MAN SPD' : 'SPD'} ${speedTarget}`;
@@ -388,7 +388,7 @@ export interface TelemetryViewModel {
 let lastTelemetryVm: TelemetryViewModel | null = null;
 
 export function selectTelemetryViewModel(s: SimStore): TelemetryViewModel {
-  const d = computeDerived(s.aircraft, s.wind);
+  const d = computeDerived(s.aircraft, s.wind, s.weather);
   const euler = quatToEuler(s.aircraft.quaternion);
   const next: TelemetryViewModel = {
     status: s.status,

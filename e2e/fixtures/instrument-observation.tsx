@@ -4,10 +4,12 @@ import { useSimStore } from '../../src/store/simStore';
 import { createDefaultAutopilotState } from '../../src/instruments/defaultAutopilotState';
 import { createSimulationRuntime, setSimulationRuntimeForTests, type AsyncSimulationRuntime } from '../../src/sim/simulationRuntime';
 import type { SimulationStepInput } from '../../src/sim/simulationStep';
+import { computeDerived } from '../../src/sim/physics/derived';
 
 let release = () => {};
 let cleanup = () => {};
 let nativeResponses = 0;
+let validatedBackend = (): string | null => null;
 
 async function settle() {
   const deadline = performance.now() + 10000;
@@ -29,6 +31,7 @@ export async function mountObservedPfd() {
     fallback: { kind: 'main-thread', step: () => { throw new Error('native instrument test forbids fallback'); } } });
   if (created.kind !== 'browser-worker') throw new Error('native instrument worker unavailable');
   const runtime = created as AsyncSimulationRuntime;
+  validatedBackend = () => runtime.diagnosticState?.().executionBackend ?? null;
   const restore = setSimulationRuntimeForTests(runtime);
   useSimStore.getState().tickAsync(16); await settle();
   const element = document.createElement('div'); document.body.append(element);
@@ -54,3 +57,15 @@ export function releaseObservation() { release(); }
 export function pauseObservation() { useSimStore.getState().pause(); }
 export function disposeObservedPfd() { cleanup(); }
 export function responseCount() { return nativeResponses; }
+
+export async function commitAirDataCase(surfaceTemperatureC: number, speedMs: number) {
+  const s = useSimStore.getState();
+  useSimStore.getState().setWeather({ ...s.weather!, qnhHpa: 1013.25, surfaceTemperatureC });
+  useSimStore.setState({ status: 'running', lastFrameTime: 16, fixedStepAccumulatorSeconds: 1 / 60,
+    aircraft: { ...s.aircraft, position: { ...s.aircraft.position, alt: 35000 }, velocity: { u: speedMs, v: 0, w: 0 },
+      angularVelocity: { p: 0, q: 0, r: 0 }, ground: { ...s.aircraft.ground, weightOnWheels: false, aglFt: 34500 } } });
+  useSimStore.getState().tickAsync(16); await settle(); useSimStore.getState().pause();
+  const committed = useSimStore.getState().simulationCommit!;
+  const air = computeDerived(committed.observation.aircraft, committed.observation.wind, committed.observation.weather);
+  return { air, weather: committed.observation.weather, backend: validatedBackend(), stepIndex: committed.stepIndex };
+}
