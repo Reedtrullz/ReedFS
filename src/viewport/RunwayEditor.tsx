@@ -132,8 +132,8 @@ export function RunwayEditor({ onOverridesChange }: Props) {
           <button style={nudgeBtn} onClick={() => nudgeLon(nudgeStepM)}>▶</button>
         </div>
         <div style={coordRow}>
-          <span style={labelStyle}>HDG</span>
-          <span style={valueStyle}>{editable.headingDeg.toFixed(2)}°</span>
+          <span style={{ ...labelStyle, width: 54 }}>HDG TRUE</span>
+          <span style={valueStyle}>{editable.headingDeg.toFixed(2)}°T</span>
           <button style={nudgeBtn} onClick={() => nudgeHeading(-headingStepDeg)}>↺</button>
           <button style={nudgeBtn} onClick={() => nudgeHeading(headingStepDeg)}>↻</button>
         </div>

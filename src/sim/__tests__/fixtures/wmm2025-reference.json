@@ -1,0 +1,927 @@
+{
+  "source": "https://www.ncei.noaa.gov/sites/default/files/2025-02/WMM2025_TEST_VALUES.txt",
+  "sourceSha256": "ae289c94e2200e4deeae2dfdedf543a8a0e93096512b30d6a754199731f570d0",
+  "coefficients": {
+    "source": "https://raw.githubusercontent.com/CIRES-Geomagnetism/wmm/96dc367e360aae21e4077ac4a54d019b32aff7f8/wmm/coefs/WMM.COF",
+    "sourceSha256": "06791cd95faba7bdf4a709808f2715a53fe689b29c23b9886bc2196fa9b3eb13",
+    "canonicalNumericRowsSha256": "dd258969a3d348c6007076a2e93075835650e43d70acbe6ea305a38cf0cb3d18",
+    "canonicalization": "Source rows in their original order, each six-column Number array; UTF8 JSON.stringify(rows), no final newline. Header and terminator excluded; raw source byte hash is separate.",
+    "canonicalNumericRows": [
+      [
+        1,
+        0,
+        -29351.8,
+        0,
+        12,
+        0
+      ],
+      [
+        1,
+        1,
+        -1410.8,
+        4545.4,
+        9.7,
+        -21.5
+      ],
+      [
+        2,
+        0,
+        -2556.6,
+        0,
+        -11.6,
+        0
+      ],
+      [
+        2,
+        1,
+        2951.1,
+        -3133.6,
+        -5.2,
+        -27.7
+      ],
+      [
+        2,
+        2,
+        1649.3,
+        -815.1,
+        -8,
+        -12.1
+      ],
+      [
+        3,
+        0,
+        1361,
+        0,
+        -1.3,
+        0
+      ],
+      [
+        3,
+        1,
+        -2404.1,
+        -56.6,
+        -4.2,
+        4
+      ],
+      [
+        3,
+        2,
+        1243.8,
+        237.5,
+        0.4,
+        -0.3
+      ],
+      [
+        3,
+        3,
+        453.6,
+        -549.5,
+        -15.6,
+        -4.1
+      ],
+      [
+        4,
+        0,
+        895,
+        0,
+        -1.6,
+        0
+      ],
+      [
+        4,
+        1,
+        799.5,
+        278.6,
+        -2.4,
+        -1.1
+      ],
+      [
+        4,
+        2,
+        55.7,
+        -133.9,
+        -6,
+        4.1
+      ],
+      [
+        4,
+        3,
+        -281.1,
+        212,
+        5.6,
+        1.6
+      ],
+      [
+        4,
+        4,
+        12.1,
+        -375.6,
+        -7,
+        -4.4
+      ],
+      [
+        5,
+        0,
+        -233.2,
+        0,
+        0.6,
+        0
+      ],
+      [
+        5,
+        1,
+        368.9,
+        45.4,
+        1.4,
+        -0.5
+      ],
+      [
+        5,
+        2,
+        187.2,
+        220.2,
+        0,
+        2.2
+      ],
+      [
+        5,
+        3,
+        -138.7,
+        -122.9,
+        0.6,
+        0.4
+      ],
+      [
+        5,
+        4,
+        -142,
+        43,
+        2.2,
+        1.7
+      ],
+      [
+        5,
+        5,
+        20.9,
+        106.1,
+        0.9,
+        1.9
+      ],
+      [
+        6,
+        0,
+        64.4,
+        0,
+        -0.2,
+        0
+      ],
+      [
+        6,
+        1,
+        63.8,
+        -18.4,
+        -0.4,
+        0.3
+      ],
+      [
+        6,
+        2,
+        76.9,
+        16.8,
+        0.9,
+        -1.6
+      ],
+      [
+        6,
+        3,
+        -115.7,
+        48.8,
+        1.2,
+        -0.4
+      ],
+      [
+        6,
+        4,
+        -40.9,
+        -59.8,
+        -0.9,
+        0.9
+      ],
+      [
+        6,
+        5,
+        14.9,
+        10.9,
+        0.3,
+        0.7
+      ],
+      [
+        6,
+        6,
+        -60.7,
+        72.7,
+        0.9,
+        0.9
+      ],
+      [
+        7,
+        0,
+        79.5,
+        0,
+        0,
+        0
+      ],
+      [
+        7,
+        1,
+        -77,
+        -48.9,
+        -0.1,
+        0.6
+      ],
+      [
+        7,
+        2,
+        -8.8,
+        -14.4,
+        -0.1,
+        0.5
+      ],
+      [
+        7,
+        3,
+        59.3,
+        -1,
+        0.5,
+        -0.8
+      ],
+      [
+        7,
+        4,
+        15.8,
+        23.4,
+        -0.1,
+        0
+      ],
+      [
+        7,
+        5,
+        2.5,
+        -7.4,
+        -0.8,
+        -1
+      ],
+      [
+        7,
+        6,
+        -11.1,
+        -25.1,
+        -0.8,
+        0.6
+      ],
+      [
+        7,
+        7,
+        14.2,
+        -2.3,
+        0.8,
+        -0.2
+      ],
+      [
+        8,
+        0,
+        23.2,
+        0,
+        -0.1,
+        0
+      ],
+      [
+        8,
+        1,
+        10.8,
+        7.1,
+        0.2,
+        -0.2
+      ],
+      [
+        8,
+        2,
+        -17.5,
+        -12.6,
+        0,
+        0.5
+      ],
+      [
+        8,
+        3,
+        2,
+        11.4,
+        0.5,
+        -0.4
+      ],
+      [
+        8,
+        4,
+        -21.7,
+        -9.7,
+        -0.1,
+        0.4
+      ],
+      [
+        8,
+        5,
+        16.9,
+        12.7,
+        0.3,
+        -0.5
+      ],
+      [
+        8,
+        6,
+        15,
+        0.7,
+        0.2,
+        -0.6
+      ],
+      [
+        8,
+        7,
+        -16.8,
+        -5.2,
+        0,
+        0.3
+      ],
+      [
+        8,
+        8,
+        0.9,
+        3.9,
+        0.2,
+        0.2
+      ],
+      [
+        9,
+        0,
+        4.6,
+        0,
+        0,
+        0
+      ],
+      [
+        9,
+        1,
+        7.8,
+        -24.8,
+        -0.1,
+        -0.3
+      ],
+      [
+        9,
+        2,
+        3,
+        12.2,
+        0.1,
+        0.3
+      ],
+      [
+        9,
+        3,
+        -0.2,
+        8.3,
+        0.3,
+        -0.3
+      ],
+      [
+        9,
+        4,
+        -2.5,
+        -3.3,
+        -0.3,
+        0.3
+      ],
+      [
+        9,
+        5,
+        -13.1,
+        -5.2,
+        0,
+        0.2
+      ],
+      [
+        9,
+        6,
+        2.4,
+        7.2,
+        0.3,
+        -0.1
+      ],
+      [
+        9,
+        7,
+        8.6,
+        -0.6,
+        -0.1,
+        -0.2
+      ],
+      [
+        9,
+        8,
+        -8.7,
+        0.8,
+        0.1,
+        0.4
+      ],
+      [
+        9,
+        9,
+        -12.9,
+        10,
+        -0.1,
+        0.1
+      ],
+      [
+        10,
+        0,
+        -1.3,
+        0,
+        0.1,
+        0
+      ],
+      [
+        10,
+        1,
+        -6.4,
+        3.3,
+        0,
+        0
+      ],
+      [
+        10,
+        2,
+        0.2,
+        0,
+        0.1,
+        0
+      ],
+      [
+        10,
+        3,
+        2,
+        2.4,
+        0.1,
+        -0.2
+      ],
+      [
+        10,
+        4,
+        -1,
+        5.3,
+        0,
+        0.1
+      ],
+      [
+        10,
+        5,
+        -0.6,
+        -9.1,
+        -0.3,
+        -0.1
+      ],
+      [
+        10,
+        6,
+        -0.9,
+        0.4,
+        0,
+        0.1
+      ],
+      [
+        10,
+        7,
+        1.5,
+        -4.2,
+        -0.1,
+        0
+      ],
+      [
+        10,
+        8,
+        0.9,
+        -3.8,
+        -0.1,
+        -0.1
+      ],
+      [
+        10,
+        9,
+        -2.7,
+        0.9,
+        0,
+        0.2
+      ],
+      [
+        10,
+        10,
+        -3.9,
+        -9.1,
+        0,
+        0
+      ],
+      [
+        11,
+        0,
+        2.9,
+        0,
+        0,
+        0
+      ],
+      [
+        11,
+        1,
+        -1.5,
+        0,
+        0,
+        0
+      ],
+      [
+        11,
+        2,
+        -2.5,
+        2.9,
+        0,
+        0.1
+      ],
+      [
+        11,
+        3,
+        2.4,
+        -0.6,
+        0,
+        0
+      ],
+      [
+        11,
+        4,
+        -0.6,
+        0.2,
+        0,
+        0.1
+      ],
+      [
+        11,
+        5,
+        -0.1,
+        0.5,
+        -0.1,
+        0
+      ],
+      [
+        11,
+        6,
+        -0.6,
+        -0.3,
+        0,
+        0
+      ],
+      [
+        11,
+        7,
+        -0.1,
+        -1.2,
+        0,
+        0.1
+      ],
+      [
+        11,
+        8,
+        1.1,
+        -1.7,
+        -0.1,
+        0
+      ],
+      [
+        11,
+        9,
+        -1,
+        -2.9,
+        -0.1,
+        0
+      ],
+      [
+        11,
+        10,
+        -0.2,
+        -1.8,
+        -0.1,
+        0
+      ],
+      [
+        11,
+        11,
+        2.6,
+        -2.3,
+        -0.1,
+        0
+      ],
+      [
+        12,
+        0,
+        -2,
+        0,
+        0,
+        0
+      ],
+      [
+        12,
+        1,
+        -0.2,
+        -1.3,
+        0,
+        0
+      ],
+      [
+        12,
+        2,
+        0.3,
+        0.7,
+        0,
+        0
+      ],
+      [
+        12,
+        3,
+        1.2,
+        1,
+        0,
+        -0.1
+      ],
+      [
+        12,
+        4,
+        -1.3,
+        -1.4,
+        0,
+        0.1
+      ],
+      [
+        12,
+        5,
+        0.6,
+        0,
+        0,
+        0
+      ],
+      [
+        12,
+        6,
+        0.6,
+        0.6,
+        0.1,
+        0
+      ],
+      [
+        12,
+        7,
+        0.5,
+        -0.1,
+        0,
+        0
+      ],
+      [
+        12,
+        8,
+        -0.1,
+        0.8,
+        0,
+        0
+      ],
+      [
+        12,
+        9,
+        -0.4,
+        0.1,
+        0,
+        0
+      ],
+      [
+        12,
+        10,
+        -0.2,
+        -1,
+        -0.1,
+        0
+      ],
+      [
+        12,
+        11,
+        -1.3,
+        0.1,
+        0,
+        0
+      ],
+      [
+        12,
+        12,
+        -0.7,
+        0.2,
+        -0.1,
+        -0.1
+      ]
+    ]
+  },
+  "notes": "Independent NOAA printed facts. Longitude240 represented as equivalent-120. Fields rounded0.1nT/0.01degrees; no derivative/grid or model-accuracy claim.",
+  "cases": [
+    {
+      "decimalYear": 2025.0,
+      "heightAboveEllipsoidKm": 0.0,
+      "latitudeDeg": 80.0,
+      "longitudeDeg": 0.0,
+      "publishedLongitudeDeg": 0.0,
+      "expected": {
+        "northNt": 6521.6,
+        "eastNt": 145.9,
+        "downNt": 54791.5,
+        "horizontalNt": 6523.2,
+        "totalNt": 55178.5,
+        "inclinationDeg": 83.21,
+        "declinationEastDeg": 1.28
+      }
+    },
+    {
+      "decimalYear": 2025.0,
+      "heightAboveEllipsoidKm": 0.0,
+      "latitudeDeg": 0.0,
+      "longitudeDeg": 120.0,
+      "publishedLongitudeDeg": 120.0,
+      "expected": {
+        "northNt": 39677.8,
+        "eastNt": -109.6,
+        "downNt": -10580.2,
+        "horizontalNt": 39677.9,
+        "totalNt": 41064.3,
+        "inclinationDeg": -14.93,
+        "declinationEastDeg": -0.16
+      }
+    },
+    {
+      "decimalYear": 2025.0,
+      "heightAboveEllipsoidKm": 0.0,
+      "latitudeDeg": -80.0,
+      "longitudeDeg": -120.0,
+      "publishedLongitudeDeg": 240.0,
+      "expected": {
+        "northNt": 6117.5,
+        "eastNt": 15751.9,
+        "downNt": -52022.5,
+        "horizontalNt": 16898.1,
+        "totalNt": 54698.2,
+        "inclinationDeg": -72.0,
+        "declinationEastDeg": 68.78
+      }
+    },
+    {
+      "decimalYear": 2025.0,
+      "heightAboveEllipsoidKm": 100.0,
+      "latitudeDeg": 80.0,
+      "longitudeDeg": 0.0,
+      "publishedLongitudeDeg": 0.0,
+      "expected": {
+        "northNt": 6216.0,
+        "eastNt": 92.4,
+        "downNt": 52598.8,
+        "horizontalNt": 6216.7,
+        "totalNt": 52964.9,
+        "inclinationDeg": 83.26,
+        "declinationEastDeg": 0.85
+      }
+    },
+    {
+      "decimalYear": 2025.0,
+      "heightAboveEllipsoidKm": 100.0,
+      "latitudeDeg": 0.0,
+      "longitudeDeg": 120.0,
+      "publishedLongitudeDeg": 120.0,
+      "expected": {
+        "northNt": 37688.6,
+        "eastNt": -96.2,
+        "downNt": -10152.1,
+        "horizontalNt": 37688.7,
+        "totalNt": 39032.1,
+        "inclinationDeg": -15.08,
+        "declinationEastDeg": -0.15
+      }
+    },
+    {
+      "decimalYear": 2025.0,
+      "heightAboveEllipsoidKm": 100.0,
+      "latitudeDeg": -80.0,
+      "longitudeDeg": -120.0,
+      "publishedLongitudeDeg": 240.0,
+      "expected": {
+        "northNt": 5907.6,
+        "eastNt": 14780.3,
+        "downNt": -49540.7,
+        "horizontalNt": 15917.1,
+        "totalNt": 52035.0,
+        "inclinationDeg": -72.19,
+        "declinationEastDeg": 68.21
+      }
+    },
+    {
+      "decimalYear": 2027.5,
+      "heightAboveEllipsoidKm": 0.0,
+      "latitudeDeg": 80.0,
+      "longitudeDeg": 0.0,
+      "publishedLongitudeDeg": 0.0,
+      "expected": {
+        "northNt": 6500.8,
+        "eastNt": 294.5,
+        "downNt": 54869.4,
+        "horizontalNt": 6507.5,
+        "totalNt": 55253.9,
+        "inclinationDeg": 83.24,
+        "declinationEastDeg": 2.59
+      }
+    },
+    {
+      "decimalYear": 2027.5,
+      "heightAboveEllipsoidKm": 0.0,
+      "latitudeDeg": 0.0,
+      "longitudeDeg": 120.0,
+      "publishedLongitudeDeg": 120.0,
+      "expected": {
+        "northNt": 39701.6,
+        "eastNt": -167.4,
+        "downNt": -10381.8,
+        "horizontalNt": 39702.0,
+        "totalNt": 41036.9,
+        "inclinationDeg": -14.65,
+        "declinationEastDeg": -0.24
+      }
+    },
+    {
+      "decimalYear": 2027.5,
+      "heightAboveEllipsoidKm": 0.0,
+      "latitudeDeg": -80.0,
+      "longitudeDeg": -120.0,
+      "publishedLongitudeDeg": 240.0,
+      "expected": {
+        "northNt": 6200.7,
+        "eastNt": 15730.3,
+        "downNt": -51783.7,
+        "horizontalNt": 16908.3,
+        "totalNt": 54474.2,
+        "inclinationDeg": -71.92,
+        "declinationEastDeg": 68.49
+      }
+    },
+    {
+      "decimalYear": 2027.5,
+      "heightAboveEllipsoidKm": 100.0,
+      "latitudeDeg": 80.0,
+      "longitudeDeg": 0.0,
+      "publishedLongitudeDeg": 0.0,
+      "expected": {
+        "northNt": 6196.7,
+        "eastNt": 233.8,
+        "downNt": 52670.5,
+        "horizontalNt": 6201.1,
+        "totalNt": 53034.3,
+        "inclinationDeg": 83.29,
+        "declinationEastDeg": 2.16
+      }
+    },
+    {
+      "decimalYear": 2027.5,
+      "heightAboveEllipsoidKm": 100.0,
+      "latitudeDeg": 0.0,
+      "longitudeDeg": 120.0,
+      "publishedLongitudeDeg": 120.0,
+      "expected": {
+        "northNt": 37711.5,
+        "eastNt": -148.7,
+        "downNt": -9969.8,
+        "horizontalNt": 37711.8,
+        "totalNt": 39007.4,
+        "inclinationDeg": -14.81,
+        "declinationEastDeg": -0.23
+      }
+    },
+    {
+      "decimalYear": 2027.5,
+      "heightAboveEllipsoidKm": 100.0,
+      "latitudeDeg": -80.0,
+      "longitudeDeg": -120.0,
+      "publishedLongitudeDeg": 240.0,
+      "expected": {
+        "northNt": 5984.0,
+        "eastNt": 14760.1,
+        "downNt": -49317.7,
+        "horizontalNt": 15927.0,
+        "totalNt": 51825.7,
+        "inclinationDeg": -72.1,
+        "declinationEastDeg": 67.93
+      }
+    }
+  ]
+}

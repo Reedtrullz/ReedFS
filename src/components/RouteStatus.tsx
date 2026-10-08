@@ -170,7 +170,7 @@ export function RouteStatus() {
           )}
           {trackText && (
             <div style={rowStyle}>
-              <span style={labelStyle}>TRK</span>
+        <span style={labelStyle}>TRK TRUE</span>
               <span style={valueStyle}>{trackText}</span>
             </div>
           )}

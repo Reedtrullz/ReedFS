@@ -1,10 +1,14 @@
 import { useSimStore } from '../store/simStore';
+import { useHeadingReferenceStore } from '../store/headingReferenceStore';
+import { headingDisplayContext, headingDisplayText } from '../sim/headingDisplay';
+import { fromTrueHeading, toTrueHeading } from '../sim/magneticHeading';
 import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
 import { createDefaultAutopilotStateFromAircraft } from './defaultAutopilotState';
 import { applyMcpMode, toggleFlightDirectorSwitch, type FlightDirectorSide } from './mcpCommands';
 import {
   mcpModeAvailability,
   selectMcpViewModel,
+  pfdObservation,
   type EnabledMcpMode,
   type McpModeAvailability,
   type McpModeAvailabilityState,
@@ -71,16 +75,8 @@ function finiteTarget(value: number | null | undefined, fallback: number): numbe
   return Number.isFinite(value) ? value as number : fallback;
 }
 
-function wrapHeadingDeg(value: number): number {
-  return ((Math.round(value) % 360) + 360) % 360;
-}
-
 function selectedSpeedKt(apState: AutopilotState | null): number {
   return clamp(Math.round(finiteTarget(apState?.boeing.speed, 250)), 100, 340);
-}
-
-function selectedHeadingDeg(apState: AutopilotState | null): number {
-  return wrapHeadingDeg(finiteTarget(apState?.boeing.heading, 0));
 }
 
 function selectedAltitudeFt(apState: AutopilotState | null): number {
@@ -95,11 +91,9 @@ function formatVerticalSpeed(value: number): string {
   return value > 0 ? `+${value}` : `${value}`;
 }
 
-function applyMcpTargetDelta(apState: AutopilotState, target: McpTarget, delta: number, speedBaseKt = selectedSpeedKt(apState)): void {
+function applyMcpTargetDelta(apState: AutopilotState, target: Exclude<McpTarget, 'heading'>, delta: number, speedBaseKt = selectedSpeedKt(apState)): void {
   if (target === 'speed') {
     apState.boeing.speed = clamp(Math.round(speedBaseKt) + delta, 100, 340);
-  } else if (target === 'heading') {
-    apState.boeing.heading = wrapHeadingDeg(selectedHeadingDeg(apState) + delta);
   } else if (target === 'altitude') {
     apState.boeing.altitude = clamp(selectedAltitudeFt(apState) + delta, 0, 41000);
   } else {
@@ -119,10 +113,19 @@ export function RfsMCP() {
     modeAvailability,
     unavailableSummary,
     speedTargetLabel,
-    headingTarget,
     altitudeTarget,
     verticalSpeedTarget,
   } = useSimStore(selectMcpViewModel);
+  const headingReference = useHeadingReferenceStore((s) => s.reference);
+  const headingTargetText = useSimStore((s) => headingDisplayText(
+    finiteTarget(s.apState?.boeing.heading, createDefaultAutopilotStateFromAircraft(s.aircraft, s.wind).boeing.heading ?? 0),
+    headingDisplayContext(pfdObservation(s).aircraft, headingReference),
+  ));
+  const headingWarning = useSimStore((s) => {
+    const context = headingDisplayContext(pfdObservation(s).aircraft, headingReference);
+    return context.unavailableReason ? `MAG unavailable: ${context.unavailableReason}; displaying TRUE` : context.caution ? 'MAG SFC caution: weak horizontal field' : null;
+  });
+  const headingUnavailable = useSimStore((s) => Boolean(headingDisplayContext(pfdObservation(s).aircraft, headingReference).unavailableReason));
   const fdGuidanceUnavailable = useSimStore((s) => {
     if (!s.apState?.boeing.fdLeft && !s.apState?.boeing.fdRight) return false;
     const sharedTargets = resolveGuidanceTargets({
@@ -172,7 +175,15 @@ export function RfsMCP() {
     const state = useSimStore.getState();
     const current = state.apState;
     const next = structuredClone(current ?? createDefaultAutopilotStateFromAircraft(state.aircraft, state.wind));
-    applyMcpTargetDelta(next, target, delta, selectMcpViewModel(state).speedTarget);
+    if (target === 'heading') {
+      const context = headingDisplayContext(pfdObservation(state).aircraft, useHeadingReferenceStore.getState().reference);
+      if (context.unavailableReason) return;
+      const displayed = fromTrueHeading(finiteTarget(next.boeing.heading, 0), context.reference, context.variationEastDeg);
+      if (displayed === null) return;
+      const trueTarget = toTrueHeading({ degrees: Math.round(displayed) + delta, reference: context.reference, variationEastDeg: context.variationEastDeg });
+      if (trueTarget === null) return;
+      next.boeing.heading = trueTarget;
+    } else applyMcpTargetDelta(next, target, delta, selectMcpViewModel(state).speedTarget);
     state.setApState(next);
   };
 
@@ -247,9 +258,9 @@ export function RfsMCP() {
           <button aria-label="SPD +5" onClick={() => editTarget('speed', 5)} style={targetButtonStyle}>+</button>
         </div>
         <div>
-          <button aria-label="HDG -5" onClick={() => editTarget('heading', -5)} style={targetButtonStyle}>-</button>
-          <span style={targetDisplayStyle}>HDG {String(headingTarget).padStart(3, '0')}</span>
-          <button aria-label="HDG +5" onClick={() => editTarget('heading', 5)} style={targetButtonStyle}>+</button>
+          <button aria-label="HDG -5" disabled={headingUnavailable} onClick={() => editTarget('heading', -5)} style={targetButtonStyle}>-</button>
+          <span style={{ ...targetDisplayStyle, minWidth: headingReference === 'magnetic' ? 100 : 64 }}>HDG {headingTargetText}</span>
+          <button aria-label="HDG +5" disabled={headingUnavailable} onClick={() => editTarget('heading', 5)} style={targetButtonStyle}>+</button>
         </div>
         <div>
           <button aria-label="ALT -1000" onClick={() => editTarget('altitude', -1000)} style={targetButtonStyle}>-</button>
@@ -262,6 +273,7 @@ export function RfsMCP() {
           <button aria-label="VS +100" onClick={() => editTarget('verticalSpeed', 100)} style={targetButtonStyle}>+</button>
         </div>
       </div>
+      {headingWarning && <div aria-label="MCP heading reference warning" style={advisoryStyle}>{headingWarning}</div>}
       <div>
         <button
           aria-disabled={!modeAvailability.HDG_SEL.available}

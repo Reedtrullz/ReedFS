@@ -13,7 +13,7 @@ describe('Telemetry', () => {
     render(<Telemetry />);
     expect(screen.getByText(/ALT:/)).toBeTruthy();
     expect(screen.getByText(/TAS:/)).toBeTruthy();
-    expect(screen.getByText(/HDG:/)).toBeTruthy();
+    expect(screen.getByText(/HDG TRUE:/)).toBeTruthy();
   });
 
   it('renders takeoff cue during takeoff phase', () => {

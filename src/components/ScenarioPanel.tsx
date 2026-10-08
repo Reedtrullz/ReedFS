@@ -3,6 +3,7 @@ import { SCENARIOS } from '../sim/scenarios';
 import { scenarioSaveSlotIdFromName } from '../store/scenarioPersistence';
 import { useSimStore } from '../store/simStore';
 import { ScenarioClockPanel } from './ScenarioClockPanel';
+import { HeadingReferenceControl } from './HeadingReferenceControl';
 
 const panelStyle: CSSProperties = {
   position: 'fixed',
@@ -146,6 +147,7 @@ export function ScenarioPanel() {
       </select>
       <div style={{ color: '#9db2bc', fontSize: 11, marginTop: 6 }}>{scenario.description}</div>
       <ScenarioClockPanel />
+      <HeadingReferenceControl />
 
       <div aria-label="Scenario persistence controls" style={{ marginTop: 10, display: 'grid', gap: 8 }}>
         <label htmlFor="save-slot-name" style={{ color: '#9ddcff', fontSize: 11, fontWeight: 800 }}>
