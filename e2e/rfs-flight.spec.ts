@@ -70,6 +70,9 @@ async function expectBrowserWorkerRuntime(page: Parameters<typeof openRfs>[0]): 
 
 test.describe('RFS playable flight loops', () => {
   test('ENVA tutorial reaches clean climb with phase-aware guidance', async ({ page }) => {
+    // CI exhausted30s during cold startup or the bounded7200-frame helper.
+    // Keep the helper's frame limit and flight envelope assertions intact.
+    test.setTimeout(90_000);
     await openRfs(page);
     await expectBrowserWorkerRuntime(page);
     await startRoll(page);

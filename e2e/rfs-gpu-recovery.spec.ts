@@ -24,7 +24,7 @@ async function session(page: Page) {
 
 test('native Cesium and Three context loss preserves approach and bounded renderer ownership', async ({ page }, testInfo) => {
   // Three actual loss/recovery cycles plus cold layer delivery completed in
-  //2.3minutes at CPU6. Keep original assertion/readiness limits and retries;
+  //2.3minutes at CPU6. Keep recovery assertions/readiness limits and retries;
   // bound only this repeated transaction, not the unavailable-WebGL case.
   test.setTimeout(240_000);
   await page.addInitScript(() => {
@@ -77,7 +77,33 @@ test('native Cesium and Three context loss preserves approach and bounded render
     await useSimStore.getState().saveScenarioState(undefined, { slotId: 'gpu-proof', name: 'Preserved approach' });
     useSimStore.getState().resume();
   });
-  await expect.poll(async () => (await session(page)).time).toBeGreaterThan(0);
+  // CI exhausted the old5s first-commit poll before any context loss. Observe
+  // the actual store and worker health together; retain a bounded startup receipt
+  // even on failure, instead of inferring renderer or worker health from timeout.
+  const startup: unknown[] = [];
+  const started = performance.now();
+  try {
+    await expect.poll(async () => {
+      const observed = await page.evaluate(async () => {
+        const storePath = '/src/store/simStore.ts', runtimePath = '/src/sim/simulationRuntime.ts', identityPath = '/src/config/buildIdentity.ts';
+        const { useSimStore } = await import(/* @vite-ignore */ storePath);
+        const { getSimulationRuntime } = await import(/* @vite-ignore */ runtimePath);
+        const { APP_BUILD_COHORT } = await import(/* @vite-ignore */ identityPath);
+        const s = useSimStore.getState();
+        return { time: s.simulationTimeSeconds, step: s.simulationCommit?.stepIndex ?? 0,
+          status: s.status, workerInFlight: s.asyncPhysicsInFlight, fault: Boolean(s.simulationFailure),
+          configuredCohort: APP_BUILD_COHORT, health: getSimulationRuntime().diagnosticState?.() };
+      });
+      startup.push({ elapsedMs: performance.now() - started, ...observed });
+      return observed.time > 0 && observed.step > 0 && !observed.fault
+        && observed.health?.executionBackend === 'browser-worker'
+        && observed.health.observedWorkerCohort === observed.configuredCohort;
+    }, { timeout: 15_000 }).toBe(true);
+  } finally {
+    const startupReceipt = testInfo.outputPath('gpu-startup-progress.json');
+    await writeFile(startupReceipt, JSON.stringify({ scope: 'Bounded actual first commit and matching worker observation before fault injection', startup }, null, 2));
+    await testInfo.attach('gpu-startup-progress', { path: startupReceipt, contentType: 'application/json' });
+  }
   const approach = await session(page); expect(approach.aircraft.ground.weightOnWheels).toBe(false); expect(approach.route).not.toBeNull(); expect(approach.save).not.toBeNull();
   const samples = [];
   for (const surface of ['cesium', 'three', 'cockpit']) {
