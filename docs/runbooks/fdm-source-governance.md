@@ -80,6 +80,10 @@ Task 14A disposition: no permitted source-backed replacement is available in thi
 
 To unblock any row, add a reviewed source packet with citation, license/redistribution decision, quality tier, allowed claim boundary, derivation notes, and tests that fail if the data group is silently mixed with placeholder lineage.
 
+## 2026-10-08 generic atmosphere packet
+
+The `weather/atmosphere` group now has a separate [USSA 1976 source packet](ussa-1976-atmosphere-source-packet.md) and versioned shell at `src/sim/data/atmosphere/ussa-1976.v1.ts`. The generic dry-air reference is derived from permitted public-reference equations, with independent published holdouts and runtime-consumer tests. Its geometric/geopotential altitude domain, out-of-domain extrapolation and scenario-weather approximation are explicit. This changes no classification or source permission for the missing aircraft-specific groups above.
+
 ## 2026-06-17 Norway runway source packet
 
 The Norway-wide runway catalog in `src/viewport/norwayRunwayData.generated.ts` is a reviewed runway/airport source packet for simulator geometry, not for procedures, navigation, terrain, slope, displaced-threshold operations, or certified airport claims.
