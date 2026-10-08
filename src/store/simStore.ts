@@ -117,7 +117,7 @@ export interface SimStore {
   pendingScenarioSave: ScenarioSnapshot | null;
   discardPendingScenarioSave: () => void;
   deleteScenarioSaveState: (slotId: string, expectedRevision: string) => void;
-  saveScenarioState: (storage?: ScenarioPersistenceStorage, options?: ScenarioSaveOptions) => void;
+  saveScenarioState: (storage?: ScenarioPersistenceStorage, options?: ScenarioSaveOptions) => Promise<boolean>;
   loadScenarioState: (storage?: ScenarioPersistenceStorage, slotId?: string) => void;
   refreshScenarioSaveSlots: (storage?: ScenarioPersistenceStorage) => void;
 }

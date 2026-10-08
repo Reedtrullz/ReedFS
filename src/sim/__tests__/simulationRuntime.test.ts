@@ -1,3 +1,5 @@
+import { APP_BUILD_COHORT } from '../../config/buildIdentity';
+import { SIMULATION_WORKER_PROTOCOL_VERSION } from '../workerCodec';
 import { afterEach, describe, expect, it } from 'vitest';
 import * as simulationRuntimeModule from '../simulationRuntime';
 import { buildGuidanceState } from '../guidanceState';
@@ -227,6 +229,18 @@ class FaultWorker {
 }
 
 describe('browser worker failure boundaries', () => {
+  it('never publishes a mismatched build result and reports the validated fallback', async () => {
+    const worker = new FaultWorker(); let fallbacks = 0;
+    const runtime = new BrowserWorkerSimulationRuntime({ worker, fallback: { kind: 'main-thread', step: (data) => { fallbacks++; return mainThreadSimulationRuntime.step(data); } } });
+    const data = input(); const pending = runtime.stepAsync(data);
+    const foreign = handleSimulationWorkerMessage(worker.messages[0]);
+    if (foreign.type !== 'simulation.step.result') throw new Error('expected result fixture');
+    foreign.result.aircraft.simTime = 99999;
+    worker.emit('message', { ...foreign, buildCohort: 'old-build' });
+    await expect(pending).resolves.toEqual(mainThreadSimulationRuntime.step(data));
+    expect(fallbacks).toBe(1); expect(runtime.diagnosticState()).toMatchObject({ executionBackend: 'main-thread', observedWorkerCohort: null });
+    runtime.dispose();
+  });
   it('rejects invalid requests before either worker or fallback executes', async () => {
     const worker = new FaultWorker();
     let fallbacks = 0;
@@ -239,7 +253,7 @@ describe('browser worker failure boundaries', () => {
     const runtime = new BrowserWorkerSimulationRuntime({ worker, timeoutMs: 1000 });
     const stepInput = input(); const expected = mainThreadSimulationRuntime.step(stepInput);
     const pending = runtime.stepAsync(stepInput);
-    expect(() => worker.emit('message', { protocolVersion: 1, type: 'simulation.step.result', requestId: 'browser-worker-step-1', result: null })).not.toThrow();
+    expect(() => worker.emit('message', { protocolVersion: SIMULATION_WORKER_PROTOCOL_VERSION, buildCohort: APP_BUILD_COHORT, type: 'simulation.step.result', requestId: 'browser-worker-step-1', result: null })).not.toThrow();
     await expect(pending).resolves.toEqual(expected); runtime.dispose();
   });
   it.each(['error', 'messageerror'])('settles %s once and releases listeners on disposal', async (type) => {
@@ -263,7 +277,7 @@ describe('browser worker failure boundaries', () => {
     const worker = new FaultWorker();
     const runtime = new BrowserWorkerSimulationRuntime({ worker, fallback: { kind: 'main-thread', step: () => { throw new Error('contained fallback failure'); } } });
     const pending = runtime.stepAsync(input());
-    expect(() => worker.emit('message', { protocolVersion: 1, type: 'simulation.step.error', requestId: 'browser-worker-step-1', error: { message: 'worker protocol failure', kind: 'protocol' } })).not.toThrow();
+    expect(() => worker.emit('message', { protocolVersion: SIMULATION_WORKER_PROTOCOL_VERSION, buildCohort: APP_BUILD_COHORT, type: 'simulation.step.error', requestId: 'browser-worker-step-1', error: { message: 'worker protocol failure', kind: 'protocol' } })).not.toThrow();
     await expect(pending).rejects.toThrow('contained fallback failure'); runtime.dispose();
   });
 });
@@ -323,6 +337,6 @@ it('rejects a valid worker execution exception without re-running its input', as
   const runtime = new BrowserWorkerSimulationRuntime({ worker, fallback: { kind: 'main-thread', step: (data) => { fallbacks++; return mainThreadSimulationRuntime.step(data); } } });
   const pending = runtime.stepAsync(input());
   const expected = expect(pending).rejects.toThrow('physics failed');
-  worker.emit('message', { protocolVersion: 1, type: 'simulation.step.error', requestId: 'browser-worker-step-1', error: { name: 'Error', message: 'physics failed', kind: 'execution' } });
+  worker.emit('message', { protocolVersion: SIMULATION_WORKER_PROTOCOL_VERSION, buildCohort: APP_BUILD_COHORT, type: 'simulation.step.error', requestId: 'browser-worker-step-1', error: { name: 'Error', message: 'physics failed', kind: 'execution' } });
   await expected; expect(fallbacks).toBe(0); runtime.dispose();
 });

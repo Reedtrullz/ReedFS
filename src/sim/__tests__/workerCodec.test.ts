@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { APP_BUILD_COHORT } from '../../config/buildIdentity';
 import type { FlightPlan } from '@shared/types/fmc';
 import { buildGuidanceState } from '../guidanceState';
 import { createAircraftStateForScenario, KSEA_LIGHT_PATTERN_SCENARIO } from '../scenarios';
@@ -103,6 +104,15 @@ function expectErrorResponse(
 }
 
 describe('workerCodec', () => {
+  it('pins requests and responses to this build and rejects absent or different cohorts', () => {
+    const request = encodeSimulationStepRequest('cohort-test', realisticStepInput());
+    const response = encodeSimulationStepResult('cohort-test', advanceSimulationStep(realisticStepInput()));
+    expect(request).toMatchObject({ buildCohort: APP_BUILD_COHORT });
+    expect(response).toMatchObject({ buildCohort: APP_BUILD_COHORT });
+    expect(() => decodeSimulationStepRequest({ ...request, buildCohort: 'old-build' })).toThrow(/cohort/);
+    expect(() => decodeSimulationStepResponse({ ...response, buildCohort: undefined })).toThrow(/cohort/);
+    expect(() => decodeSimulationStepResponse({ ...encodeSimulationStepError('cohort-test', new Error('failed')), buildCohort: 'old-build' })).toThrow(/cohort/);
+  });
   it('round-trips a realistic simulation step input as structured-clone-safe data', () => {
     const input = realisticStepInput();
     const originalWind = structuredClone(input.wind);
@@ -112,6 +122,7 @@ describe('workerCodec', () => {
 
     expect(decoded).toEqual({
       protocolVersion: SIMULATION_WORKER_PROTOCOL_VERSION,
+      buildCohort: APP_BUILD_COHORT,
       type: 'simulation.step.request',
       requestId: 'step-64c',
       input,
@@ -150,6 +161,7 @@ describe('workerCodec', () => {
     expectErrorResponse(decoded);
     expect(decoded).toEqual({
       protocolVersion: SIMULATION_WORKER_PROTOCOL_VERSION,
+      buildCohort: APP_BUILD_COHORT,
       type: 'simulation.step.error',
       requestId: 'step-64c-error',
       error: {

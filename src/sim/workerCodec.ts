@@ -1,7 +1,8 @@
+import { APP_BUILD_COHORT } from '../config/buildIdentity';
 import type { SimulationStepInput, SimulationStepResult } from './simulationStep';
 import { assertSimulationStepInput, assertSimulationStepResult, InvalidSimulationStateError, isFiniteSimulationData } from './simulationValidation';
 
-export const SIMULATION_WORKER_PROTOCOL_VERSION = 1 as const;
+export const SIMULATION_WORKER_PROTOCOL_VERSION = 2 as const;
 export const SIMULATION_STEP_REQUEST_TYPE = 'simulation.step.request' as const;
 export const SIMULATION_STEP_RESULT_TYPE = 'simulation.step.result' as const;
 export const SIMULATION_STEP_ERROR_TYPE = 'simulation.step.error' as const;
@@ -14,6 +15,7 @@ type SimulationWorkerMessageType =
 
 interface SimulationWorkerEnvelope {
   protocolVersion: SimulationWorkerProtocolVersion;
+  buildCohort: string;
   type: SimulationWorkerMessageType;
   requestId: string;
 }
@@ -28,6 +30,7 @@ export interface SimulationWorkerErrorPayload {
 
 export interface SimulationStepRequestMessage {
   protocolVersion: SimulationWorkerProtocolVersion;
+  buildCohort: string;
   type: typeof SIMULATION_STEP_REQUEST_TYPE;
   requestId: string;
   input: SimulationStepInput;
@@ -35,6 +38,7 @@ export interface SimulationStepRequestMessage {
 
 export interface SimulationStepResultResponseMessage {
   protocolVersion: SimulationWorkerProtocolVersion;
+  buildCohort: string;
   type: typeof SIMULATION_STEP_RESULT_TYPE;
   requestId: string;
   result: SimulationStepResult;
@@ -42,6 +46,7 @@ export interface SimulationStepResultResponseMessage {
 
 export interface SimulationStepErrorResponseMessage {
   protocolVersion: SimulationWorkerProtocolVersion;
+  buildCohort: string;
   type: typeof SIMULATION_STEP_ERROR_TYPE;
   requestId: string;
   error: SimulationWorkerErrorPayload;
@@ -89,6 +94,7 @@ function readEnvelope(record: MessageRecord): SimulationWorkerEnvelope {
   if (record.protocolVersion !== SIMULATION_WORKER_PROTOCOL_VERSION) {
     throw new TypeError(`Unsupported simulation worker protocol version: ${String(record.protocolVersion)}`);
   }
+  if (record.buildCohort !== APP_BUILD_COHORT) throw new TypeError('Simulation worker build cohort mismatch');
   if (!isMessageType(record.type)) {
     throw new TypeError(`Unsupported simulation worker message type: ${String(record.type)}`);
   }
@@ -98,6 +104,7 @@ function readEnvelope(record: MessageRecord): SimulationWorkerEnvelope {
 
   return {
     protocolVersion: SIMULATION_WORKER_PROTOCOL_VERSION,
+    buildCohort: APP_BUILD_COHORT,
     type: record.type,
     requestId: record.requestId,
   };
@@ -168,6 +175,7 @@ export function encodeSimulationStepRequest(
   assertSimulationStepInput(input);
   return {
     protocolVersion: SIMULATION_WORKER_PROTOCOL_VERSION,
+    buildCohort: APP_BUILD_COHORT,
     type: SIMULATION_STEP_REQUEST_TYPE,
     requestId: assertRequestId(requestId),
     input: cloneForWorker(input),
@@ -184,6 +192,7 @@ export function decodeSimulationStepRequest(message: unknown): SimulationStepReq
   assertSimulationStepInput(input);
   return {
     protocolVersion: envelope.protocolVersion,
+    buildCohort: envelope.buildCohort,
     type: SIMULATION_STEP_REQUEST_TYPE,
     requestId: envelope.requestId,
     input: cloneForWorker(input),
@@ -197,6 +206,7 @@ export function encodeSimulationStepResult(
   assertSimulationStepResult(result);
   return {
     protocolVersion: SIMULATION_WORKER_PROTOCOL_VERSION,
+    buildCohort: APP_BUILD_COHORT,
     type: SIMULATION_STEP_RESULT_TYPE,
     requestId: assertRequestId(requestId),
     result: cloneForWorker(result),
@@ -210,6 +220,7 @@ export function encodeSimulationStepError(
 ): SimulationStepErrorResponseMessage {
   return {
     protocolVersion: SIMULATION_WORKER_PROTOCOL_VERSION,
+    buildCohort: APP_BUILD_COHORT,
     type: SIMULATION_STEP_ERROR_TYPE,
     requestId: assertRequestId(requestId),
     error: cloneForWorker(errorPayloadFrom(error, kind)),
@@ -224,6 +235,7 @@ export function decodeSimulationStepResponse(message: unknown): SimulationStepRe
     assertSimulationStepResult(result);
     return {
       protocolVersion: envelope.protocolVersion,
+    buildCohort: envelope.buildCohort,
       type: SIMULATION_STEP_RESULT_TYPE,
       requestId: envelope.requestId,
       result: cloneForWorker(result),
@@ -233,6 +245,7 @@ export function decodeSimulationStepResponse(message: unknown): SimulationStepRe
   if (envelope.type === SIMULATION_STEP_ERROR_TYPE) {
     return {
       protocolVersion: envelope.protocolVersion,
+    buildCohort: envelope.buildCohort,
       type: SIMULATION_STEP_ERROR_TYPE,
       requestId: envelope.requestId,
       error: decodeErrorPayload(requirePayload(record, 'error')),

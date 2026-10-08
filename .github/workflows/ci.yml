@@ -82,6 +82,16 @@ jobs:
           name: rfs-visual-evidence-${{ github.sha }}-${{ github.run_attempt }}
           path: test-results/
           retention-days: 7
+      - run: npm run test:e2e:pwa
+        id: pwa
+      - name: Retain executed PWA evidence
+        if: ${{ always() && (steps.pwa.outcome == 'success' || steps.pwa.outcome == 'failure') }}
+        # actions/upload-artifact@v7.0.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: rfs-pwa-evidence-${{ github.sha }}-${{ github.run_attempt }}
+          path: test-results/
+          retention-days: 7
 
   docker-smoke:
     needs: test

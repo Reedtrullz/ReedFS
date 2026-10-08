@@ -1,3 +1,4 @@
+import { SIMULATION_WORKER_PROTOCOL_VERSION } from '../workerCodec';
 import { afterEach, expect, it } from 'vitest';
 import { useSimStore } from '../../store/simStore';
 import { captureDiagnosticSnapshot, serializeDiagnosticBundle, MAX_DIAGNOSTIC_BYTES } from '../diagnosticBundle';
@@ -11,7 +12,7 @@ it('exports useful whitelisted metrics while excluding planted names/tokens and 
   const snapshot = captureDiagnosticSnapshot(polluted, { nowMs: 1000 }); const payload = serializeDiagnosticBundle(snapshot, false);
   const bundle = JSON.parse(payload);
   expect(bundle.schema).toBe('rfs-diagnostic/v1'); expect(bundle.runtime.status).toBe('paused');
-  expect(bundle.identities.workerProtocol).toBe(1); expect(bundle.fault.present).toBe(true);
+  expect(bundle.identities.workerProtocol).toBe(SIMULATION_WORKER_PROTOCOL_VERSION); expect(bundle.fault.present).toBe(true);
   expect(payload).not.toMatch(/PLANTED_|latitude|longitude|flightNumber|input|stack/);
   expect(new TextEncoder().encode(payload).length).toBeLessThan(MAX_DIAGNOSTIC_BYTES);
   expect(useSimStore.getState()).toBe(state);

@@ -12,15 +12,17 @@ function number(value: number | undefined, min = 0, max = Number.MAX_SAFE_INTEGE
 /** Only these explicit fields can enter a general sharing bundle. No error traversal. */
 export function captureDiagnosticSnapshot(state: SimStore, options: { nowMs: number; uiFailure?: boolean }) {
   const commit = state.simulationCommit;
-  const configuredBackend = getSimulationRuntime().kind;
+  const runtime = getSimulationRuntime(); const configuredBackend = runtime.kind;
+  const health = runtime.diagnosticState?.();
   return {
     bundle: {
       schema: 'rfs-diagnostic/v1', capturedAtUtc: new Date().toISOString(),
       identities: { ...SCENARIO_SNAPSHOT_IDENTITIES, appCohort: APP_BUILD_COHORT,
-        workerProtocol: SIMULATION_WORKER_PROTOCOL_VERSION, observedWorkerCohort: 'unavailable' },
+        workerProtocol: SIMULATION_WORKER_PROTOCOL_VERSION, observedWorkerCohort: health?.observedWorkerCohort === APP_BUILD_COHORT ? APP_BUILD_COHORT : 'unavailable' },
       runtime: {
         status: ['stopped', 'running', 'paused'].includes(state.status) ? state.status : 'unavailable',
         configuredBackend: ['main-thread', 'browser-worker', 'worker-handler-parity'].includes(configuredBackend) ? configuredBackend : 'unavailable',
+        lastValidatedBackend: health?.executionBackend && ['main-thread', 'browser-worker', 'worker-handler-parity'].includes(health.executionBackend) ? health.executionBackend : 'unavailable',
         requestedRate: number(state.simRate, 1, 64), achievedRate: number(commit?.achievedSimRate ?? undefined),
         simulationSeconds: number(state.simulationTimeSeconds), droppedSeconds: number(state.droppedSimulationTimeSeconds),
         stepIndex: number(commit?.stepIndex), ageMs: commit ? number(Math.max(0, options.nowMs - commit.committedAtMs)) : null,
