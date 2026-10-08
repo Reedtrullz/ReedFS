@@ -1,7 +1,7 @@
 import type { AircraftState } from '../sim/types';
 import { bodyToNed } from '../sim/physics/frames';
 import { quatToEuler } from '../sim/physics/quaternion';
-import { mapGpwsCalloutToSpeechParams } from './audioMapping';
+import { clampAudioUnit, mapGpwsCalloutToSpeechParams } from './audioMapping';
 
 const MPS_TO_FPM = 196.85;
 
@@ -12,9 +12,10 @@ interface GpwsKinematics {
   weightOnWheels: boolean;
 }
 
-function gpwsKinematics(state: AircraftState): GpwsKinematics {
-  const groundAltFt = state.ground?.groundAltFt ?? 0;
-  const aglFt = Math.max(0, state.ground?.aglFt ?? state.position.alt - groundAltFt);
+function gpwsKinematics(state: AircraftState): GpwsKinematics | null {
+  const aglFt = state.ground.aglFt;
+  const required = [aglFt, state.velocity.u, state.velocity.v, state.velocity.w, state.attitude.phi, state.attitude.theta, state.attitude.psi, state.config.flapSetting, ...Object.values(state.quaternion)];
+  if (!required.every(Number.isFinite) || aglFt < 0 || Math.abs(Math.hypot(...Object.values(state.quaternion)) - 1) > 0.02) return null;
   const nedVelocity = bodyToNed(state.velocity, state.attitude);
   return {
     aglFt,
@@ -24,16 +25,16 @@ function gpwsKinematics(state: AircraftState): GpwsKinematics {
   };
 }
 
-function checkMode1(state: AircraftState): string | null {
-  const { aglFt, descentRateFpm, weightOnWheels } = gpwsKinematics(state);
+function checkMode1(kinematics: GpwsKinematics): GpwsAlert | null {
+  const { aglFt, descentRateFpm, weightOnWheels } = kinematics;
   if (weightOnWheels) return null;
-  if (aglFt < 2500 && descentRateFpm > 5000) return 'SINK RATE';
   if (aglFt < 1000 && descentRateFpm > 2000) return 'PULL UP';
+  if (aglFt < 2500 && descentRateFpm > 5000) return 'SINK RATE';
   return null;
 }
 
-function checkMode4(state: AircraftState): string | null {
-  const { aglFt, groundSpeedMps, weightOnWheels } = gpwsKinematics(state);
+function checkMode4(state: AircraftState, kinematics: GpwsKinematics): GpwsAlert | null {
+  const { aglFt, groundSpeedMps, weightOnWheels } = kinematics;
   if (weightOnWheels || groundSpeedMps <= 10) return null;
   if (state.flightPhase === 'TAKEOFF' || state.flightPhase === 'CLIMB') return null;
   if (aglFt < 500 && !state.config.gearDown) return 'TOO LOW GEAR';
@@ -41,40 +42,41 @@ function checkMode4(state: AircraftState): string | null {
   return null;
 }
 
-function checkMode5(state: AircraftState): string | null {
-  const { aglFt, descentRateFpm, weightOnWheels } = gpwsKinematics(state);
+function checkMode2(kinematics: GpwsKinematics): GpwsAlert | null {
+  const { aglFt, descentRateFpm, weightOnWheels } = kinematics;
   if (weightOnWheels) return null;
-  if (aglFt < 1000 && descentRateFpm > 500) return 'GLIDESLOPE';
-  return null;
-}
-
-function checkMode2(state: AircraftState): string | null {
-  const { aglFt, descentRateFpm, weightOnWheels } = gpwsKinematics(state);
-  if (weightOnWheels) return null;
-  if (aglFt < 1500 && descentRateFpm > 3000) return 'TERRAIN';
   if (aglFt < 800 && descentRateFpm > 2000) return 'PULL UP';
+  if (aglFt < 1500 && descentRateFpm > 3000) return 'TERRAIN';
   return null;
 }
 
-function checkMode3(state: AircraftState): string | null {
-  const { aglFt, descentRateFpm, weightOnWheels } = gpwsKinematics(state);
+function checkMode3(state: AircraftState, kinematics: GpwsKinematics): GpwsAlert | null {
+  const { aglFt, descentRateFpm, weightOnWheels } = kinematics;
   if (state.flightPhase === 'TAKEOFF' && !weightOnWheels && aglFt < 1000 && descentRateFpm > 200) return "DON'T SINK";
   return null;
 }
 
-function checkMode6(state: AircraftState): string | null {
+function checkMode6(state: AircraftState, kinematics: GpwsKinematics): GpwsAlert | null {
   const bankDeg = Math.abs((quatToEuler(state.quaternion).phi * 180) / Math.PI);
-  const aglFt = state.ground?.aglFt ?? state.position.alt - (state.ground?.groundAltFt ?? 0);
+  const { aglFt } = kinematics;
   if (bankDeg > 35 && aglFt > 500) return 'BANK ANGLE';
   return null;
 }
 
-export function checkGPWS(state: AircraftState): string | null {
-  return checkMode1(state) ?? checkMode2(state) ?? checkMode3(state) ?? checkMode4(state) ?? checkMode5(state) ?? checkMode6(state);
+export const GPWS_ALERT_PRIORITY = { 'PULL UP': 6, TERRAIN: 5, 'SINK RATE': 4, "DON'T SINK": 3, 'TOO LOW GEAR': 3, 'TOO LOW FLAPS': 2, 'BANK ANGLE': 1 } as const;
+export type GpwsAlert = keyof typeof GPWS_ALERT_PRIORITY;
+
+export function checkGPWS(state: AircraftState): GpwsAlert | null {
+  const kinematics = gpwsKinematics(state);
+  if (!kinematics || ![kinematics.descentRateFpm, kinematics.groundSpeedMps].every(Number.isFinite)) return null;
+  // GLIDESLOPE is unavailable until an applicable receiver/deviation contract exists.
+  const candidates = [checkMode1(kinematics), checkMode2(kinematics), checkMode3(state, kinematics), checkMode4(state, kinematics), checkMode6(state, kinematics)];
+  return candidates.reduce<GpwsAlert | null>((highest, alert) => alert && (!highest || GPWS_ALERT_PRIORITY[alert] > GPWS_ALERT_PRIORITY[highest]) ? alert : highest, null);
 }
 
 export interface AudioCaptionEvent {
   kind: 'gpws';
+  delivery: 'caption';
   text: string;
   timestampMs: number;
 }
@@ -83,40 +85,67 @@ export interface GpwsUpdateOptions {
   nowMs?: number;
   captionsEnabled?: boolean;
   speechEnabled?: boolean;
+  masterVolume?: number;
   onCaption?: (event: AudioCaptionEvent) => void;
 }
 
-let lastAlertTime = 0;
-
+const captionTimes = new Map<GpwsAlert, number>();
+const speechTimes = new Map<GpwsAlert, number>();
 const GPWS_REPEAT_INTERVAL_MS = 3000;
+let active: { alert: GpwsAlert; utterance: SpeechSynthesisUtterance; volume: number } | null = null;
+
+export function cancelGPWSSpeech(): void {
+  if (active) {
+    active = null;
+    try { globalThis.speechSynthesis?.cancel(); } catch { /* Captions remain independent of browser speech failures. */ }
+  }
+  speechTimes.clear();
+}
 
 export function resetGPWS(): void {
-  lastAlertTime = 0;
+  cancelGPWSSpeech();
+  captionTimes.clear();
+}
+
+function due(times: Map<GpwsAlert, number>, alert: GpwsAlert, now: number): boolean {
+  const previous = times.get(alert);
+  return previous === undefined || now < previous || now - previous >= GPWS_REPEAT_INTERVAL_MS;
 }
 
 export function updateGPWS(state: AircraftState, options: GpwsUpdateOptions = {}): void {
   const now = options.nowMs ?? performance.now();
+  if (!Number.isFinite(now)) return;
   const alert = checkGPWS(state);
-  const shouldCaption = options.captionsEnabled ?? true;
-  const shouldSpeak = options.speechEnabled ?? true;
-  if (!shouldCaption && !shouldSpeak) return;
-  if (alert && now - lastAlertTime > GPWS_REPEAT_INTERVAL_MS) {
-    lastAlertTime = now;
-    if (shouldCaption) {
-      options.onCaption?.({ kind: 'gpws', text: alert, timestampMs: now });
-    }
-    if (shouldSpeak) {
-      speakCallout(alert);
-    }
+  const volume = clampAudioUnit(options.masterVolume ?? 1);
+  const shouldSpeak = (options.speechEnabled ?? true) && volume > 0;
+  // Only the currently selected condition can own speech. Repeats never enqueue
+  // while it is active; changes replace obsolete speech, including urgent alerts.
+  if (!alert || !shouldSpeak || (active && (active.alert !== alert || active.volume !== volume))) cancelGPWSSpeech();
+  if (!alert) return;
+  if ((options.captionsEnabled ?? true) && due(captionTimes, alert, now)) {
+    captionTimes.set(alert, now);
+    options.onCaption?.({ kind: 'gpws', delivery: 'caption', text: alert, timestampMs: now });
   }
+  if (!shouldSpeak || active || !due(speechTimes, alert, now)) return;
+  speechTimes.set(alert, now);
+  speakCallout(alert, volume);
 }
 
-function speakCallout(text: string): void {
+function speakCallout(alert: GpwsAlert, volume: number): void {
   if (typeof speechSynthesis === 'undefined' || typeof SpeechSynthesisUtterance === 'undefined') return;
-  const speech = mapGpwsCalloutToSpeechParams(text);
-  const utterance = new SpeechSynthesisUtterance(speech.text);
-  utterance.rate = speech.rate;
-  utterance.pitch = speech.pitch;
-  utterance.volume = speech.volume;
-  speechSynthesis.speak(utterance);
+  try {
+    const speech = mapGpwsCalloutToSpeechParams(alert);
+    const utterance = new SpeechSynthesisUtterance(speech.text);
+    utterance.rate = speech.rate;
+    utterance.pitch = speech.pitch;
+    utterance.volume = speech.volume * volume;
+    const delivery = { alert, utterance, volume };
+    active = delivery;
+    const finish = () => { if (active === delivery) active = null; };
+    utterance.onend = finish;
+    utterance.onerror = finish;
+    speechSynthesis.speak(utterance);
+  } catch {
+    active = null;
+  }
 }

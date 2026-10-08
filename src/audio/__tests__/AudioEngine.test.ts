@@ -88,3 +88,21 @@ describe('AudioEngine lifecycle', () => {
     expect(engine.status).toEqual({ started: false, disposed: true, contextState: 'closed' });
   });
 });
+
+it('resumes on a later explicit gesture after an already-started context is suspended', async () => {
+  const context = createFakeAudioContext();
+  const engine = new AudioEngine({ contextFactory: () => context as unknown as AudioContext });
+  await engine.start();
+  context.state = 'suspended';
+  await engine.start();
+  expect(context.resume).toHaveBeenCalledTimes(2);
+  expect(engine.status.contextState).toBe('running');
+});
+
+it('does not report running when resume rejects or leaves the context suspended', async () => {
+  const context = createFakeAudioContext();
+  context.resume = vi.fn(async () => {});
+  const engine = new AudioEngine({ contextFactory: () => context as unknown as AudioContext });
+  await expect(engine.start()).rejects.toThrow(/running/);
+  expect(engine.started).toBe(false);
+});

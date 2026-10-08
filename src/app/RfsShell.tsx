@@ -74,11 +74,14 @@ export function RfsShell() {
   const handleAudioCaption = useCallback((event: AudioCaptionEvent) => {
     setAudioCaption(event);
   }, []);
+  const clearAudioCaption = useCallback(() => setAudioCaption(null), []);
   const audioFrame = useAudioLoop({
     enabled: audioEnabled,
     captionsEnabled: audioSettings.captionsEnabled,
-    speechEnabled: audioEnabled && !audioSettings.muted,
+    speechEnabled: audioEnabled && audioStatus === 'on',
+    masterVolume: effectiveMasterVolume(audioSettings),
     onCaption: handleAudioCaption,
+    onSessionSilenced: clearAudioCaption,
   });
   const inputFrame = useCallback(({ dt }: FramePhaseContext) => {
     const gamepadActions = readGamepadActions();
@@ -231,7 +234,7 @@ export function RfsShell() {
   }, [audioEnabled]);
 
   const handleToggleAudio = useCallback(async () => {
-    if (audioEnabled) {
+    if (audioEnabled && getAudioEngine().sessionState === 'running') {
       getAudioEngine().setMasterVolume(0);
       setAudioEnabled(false);
       setAudioStatus('off');
@@ -250,6 +253,14 @@ export function RfsShell() {
       setAudioStatus('blocked');
     }
   }, [audioEnabled, audioSettings]);
+
+  useEffect(() => {
+    if (!audioEnabled) return;
+    const engine = getAudioEngine();
+    const update = () => setAudioStatus(engine.sessionState === 'running' ? 'on' : engine.sessionState === 'suspended' ? 'suspended' : 'blocked');
+    update();
+    return engine.subscribeStatus(update);
+  }, [audioEnabled]);
 
   const handleLoadPlan = () => {
     const store = useSimStore.getState();

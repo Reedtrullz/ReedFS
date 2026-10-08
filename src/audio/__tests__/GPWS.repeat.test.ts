@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { eulerToQuat } from '../../sim/physics/quaternion';
 import { resetGPWS, updateGPWS } from '../GPWS';
 import {
   B737_800_SPEC,
@@ -49,6 +50,9 @@ describe('GPWS repeat and reset', () => {
     const banked = {
       ...state,
       ground: { ...state.ground, aglFt: 300 },
+      velocity: { u: 90, v: 0, w: 0 },
+      attitude: { phi: Math.PI / 4, theta: 0, psi: 0 },
+      quaternion: eulerToQuat(Math.PI / 4, 0, 0),
     };
 
     updateGPWS(banked, { nowMs: 1_000, captionsEnabled: true, speechEnabled: false, onCaption });

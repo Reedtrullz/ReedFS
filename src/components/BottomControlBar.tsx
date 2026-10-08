@@ -3,7 +3,7 @@ import type { CameraMode } from '../viewport/cameraMode';
 import type { OverlayMode } from '../viewport/overlayMode';
 import { shouldShowFlightInstruments } from '../viewport/overlayMode';
 
-export type AudioUiStatus = 'off' | 'starting' | 'on' | 'blocked';
+export type AudioUiStatus = 'off' | 'starting' | 'on' | 'blocked' | 'suspended';
 
 export interface BottomControlBarProps {
   status: SimStatus;
@@ -46,6 +46,8 @@ export function BottomControlBar({
 }: BottomControlBarProps) {
   const audioButtonLabel = audioStatus === 'starting'
     ? 'AUDIO: STARTING'
+    : audioStatus === 'suspended'
+      ? 'AUDIO: SUSPENDED — RESUME'
     : audioStatus === 'blocked'
       ? 'AUDIO: BLOCKED'
       : audioEnabled
