@@ -12,6 +12,8 @@ const mockTtc = vi.hoisted(() => ({
   destroy: vi.fn(),
   threeSceneAdd: vi.fn(),
   canvas: {
+    dataset: {},
+    remove: vi.fn(),
     style: { pointerEvents: 'none' },
     addEventListener: vi.fn(),
     removeEventListener: vi.fn(),
@@ -27,7 +29,7 @@ vi.mock('three-to-cesium', () => ({
     destroy: mockTtc.destroy,
     threeScene: { add: mockTtc.threeSceneAdd },
     threeCamera: {},
-    threeRenderer: { domElement: mockTtc.canvas },
+    threeRenderer: { domElement: mockTtc.canvas, forceContextLoss: vi.fn() },
   })),
 }));
 
