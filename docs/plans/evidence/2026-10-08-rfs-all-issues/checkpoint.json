@@ -62,11 +62,11 @@
       "wave": 1,
       "githubState": "OPEN",
       "projectStatus": "In Progress",
-      "executionDisposition": "Partial delivered",
+      "executionDisposition": "Delivered foundation; scope open",
       "pullRequests": [
         164
       ],
-      "completedOrObserved": "No implementation claimed in this execution; initial source assessment/plan remains applicable.",
+      "completedOrObserved": "Reproducible check/browser foundations are delivered through164; the current acceptance matrix and continuous-flight/runtime coverage remain open.",
       "remaining": "Keep matrix current across all waves and add real-scene/cockpit acceptance without weakening existing release/CSP/PWA gates. Acceptance: A clean pinned checkout reproduces the gates; mismatched siblings fail clearly or use a separately authorized isolated build. No source presence, seeded screenshot or sampled endpoint is promoted into full-flight, aerodynamic, visual or production acceptance. Keep existing Pages/CSP/PWA/release protections and exact-SHA readback.",
       "dependencies": []
     },
@@ -109,11 +109,11 @@
       "wave": 1,
       "githubState": "OPEN",
       "projectStatus": "In Progress",
-      "executionDisposition": "Partial delivered",
+      "executionDisposition": "Delivered foundation; scope open",
       "pullRequests": [
         164
       ],
-      "completedOrObserved": "No implementation claimed in this execution; initial source assessment/plan remains applicable.",
+      "completedOrObserved": "Save/storage preservation foundations are delivered through164; remaining cross-tab, quota/growth and companion-window acceptance remains open.",
       "remaining": "Coordinate companion windows as non-writers after #116; bound storage growth and retain previous valid collections. Acceptance: Concurrent create/update/delete cannot silently discard another session's slot; cancel preserves both versions. Quota exceptions retain the previous valid collection and offer export. Companion windows are not independent save writers. Test on actual supported browser storage, including denied persistence and full quota.",
       "dependencies": [
         91
@@ -126,11 +126,11 @@
       "wave": 2,
       "githubState": "OPEN",
       "projectStatus": "In Progress",
-      "executionDisposition": "Partial delivered",
+      "executionDisposition": "Delivered foundation; scope open",
       "pullRequests": [
         166
       ],
-      "completedOrObserved": "No implementation claimed in this execution; initial source assessment/plan remains applicable.",
+      "completedOrObserved": "Finite worker batching/generation and measured runtime/input-latency foundations are delivered through166; physical latency and measurement-driven render work remain open.",
       "remaining": "Add render-only interpolation/adaptive quality only where data shows need; never feed interpolated poses into truth. Acceptance: Low FPS/worker delay/high sim rates retain responsive pause/reset/control changes and discard stale generations. Interpolation never feeds physics or changes instrument truth; evaluate representative desktop/mobile devices before making performance claims.",
       "dependencies": []
     },
@@ -189,11 +189,11 @@
       "wave": 2,
       "githubState": "OPEN",
       "projectStatus": "In Progress",
-      "executionDisposition": "Partial delivered",
+      "executionDisposition": "Delivered foundation; scope open",
       "pullRequests": [
         165
       ],
-      "completedOrObserved": "No implementation claimed in this execution; initial source assessment/plan remains applicable.",
+      "completedOrObserved": "Audio session lifecycle source/local gates are delivered through165; physical desktop/mobile and background acceptance remains open.",
       "remaining": "Cover supported desktop/mobile contexts and background/rate policy without tying pitch directly to simulation rate. Acceptance: First gesture, later suspension, mute/unmute, pause/resume, StrictMode remount and reset produce no duplicate oscillators or stale speech. UI reflects actual context state. Real-browser checks cover supported desktop/mobile audio behavior; mock success alone is insufficient.",
       "dependencies": []
     },
@@ -259,11 +259,11 @@
       "wave": 2,
       "githubState": "OPEN",
       "projectStatus": "In Progress",
-      "executionDisposition": "Partial delivered",
+      "executionDisposition": "Delivered foundation; scope open",
       "pullRequests": [
         167
       ],
-      "completedOrObserved": "No implementation claimed in this execution; initial source assessment/plan remains applicable.",
+      "completedOrObserved": "Committed snapshot/age-labeled instrument observation is delivered through167; measured physical readability/refresh and companion-display reuse remain open.",
       "remaining": "Reuse in #63/#116 and measured display refresh/readability; avoid blanket memoization. Acceptance: Mode/airspeed/altitude/source-validity fields identify one coherent revision; slow workers and owner loss show age/state honestly. Pause is not confused with disconnection. Camera interpolation cannot announce uncommitted mode capture. Verify rendered instrument latency/readability rather than only selector equality.",
       "dependencies": [
         123
@@ -1059,11 +1059,11 @@
       "wave": 7,
       "githubState": "OPEN",
       "projectStatus": "Intake",
-      "executionDisposition": "Partial delivered",
+      "executionDisposition": "Delivered foundation; scope open",
       "pullRequests": [
         168
       ],
-      "completedOrObserved": "No implementation claimed in this execution; initial source assessment/plan remains applicable.",
+      "completedOrObserved": "Warning/audio foundations are delivered through168; procedural crew transitions and challenge-response are not implemented.",
       "remaining": "Review terminology for selected aircraft and extend the bounded takeoff/landing set. Acceptance: Calls trigger on valid transitions, not every frame; replay/reset creates no duplicate conversation. Missing/invalid source data suppresses unsupported calls. Captions, quiet mode and warning priority work without requiring audio, and callout terminology is reviewed for the selected aircraft.",
       "dependencies": [
         101,
