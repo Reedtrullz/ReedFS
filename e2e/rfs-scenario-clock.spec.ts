@@ -31,7 +31,7 @@ async function observe(page: Page) {
     const camera = viewer.camera.positionCartographic;
     const lat = camera.latitude * 180 / Math.PI; const lon = camera.longitude * 180 / Math.PI;
     const runtime = getSimulationRuntime().diagnosticState?.();
-    return { status: state.status, simTime: state.aircraft.simTime, utcMs, timeOfDay: state.aircraft.timeOfDay,
+    return { status: state.status, simTime: state.aircraft.simTime, fault: Boolean(state.simulationFailure), utcMs, timeOfDay: state.aircraft.timeOfDay,
       clockUtcMs: toDate(julian).getTime(), frameUtcMs: toDate(viewer.scene.frameState.time).getTime(),
       clockProjectionSeconds: JulianDate.secondsDifference(julian, projected),
       frameProjectionSeconds: JulianDate.secondsDifference(viewer.scene.frameState.time, projected),
@@ -67,8 +67,21 @@ test('native worker, paused renderer and exact restored save use the same commit
   expect((await observe(page)).utcMs).toBe(Date.UTC(2026, 11, 31, 23, 59, 59));
   await page.getByRole('button', { name: 'START ROLL', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Apply UTC date/time', exact: true })).toBeDisabled();
-  await expect.poll(async () => (await observe(page)).runtime?.executionBackend).toBe('browser-worker');
-  await expect.poll(async () => (await observe(page)).simTime).toBeGreaterThan(0);
+  // CI exhausted the5s observation window before the pause/save proof. Keep
+  // backend and positive-commit gates together under a bounded startup window.
+  const startup: unknown[] = [];
+  const started = performance.now();
+  try {
+    await expect.poll(async () => {
+      const observed = await observe(page);
+      startup.push({ elapsedMs: performance.now() - started, ...observed });
+      return observed.runtime?.executionBackend === 'browser-worker' && observed.simTime > 0 && !observed.fault;
+    }, { timeout: 15000 }).toBe(true);
+  } finally {
+    const startupReceipt = testInfo.outputPath('clock-startup-progress.json');
+    await writeFile(startupReceipt, JSON.stringify({ scope: 'Actual worker and positive committed UTC progress before pause/save; finite startup observation', startup }, null, 2));
+    await testInfo.attach('clock-startup-progress', { path: startupReceipt, contentType: 'application/json' });
+  }
   await page.getByRole('button', { name: 'PAUSE', exact: true }).click();
   await expect(page.getByRole('button', { name: 'RESUME', exact: true })).toBeVisible();
   const paused = await observe(page);
