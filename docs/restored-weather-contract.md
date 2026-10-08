@@ -3,7 +3,8 @@
 A saved flight restores its recorded wind, pressure, temperature, visibility,
 cloud cover and deterministic cloud/gust seeds. Restoring a running save pauses
 the flight. The restored atmosphere remains authoritative until reset or scenario
-selection; the visible load message states that choice.
+selection; the visible load message states that choice. Loading a runway route
+preserves this restored atmosphere, including an explicitly absent wind field.
 
 Scenario selection, reset, save restoration and last-valid-checkpoint recovery
 advance a weather session epoch. The weather hook checks the captured epoch as

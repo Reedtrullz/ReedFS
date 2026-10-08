@@ -4,6 +4,8 @@ import { useSimStore } from '../../store/simStore';
 import { useScenarioWeather } from '../useScenarioWeather';
 import type { MetarData } from '../../sim/weather';
 import { createScenarioSnapshot } from '../../store/scenarioPersistence';
+import { createKseaKpdxFlight } from '../../sim/flightPlanLoader';
+import { KSEA_RUNWAY_16L } from '../../viewport/runwayData';
 
 const { fetchMetar } = vi.hoisted(() => ({ fetchMetar: vi.fn() }));
 vi.mock('../../sim/weather', async (original) => ({
@@ -99,5 +101,15 @@ describe('restored weather owns the active session', () => {
     expect(useSimStore.getState().weather).toEqual(checkpoint.weather);
     expect(useSimStore.getState().wind).toEqual(checkpoint.wind);
     expect(useSimStore.getState().status).toBe('paused');
+  });
+
+  it('loading a runway route preserves the restored atmosphere and wind', async () => {
+    const target = storage(); const saved = await saveConditions(target);
+    useSimStore.getState().reset();
+    useSimStore.getState().loadScenarioState(target);
+    useSimStore.getState().setFlightPlanAtRunway(createKseaKpdxFlight(), KSEA_RUNWAY_16L);
+    expect(useSimStore.getState().weather).toEqual(saved.weather);
+    expect(useSimStore.getState().wind).toEqual(saved.wind);
+    expect(useSimStore.getState().weatherRestored).toBe(true);
   });
 });
