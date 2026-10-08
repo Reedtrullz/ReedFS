@@ -3,6 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 // Installed generated SW and two actual builds with explicitly synthetic cohorts.
 async function diagnostic(page: Page) {
+  await page.bringToFront();
   const trigger = page.getByRole('button', { name: 'Diagnostic export', exact: true });
   if (!(await trigger.isVisible())) {
     await page.getByRole('button', { name: /OVL:\s*FLIGHT/i }).click();
@@ -16,7 +17,7 @@ async function diagnostic(page: Page) {
 
 test('installed update waits for a verified save and preserves another flight and the offline cohort', async ({ page, context, request }, testInfo) => {
   // Two installed cohorts, live tabs, quota recovery, restore and offline reload.
-  // The measured CPU6 probe exceeds120s; individual assertion gates stay5s.
+  // The measured CPU6 probe exceeds120s; assertion deadlines and retries are unchanged.
   test.setTimeout(240000);
   expect((await request.post('/__fixture/version/1')).status()).toBe(204);
   await page.goto('/');
@@ -34,6 +35,7 @@ test('installed update waits for a verified save and preserves another flight an
   const other = await context.newPage(); await other.goto('/');
   await other.getByRole('button', { name: 'START ROLL', exact: true }).click();
   await expect(other.getByRole('button', { name: 'PAUSE', exact: true })).toBeVisible();
+  await page.bringToFront();
   let otherNavigations = 0; other.on('framenavigated', (frame) => { if (frame === other.mainFrame()) otherNavigations++; });
   expect((await request.post('/__fixture/version/2')).status()).toBe(204);
   await page.evaluate(async () => { await (await navigator.serviceWorker.getRegistration())!.update(); });
