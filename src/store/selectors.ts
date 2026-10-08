@@ -115,7 +115,7 @@ export const selectPfdFlightPhase = (s: SimStore) => pfdObservation(s).aircraft.
 export const selectPfdTakeoffCue = (s: SimStore): string | null => {
   if (!pfdObservation(s).aircraft.ground) return null;
   const derived = computeDerived(pfdObservation(s).aircraft, pfdObservation(s).wind, pfdObservation(s).weather);
-  return takeoffCueText(pfdObservation(s).aircraft, derived.ias, s.selectedScenarioId);
+  return derived.airDataValid ? takeoffCueText(pfdObservation(s).aircraft, derived.ias, s.selectedScenarioId) : null;
 };
 
 export function selectPfdFmaText(kind: 'thrustActive' | 'lateralActive' | 'verticalActive' | 'autopilotStatus') {
@@ -305,7 +305,8 @@ export function selectMcpViewModel(s: SimStore): McpViewModel {
 
   const selectedSpeed = finiteNumber(displayApState.boeing.speed);
   const managedSpeed = finiteNumber((effectiveTruth as { managedSpeedKt?: number }).managedSpeedKt);
-  const currentIasSpeed = speedBugKt(computeDerived(s.aircraft, s.wind, s.weather).ias, 250);
+  const airData = computeDerived(s.aircraft, s.wind, s.weather);
+  const currentIasSpeed = speedBugKt(airData.airDataValid ? airData.ias : null, 250);
   const speedTargetManaged = selectedSpeed === null && managedSpeed !== null;
   const speedTarget = speedBugKt(selectedSpeed ?? managedSpeed ?? currentIasSpeed, currentIasSpeed);
   const speedTargetLabel = `${speedTargetManaged ? 'MAN SPD' : 'SPD'} ${speedTarget}`;
@@ -368,7 +369,7 @@ export interface TelemetryViewModel {
   batchDurationMs: number | null;
   commandLatencyMs: number | null;
   altitudeFt: number;
-  iasKt: number;
+  iasKt: number | null;
   tasKt: number;
   groundSpeedKt: number;
   verticalSpeedFpm: number;
@@ -392,14 +393,14 @@ export function selectTelemetryViewModel(s: SimStore): TelemetryViewModel {
   const euler = quatToEuler(s.aircraft.quaternion);
   const next: TelemetryViewModel = {
     status: s.status,
-    takeoffCue: takeoffCueText(s.aircraft, d.ias, s.selectedScenarioId),
+    takeoffCue: d.airDataValid ? takeoffCueText(s.aircraft, d.ias, s.selectedScenarioId) : null,
     simRate: s.simRate,
     droppedSimTimeSeconds: s.droppedSimulationTimeSeconds,
     achievedSimRate: s.simulationCommit?.achievedSimRate ?? null,
     batchDurationMs: s.simulationCommit?.batchDurationMs ?? null,
     commandLatencyMs: s.simulationCommit?.commandLatencyMs ?? null,
     altitudeFt: s.aircraft.position.alt,
-    iasKt: d.ias,
+    iasKt: d.airDataValid ? d.ias : null,
     tasKt: d.tas,
     groundSpeedKt: d.gs,
     verticalSpeedFpm: d.vs,

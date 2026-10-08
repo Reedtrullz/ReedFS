@@ -1,5 +1,6 @@
 import { createRoot } from 'react-dom/client';
 import { RfsPFD } from '../../src/instruments/RfsPFD';
+import { Telemetry } from '../../src/components/Telemetry';
 import { useSimStore } from '../../src/store/simStore';
 import { createDefaultAutopilotState } from '../../src/instruments/defaultAutopilotState';
 import { createSimulationRuntime, setSimulationRuntimeForTests, type AsyncSimulationRuntime } from '../../src/sim/simulationRuntime';
@@ -19,7 +20,7 @@ async function settle() {
   }
 }
 
-export async function mountObservedPfd() {
+export async function mountObservedPfd(includeTelemetry = false) {
   useSimStore.getState().reset(); useSimStore.getState().start();
   const s = useSimStore.getState(); const ap = createDefaultAutopilotState();
   ap.boeing.cmdA = true; ap.boeing.hdgSel = true; ap.boeing.altHold = true;
@@ -35,7 +36,7 @@ export async function mountObservedPfd() {
   const restore = setSimulationRuntimeForTests(runtime);
   useSimStore.getState().tickAsync(16); await settle();
   const element = document.createElement('div'); document.body.append(element);
-  const root = createRoot(element); root.render(<RfsPFD />);
+  const root = createRoot(element); root.render(<><RfsPFD />{includeTelemetry && <Telemetry />}</>);
   cleanup = () => { root.unmount(); element.remove(); restore(); runtime.dispose?.(); };
   let defer = false;
   setSimulationRuntimeForTests({ kind: runtime.kind, step: runtime.step.bind(runtime), stepAsync: async (input: SimulationStepInput) => {

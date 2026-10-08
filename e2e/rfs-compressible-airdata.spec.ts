@@ -3,7 +3,7 @@ import { writeFile } from 'node:fs/promises';
 
 test('actual worker weather commits render ideal CAS and show unsupported air data explicitly', async ({ page }, testInfo) => {
   await page.goto('/e2e/fixtures/runtime.html');
-  await page.evaluate(async () => { const path = '/e2e/fixtures/instrument-observation.tsx'; await (await import(/* @vite-ignore */ path)).mountObservedPfd(); });
+  await page.evaluate(async () => { const path = '/e2e/fixtures/instrument-observation.tsx'; await (await import(/* @vite-ignore */ path)).mountObservedPfd(true); });
   const receipts = [];
   for (const [temperature, speed] of [[15, 250], [35, 250], [15, 400]]) {
     const row = await page.evaluate(async ([t, v]) => { const path = '/e2e/fixtures/instrument-observation.tsx'; return (await import(/* @vite-ignore */ path)).commitAirDataCase(t, v); }, [temperature, speed]);
@@ -26,6 +26,8 @@ test('actual worker weather commits render ideal CAS and show unsupported air da
   expect(receipts[1].air.cas).toBeLessThan(receipts[0].air.cas);
   expect(receipts[2].air.cas).toBeNull();
   await expect(page.getByLabel('Airspeed tape', { exact: true })).toContainText('IAS INVALID');
+  await expect(page.getByLabel('Flight telemetry', { exact: true })).toContainText('IAS: INVALID');
+  await expect(page.getByLabel('Flight telemetry', { exact: true })).not.toContainText('IAS: 0 kt');
   const path = testInfo.outputPath('native-compressible-airdata-qualification.json');
   await writeFile(path, JSON.stringify({ receipts }, null, 2) + '\n'); await testInfo.attach('native-compressible-airdata-qualification', { path, contentType: 'application/json' });
   await page.evaluate(async () => { const path = '/e2e/fixtures/instrument-observation.tsx'; (await import(/* @vite-ignore */ path)).disposeObservedPfd(); });

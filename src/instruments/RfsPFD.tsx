@@ -485,7 +485,7 @@ export function RfsPFD() {
   const flightDirectorEnabled = Boolean(apStateForGuidance?.boeing.fdLeft || apStateForGuidance?.boeing.fdRight);
   const selectedScenarioId = useSimStore(selectPfdSelectedScenarioId);
   const flightPhase = aircraftForVnav.flightPhase;
-  const takeoffCue = takeoffCueText(aircraftForVnav, ias, selectedScenarioId);
+  const takeoffCue = derived.airDataValid ? takeoffCueText(aircraftForVnav, ias, selectedScenarioId) : null;
   const vSpeeds = maybeFindPerformanceCardForScenario(selectedScenarioId)?.vSpeeds;
   const showTakeoffReference = takeoffCue != null || flightPhase === 'PARKED' || flightPhase === 'TAKEOFF';
   const sharedGuidanceTargets = resolveGuidanceTargets({

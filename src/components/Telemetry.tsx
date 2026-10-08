@@ -9,7 +9,7 @@ export function Telemetry() {
   );
 
   return (
-    <div style={{
+    <div aria-label="Flight telemetry" style={{
       position: 'fixed', top: 14, left: 360, zIndex: 100,
       background: 'rgba(0,0,0,0.85)', color: '#0f0',
       fontFamily: 'monospace', fontSize: 12, padding: 10,
@@ -25,7 +25,7 @@ export function Telemetry() {
       {vm.batchDurationMs !== null && <div style={{ opacity: 0.7 }}>BATCH {vm.batchDurationMs.toFixed(0)}ms | LATEST COMMAND {vm.commandLatencyMs?.toFixed(0)}ms</div>}
       {vm.takeoffCue && <div style={{ fontWeight: 'bold', color: '#ff0', marginBottom: 4 }}>{vm.takeoffCue}</div>}
       {row('ALT', `${vm.altitudeFt.toFixed(0)} ft`)}
-      {row('IAS', `${vm.iasKt.toFixed(0)} kt`)}
+      {row('IAS', vm.iasKt === null ? 'INVALID' : `${vm.iasKt.toFixed(0)} kt`)}
       {row('TAS', `${vm.tasKt.toFixed(0)} kt`)}
       {row('GS', `${vm.groundSpeedKt.toFixed(0)} kt`)}
       {row('VS', `${vm.verticalSpeedFpm.toFixed(0)} fpm`)}
