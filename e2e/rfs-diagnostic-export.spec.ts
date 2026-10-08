@@ -11,6 +11,20 @@ async function readSession(page: Page) {
   });
 }
 
+test('error recovery survives unavailable later chunks and exports the UI-failure flag', async ({ page }) => {
+  await page.goto('/e2e/fixtures/runtime.html');
+  await page.evaluate(async () => { const path = '/e2e/fixtures/diagnostic-error.tsx'; (await import(/* @vite-ignore */ path)).mountErrorProbe(); });
+  await expect(page.getByRole('button', { name: 'Inject UI failure', exact: true })).toBeVisible();
+  await page.route('**/src/components/DiagnosticExport.tsx*', (route) => route.abort());
+  await page.getByRole('button', { name: 'Inject UI failure', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Something went wrong', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Diagnostic export', exact: true }).click();
+  const payload = (await page.getByLabel('Diagnostic JSON preview').textContent())!;
+  expect(JSON.parse(payload).fault.uiFailure).toBe(true); expect(payload).not.toMatch(/PLANTED_/);
+  await page.getByRole('button', { name: 'Close preview', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Try Again', exact: true })).toBeVisible();
+});
+
 test('native preview downloads exact private-default data and keeps the paused flight unchanged', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: /OVL:\s*FLIGHT/i }).click();

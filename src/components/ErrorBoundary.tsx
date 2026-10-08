@@ -1,6 +1,5 @@
-import { Component, lazy, Suspense, type ReactNode } from 'react';
-
-const DiagnosticExport = lazy(() => import('./DiagnosticExport').then((m) => ({ default: m.DiagnosticExport })));
+import { Component, type ReactNode } from 'react';
+import { DiagnosticExport } from './DiagnosticExport';
 
 interface Props {
   children: ReactNode;
@@ -46,7 +45,7 @@ export class ErrorBoundary extends Component<Props, State> {
           >
             Try Again
           </button>
-          <Suspense fallback={null}><DiagnosticExport uiFailure /></Suspense>
+          <DiagnosticExport uiFailure />
         </div>
       );
     }
