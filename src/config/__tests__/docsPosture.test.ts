@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { parse } from 'yaml';
 import dockerignore from '../../../.dockerignore?raw';
 import codeowners from '../../../.github/CODEOWNERS?raw';
 import bugReportTemplate from '../../../.github/ISSUE_TEMPLATE/bug_report.yml?raw';
@@ -86,7 +87,22 @@ describe('canonical docs posture', () => {
     expect(packageJson.scripts['test:e2e']).not.toContain('e2e/rfs-full-flight-blackbox.spec.ts');
     expect(packageJson.scripts['test:e2e:full-flight']).toContain('e2e/rfs-full-flight-blackbox.spec.ts');
     expect(packageJson.scripts['test:visual']).toContain('e2e/rfs-visual.spec.ts');
-    expect(ciWorkflow).toMatch(/- run: npm run test:e2e\s+- run: npm run test:visual/);
+    const workflow = parse(ciWorkflow) as { jobs: { test: { steps: Array<{
+      run?: string; id?: string; if?: string; with?: { name?: string; path?: string };
+    }> } } };
+    const steps = workflow.jobs.test.steps;
+    const browser = steps.findIndex((step) => step.run === 'npm run test:e2e');
+    const visual = steps.findIndex((step) => step.run === 'npm run test:visual');
+    expect(browser).toBeGreaterThanOrEqual(0);
+    expect(visual).toBeGreaterThan(browser);
+    for (const [phase, start, end] of [['browser', browser, visual], ['visual', visual, steps.length]] as const) {
+      expect(steps[start].id).toBe(phase);
+      const upload = steps.slice(start + 1, end).find((step) => step.with?.name?.startsWith(`rfs-${phase}-evidence-`));
+      expect(upload?.if).toContain('always()');
+      expect(upload?.if).toContain(`steps.${phase}.outcome == 'failure'`);
+      expect(upload?.with?.path).toContain('test-results/');
+      expect(upload?.with?.name).toContain('${{ github.run_attempt }}');
+    }
     expect(ciWorkflow).toContain('npm run check:deps');
     expect(ciWorkflow).toContain('push: false');
     expect(ciWorkflow).toContain('load: true');

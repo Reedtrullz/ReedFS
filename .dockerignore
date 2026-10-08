@@ -8,6 +8,7 @@ playwright-report/
 # VCS and local review/dogfood artifacts
 .git
 .gitignore
+.superpowers/
 dogfood-output/
 docs/reviews/
 

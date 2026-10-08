@@ -67,7 +67,7 @@ jobs:
         # actions/upload-artifact@v7.0.2
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
-          name: rfs-browser-evidence-${{ github.sha }}
+          name: rfs-browser-evidence-${{ github.sha }}-${{ github.run_attempt }}
           path: |
             test-results/
             dist/rfs-version.json
@@ -79,7 +79,7 @@ jobs:
         # actions/upload-artifact@v7.0.2
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
-          name: rfs-visual-evidence-${{ github.sha }}
+          name: rfs-visual-evidence-${{ github.sha }}-${{ github.run_attempt }}
           path: test-results/
           retention-days: 7
 
