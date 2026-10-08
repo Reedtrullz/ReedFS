@@ -714,7 +714,8 @@ export function RfsPFD() {
           </div>
           <div
             style={{
-              display: 'flex',
+              display: headingContext.reference === 'magnetic' ? 'grid' : 'flex',
+              gridTemplateColumns: '1fr auto',
               alignItems: 'center',
               justifyContent: 'space-between',
               padding: '7px 10px',
@@ -722,19 +723,19 @@ export function RfsPFD() {
               background: 'rgba(0,0,0,0.45)',
             }}
           >
-            <span style={{ color: '#9ddcff', fontSize: 13, fontWeight: 800 }}>HDG</span>
-            <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1.05 }}>
-              <span aria-label="PFD heading" style={{ color: '#ffffff', fontSize: headingContext.reference === 'magnetic' ? 20 : 26, fontWeight: 900 }}>{headingDisplayText(hdgTrue, headingContext)}</span>
+            <span style={{ color: '#9ddcff', fontSize: headingContext.reference === 'magnetic' ? 10 : 13, fontWeight: 800, gridColumn: '1 / -1' }}>HDG</span>
+            <span style={{ display: 'flex', flexDirection: 'column', alignItems: headingContext.reference === 'magnetic' ? 'flex-start' : 'center', lineHeight: 1.05 }}>
+              <span aria-label="PFD heading" style={{ color: '#ffffff', fontSize: headingContext.reference === 'magnetic' ? 16 : 26, fontWeight: 900, whiteSpace: 'nowrap' }}>{headingDisplayText(hdgTrue, headingContext)}</span>
               {hasMcpTargets && Number.isFinite(selectedHeading) && (
-                <span aria-label="Heading selected bug" style={{ color: '#ff4df3', fontSize: 10, fontWeight: 900 }}>
+                <span aria-label="Heading selected bug" style={{ color: '#ff4df3', fontSize: headingContext.reference === 'magnetic' ? 8 : 10, fontWeight: 900, whiteSpace: 'nowrap' }}>
                   HDG BUG {headingDisplayText(selectedHeading, headingContext)}
                 </span>
               )}
             </span>
             <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', lineHeight: 1.15 }}>
-              <span style={{ color: '#9ddcff', fontSize: 13, fontWeight: 800 }}>VS {vs.toFixed(0)}</span>
+              <span style={{ color: '#9ddcff', fontSize: headingContext.reference === 'magnetic' ? 11 : 13, fontWeight: 800 }}>VS {vs.toFixed(0)}</span>
               {hasMcpTargets && Number.isFinite(selectedVerticalSpeed) && (
-                <span aria-label="Vertical speed selected bug" style={{ color: '#ff4df3', fontSize: 10, fontWeight: 900 }}>
+                <span aria-label="Vertical speed selected bug" style={{ color: '#ff4df3', fontSize: headingContext.reference === 'magnetic' ? 8 : 10, fontWeight: 900 }}>
                   VS BUG {verticalSpeedTargetText(selectedVerticalSpeed)}
                 </span>
               )}

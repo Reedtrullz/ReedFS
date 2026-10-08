@@ -98,8 +98,21 @@ test('actual worker flight keeps true orientation and targets while magnetic sur
   await expect(mcp).toContainText(`HDG ${stepped.magneticLabel}`);
   const restored = await observe(page); expect(restored.aircraft).toEqual(saved.aircraft);
   expect(restored.trueTarget).toBe(saved.apState.boeing.heading); expect(restored.weather).toEqual(saved.weather);
+  const readoutLayout = await page.getByLabel('PFD heading', { exact: true }).evaluate((heading) => {
+    const selected = document.querySelector('[aria-label="Heading selected bug"]')!;
+    const row = heading.parentElement!.parentElement!;
+    const right = row.lastElementChild!;
+    const textLines = (node: Element) => { const range = document.createRange(); range.selectNodeContents(node); return range.getClientRects().length; };
+    return { headingLines: textLines(heading), selectedLines: textLines(selected),
+      headingRight: heading.getBoundingClientRect().right, selectedRight: selected.getBoundingClientRect().right,
+      verticalSpeedLeft: right.getBoundingClientRect().left, rowLeft: row.getBoundingClientRect().left,
+      headingLeft: heading.getBoundingClientRect().left };
+  });
+  expect(readoutLayout.headingLines).toBe(1); expect(readoutLayout.selectedLines).toBe(1);
+  expect(readoutLayout.headingLeft).toBeGreaterThanOrEqual(readoutLayout.rowLeft);
+  expect(Math.max(readoutLayout.headingRight, readoutLayout.selectedRight)).toBeLessThanOrEqual(readoutLayout.verticalSpeedLeft);
   await page.screenshot({ path: testInfo.outputPath('native-magnetic-surface-heading.png') });
   const path = testInfo.outputPath('native-heading-reference.json');
-  await writeFile(path, JSON.stringify({ scope: 'Actual worker/cohort, paused UI reference invariance, one-step conversion, unsupported epoch and v4 save/restore; surface estimate, no operational/device/full-flight qualification', before, toggled, stepped, unavailable, restored }, null, 2));
+  await writeFile(path, JSON.stringify({ scope: 'Actual worker/cohort, paused UI reference invariance, one-step conversion, unsupported epoch and v4 save/restore; surface estimate, no operational/device/full-flight qualification', before, toggled, stepped, unavailable, restored, readoutLayout }, null, 2));
   await testInfo.attach('native-heading-reference', { path, contentType: 'application/json' });
 });
