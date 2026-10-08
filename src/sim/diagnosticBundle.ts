@@ -32,7 +32,7 @@ export function captureDiagnosticSnapshot(state: SimStore, options: { nowMs: num
         batchMs: number(commit?.batchDurationMs), latestCommandMs: number(commit?.commandLatencyMs),
         workerInFlight: Boolean(state.asyncPhysicsInFlight),
       },
-      airData: { quantity: 'ideal-ias-equals-cas', valid: air.airDataValid, tasKt: number(air.tas), easKt: number(air.eas),
+      airData: { quantity: 'ideal-ias-equals-cas', valid: air.airDataValid, tasKt: number(air.tas), gsKt: number(air.gs), easKt: number(air.eas),
         casKt: number(air.cas ?? undefined), iasKt: air.airDataValid ? number(air.ias) : null, mach: number(air.mach) },
       fault: { present: Boolean(state.simulationFailure), recovered: Boolean(state.simulationFailure?.recovered),
         checkpointAvailable: Boolean(state.lastValidCheckpoint), uiFailure: Boolean(options.uiFailure) },

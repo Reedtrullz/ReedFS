@@ -16,7 +16,7 @@ it('exports useful whitelisted metrics while excluding planted names/tokens and 
   expect(payload).not.toMatch(/PLANTED_|latitude|longitude|flightNumber|input|stack/);
   expect(new TextEncoder().encode(payload).length).toBeLessThan(MAX_DIAGNOSTIC_BYTES);
   expect(bundle.airData.quantity).toBe('ideal-ias-equals-cas'); expect(bundle.airData.valid).toBe(true);
-  expect(bundle.airData.iasKt).toBe(bundle.airData.casKt);
+  expect(bundle.airData.iasKt).toBe(bundle.airData.casKt); expect(bundle.airData.gsKt).toBeGreaterThanOrEqual(0);
   expect(useSimStore.getState()).toBe(state);
 });
 

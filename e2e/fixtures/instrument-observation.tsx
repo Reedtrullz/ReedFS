@@ -61,11 +61,17 @@ export function responseCount() { return nativeResponses; }
 export async function commitAirDataCase(surfaceTemperatureC: number, speedMs: number) {
   const s = useSimStore.getState();
   useSimStore.getState().setWeather({ ...s.weather!, qnhHpa: 1013.25, surfaceTemperatureC });
-  useSimStore.setState({ status: 'running', lastFrameTime: 16, fixedStepAccumulatorSeconds: 1 / 60,
+  const ap = createDefaultAutopilotState(); ap.boeing.speedMode = true; ap.boeing.speed = 250; ap.truth.thrustActive = 'SPEED';
+  useSimStore.getState().setApState(ap);
+  useSimStore.setState({ status: 'running', wind: null, lastFrameTime: 16, fixedStepAccumulatorSeconds: 1 / 60,
     aircraft: { ...s.aircraft, position: { ...s.aircraft.position, alt: 35000 }, velocity: { u: speedMs, v: 0, w: 0 },
       angularVelocity: { p: 0, q: 0, r: 0 }, ground: { ...s.aircraft.ground, weightOnWheels: false, aglFt: 34500 } } });
+  const before = useSimStore.getState();
+  const expectedAir = computeDerived(before.aircraft, before.wind, before.weather);
+  const beforeController = structuredClone(before.apControllerState);
   useSimStore.getState().tickAsync(16); await settle(); useSimStore.getState().pause();
   const committed = useSimStore.getState().simulationCommit!;
   const air = computeDerived(committed.observation.aircraft, committed.observation.wind, committed.observation.weather);
-  return { air, weather: committed.observation.weather, backend: validatedBackend(), stepIndex: committed.stepIndex };
+  return { air, expectedAir, beforeController, controller: useSimStore.getState().apControllerState, commands: useSimStore.getState().apCommands,
+    weather: committed.observation.weather, backend: validatedBackend(), stepIndex: committed.stepIndex };
 }

@@ -10,6 +10,14 @@ test('actual worker weather commits render ideal CAS and show unsupported air da
     expect(row.backend).toBe('browser-worker'); expect(row.weather.surfaceTemperatureC).toBe(temperature);
     await expect(page.getByLabel('Airspeed tape', { exact: true })).toHaveAttribute('data-valid', String(row.air.airDataValid));
     await expect(page.getByLabel('Observed airspeed', { exact: true })).toHaveText(row.air.airDataValid ? String(Math.round(row.air.cas)) : '---');
+    if (row.expectedAir.airDataValid) {
+      expect(row.controller.thrustPid.prevError).toBeCloseTo(250 - row.expectedAir.cas, 8);
+      expect(row.commands.throttle1).toBeGreaterThanOrEqual(0);
+    } else {
+      expect(row.controller.thrustPid).toEqual(row.beforeController.thrustPid);
+      expect(row.controller.throttleLimited).toBe(row.beforeController.throttleLimited);
+      expect(row.commands.throttle1).toBeUndefined(); expect(row.commands.throttle2).toBeUndefined();
+    }
     receipts.push(row);
   }
   expect(receipts[0].air.cas).toBeGreaterThan(receipts[0].air.eas + 10);
