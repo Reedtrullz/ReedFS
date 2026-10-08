@@ -1,5 +1,5 @@
 import { readdir, writeFile } from 'node:fs/promises';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type APIRequestContext, type Page, type TestInfo } from '@playwright/test';
 
 // Installed generated SW and two actual builds with explicitly synthetic cohorts.
 async function diagnostic(page: Page) {
@@ -15,15 +15,64 @@ async function diagnostic(page: Page) {
   return result;
 }
 
-test('installed update waits for a verified save and preserves another flight and the offline cohort', async ({ page, context, request }, testInfo) => {
-  // Two installed cohorts, live tabs, quota recovery, restore and offline reload.
-  // The measured CPU6 probe exceeds120s; assertion deadlines and retries are unchanged.
-  test.setTimeout(240000);
+async function installV1(page: Page, request: APIRequestContext) {
   expect((await request.post('/__fixture/version/1')).status()).toBe(204);
   await page.goto('/');
   await page.evaluate(async () => { await navigator.serviceWorker.ready; });
   await page.reload();
   await page.waitForFunction(() => Boolean(navigator.serviceWorker.controller));
+}
+
+async function stageV2(page: Page, request: APIRequestContext) {
+  expect((await request.post('/__fixture/version/2')).status()).toBe(204);
+  await page.evaluate(async () => { await (await navigator.serviceWorker.getRegistration())!.update(); });
+  const update = page.getByRole('status', { name: 'App update', exact: true });
+  await expect(update).toBeVisible({ timeout: 30000 });
+  return update;
+}
+
+async function saveAndActivate(page: Page) {
+  await Promise.all([page.waitForEvent('load'), page.getByRole('button', { name: 'Save session and update', exact: true }).click()]);
+  await expect(page.getByLabel('Saved scenario slot', { exact: true })).toContainText('Before app update');
+  const stored = await page.evaluate(() => localStorage.getItem('rfs.scenarioSnapshot.v1'));
+  const slots = JSON.parse(stored!).slots;
+  const id = Object.keys(slots).find((key) => key.startsWith('update-'));
+  expect(id).toBeDefined();
+  expect(slots[id!].snapshot.status).toBe('paused');
+  expect(slots[id!].snapshot.simulationTimeSeconds).toBeGreaterThan(0);
+  return { stored, slots, id: id! };
+}
+
+async function restoreUpdatedSave(page: Page, id: string) {
+  await page.bringToFront();
+  await page.getByRole('button', { name: /OVL:\s*DEBUG/i }).click();
+  await page.getByRole('button', { name: /OVL:\s*FLIGHT/i }).waitFor();
+  await page.getByLabel('Saved scenario slot', { exact: true }).selectOption(id);
+  await page.getByRole('button', { name: 'Load saved scenario state', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'RESUME', exact: true })).toBeVisible();
+}
+
+async function runtimeObservation(page: Page) {
+  return page.evaluate(() => {
+    const getRuntime = (window as unknown as { __RFS_GET_SIMULATION_RUNTIME: () => { diagnosticState?: () => {
+      executionBackend: string | null; observedWorkerCohort: string | null;
+    } } }).__RFS_GET_SIMULATION_RUNTIME;
+    return getRuntime().diagnosticState?.();
+  });
+}
+
+async function receipt(testInfo: TestInfo, name: string, evidence: Record<string, unknown>) {
+  const path = testInfo.outputPath(`${name}.json`);
+  await writeFile(path, JSON.stringify({ syntheticBuildIdentities: true, ...evidence }, null, 2));
+  await testInfo.attach(name, { path, contentType: 'application/json' });
+}
+
+// Each case completes an installed-worker transaction. The former single case
+// spent its240s budget before quota discard in CI; every acceptance assertion is
+// retained below, with original assertion deadlines/retries and finite case caps.
+test('installed update stays deferred while the current flight runs', async ({ page, request }, testInfo) => {
+  test.setTimeout(240000);
+  await installV1(page, request);
   await page.getByRole('button', { name: 'LOAD PLAN', exact: true }).click();
   await page.getByLabel('Save slot name').fill('Preserved before update');
   await page.getByRole('button', { name: 'Save scenario state', exact: true }).click();
@@ -32,22 +81,33 @@ test('installed update waits for a verified save and preserves another flight an
   await expect(page.getByRole('button', { name: 'PAUSE', exact: true })).toBeVisible();
   const v1 = await diagnostic(page);
   expect(v1.identities.appCohort).toBe('a'.repeat(40)); expect(v1.identities.observedWorkerCohort).toBe('a'.repeat(40));
-  const other = await context.newPage(); await other.goto('/');
-  await other.getByRole('button', { name: 'START ROLL', exact: true }).click();
-  await expect(other.getByRole('button', { name: 'PAUSE', exact: true })).toBeVisible();
-  await page.bringToFront();
-  let otherNavigations = 0; other.on('framenavigated', (frame) => { if (frame === other.mainFrame()) otherNavigations++; });
-  expect((await request.post('/__fixture/version/2')).status()).toBe(204);
-  await page.evaluate(async () => { await (await navigator.serviceWorker.getRegistration())!.update(); });
-  const update = page.getByRole('status', { name: 'App update', exact: true });
-  await expect(update).toBeVisible({ timeout: 30000 });
+  const update = await stageV2(page, request);
   await expect(page.getByRole('button', { name: 'Save session and update', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: 'Later', exact: true }).click();
   await expect(update).toHaveCount(0); await expect(page.getByRole('button', { name: 'PAUSE', exact: true })).toBeVisible();
   const deferred = await diagnostic(page); expect(deferred.identities.appCohort).toBe(v1.identities.appCohort);
   expect(deferred.runtime.simulationSeconds).toBeGreaterThanOrEqual(v1.runtime.simulationSeconds);
+  expect(await page.evaluate(async () => (await navigator.serviceWorker.getRegistration())?.waiting?.state)).toBe('installed');
   await page.getByRole('button', { name: 'PAUSE', exact: true }).click();
   await page.getByRole('button', { name: 'Update available', exact: true }).click();
+  await expect(update).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Save session and update', exact: true })).toBeEnabled();
+  await receipt(testInfo, 'staged-pwa-deferral', { scope: 'Active-flight refusal and explicit deferral; no activation', v1, deferred });
+});
+
+test('installed update recovers from quota refusal and restores the saved offline cohort', async ({ page, context, request }, testInfo) => {
+  test.setTimeout(240000);
+  await installV1(page, request);
+  await page.getByRole('button', { name: 'LOAD PLAN', exact: true }).click();
+  await page.getByLabel('Save slot name').fill('Preserved before update');
+  await page.getByRole('button', { name: 'Save scenario state', exact: true }).click();
+  await expect(page.getByText('Preserved before update saved.', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'START ROLL', exact: true }).click();
+  await expect.poll(async () => (await runtimeObservation(page))?.observedWorkerCohort).toBe('a'.repeat(40));
+  await page.getByRole('button', { name: 'PAUSE', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'RESUME', exact: true })).toBeVisible();
+  const update = await stageV2(page, request);
+  await expect(page.getByRole('button', { name: 'Save session and update', exact: true })).toBeEnabled();
   const beforeQuota = await page.evaluate(() => {
     const old = localStorage.getItem('rfs.scenarioSnapshot.v1');
     try { for (let i = 0; i < 3000; i++) localStorage.setItem(`pwa-quota-${i}`, 'x'.repeat(4096)); }
@@ -63,30 +123,46 @@ test('installed update waits for a verified save and preserves another flight an
     await expect(page.getByRole('button', { name: 'Discard pending save', exact: true })).toBeVisible();
   } finally { await page.evaluate(() => Object.keys(localStorage).filter((key) => key.startsWith('pwa-quota-')).forEach((key) => localStorage.removeItem(key))); }
   await page.getByRole('button', { name: 'Discard pending save', exact: true }).click();
-  await Promise.all([page.waitForEvent('load'), page.getByRole('button', { name: 'Save session and update', exact: true }).click()]);
-  await expect(page.getByLabel('Saved scenario slot', { exact: true })).toContainText('Before app update');
-  const stored = await page.evaluate(() => localStorage.getItem('rfs.scenarioSnapshot.v1'));
-  const slots = JSON.parse(stored!).slots; const id = Object.keys(slots).find((key) => key.startsWith('update-'))!;
-  expect(slots[id].snapshot.status).toBe('paused'); expect(slots[id].snapshot.simulationTimeSeconds).toBeGreaterThan(0);
+  const { stored, slots, id } = await saveAndActivate(page);
+  expect(slots['preserved-before-update']).toEqual(JSON.parse(beforeQuota!).slots['preserved-before-update']);
   const v2 = await diagnostic(page); expect(v2.identities.appCohort).toBe('b'.repeat(40));
-  expect(otherNavigations).toBe(0); await expect(other.getByRole('button', { name: 'PAUSE', exact: true })).toBeVisible();
-  expect((await diagnostic(other)).identities.appCohort).toBe('a'.repeat(40));
-  await page.getByRole('button', { name: /OVL:\s*DEBUG/i }).click(); // Return to visible flight controls.
-  await page.getByRole('button', { name: /OVL:\s*FLIGHT/i }).waitFor();
-  await page.getByLabel('Saved scenario slot', { exact: true }).selectOption(id);
-  await page.getByRole('button', { name: 'Load saved scenario state', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'RESUME', exact: true })).toBeVisible();
+  await restoreUpdatedSave(page, id);
   const client = await context.newCDPSession(page); await client.send('Network.clearBrowserCache');
   await context.setOffline(true); await page.reload();
   await expect(page.getByRole('button', { name: 'START ROLL', exact: true })).toBeVisible();
   expect(await page.evaluate(() => localStorage.getItem('rfs.scenarioSnapshot.v1'))).toBe(stored);
   await page.getByRole('button', { name: 'START ROLL', exact: true }).click();
-  await expect.poll(async () => (await diagnostic(page)).identities.observedWorkerCohort).toBe('b'.repeat(40));
+  await expect.poll(async () => (await runtimeObservation(page))?.observedWorkerCohort).toBe('b'.repeat(40));
   const offline = await diagnostic(page); expect(offline.runtime.lastValidatedBackend).toBe('browser-worker');
+  expect(offline.identities.observedWorkerCohort).toBe('b'.repeat(40));
   await context.setOffline(false);
-  const receipt = testInfo.outputPath('staged-pwa-cohorts.json');
-  await writeFile(receipt, JSON.stringify({ syntheticBuildIdentities: true, v1, deferred, v2, offline, otherNavigations }, null, 2));
-  await testInfo.attach('staged-pwa-cohorts', { path: receipt, contentType: 'application/json' });
+  await receipt(testInfo, 'staged-pwa-quota-offline', { scope: 'Real quota refusal, preserved slots, verified save/activation, paused restore and cache-cleared offline v2 execution', v2, offline });
+});
+
+test('explicit installed update preserves another running v1 flight and paused restoration', async ({ page, context, request }, testInfo) => {
+  test.setTimeout(240000);
+  await installV1(page, request);
+  await page.getByRole('button', { name: 'LOAD PLAN', exact: true }).click();
+  await page.getByRole('button', { name: 'START ROLL', exact: true }).click();
+  await expect.poll(async () => (await runtimeObservation(page))?.observedWorkerCohort).toBe('a'.repeat(40));
+  await page.getByRole('button', { name: 'PAUSE', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'RESUME', exact: true })).toBeVisible();
+  const other = await context.newPage(); await other.goto('/');
+  await other.getByRole('button', { name: 'START ROLL', exact: true }).click();
+  await expect(other.getByRole('button', { name: 'PAUSE', exact: true })).toBeVisible();
+  await expect.poll(async () => (await runtimeObservation(other))?.observedWorkerCohort).toBe('a'.repeat(40));
+  let otherNavigations = 0; other.on('framenavigated', (frame) => { if (frame === other.mainFrame()) otherNavigations++; });
+  await page.bringToFront();
+  await stageV2(page, request);
+  const { id } = await saveAndActivate(page);
+  const v2 = await diagnostic(page); expect(v2.identities.appCohort).toBe('b'.repeat(40));
+  expect(otherNavigations).toBe(0); await expect(other.getByRole('button', { name: 'PAUSE', exact: true })).toBeVisible();
+  const continuing = await diagnostic(other);
+  expect(continuing.identities.appCohort).toBe('a'.repeat(40));
+  expect(continuing.identities.observedWorkerCohort).toBe('a'.repeat(40));
+  expect(continuing.runtime.simulationSeconds).toBeGreaterThan(0);
+  await restoreUpdatedSave(page, id);
+  await receipt(testInfo, 'staged-pwa-other-flight', { scope: 'Actual v1→v2 activation with no navigation of the other running v1 tab and explicit paused save restoration; no continuous/full-flight claim', v2, continuing, otherNavigations });
 });
 
 test('installed v2 rejects an actual v1 worker reply and continues with validated fallback', async ({ page: mismatched, request }, testInfo) => {
