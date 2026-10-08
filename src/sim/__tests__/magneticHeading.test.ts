@@ -1,8 +1,15 @@
 import { describe, expect, it } from 'vitest';
+import { createHash } from 'node:crypto';
 import reference from './fixtures/wmm2025-reference.json';
+import { WMM_2025_COEFFICIENTS, WMM_COEFFICIENT_SHA256 } from '../data/navigation/wmm2025';
 import { decimalYearUtc, magneticFieldBand, wmm2025Field, fromTrueHeading, toTrueHeading } from '../magneticHeading';
 
 describe('pinned WMM2025 numeric and input qualification', () => {
+  it('binds the embedded numeric table to the independently pinned source rows', () => {
+    expect(WMM_COEFFICIENT_SHA256).toBe(reference.coefficients.sourceSha256);
+    expect(WMM_2025_COEFFICIENTS).toHaveLength(90);
+    expect(createHash('sha256').update(JSON.stringify(WMM_2025_COEFFICIENTS)).digest('hex')).toBe(reference.coefficients.canonicalNumericRowsSha256);
+  });
   it.each(reference.cases)('matches independently printed fields at $decimalYear/$latitudeDeg/$heightAboveEllipsoidKm', (row) => {
     const year = Math.floor(row.decimalYear);
     const utcMs = Date.UTC(year, 0, 1) + (row.decimalYear - year) * (Date.UTC(year + 1, 0, 1) - Date.UTC(year, 0, 1));

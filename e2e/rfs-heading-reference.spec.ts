@@ -27,6 +27,13 @@ async function observe(page: Page) {
   });
 }
 
+async function selectHeadingReference(page: Page, reference: 'true' | 'magnetic') {
+  const field = page.getByLabel('Heading reference', { exact: true });
+  // MINIMAL unmounts this panel; a later DEBUG/FLIGHT mount closes its details.
+  if (!await field.isVisible()) await page.locator('summary').filter({ hasText: /^Heading reference:/ }).click();
+  await field.selectOption(reference);
+}
+
 test('actual worker flight keeps true orientation and targets while magnetic surface presentation converts one MCP step', async ({ page }, testInfo) => {
   test.setTimeout(240_000);
   await openRfs(page);
@@ -47,8 +54,7 @@ test('actual worker flight keeps true orientation and targets while magnetic sur
   const before = await observe(page);
   expect(before.runtime?.observedWorkerCohort).toBe(before.configuredCohort);
   expect(before.context.reference).toBe('magnetic'); expect(Math.abs(before.context.variationEastDeg!)).toBeGreaterThan(1);
-  await page.getByText('Heading reference: TRUE', { exact: true }).click();
-  await page.getByLabel('Heading reference', { exact: true }).selectOption('magnetic');
+  await selectHeadingReference(page, 'magnetic');
   const mcp = page.getByRole('region', { name: 'Mode control panel', exact: true });
   await expect(mcp).toContainText(`HDG ${before.magneticLabel}`);
   await expect(page.getByLabel('PFD heading', { exact: true })).toContainText('M SFC');
@@ -64,7 +70,7 @@ test('actual worker flight keeps true orientation and targets while magnetic sur
   expect(stepped.aircraft).toEqual(before.aircraft);
   await expect(mcp).toContainText(`HDG ${String((displayed + 5) % 360).padStart(3, '0')}M SFC`);
   await expect(page.getByLabel('Heading selected bug', { exact: true })).toContainText('M SFC');
-  await page.getByLabel('Heading reference', { exact: true }).selectOption('true');
+  await selectHeadingReference(page, 'true');
   expect((await observe(page)).trueTarget).toBe(stepped.trueTarget);
   await expect(mcp).toContainText(`HDG ${stepped.trueLabel}`);
   await page.getByRole('button', { name: 'OVL: FLIGHT', exact: true }).click();
@@ -79,7 +85,7 @@ test('actual worker flight keeps true orientation and targets while magnetic sur
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('rfs.scenarioSnapshot.v1')!).slots['heading-practice'].snapshot);
   expect(saved.version).toBe(4); expect(saved.apState.boeing.heading).toBe(stepped.trueTarget);
   expect(saved).not.toHaveProperty('headingReference');
-  await page.getByLabel('Heading reference', { exact: true }).selectOption('magnetic');
+  await selectHeadingReference(page, 'magnetic');
   await page.getByText('Date and time (UTC)', { exact: true }).click();
   await page.getByLabel('UTC date and time', { exact: true }).fill('2030-01-01T00:00');
   await page.getByRole('button', { name: 'Apply UTC date/time', exact: true }).click();
