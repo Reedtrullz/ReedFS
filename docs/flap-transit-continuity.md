@@ -1,0 +1,7 @@
+# Continuous flap transit
+
+Actual flap position moves continuously through the configured actuator model. Aerodynamics now interpolates the seven existing polar parameters between adjacent authored detents, so lift, drag and pitching moment remain continuous during extension and retraction. The coefficients at each authored detent are unchanged; settings beyond the end detents use the endpoint polar.
+
+This is an interpolation of the existing gameplay data, with no new aircraft calibration or claim of measured 737-800 flap forces. Piecewise linear parameter interpolation is continuous in value; it does not promise smooth derivatives or linear forces. Drag includes the existing quadratic induced/stall terms. The bounded post-stall heuristic and pitch-attitude elevator-authority fade remain unchanged. Source-qualified aerodynamic/control derivatives, flow-based authority, separation and buffet still belong to issues69/71 and dependent systems work. Unsupported high-AoA or backward-flight states remain outside aircraft-fidelity claims.
+
+Validation distinguishes numerical continuity and preservation from aircraft validity. Unit checks sample both sides of all authored detents, normal and negative/post-stall AoA, a fine flap sweep, exact detent outputs and endpoint bounds. Existing takeoff, climb, approach, landing and worker/save regressions must keep their original acceptance thresholds. Native worker transit qualification supplements those preservation checks; it is not certified performance or continuous full-flight acceptance.
