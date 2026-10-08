@@ -7,6 +7,7 @@ import { createNoRouteStatus } from '../systems/navigation';
 import { B737_800_SPEC, createInitialState, type ControlInputs } from '../types';
 import type { SimulationStepInput } from '../simulationStep';
 import {
+  BrowserWorkerSimulationRuntime,
   MainThreadSimulationRuntime,
   WorkerHandlerSimulationRuntime,
   getSimulationRuntime,
@@ -211,4 +212,117 @@ describe('simulation runtime adapters', () => {
     await expect(runtime.stepAsync?.(stepInput)).resolves.toEqual(expected);
     runtime.dispose?.();
   });
+});
+
+class FaultWorker {
+  readonly messages: unknown[] = [];
+  readonly listeners = new Map<string, Set<FakeWorkerListener>>();
+  addEventListener(type: string, listener: FakeWorkerListener): void {
+    const set = this.listeners.get(type) ?? new Set(); set.add(listener); this.listeners.set(type, set);
+  }
+  removeEventListener(type: string, listener: FakeWorkerListener): void { this.listeners.get(type)?.delete(listener); }
+  postMessage(message: unknown): void { this.messages.push(message); }
+  emit(type: string, data: unknown = undefined): void { for (const listener of this.listeners.get(type) ?? []) listener({ data }); }
+  terminate(): void { this.listeners.clear(); }
+}
+
+describe('browser worker failure boundaries', () => {
+  it('rejects invalid requests before either worker or fallback executes', async () => {
+    const worker = new FaultWorker();
+    let fallbacks = 0;
+    const runtime = new BrowserWorkerSimulationRuntime({ worker, fallback: { kind: 'main-thread', step: (data) => { fallbacks++; return mainThreadSimulationRuntime.step(data); } } });
+    await expect(runtime.stepAsync({ ...input(), dt: NaN })).rejects.toThrow();
+    expect(worker.messages).toHaveLength(0); expect(fallbacks).toBe(0); runtime.dispose();
+  });
+  it('contains malformed replies without throwing from the message listener', async () => {
+    const worker = new FaultWorker();
+    const runtime = new BrowserWorkerSimulationRuntime({ worker, timeoutMs: 1000 });
+    const stepInput = input(); const expected = mainThreadSimulationRuntime.step(stepInput);
+    const pending = runtime.stepAsync(stepInput);
+    expect(() => worker.emit('message', { protocolVersion: 1, type: 'simulation.step.result', requestId: 'browser-worker-step-1', result: null })).not.toThrow();
+    await expect(pending).resolves.toEqual(expected); runtime.dispose();
+  });
+  it.each(['error', 'messageerror'])('settles %s once and releases listeners on disposal', async (type) => {
+    const worker = new FaultWorker(); let fallbacks = 0;
+    const runtime = new BrowserWorkerSimulationRuntime({ worker, timeoutMs: 1000, fallback: { kind: 'main-thread', step: (data) => { fallbacks++; return mainThreadSimulationRuntime.step(data); } } });
+    const pending = runtime.stepAsync(input());
+    worker.emit(type); worker.emit(type);
+    expect(fallbacks).toBe(1);
+    await expect(pending).resolves.toEqual(mainThreadSimulationRuntime.step(input()));
+    expect(fallbacks).toBe(1); runtime.dispose();
+    expect([...worker.listeners.values()].every((set) => set.size === 0)).toBe(true);
+  });
+  it('falls back from the validated dispatch snapshot rather than mutable caller state', async () => {
+    const worker = new FaultWorker(); const runtime = new BrowserWorkerSimulationRuntime({ worker, timeoutMs: 1 });
+    const data = input(); const expected = structuredClone(mainThreadSimulationRuntime.step(data));
+    const pending = runtime.stepAsync(data);
+    data.pilotInputs.throttle1 = 4; data.aircraft.simTime = 999;
+    await expect(pending).resolves.toEqual(expected); runtime.dispose();
+  });
+  it('rejects a fallback exception without leaving a permanently pending promise', async () => {
+    const worker = new FaultWorker();
+    const runtime = new BrowserWorkerSimulationRuntime({ worker, fallback: { kind: 'main-thread', step: () => { throw new Error('contained fallback failure'); } } });
+    const pending = runtime.stepAsync(input());
+    expect(() => worker.emit('message', { protocolVersion: 1, type: 'simulation.step.error', requestId: 'browser-worker-step-1', error: { message: 'worker protocol failure', kind: 'protocol' } })).not.toThrow();
+    await expect(pending).rejects.toThrow('contained fallback failure'); runtime.dispose();
+  });
+});
+
+it('main-thread runtime rejects a nonfinite integrated result before publication', () => {
+  const data = input(); data.aircraft.velocity.u = 1e300;
+  expect(() => new MainThreadSimulationRuntime().step(data)).toThrow();
+});
+
+it('ignores duplicate and late replies while a newer request is pending', async () => {
+  const worker = new FaultWorker(); let fallbacks = 0;
+  const runtime = new BrowserWorkerSimulationRuntime({ worker, fallback: { kind: 'main-thread', step: (data) => { fallbacks++; return mainThreadSimulationRuntime.step(data); } } });
+  const first = runtime.stepAsync(input());
+  const firstReply = handleSimulationWorkerMessage(worker.messages[0]);
+  worker.emit('message', firstReply); await first;
+  const second = runtime.stepAsync(input());
+  worker.emit('message', firstReply);
+  worker.emit('message', { protocolVersion: 99, requestId: 'browser-worker-step-1', result: null });
+  worker.emit('message', handleSimulationWorkerMessage(worker.messages[1]));
+  await expect(second).resolves.toEqual(mainThreadSimulationRuntime.step(input()));
+  expect(fallbacks).toBe(0); runtime.dispose();
+});
+
+it('preserves a numerical worker fault and rejects instead of recomputing it through fallback', async () => {
+  const worker = new FaultWorker(); let fallbacks = 0;
+  const runtime = new BrowserWorkerSimulationRuntime({ worker, fallback: { kind: 'main-thread', step: (data) => { fallbacks++; return mainThreadSimulationRuntime.step(data); } } });
+  const data = input(); data.aircraft.velocity.u = 1e300;
+  const pending = runtime.stepAsync(data);
+  const expected = expect(pending).rejects.toMatchObject({ name: 'InvalidSimulationStateError', result: { aircraft: { velocity: { u: NaN } } } });
+  worker.emit('message', handleSimulationWorkerMessage(worker.messages[0]));
+  await expected;
+  expect(fallbacks).toBe(0); runtime.dispose();
+});
+
+it('rejects an invalid numerical result supplied as a success reply with its original evidence', async () => {
+  const worker = new FaultWorker(); let fallbacks = 0;
+  const runtime = new BrowserWorkerSimulationRuntime({ worker, fallback: { kind: 'main-thread', step: (data) => { fallbacks++; return mainThreadSimulationRuntime.step(data); } } });
+  const pending = runtime.stepAsync(input());
+  const response = handleSimulationWorkerMessage(worker.messages[0]);
+  if (response.type !== 'simulation.step.result') throw new Error('valid result required');
+  response.result.aircraft.velocity.u = NaN;
+  const expected = expect(pending).rejects.toMatchObject({ name: 'InvalidSimulationStateError', result: response.result });
+  worker.emit('message', response); await expected;
+  expect(fallbacks).toBe(0); runtime.dispose();
+});
+
+it('rejects incoherent dispatch attitude before posting to the worker', async () => {
+  const worker = new FaultWorker();
+  const runtime = new BrowserWorkerSimulationRuntime({ worker });
+  const data = input(); data.aircraft.attitude.phi += 0.5;
+  await expect(runtime.stepAsync(data)).rejects.toThrow();
+  expect(worker.messages).toHaveLength(0); runtime.dispose();
+});
+
+it('rejects a valid worker execution exception without re-running its input', async () => {
+  const worker = new FaultWorker(); let fallbacks = 0;
+  const runtime = new BrowserWorkerSimulationRuntime({ worker, fallback: { kind: 'main-thread', step: (data) => { fallbacks++; return mainThreadSimulationRuntime.step(data); } } });
+  const pending = runtime.stepAsync(input());
+  const expected = expect(pending).rejects.toThrow('physics failed');
+  worker.emit('message', { protocolVersion: 1, type: 'simulation.step.error', requestId: 'browser-worker-step-1', error: { name: 'Error', message: 'physics failed', kind: 'execution' } });
+  await expected; expect(fallbacks).toBe(0); runtime.dispose();
 });

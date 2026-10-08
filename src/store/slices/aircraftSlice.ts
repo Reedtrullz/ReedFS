@@ -107,6 +107,7 @@ export function createAircraftSlice(set: SimStoreSet): Pick<
     scenarioSaveSlots: [],
 
     start: () => set((s) => {
+      if (s.simulationFailure && !s.simulationFailure.recovered) return {};
       const scenario = scenarioById(s.selectedScenarioId);
       return {
         status: 'running',
@@ -118,6 +119,7 @@ export function createAircraftSlice(set: SimStoreSet): Pick<
     }),
 
     startTakeoffRoll: () => set((s) => {
+      if (s.simulationFailure && !s.simulationFailure.recovered) return {};
       const aircraft = structuredClone(s.aircraft);
       const scenario = scenarioById(s.selectedScenarioId);
       const startsAirborne = !aircraft.ground.weightOnWheels && aircraft.flightPhase !== 'PARKED';
@@ -152,6 +154,7 @@ export function createAircraftSlice(set: SimStoreSet): Pick<
     }),
 
     abortTakeoff: () => set((s) => {
+      if (s.simulationFailure && !s.simulationFailure.recovered) return {};
       const aircraft = structuredClone(s.aircraft);
       if (aircraft.ground.weightOnWheels) aircraft.flightPhase = 'TAKEOFF';
       const pilotInputs: ControlInputs = {
@@ -197,6 +200,7 @@ export function createAircraftSlice(set: SimStoreSet): Pick<
     }),
 
     resume: () => set((s) => {
+      if (s.simulationFailure && !s.simulationFailure.recovered) return {};
       const scenario = scenarioById(s.selectedScenarioId);
       return {
         status: 'running',
@@ -219,6 +223,8 @@ export function createAircraftSlice(set: SimStoreSet): Pick<
         ...controlsSlice,
         inputManager: inputManagerForScenario(scenario),
         status: 'stopped',
+        simulationFailure: s.simulationFailure ? { ...s.simulationFailure, recovered: true } : null,
+        lastValidCheckpoint: null,
         lastFrameTime: 0,
         fixedStepAccumulatorSeconds: 0,
         simulationTimeSeconds: 0,
@@ -258,6 +264,8 @@ export function createAircraftSlice(set: SimStoreSet): Pick<
         ...controlsSlice,
         inputManager: inputManagerForScenario(scenario),
         status: 'stopped',
+        simulationFailure: s.simulationFailure ? { ...s.simulationFailure, recovered: true } : null,
+        lastValidCheckpoint: null,
         lastFrameTime: 0,
         fixedStepAccumulatorSeconds: 0,
         simulationTimeSeconds: 0,

@@ -177,3 +177,23 @@ npm run check
 ```
 
 For deployment-affecting changes, also wait for GitHub Actions to complete successfully and verify the live URL with `curl https://fly.reidar.tech/`.
+
+## Invalid result containment
+
+Every committed synchronous or worker batch must contain finite, shaped aircraft,
+route, controls, guidance and controller state, matching the dispatched scenario.
+A normalized quaternion and the Euler mirror must encode the same orientation;
+there is no bank/pitch or hard-landing envelope used to label a numerical fault.
+
+Invalid results are rejected before publishing instruments. The session pauses,
+invalidates older worker generations, and retains the dispatched input, offending
+result and last valid checkpoint. Resume/start cannot retry an unresolved fault.
+Restore, saved restore, scenario reset or scenario selection explicitly recover;
+reset preserves the latest failure evidence in this session. Checkpoints capture
+store-owned immutable previous state; copies are made when evidence is retained,
+so normal integration still copies the working aircraft once per rendered frame.
+
+Failure evidence export is an explicit local download, with nonfinite values
+represented as labels and recursion limits. It includes flight position and route;
+review before sharing. This containment does not constitute GPWS, aircraft handling
+or certification acceptance.

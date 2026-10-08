@@ -1,4 +1,5 @@
 import type { SimulationStepInput, SimulationStepResult } from './simulationStep';
+import { assertSimulationStepInput, assertSimulationStepResult, InvalidSimulationStateError, isFiniteSimulationData } from './simulationValidation';
 
 export const SIMULATION_WORKER_PROTOCOL_VERSION = 1 as const;
 export const SIMULATION_STEP_REQUEST_TYPE = 'simulation.step.request' as const;
@@ -18,9 +19,11 @@ interface SimulationWorkerEnvelope {
 }
 
 export interface SimulationWorkerErrorPayload {
+  kind: 'protocol' | 'execution';
   name: string;
   message: string;
   stack?: string;
+  invalidResult?: unknown;
 }
 
 export interface SimulationStepRequestMessage {
@@ -112,30 +115,31 @@ function requirePayload(record: MessageRecord, key: string): unknown {
   return record[key];
 }
 
-function errorPayloadFrom(error: unknown): SimulationWorkerErrorPayload {
+function errorPayloadFrom(error: unknown, kind: SimulationWorkerErrorPayload['kind']): SimulationWorkerErrorPayload {
   if (error instanceof Error) {
     const payload: SimulationWorkerErrorPayload = {
-      name: error.name || 'Error',
+      kind, name: error.name || 'Error',
       message: error.message,
     };
     if (typeof error.stack === 'string') payload.stack = error.stack;
+    if (error instanceof InvalidSimulationStateError) payload.invalidResult = error.result;
     return payload;
   }
 
   if (typeof error === 'string') {
-    return { name: 'Error', message: error };
+    return { kind, name: 'Error', message: error };
   }
 
   if (isRecord(error)) {
     const payload: SimulationWorkerErrorPayload = {
-      name: typeof error.name === 'string' && error.name.length > 0 ? error.name : 'Error',
+      kind, name: typeof error.name === 'string' && error.name.length > 0 ? error.name : 'Error',
       message: typeof error.message === 'string' ? error.message : 'Unknown simulation worker error',
     };
     if (typeof error.stack === 'string') payload.stack = error.stack;
     return payload;
   }
 
-  return { name: 'Error', message: error == null ? 'Unknown simulation worker error' : String(error) };
+  return { kind, name: 'Error', message: error == null ? 'Unknown simulation worker error' : String(error) };
 }
 
 function decodeErrorPayload(error: unknown): SimulationWorkerErrorPayload {
@@ -145,10 +149,15 @@ function decodeErrorPayload(error: unknown): SimulationWorkerErrorPayload {
   }
 
   const payload: SimulationWorkerErrorPayload = {
+    kind: record.kind === 'protocol' ? 'protocol' : 'execution',
     name: typeof record.name === 'string' && record.name.length > 0 ? record.name : 'Error',
     message: record.message,
   };
   if (typeof record.stack === 'string') payload.stack = record.stack;
+  if (record.name === 'InvalidSimulationStateError' && 'invalidResult' in record) {
+    if (!isFiniteSimulationData(record.invalidResult, true)) throw new TypeError('Unbounded worker diagnostic result');
+    payload.invalidResult = structuredClone(record.invalidResult);
+  }
   return payload;
 }
 
@@ -156,6 +165,7 @@ export function encodeSimulationStepRequest(
   requestId: string,
   input: SimulationStepInput,
 ): SimulationStepRequestMessage {
+  assertSimulationStepInput(input);
   return {
     protocolVersion: SIMULATION_WORKER_PROTOCOL_VERSION,
     type: SIMULATION_STEP_REQUEST_TYPE,
@@ -170,11 +180,13 @@ export function decodeSimulationStepRequest(message: unknown): SimulationStepReq
     throw new TypeError(`Expected simulation step request, received ${envelope.type}`);
   }
 
+  const input = requirePayload(record, 'input');
+  assertSimulationStepInput(input);
   return {
     protocolVersion: envelope.protocolVersion,
     type: SIMULATION_STEP_REQUEST_TYPE,
     requestId: envelope.requestId,
-    input: cloneForWorker(requirePayload(record, 'input') as SimulationStepInput),
+    input: cloneForWorker(input),
   };
 }
 
@@ -182,6 +194,7 @@ export function encodeSimulationStepResult(
   requestId: string,
   result: SimulationStepResult,
 ): SimulationStepResultResponseMessage {
+  assertSimulationStepResult(result);
   return {
     protocolVersion: SIMULATION_WORKER_PROTOCOL_VERSION,
     type: SIMULATION_STEP_RESULT_TYPE,
@@ -193,12 +206,13 @@ export function encodeSimulationStepResult(
 export function encodeSimulationStepError(
   requestId: string,
   error: unknown,
+  kind: SimulationWorkerErrorPayload['kind'] = 'execution',
 ): SimulationStepErrorResponseMessage {
   return {
     protocolVersion: SIMULATION_WORKER_PROTOCOL_VERSION,
     type: SIMULATION_STEP_ERROR_TYPE,
     requestId: assertRequestId(requestId),
-    error: cloneForWorker(errorPayloadFrom(error)),
+    error: cloneForWorker(errorPayloadFrom(error, kind)),
   };
 }
 
@@ -206,11 +220,13 @@ export function decodeSimulationStepResponse(message: unknown): SimulationStepRe
   const { envelope, record } = readMessage(message);
 
   if (envelope.type === SIMULATION_STEP_RESULT_TYPE) {
+    const result = requirePayload(record, 'result');
+    assertSimulationStepResult(result);
     return {
       protocolVersion: envelope.protocolVersion,
       type: SIMULATION_STEP_RESULT_TYPE,
       requestId: envelope.requestId,
-      result: cloneForWorker(requirePayload(record, 'result') as SimulationStepResult),
+      result: cloneForWorker(result),
     };
   }
 

@@ -153,10 +153,53 @@ describe('workerCodec', () => {
       type: 'simulation.step.error',
       requestId: 'step-64c-error',
       error: {
+        kind: 'execution',
         name: 'SimulationWorkerError',
         message: 'physics worker failed before integration',
         stack: 'SimulationWorkerError: physics worker failed before integration',
       },
     });
+  });
+});
+
+// Boundary regressions: envelope validity must not admit unsafe execution data.
+describe('worker payload validation', () => {
+  it.each([NaN, Infinity, -Infinity, 0, -1, 0.5, 1e9])('rejects unsafe batch count %s before execution', (steps) => {
+    const message = encodeSimulationStepRequest('bounds', realisticStepInput());
+    message.input.steps = steps;
+    expect(() => decodeSimulationStepRequest(message)).toThrow();
+  });
+  it.each([NaN, Infinity, 0, -0.1, 10])('rejects unsafe timestep %s', (dt) => {
+    const message = encodeSimulationStepRequest('bounds', realisticStepInput());
+    message.input.dt = dt;
+    expect(() => decodeSimulationStepRequest(message)).toThrow();
+  });
+  it.each([null, {}, { aircraft: null }])('rejects malformed request payload %s', (input) => {
+    const message = encodeSimulationStepRequest('shape', realisticStepInput());
+    expect(() => decodeSimulationStepRequest({ ...message, input })).toThrow();
+  });
+  it('rejects a nested nonfinite aircraft value', () => {
+    const message = encodeSimulationStepRequest('shape', realisticStepInput());
+    message.input.aircraft.velocity.w = NaN;
+    expect(() => decodeSimulationStepRequest(message)).toThrow();
+  });
+  it('rejects an unsupported scenario identity', () => {
+    const message = encodeSimulationStepRequest('identity', realisticStepInput());
+    message.input.selectedScenarioId = 'unknown-scenario';
+    expect(() => decodeSimulationStepRequest(message)).toThrow();
+  });
+  it('rejects an impossible control command', () => {
+    const message = encodeSimulationStepRequest('control', realisticStepInput());
+    message.input.pilotInputs.throttle1 = 4;
+    expect(() => decodeSimulationStepRequest(message)).toThrow();
+  });
+  it.each([null, {}, { aircraft: null }])('rejects malformed result payload %s', (result) => {
+    const message = encodeSimulationStepResult('result', advanceSimulationStep(realisticStepInput()));
+    expect(() => decodeSimulationStepResponse({ ...message, result })).toThrow();
+  });
+  it('rejects nonfinite results before they can be published', () => {
+    const message = encodeSimulationStepResult('result', advanceSimulationStep(realisticStepInput()));
+    message.result.aircraft.position.alt = NaN;
+    expect(() => decodeSimulationStepResponse(message)).toThrow();
   });
 });

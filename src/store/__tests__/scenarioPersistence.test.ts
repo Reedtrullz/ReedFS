@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDefaultAutopilotState } from '../../instruments/defaultAutopilotState';
 import { createAutopilotControllerState } from '../../sim/systems/autopilot';
 import { createKseaKpdxFlight } from '../../sim/flightPlanLoader';
@@ -7,9 +7,12 @@ import {
   SCENARIO_SAVE_KEY,
   createScenarioSnapshot,
   loadScenarioSnapshot,
+  listScenarioSaveSlots,
   saveScenarioSnapshot,
 } from '../scenarioPersistence';
 import { useSimStore } from '../simStore';
+
+beforeEach(() => { useSimStore.getState().discardPendingScenarioSave(); });
 
 function memoryStorage(): Storage {
   const entries = new Map<string, string>();
@@ -115,10 +118,13 @@ describe('scenario persistence', () => {
     storage.setItem(SCENARIO_SAVE_KEY, JSON.stringify(legacySnapshot));
 
     const loaded = loadScenarioSnapshot(storage, 'default');
+    expect(storage.getItem(SCENARIO_SAVE_KEY)).toBe(JSON.stringify(legacySnapshot));
+    saveScenarioSnapshot(storage, createScenarioSnapshot(useSimStore.getState()), { slotId: 'second-slot' });
     const migrated = JSON.parse(storage.getItem(SCENARIO_SAVE_KEY) ?? 'null');
 
     expect(loaded.ok).toBe(true);
     expect(migrated.version).toBe(3);
+    expect(migrated.slots['second-slot']).toBeDefined();
     expect(migrated.slots.default.metadata).toEqual(expect.objectContaining({
       id: 'default',
       name: 'Default save',
@@ -192,4 +198,128 @@ describe('scenario persistence', () => {
     if (!loaded.ok) expect(loaded.reason).toMatch(/invalid/i);
     expect(useSimStore.getState().scenarioPersistenceMessage).toMatch(/ignored/i);
   });
+});
+
+describe('save trust boundary regressions', () => {
+  beforeEach(() => { useSimStore.getState().setScenario(KSEA_TUTORIAL_SCENARIO.id); useSimStore.getState().reset(); });
+  it('restores the effective atmosphere and pauses a running flight', () => {
+    const storage = memoryStorage();
+    const weather = { ...KSEA_TUTORIAL_SCENARIO.weather, qnhHpa: 850, surfaceTemperatureC: 42, visibilityM: 900 };
+    useSimStore.setState({ weather, status: 'running' });
+    useSimStore.getState().saveScenarioState(storage);
+    useSimStore.getState().reset(); useSimStore.getState().loadScenarioState(storage);
+    expect(useSimStore.getState().weather).toEqual(weather);
+    expect(useSimStore.getState().status).toBe('paused');
+  });
+  it.each(['{broken', '{"version":99,"slots":{}}'])('preserves an unreadable collection instead of overwriting it: %s', (raw) => {
+    const storage = memoryStorage(); storage.setItem(SCENARIO_SAVE_KEY, raw);
+    expect(() => saveScenarioSnapshot(storage, createScenarioSnapshot(useSimStore.getState()), { slotId: 'new-slot' })).toThrow();
+    expect(storage.getItem(SCENARIO_SAVE_KEY)).toBe(raw);
+  });
+  it.each([
+    (x: Record<string, unknown>) => { x.aircraft = {}; },
+    (x: Record<string, unknown>) => { x.pilotInputs = { throttle1: 4 }; },
+    (x: Record<string, unknown>) => { x.selectedScenarioId = 'unknown'; },
+    (x: Record<string, unknown>) => { x.status = 'unknown'; },
+    (x: Record<string, unknown>) => { x.activeLegIndex = -1; },
+    (x: Record<string, unknown>) => { x.simulationTimeSeconds = 'not-time'; },
+  ])('rejects malformed saved state without altering the active aircraft', (corrupt) => {
+    const storage = memoryStorage(); const snapshot = createScenarioSnapshot(useSimStore.getState());
+    saveScenarioSnapshot(storage, snapshot);
+    const parsed = JSON.parse(storage.getItem(SCENARIO_SAVE_KEY)!);
+    corrupt(parsed.slots.default.snapshot); storage.setItem(SCENARIO_SAVE_KEY, JSON.stringify(parsed));
+    const before = structuredClone(useSimStore.getState().aircraft);
+    expect(loadScenarioSnapshot(storage).ok).toBe(false);
+    useSimStore.getState().loadScenarioState(storage);
+    expect(useSimStore.getState().aircraft).toEqual(before);
+  });
+  it('refuses a new save containing nonfinite values', () => {
+    const snapshot = createScenarioSnapshot(useSimStore.getState()); snapshot.aircraft.velocity.u = NaN;
+    expect(() => saveScenarioSnapshot(memoryStorage(), snapshot)).toThrow();
+  });
+  it('keeps the previous collection when quota blocks a new save', () => {
+    const storage = memoryStorage(); saveScenarioSnapshot(storage, createScenarioSnapshot(useSimStore.getState()));
+    const before = storage.getItem(SCENARIO_SAVE_KEY);
+    storage.setItem = () => { throw new DOMException('full', 'QuotaExceededError'); };
+    useSimStore.getState().saveScenarioState(storage, { slotId: 'quota-slot' });
+    expect(storage.getItem(SCENARIO_SAVE_KEY)).toBe(before);
+    expect(useSimStore.getState().scenarioPersistenceMessage).toMatch(/failed/i);
+  });
+  it('contains denied reads rather than throwing from store actions', () => {
+    const storage = memoryStorage(); storage.getItem = () => { throw new DOMException('denied', 'SecurityError'); };
+    expect(() => useSimStore.getState().loadScenarioState(storage)).not.toThrow();
+    expect(() => useSimStore.getState().saveScenarioState(storage)).not.toThrow();
+    expect(() => useSimStore.getState().refreshScenarioSaveSlots(storage)).not.toThrow();
+  });
+});
+
+it('rejects unsupported saved contract identities', () => {
+  const storage = memoryStorage(); const snapshot = createScenarioSnapshot(useSimStore.getState());
+  saveScenarioSnapshot(storage, snapshot); const parsed = JSON.parse(storage.getItem(SCENARIO_SAVE_KEY)!);
+  parsed.slots.default.snapshot.identities = { aircraft: 'different-pack', sharedCommit: 'different-commit' };
+  storage.setItem(SCENARIO_SAVE_KEY, JSON.stringify(parsed));
+  expect(loadScenarioSnapshot(storage).ok).toBe(false);
+});
+
+  it('rejects a stale overwrite confirmation and preserves both versions', () => {
+    const storage = memoryStorage();
+    saveScenarioSnapshot(storage, createScenarioSnapshot(useSimStore.getState()), { slotId: 'same' });
+    const revision = listScenarioSaveSlots(storage)[0].revision;
+    useSimStore.getState().setInput({ throttle1: 0.7 });
+    saveScenarioSnapshot(storage, createScenarioSnapshot(useSimStore.getState()), { slotId: 'same', overwrite: true });
+    const previous = storage.getItem(SCENARIO_SAVE_KEY);
+    expect(() => saveScenarioSnapshot(storage, createScenarioSnapshot(useSimStore.getState()), { slotId: 'same', overwrite: true, expectedRevision: revision })).toThrow(/changed/);
+    expect(storage.getItem(SCENARIO_SAVE_KEY)).toBe(previous);
+  });
+
+it('contains denied browser storage access and retains the pending save', async () => {
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+  const lockDescriptor = Object.getOwnPropertyDescriptor(navigator, 'locks');
+  Object.defineProperty(navigator, 'locks', { configurable: true, value: { request: async (_name: string, _options: unknown, callback: () => void) => callback() } });
+  Object.defineProperty(globalThis, 'localStorage', { configurable: true, get: () => { throw new DOMException('Persistence denied', 'SecurityError'); } });
+  try {
+    expect(() => useSimStore.getState().refreshScenarioSaveSlots()).not.toThrow();
+    expect(() => useSimStore.getState().loadScenarioState()).not.toThrow();
+    expect(() => useSimStore.getState().saveScenarioState()).not.toThrow();
+    await vi.waitFor(() => expect(useSimStore.getState().scenarioPersistenceMessage).toContain('Persistence denied'));
+    expect(useSimStore.getState().pendingScenarioSave?.aircraft).toEqual(useSimStore.getState().aircraft);
+  } finally {
+    if (descriptor) Object.defineProperty(globalThis, 'localStorage', descriptor);
+    if (lockDescriptor) Object.defineProperty(navigator, 'locks', lockDescriptor);
+    else Reflect.deleteProperty(navigator, 'locks');
+  }
+});
+
+it('bounds collection growth before writing and preserves all existing slots', () => {
+  const storage = memoryStorage();
+  const snapshot = createScenarioSnapshot(useSimStore.getState());
+  for (let i = 0; i < 32; i++) saveScenarioSnapshot(storage, snapshot, { slotId: `slot-${i}` });
+  const previous = storage.getItem(SCENARIO_SAVE_KEY);
+  expect(() => saveScenarioSnapshot(storage, snapshot, { slotId: 'over-limit' })).toThrow(/limit/);
+  expect(storage.getItem(SCENARIO_SAVE_KEY)).toBe(previous);
+});
+
+it('rejects a stored incoherent attitude before publishing it', () => {
+  const storage = memoryStorage();
+  saveScenarioSnapshot(storage, createScenarioSnapshot(useSimStore.getState()));
+  const collection = JSON.parse(storage.getItem(SCENARIO_SAVE_KEY)!);
+  collection.slots.default.snapshot.aircraft.attitude.phi += 0.5;
+  storage.setItem(SCENARIO_SAVE_KEY, JSON.stringify(collection));
+  expect(loadScenarioSnapshot(storage).ok).toBe(false);
+});
+
+it('preserves an earlier pending payload until explicit discard even if a later save succeeds', () => {
+  const full = memoryStorage();
+  full.setItem = () => { throw new DOMException('full', 'QuotaExceededError'); };
+  useSimStore.getState().saveScenarioState(full);
+  const pending = useSimStore.getState().pendingScenarioSave;
+  useSimStore.getState().setInput({ throttle1: 0.8 });
+  const writable = memoryStorage();
+  useSimStore.getState().saveScenarioState(writable);
+  expect(useSimStore.getState().pendingScenarioSave).toBe(pending);
+  expect(writable.getItem(SCENARIO_SAVE_KEY)).toBeNull();
+  expect(useSimStore.getState().scenarioPersistenceMessage).toMatch(/export or discard/i);
+  useSimStore.getState().discardPendingScenarioSave();
+  useSimStore.getState().saveScenarioState(writable);
+  expect(loadScenarioSnapshot(writable).ok).toBe(true);
 });

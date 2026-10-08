@@ -7,7 +7,7 @@ import type { ScenarioWeatherMetadata } from '../sim/weather';
 import type { RunwayReference } from '../viewport/runwayData';
 import type { GuidanceState } from '../sim/guidanceState';
 import type { RouteEditSession } from '../sim/fms/routeAdapter';
-import { composeControlsSlice, type SimulationStepResult } from '../sim/simulationStep';
+import { composeControlsSlice, type SimulationStepInput, type SimulationStepResult } from '../sim/simulationStep';
 import { getSimulationRuntime, type AsyncSimulationRuntime } from '../sim/simulationRuntime';
 import type { SimulationStatus } from '../sim/simulationStatus';
 import type { RouteStatusSnapshot } from '../sim/systems/navigation';
@@ -23,11 +23,25 @@ import { createAircraftSlice, type SimStoreSet } from './slices/aircraftSlice';
 import { createInputSlice } from './slices/inputSlice';
 import { createAutoflightSlice } from './slices/autoflightSlice';
 import { createRouteSlice } from './slices/routeSlice';
-import { createPersistenceSlice } from './slices/persistenceSlice';
+import { createPersistenceSlice, restoreSnapshotSlice } from './slices/persistenceSlice';
+import { captureScenarioSnapshot, type ScenarioSnapshot } from './scenarioPersistence';
+import { assertCommittedSimulationResult, assertSimulationStepInput, InvalidSimulationStateError } from '../sim/simulationValidation';
 
 export type SimStatus = SimulationStatus;
 
+export interface SimulationFailureEvidence {
+  message: string;
+  detectedAtIso: string;
+  input: unknown;
+  result: unknown;
+  recovered: boolean;
+  checkpoint: ScenarioSnapshot | null;
+}
+
 export interface SimStore {
+  simulationFailure: SimulationFailureEvidence | null;
+  lastValidCheckpoint: ScenarioSnapshot | null;
+  restoreLastValidCheckpoint: () => void;
   aircraft: AircraftState;
   /** Legacy alias for effectiveControls. Keep this object identical to effectiveControls for existing UI/tests. */
   inputs: ControlInputs;
@@ -94,6 +108,9 @@ export interface SimStore {
   executeRouteEdit: () => void;
   setWind: (w: WindInfo | null) => void;
   setWeather: (w: ScenarioWeatherMetadata | null) => void;
+  pendingScenarioSave: ScenarioSnapshot | null;
+  discardPendingScenarioSave: () => void;
+  deleteScenarioSaveState: (slotId: string, expectedRevision: string) => void;
   saveScenarioState: (storage?: ScenarioPersistenceStorage, options?: ScenarioSaveOptions) => void;
   loadScenarioState: (storage?: ScenarioPersistenceStorage, slotId?: string) => void;
   refreshScenarioSaveSlots: (storage?: ScenarioPersistenceStorage) => void;
@@ -117,10 +134,38 @@ function maxStepsPerRenderedFrame(simRate: number): number {
 
 export const useSimStore = create<SimStore>((set, get) => {
   const storeSet = set as SimStoreSet;
+  const containFailure = (error: unknown, input: unknown, result: unknown) => {
+    const current = get();
+    const checkpoint = current.lastValidCheckpoint ? structuredClone(current.lastValidCheckpoint) : null;
+    set({
+      lastValidCheckpoint: checkpoint,
+      status: 'paused', asyncPhysicsInFlight: false,
+      asyncPhysicsGeneration: current.asyncPhysicsGeneration + 1,
+      fixedStepAccumulatorSeconds: 0, lastFrameTime: 0,
+      simulationFailure: {
+        message: error instanceof Error ? error.message : 'Simulation failed',
+        detectedAtIso: new Date().toISOString(), input: structuredClone(input),
+        result: error instanceof InvalidSimulationStateError ? error.result : result,
+        recovered: false, checkpoint,
+      },
+    });
+  };
 
   return {
     ...createAircraftSlice(storeSet),
     ...createInputSlice(storeSet),
+    simulationFailure: null,
+    lastValidCheckpoint: null,
+    restoreLastValidCheckpoint: () => {
+      const current = get();
+      if (!current.lastValidCheckpoint) return;
+      set({
+        ...restoreSnapshotSlice(current.lastValidCheckpoint, 'Last valid checkpoint'),
+        status: 'paused', asyncPhysicsInFlight: false,
+        asyncPhysicsGeneration: current.asyncPhysicsGeneration + 1,
+        simulationFailure: current.simulationFailure ? { ...current.simulationFailure, recovered: true } : null,
+      });
+    },
     simRate: 1,
     cycleSimRate: () => set((state) => ({ simRate: nextSimRate(state.simRate) })),
 
@@ -145,7 +190,7 @@ export const useSimStore = create<SimStore>((set, get) => {
         selectedScenarioId,
         guidance,
       } = get();
-      if (status !== 'running') return;
+      if (status !== 'running' || (get().simulationFailure && !get().simulationFailure?.recovered)) return;
 
       const frameDeltaSeconds = lastFrameTime > 0
         ? Math.max(0, (timestamp - lastFrameTime) / 1000)
@@ -178,15 +223,14 @@ export const useSimStore = create<SimStore>((set, get) => {
       let nextRouteStatus = routeStatus;
       let nextGuidance = guidance;
       let nextApControllerState = apControllerState;
-      let nextControls = composeControlsSlice(pilotInputs, get().apCommands, apState, {
-        aircraft: nextAircraft,
-        flightPlan,
-        routeStatus: nextRouteStatus,
-      });
+      let nextControls: ReturnType<typeof composeControlsSlice>;
       const simulationRuntime = getSimulationRuntime();
 
-      for (let step = 0; step < stepCount; step++) {
-        const next = simulationRuntime.step({
+      const checkpoint = captureScenarioSnapshot(get());
+      let diagnosticInput: unknown;
+      let diagnosticResult: unknown;
+      try {
+        const input: SimulationStepInput = {
           aircraft: nextAircraft,
           spec,
           pilotInputs,
@@ -202,13 +246,23 @@ export const useSimStore = create<SimStore>((set, get) => {
           guidance: nextGuidance,
           apControllerState: nextApControllerState,
           cloneAircraft: false,
-        });
+          steps: stepCount,
+        };
+        diagnosticInput = { ...input, aircraft: checkpoint.aircraft, pilotInputs: checkpoint.pilotInputs, apControllerState: checkpoint.apControllerState, apState: checkpoint.apState, flightPlan: checkpoint.flightPlan, weather: checkpoint.weather, wind: checkpoint.wind };
+        assertSimulationStepInput(input);
+        set({ lastValidCheckpoint: checkpoint });
+        const next = simulationRuntime.step(input);
+        diagnosticResult = next;
+        assertCommittedSimulationResult(next, selectedScenarioId);
         nextAircraft = next.aircraft;
         nextControls = next.controls;
         nextActiveLegIndex = next.activeLegIndex;
         nextRouteStatus = next.routeStatus;
         nextGuidance = next.guidance;
         nextApControllerState = next.apControllerState;
+      } catch (error) {
+        containFailure(error, diagnosticInput, diagnosticResult);
+        return;
       }
 
       accumulator -= stepCount * FIXED_STEP_SECONDS;
@@ -238,7 +292,7 @@ export const useSimStore = create<SimStore>((set, get) => {
       }
 
       const state = get();
-      if (state.status !== 'running') return;
+      if (state.status !== 'running' || (state.simulationFailure && !state.simulationFailure.recovered)) return;
       if (state.asyncPhysicsInFlight) {
         // Frames arriving while a batch is in flight must bank their wall
         // time into the accumulator; resetting lastFrameTime here would
@@ -295,6 +349,9 @@ export const useSimStore = create<SimStore>((set, get) => {
       let nextApControllerState = apControllerState;
       let remainingSteps = stepCount;
 
+      const checkpoint = captureScenarioSnapshot(state);
+      let diagnosticInput: unknown;
+      let diagnosticResult: unknown;
       const committedSteps = () => stepCount - remainingSteps;
 
       const applyBatch = (result: SimulationStepResult) => {
@@ -334,7 +391,7 @@ export const useSimStore = create<SimStore>((set, get) => {
       const runBatch = (): Promise<void> => {
         if (remainingSteps <= 0) return Promise.resolve();
         const batchSteps = remainingSteps;
-        const input = {
+        const input: SimulationStepInput = {
           aircraft: nextAircraft,
           spec,
           pilotInputs,
@@ -352,8 +409,16 @@ export const useSimStore = create<SimStore>((set, get) => {
           cloneAircraft: false,
           steps: batchSteps,
         };
-        return asyncRuntime.stepAsync(input).then((result) => {
+        diagnosticInput = { ...input, aircraft: checkpoint.aircraft, pilotInputs: checkpoint.pilotInputs, apControllerState: checkpoint.apControllerState, apState: checkpoint.apState, flightPlan: checkpoint.flightPlan, weather: checkpoint.weather, wind: checkpoint.wind };
+        return Promise.resolve().then(() => {
           if (get().asyncPhysicsGeneration !== generation) return;
+          assertSimulationStepInput(input);
+          set({ lastValidCheckpoint: checkpoint });
+          return asyncRuntime.stepAsync(input);
+        }).then((result) => {
+          if (get().asyncPhysicsGeneration !== generation) return;
+          diagnosticResult = result;
+          assertCommittedSimulationResult(result, selectedScenarioId);
           nextAircraft = result.aircraft;
           nextActiveLegIndex = result.activeLegIndex;
           nextRouteStatus = result.routeStatus;
@@ -365,14 +430,14 @@ export const useSimStore = create<SimStore>((set, get) => {
       };
 
       set({ asyncPhysicsInFlight: true });
-      runBatch().catch(() => {
+      runBatch().catch((error) => {
         if (get().asyncPhysicsGeneration !== generation) return;
-        set({ asyncPhysicsInFlight: false });
+        containFailure(error, diagnosticInput, diagnosticResult);
       });
     },
 
     ...createAutoflightSlice(storeSet),
     ...createRouteSlice(storeSet),
-    ...createPersistenceSlice(storeSet),
+    ...createPersistenceSlice(storeSet, get),
   };
 });

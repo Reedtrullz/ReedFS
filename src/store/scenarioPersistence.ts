@@ -4,13 +4,27 @@ import type { InputManagerState } from '../input/InputManager';
 import type { AircraftState, AutopilotCommands, ControlInputs } from '../sim/types';
 import type { AutopilotControllerState } from '../sim/systems/autopilot';
 import type { WindInfo } from '../sim/weather';
+import type { ScenarioWeatherMetadata } from '../sim/weather';
+import { SCENARIOS, scenarioById } from '../sim/scenarios';
+import { B737_800_AIRCRAFT_DATA } from '../sim/data/aircraft/b737-800.v1';
+import { B737_800_FDM_DATA_VERSION } from '../sim/data/aircraft/b737-800-fdm.v1';
+import { isAircraftState, hasCoherentAttitude, isAutopilotCommands, isAutopilotControllerState, isAutopilotState, isControlInputs, isFiniteSimulationData, isFlightPlan, isWeather, isWind } from '../sim/simulationValidation';
 import type { SimStatus, SimStore } from './simStore';
 
+export const MAX_SCENARIO_SAVE_BYTES = 1024 * 1024;
+const MAX_SCENARIO_SAVE_SLOTS = 32;
 export const SCENARIO_SAVE_KEY = 'rfs.scenarioSnapshot.v1';
 export const DEFAULT_SCENARIO_SAVE_SLOT_ID = 'default';
-const SCENARIO_SAVE_VERSION = 2;
+const SCENARIO_SAVE_VERSION = 3;
 const SCENARIO_SAVE_COLLECTION_VERSION = 3;
-type ScenarioSaveVersion = 1 | typeof SCENARIO_SAVE_VERSION;
+type ScenarioSaveVersion = 1 | 2 | typeof SCENARIO_SAVE_VERSION;
+export const SCENARIO_SNAPSHOT_IDENTITIES = {
+  aircraft: B737_800_AIRCRAFT_DATA.id,
+  aircraftData: B737_800_AIRCRAFT_DATA.dataVersion,
+  fdmData: B737_800_FDM_DATA_VERSION,
+  sharedCommit: '810fc9652da431eaf8978b85bf4af131605559b5',
+  clock: 'sim-time-ms/time-of-day-hours/v1',
+} as const;
 
 export type ScenarioPersistenceStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 
@@ -28,10 +42,14 @@ export interface ScenarioSnapshot {
   flightPlan: FlightPlan | null;
   activeLegIndex: number | null;
   wind: WindInfo | null;
+  weather?: ScenarioWeatherMetadata;
+  identities?: typeof SCENARIO_SNAPSHOT_IDENTITIES;
   simulationTimeSeconds: number;
 }
 
 export interface ScenarioSaveSlotMetadata {
+  /** Exact serialized slot observed by the reader; never persisted as metadata. */
+  revision?: string;
   id: string;
   name: string;
   savedAtIso: string;
@@ -56,6 +74,7 @@ export interface ScenarioSaveOptions {
   slotId?: string;
   slotName?: string;
   overwrite?: boolean;
+  expectedRevision?: string | null;
 }
 
 export type ScenarioSnapshotLoadResult =
@@ -67,26 +86,33 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isValidSnapshot(value: unknown): value is ScenarioSnapshot {
-  if (!isRecord(value)) return false;
-  const supportedVersion = value.version === 1 || value.version === SCENARIO_SAVE_VERSION;
+  if (!isRecord(value) || !isFiniteSimulationData(value)) return false;
+  const supportedVersion = value.version === 1 || value.version === 2 || value.version === SCENARIO_SAVE_VERSION;
   const validControllerState = value.version === 1
-    ? (value.apControllerState === undefined || isRecord(value.apControllerState))
-    : isRecord(value.apControllerState);
+    ? (value.apControllerState === undefined || isAutopilotControllerState(value.apControllerState))
+    : isAutopilotControllerState(value.apControllerState);
+  const aircraft = isRecord(value.aircraft) && isRecord(value.aircraft.config) && value.version !== 3 && value.aircraft.config.gearPosition === undefined
+    ? { ...value.aircraft, config: { ...value.aircraft.config, gearPosition: value.aircraft.config.gearDown === true ? 1 : 0 } }
+    : value.aircraft;
   return (
     supportedVersion &&
-    typeof value.savedAtIso === 'string' &&
-    typeof value.selectedScenarioId === 'string' &&
-    typeof value.status === 'string' &&
-    isRecord(value.aircraft) &&
-    isRecord(value.pilotInputs) &&
-    isRecord(value.apCommands) &&
+    typeof value.savedAtIso === 'string' && Number.isFinite(Date.parse(value.savedAtIso)) &&
+    SCENARIOS.some((scenario) => scenario.id === value.selectedScenarioId) &&
+    ['stopped', 'running', 'paused'].includes(String(value.status)) &&
+    isAircraftState(aircraft) && hasCoherentAttitude(aircraft) &&
+    isControlInputs(value.pilotInputs) &&
+    isAutopilotCommands(value.apCommands) &&
     validControllerState &&
     isRecord(value.inputManager) &&
-    (value.apState === null || isRecord(value.apState)) &&
-    (value.flightPlan === null || isRecord(value.flightPlan)) &&
-    (value.activeLegIndex === null || typeof value.activeLegIndex === 'number') &&
-    (value.wind === null || isRecord(value.wind)) &&
-    typeof value.simulationTimeSeconds === 'number'
+    ['elevator', 'aileron', 'rudder'].every((key) => typeof (value.inputManager as Record<string, unknown>)[key] === 'number' && Math.abs(Number((value.inputManager as Record<string, unknown>)[key])) <= 1) &&
+    ['throttle', 'brake', 'leftBrake', 'rightBrake'].every((key) => typeof (value.inputManager as Record<string, unknown>)[key] === 'number' && Number((value.inputManager as Record<string, unknown>)[key]) >= 0 && Number((value.inputManager as Record<string, unknown>)[key]) <= 1) &&
+    typeof value.inputManager.stabilizerTrimUnits === 'number' && value.inputManager.stabilizerTrimUnits >= 0 && value.inputManager.stabilizerTrimUnits <= 15 &&
+    isAutopilotState(value.apState) && isFlightPlan(value.flightPlan) &&
+    (value.activeLegIndex === null || (typeof value.activeLegIndex === 'number' && Number.isSafeInteger(value.activeLegIndex) && value.activeLegIndex >= 0 && value.flightPlan !== null && value.activeLegIndex < value.flightPlan.waypoints.length)) &&
+    isWind(value.wind) &&
+    (value.version !== 3 || (isWeather(value.weather) && isRecord(value.identities) && Object.entries(SCENARIO_SNAPSHOT_IDENTITIES).every(([key, expected]) => (value.identities as Record<string, unknown>)[key] === expected))) &&
+    (value.weather === undefined || isWeather(value.weather)) &&
+    typeof value.simulationTimeSeconds === 'number' && value.simulationTimeSeconds >= 0
   );
 }
 
@@ -104,7 +130,9 @@ function isValidSlotMetadata(value: unknown): value is ScenarioSaveSlotMetadata 
     typeof value.status === 'string' &&
     typeof value.restoreStatus === 'string' &&
     typeof value.routeSummary === 'string' &&
-    typeof value.simulationTimeSeconds === 'number'
+    typeof value.simulationTimeSeconds === 'number' && Number.isFinite(value.simulationTimeSeconds) && value.simulationTimeSeconds >= 0 &&
+    ['running', 'paused', 'stopped'].includes(String(value.status)) &&
+    ['paused', 'stopped'].includes(String(value.restoreStatus))
   );
 }
 
@@ -125,7 +153,9 @@ function slotNameFromOptions(options?: ScenarioSaveOptions): string {
 }
 
 function slotIdFromOptions(options?: ScenarioSaveOptions): string {
-  return options?.slotId?.trim() || scenarioSaveSlotIdFromName(slotNameFromOptions(options));
+  const id = options?.slotId?.trim() || scenarioSaveSlotIdFromName(slotNameFromOptions(options));
+  if (!/^[a-z0-9][a-z0-9-]{0,63}$/i.test(id) || ['constructor', 'prototype', '__proto__'].includes(id)) throw new Error('Invalid save slot identity');
+  return id;
 }
 
 function restoreStatusFor(snapshot: ScenarioSnapshot): SimStatus {
@@ -167,22 +197,24 @@ function collectionWithSlot(snapshot: ScenarioSnapshot, options?: ScenarioSaveOp
   };
 }
 
-function migrateLegacySnapshot(storage: ScenarioPersistenceStorage, snapshot: ScenarioSnapshot): ScenarioSaveCollection {
+function migrateLegacySnapshot(snapshot: ScenarioSnapshot): ScenarioSaveCollection {
   const collection = collectionWithSlot(snapshot, {
     slotId: DEFAULT_SCENARIO_SAVE_SLOT_ID,
     slotName: 'Default save',
     overwrite: true,
   });
-  storage.setItem(SCENARIO_SAVE_KEY, JSON.stringify(collection));
   return collection;
 }
 
 function parseStoredSave(storage: ScenarioPersistenceStorage):
   | { ok: true; collection: ScenarioSaveCollection }
   | { ok: false; reason: string; empty?: true } {
-  const raw = storage.getItem(SCENARIO_SAVE_KEY);
-  if (!raw) return { ok: false, reason: 'no saved scenario state found', empty: true };
+  let raw: string | null;
+  try { raw = storage.getItem(SCENARIO_SAVE_KEY); }
+  catch (error) { return { ok: false, reason: `storage read failed: ${error instanceof Error ? error.message : 'access denied'}` }; }
+  if (raw === null) return { ok: false, reason: 'no saved scenario state found', empty: true };
 
+  if (raw.length * 2 > MAX_SCENARIO_SAVE_BYTES) return { ok: false, reason: 'saved collection exceeds the storage size limit; data preserved' };
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
@@ -191,7 +223,7 @@ function parseStoredSave(storage: ScenarioPersistenceStorage):
   }
 
   if (isSaveCollection(parsed)) return { ok: true, collection: parsed };
-  if (isValidSnapshot(parsed)) return { ok: true, collection: migrateLegacySnapshot(storage, parsed) };
+  if (isValidSnapshot(parsed)) return { ok: true, collection: migrateLegacySnapshot(parsed) };
   return { ok: false, reason: 'saved scenario has an unsupported shape or version' };
 }
 
@@ -201,7 +233,12 @@ function emptyCollection(): ScenarioSaveCollection {
 
 function collectionForWrite(storage: ScenarioPersistenceStorage): ScenarioSaveCollection {
   const parsed = parseStoredSave(storage);
-  return parsed.ok ? structuredClone(parsed.collection) : emptyCollection();
+  if (!parsed.ok) {
+    if (parsed.empty) return emptyCollection();
+    throw new Error(`${parsed.reason}; previous save data preserved`);
+  }
+  if (Object.keys(parsed.collection.slots).some((id) => !slotFromCollection(parsed.collection, id).ok)) throw new Error('Existing collection contains an invalid slot; previous save data preserved');
+  return structuredClone(parsed.collection);
 }
 
 function slotFromCollection(collection: ScenarioSaveCollection, slotId: string): ScenarioSnapshotLoadResult {
@@ -215,11 +252,13 @@ function slotFromCollection(collection: ScenarioSaveCollection, slotId: string):
   if (!metadata) {
     return { ok: false, reason: `saved slot "${slotName}" has invalid metadata` };
   }
+  if (metadata.id !== slotId || metadata.selectedScenarioId !== rawSlot.snapshot.selectedScenarioId || metadata.savedAtIso !== rawSlot.snapshot.savedAtIso || metadata.status !== rawSlot.snapshot.status || metadata.restoreStatus !== restoreStatusFor(rawSlot.snapshot)) return { ok: false, reason: 'saved slot metadata disagrees with snapshot' };
   return { ok: true, snapshot: rawSlot.snapshot, metadata };
 }
 
-export function createScenarioSnapshot(state: SimStore): ScenarioSnapshot {
-  return structuredClone({
+/** Read-only capture of store-owned immutable objects; clone before external use. */
+export function captureScenarioSnapshot(state: SimStore): ScenarioSnapshot {
+  return {
     version: SCENARIO_SAVE_VERSION,
     savedAtIso: new Date().toISOString(),
     selectedScenarioId: state.selectedScenarioId,
@@ -233,8 +272,14 @@ export function createScenarioSnapshot(state: SimStore): ScenarioSnapshot {
     flightPlan: state.flightPlan,
     activeLegIndex: state.activeLegIndex,
     wind: state.wind,
+    weather: state.weather ?? scenarioById(state.selectedScenarioId).weather,
+    identities: SCENARIO_SNAPSHOT_IDENTITIES,
     simulationTimeSeconds: state.simulationTimeSeconds,
-  });
+  };
+}
+
+export function createScenarioSnapshot(state: SimStore): ScenarioSnapshot {
+  return structuredClone(captureScenarioSnapshot(state));
 }
 
 export function saveScenarioSnapshot(
@@ -242,16 +287,21 @@ export function saveScenarioSnapshot(
   snapshot: ScenarioSnapshot,
   options?: ScenarioSaveOptions,
 ): ScenarioSaveSlotMetadata {
+  if (!isValidSnapshot(snapshot)) throw new Error('Invalid scenario snapshot; save refused');
   const collection = collectionForWrite(storage);
   const metadata = metadataForSnapshot(snapshot, options);
   if (collection.slots[metadata.id] && !options?.overwrite) {
     throw new Error(`save slot "${metadata.name}" already exists; confirm overwrite to replace it`);
   }
+  const currentRevision = collection.slots[metadata.id] ? JSON.stringify(collection.slots[metadata.id]) : null;
+  if (options?.expectedRevision !== undefined && options.expectedRevision !== currentRevision) throw new Error('Save slot changed in another session; review the current version before overwriting');
   collection.slots[metadata.id] = {
     metadata,
     snapshot: structuredClone(snapshot),
   };
-  storage.setItem(SCENARIO_SAVE_KEY, JSON.stringify(collection));
+  const serialized = JSON.stringify(collection);
+  if (Object.keys(collection.slots).length > MAX_SCENARIO_SAVE_SLOTS || serialized.length * 2 > MAX_SCENARIO_SAVE_BYTES) throw new Error('Save collection limit reached; export or remove a reviewed slot');
+  storage.setItem(SCENARIO_SAVE_KEY, serialized);
   return metadata;
 }
 
@@ -268,7 +318,14 @@ export function listScenarioSaveSlots(storage: ScenarioPersistenceStorage): Scen
   const parsed = parseStoredSave(storage);
   if (!parsed.ok) return [];
   return Object.values(parsed.collection.slots)
-    .map((slot) => isRecord(slot) && isValidSlotMetadata(slot.metadata) ? slot.metadata : null)
-    .filter((metadata): metadata is ScenarioSaveSlotMetadata => metadata !== null)
+    .map((slot) => isRecord(slot) && isValidSlotMetadata(slot.metadata) ? { ...slot.metadata, revision: JSON.stringify(slot) } : null)
+    .filter((metadata) => metadata !== null)
     .sort((a, b) => b.savedAtIso.localeCompare(a.savedAtIso));
+}
+
+export function deleteScenarioSaveSlot(storage: ScenarioPersistenceStorage, slotId: string, expectedRevision: string): void {
+  const collection = collectionForWrite(storage);
+  if (!Object.hasOwn(collection.slots, slotId) || JSON.stringify(collection.slots[slotId]) !== expectedRevision) throw new Error('Save slot changed in another session; review before deleting');
+  delete collection.slots[slotId];
+  storage.setItem(SCENARIO_SAVE_KEY, JSON.stringify(collection));
 }

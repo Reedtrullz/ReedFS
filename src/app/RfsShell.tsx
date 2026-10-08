@@ -23,6 +23,7 @@ import { createDefaultFlightForScenario } from '../sim/flightPlanLoader';
 import { scenarioById } from '../sim/scenarios';
 import { FPSMonitor } from '../components/FPSMonitor';
 import { EngineStrip } from '../components/EngineStrip';
+import { SimulationRecovery } from '../components/SimulationRecovery';
 import { ScenarioPanel } from '../components/ScenarioPanel';
 import { RouteStatus } from '../components/RouteStatus';
 import { SceneStatusOverlay } from '../components/SceneStatus';
@@ -389,6 +390,7 @@ export function RfsShell() {
       fpsMonitor={showDebugOverlays ? <FPSMonitor registerFrameEffect={registerFrameEffect} /> : null}
       controls={(
         <>
+          <SimulationRecovery />
           {audioCaptionNode}
           <AudioSettings
             settings={audioSettings}
