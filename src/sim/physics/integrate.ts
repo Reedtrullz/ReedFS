@@ -220,9 +220,14 @@ export function integrate(
 
   // ── Angular acceleration (Euler's equations) ──
   const ixx = spec.ixx, iyy = spec.iyy, izz = spec.izz, ixz = spec.ixz;
-  const pDot = (aero.rollMoment + (iyy - izz) * q * r + ixz * p * q) / ixx;
+  // I has off-diagonal entries -Ixz. Solve the coupled roll/yaw block of
+  // I*omegaDot = M - omega cross (I*omega), rather than dividing it diagonally.
+  const rollRhs = aero.rollMoment + (iyy - izz) * q * r + ixz * p * q;
+  const yawRhs = aero.yawMoment + (ixx - iyy) * p * q - ixz * q * r;
+  const inertiaDeterminant = ixx * izz - ixz * ixz;
+  const pDot = (izz * rollRhs + ixz * yawRhs) / inertiaDeterminant;
   const qDot = (aero.pitchMoment + (izz - ixx) * p * r + ixz * (r * r - p * p)) / iyy;
-  const rDot = (aero.yawMoment + (ixx - iyy) * p * q - ixz * q * r) / izz;
+  const rDot = (ixz * rollRhs + ixx * yawRhs) / inertiaDeterminant;
 
   state.angularVel.p += pDot * dt;
   state.angularVel.q += qDot * dt;
