@@ -64,11 +64,11 @@ describe('warning delivery', () => {
   });
 });
 
-it('preserves each identity cooldown across rapid A to B to A changes', () => {
+it.each([false, true])('preserves identity cooldown through A to B to A (volume change=%s)', (volumeChange) => {
   const onCaption = vi.fn();
-  updateGPWS(alertState(), { nowMs: 4000, onCaption });
-  updateGPWS(alertState(true), { nowMs: 4010, onCaption });
-  updateGPWS(alertState(), { nowMs: 4020, onCaption });
+  updateGPWS(alertState(), { nowMs: 4000, masterVolume: 0.5, onCaption });
+  updateGPWS(alertState(true), { nowMs: 4010, masterVolume: volumeChange ? 0.8 : 0.5, onCaption });
+  updateGPWS(alertState(), { nowMs: 4020, masterVolume: volumeChange ? 0.8 : 0.5, onCaption });
   expect(spoken.map((item) => item.text)).toEqual(['TOO LOW GEAR', 'PULL UP']);
   // Captions still track the current condition even if speech is cooling down.
   expect(onCaption).toHaveBeenLastCalledWith(expect.objectContaining({ text: 'TOO LOW GEAR', timestampMs: 4020, delivery: 'caption' }));

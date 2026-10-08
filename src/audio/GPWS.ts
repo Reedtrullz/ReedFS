@@ -128,7 +128,7 @@ export function updateGPWS(state: AircraftState, options: GpwsUpdateOptions = {}
   // while it is active; changes replace obsolete speech, including urgent alerts.
   if (!alert || !shouldSpeak) cancelGPWSSpeech();
   else if (active && (active.alert !== alert || active.volume !== volume)) {
-    if (active.volume !== volume) speechTimes.delete(active.alert);
+    if (active.alert === alert && active.volume !== volume) speechTimes.delete(active.alert);
     cancelActiveSpeech();
   }
   if (!alert) { captionAlert = null; return; }
