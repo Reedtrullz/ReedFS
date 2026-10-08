@@ -21,6 +21,10 @@ export class AudioEngine {
   cockpitBus: GainNode;
   private _started = false;
   private _disposed = false;
+  private _failure: string | null = null;
+  private _starting: Promise<void> | null = null;
+  private listeners = new Set<() => void>();
+  private notify = () => { for (const listener of this.listeners) listener(); };
 
   constructor(options: AudioEngineOptions = {}) {
     this.ctx = (options.contextFactory ?? createBrowserAudioContext)();
@@ -37,15 +41,41 @@ export class AudioEngine {
     this.cockpitBus.connect(this.master);
 
     this._started = false;
+    this.ctx.addEventListener?.('statechange', this.notify);
   }
 
-  async start() {
+  async start(): Promise<void> {
     if (this._disposed) throw new Error('Cannot start a disposed AudioEngine');
-    if (this._started) return;
-    if (this.ctx.state === 'suspended') {
-      await this.ctx.resume();
-    }
-    this._started = true;
+    if (this._starting) return this._starting;
+    const request = this.resumeContext();
+    this._starting = request;
+    try { await request; }
+    finally { if (this._starting === request) this._starting = null; }
+  }
+
+  private async resumeContext(): Promise<void> {
+    this._failure = null;
+    try {
+      if (this.ctx.state === 'closed') throw new Error('Audio context is closed');
+      if (this.ctx.state !== 'running') await this.ctx.resume();
+      if (this._disposed || this.ctx.state !== 'running') throw new Error('Audio context did not become running');
+      this._started = true;
+    } catch (error) {
+      this._failure = error instanceof Error ? error.message : 'Audio start failed';
+      throw error;
+    } finally { this.notify(); }
+  }
+
+  get sessionState(): 'locked' | 'running' | 'suspended' | 'failed' | 'closed' {
+    if (this._disposed || this.ctx.state === 'closed') return 'closed';
+    if (this._failure) return 'failed';
+    if (!this._started) return 'locked';
+    return this.ctx.state === 'running' ? 'running' : 'suspended';
+  }
+
+  subscribeStatus(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => { this.listeners.delete(listener); };
   }
 
   get started() { return this._started; }
@@ -68,6 +98,9 @@ export class AudioEngine {
     if (this._disposed) return;
     this._disposed = true;
     this._started = false;
+    this.engineBus.disconnect(); this.cockpitBus.disconnect(); this.master.disconnect();
+    this.ctx.removeEventListener?.('statechange', this.notify);
+    this.notify(); this.listeners.clear();
     if (this.ctx.state !== 'closed') {
       await this.ctx.close();
     }

@@ -9,6 +9,7 @@ class MockAudioContext {
     type: '',
     frequency: { value: 0 },
     connect: vi.fn(),
+    disconnect: vi.fn(),
     start: vi.fn(),
     stop: vi.fn(),
   }));
@@ -27,6 +28,7 @@ class MockOscillatorNode {
   type = '';
   frequency = { value: 0 };
   connect = vi.fn();
+  disconnect = vi.fn();
   start = vi.fn();
   stop = vi.fn();
 }

@@ -128,3 +128,18 @@ describe('GPWS', () => {
     expect(onCaption).toHaveBeenCalledWith(expect.objectContaining({ text: 'TOO LOW GEAR' }));
   });
 });
+
+it('does not name glideslope without an applicable receiver/deviation signal during normal configured descent', () => {
+  const state = gpwsState({ ground: { aglFt: 700, weightOnWheels: false }, velocity: { u: 90, w: 4 }, config: { gearDown: true, flapSetting: 30 }, flightPhase: 'APPROACH' });
+  expect(checkGPWS(state)).toBeNull();
+});
+
+it('prioritizes pull-up when severe sink rate and other hazards overlap', () => {
+  const state = gpwsState({ ground: { aglFt: 600, weightOnWheels: false }, velocity: { u: 90, w: 35 }, config: { gearDown: false, flapSetting: 0 }, flightPhase: 'DESCENT' });
+  expect(checkGPWS(state)).toBe('PULL UP');
+});
+
+it.each([-1, NaN, Infinity])('does not infer a warning from invalid radio altitude: %s', (aglFt) => {
+  const state = gpwsState({ ground: { aglFt, weightOnWheels: false }, velocity: { u: 90, w: 35 }, config: { gearDown: false }, flightPhase: 'DESCENT', quaternion: { q0: Math.cos(Math.PI / 8), q1: Math.sin(Math.PI / 8), q2: 0, q3: 0 } });
+  expect(checkGPWS(state)).toBeNull();
+});
