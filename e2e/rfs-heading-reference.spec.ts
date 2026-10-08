@@ -77,7 +77,22 @@ test('actual worker flight keeps true orientation and targets while magnetic sur
   await page.getByRole('button', { name: 'OVL: MINIMAL', exact: true }).click();
   await expect(page.getByRole('button', { name: 'OVL: DEBUG', exact: true })).toBeVisible();
   // Overlay mode changes before its lazy telemetry panel is delivered.
-  await page.getByLabel('Flight telemetry', { exact: true }).waitFor({ state: 'visible', timeout: 30000 });
+  const telemetryStarted = performance.now();
+  try {
+    await page.getByLabel('Flight telemetry', { exact: true }).waitFor({ state: 'visible', timeout: 30000 });
+  } finally {
+    const observation = await page.evaluate(() => {
+      const element = document.querySelector('[aria-label="Flight telemetry"]');
+      const rect = element?.getBoundingClientRect();
+      return { exists: Boolean(element), display: element ? getComputedStyle(element).display : null,
+        rect: rect ? { x: rect.x, y: rect.y, width: rect.width, height: rect.height } : null,
+        debugHtml: document.querySelector('[data-rfs-zone="debug"]')?.innerHTML,
+        resources: performance.getEntriesByType('resource').filter((entry) => /Telemetry|ControlsHelp|ControlsSettings|AttitudeIndicator/.test(entry.name)).map((entry) => ({ name: entry.name, duration: entry.duration })) };
+    });
+    const path = testInfo.outputPath('heading-telemetry-delivery.json');
+    await writeFile(path, JSON.stringify({ elapsedMs: performance.now() - telemetryStarted, observation }, null, 2));
+    await testInfo.attach('heading-telemetry-delivery', { path, contentType: 'application/json' });
+  }
   await expect(page.getByLabel('Flight telemetry', { exact: true })).toContainText('HDG TRUE');
   await page.getByLabel('Save slot name').fill('Heading practice');
   await page.getByRole('button', { name: 'Save scenario state', exact: true }).click();
@@ -102,17 +117,21 @@ test('actual worker flight keeps true orientation and targets while magnetic sur
     const selected = document.querySelector('[aria-label="Heading selected bug"]')!;
     const row = heading.parentElement!.parentElement!;
     const right = row.lastElementChild!;
-    const textLines = (node: Element) => { const range = document.createRange(); range.selectNodeContents(node); return range.getClientRects().length; };
+    const textLines = (node: Element) => {
+      const range = document.createRange(); range.selectNodeContents(node);
+      // React may split prefix/value text into adjacent rectangles on one line.
+      return new Set(Array.from(range.getClientRects()).filter((rect) => rect.width > 0).map((rect) => Math.round(rect.top))).size;
+    };
     return { headingLines: textLines(heading), selectedLines: textLines(selected),
       headingRight: heading.getBoundingClientRect().right, selectedRight: selected.getBoundingClientRect().right,
       verticalSpeedLeft: right.getBoundingClientRect().left, rowLeft: row.getBoundingClientRect().left,
       headingLeft: heading.getBoundingClientRect().left };
   });
-  expect(readoutLayout.headingLines).toBe(1); expect(readoutLayout.selectedLines).toBe(1);
-  expect(readoutLayout.headingLeft).toBeGreaterThanOrEqual(readoutLayout.rowLeft);
-  expect(Math.max(readoutLayout.headingRight, readoutLayout.selectedRight)).toBeLessThanOrEqual(readoutLayout.verticalSpeedLeft);
   await page.screenshot({ path: testInfo.outputPath('native-magnetic-surface-heading.png') });
   const path = testInfo.outputPath('native-heading-reference.json');
   await writeFile(path, JSON.stringify({ scope: 'Actual worker/cohort, paused UI reference invariance, one-step conversion, unsupported epoch and v4 save/restore; surface estimate, no operational/device/full-flight qualification', before, toggled, stepped, unavailable, restored, readoutLayout }, null, 2));
   await testInfo.attach('native-heading-reference', { path, contentType: 'application/json' });
+  expect(readoutLayout.headingLines).toBe(1); expect(readoutLayout.selectedLines).toBe(1);
+  expect(readoutLayout.headingLeft).toBeGreaterThanOrEqual(readoutLayout.rowLeft);
+  expect(Math.max(readoutLayout.headingRight, readoutLayout.selectedRight)).toBeLessThanOrEqual(readoutLayout.verticalSpeedLeft);
 });
