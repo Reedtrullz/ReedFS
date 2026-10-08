@@ -1,3 +1,5 @@
+import type { ScenarioWeatherMetadata } from '../weather';
+
 const T0 = 288.15; // K at MSL
 const P0 = 101325; // Pa
 const LAPSE = -0.0065; // K/m troposphere
@@ -52,3 +54,40 @@ export function isaAtAltitude(altFt: number): AtmoConditions {
     density, speedOfSound, viscosity,
   };
 }
+
+// Scenario weather is a surface pressure/temperature offset on the ISA profile,
+// not a measured vertical sounding. All consumers share this same approximation.
+const SEA_LEVEL_PRESSURE_PA = 101_325;
+const GAS_CONSTANT_DRY_AIR = 287.058;
+const HEAT_CAPACITY_RATIO_AIR = 1.4;
+const SUTHERLAND_CONSTANT_K = 110.4;
+const SUTHERLAND_COEFFICIENT = 1.458e-6;
+
+export type DensityAltitudeWeather = Pick<ScenarioWeatherMetadata, 'qnhHpa' | 'surfaceTemperatureC'>;
+
+function viscosityForTemperature(tempK: number): number {
+  return SUTHERLAND_COEFFICIENT * Math.pow(tempK, 1.5) / (tempK + SUTHERLAND_CONSTANT_K);
+}
+
+export function atmosphereForDensityAltitude(altFt: number, weather: DensityAltitudeWeather | null = null): AtmoConditions {
+  const standard = isaAtAltitude(altFt);
+  if (!weather) return standard;
+
+  const qnhHpa = Number.isFinite(weather.qnhHpa) && weather.qnhHpa > 0 ? weather.qnhHpa : 1013.25;
+  const surfaceTemperatureC = Number.isFinite(weather.surfaceTemperatureC) ? weather.surfaceTemperatureC : 15;
+  const pressurePa = qnhHpa * 100 * (standard.pressurePa / SEA_LEVEL_PRESSURE_PA);
+  const isaSeaLevelDeltaK = (surfaceTemperatureC + 273.15) - 288.15;
+  const tempK = Math.max(150, standard.tempK + isaSeaLevelDeltaK);
+  const density = pressurePa / (GAS_CONSTANT_DRY_AIR * tempK);
+
+  return {
+    tempK,
+    tempC: tempK - 273.15,
+    pressurePa,
+    pressureHpa: pressurePa / 100,
+    density,
+    speedOfSound: Math.sqrt(HEAT_CAPACITY_RATIO_AIR * GAS_CONSTANT_DRY_AIR * tempK),
+    viscosity: viscosityForTemperature(tempK),
+  };
+}
+

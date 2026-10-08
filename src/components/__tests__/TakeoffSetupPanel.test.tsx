@@ -6,6 +6,23 @@ import { useSimStore } from '../../store/simStore';
 import { ENVA_TUTORIAL_SCENARIO } from '../../sim/scenarios';
 
 describe('TakeoffSetupPanel', () => {
+  it('keeps fuel cutoff independent for each engine and preserves it when throttle or takeoff configuration changes', () => {
+    render(<TakeoffSetupPanel />);
+    fireEvent.click(screen.getByText('Engine fuel'));
+    const left = screen.getByRole('button', { name: 'Engine 1 fuel cutoff' });
+    const right = screen.getByRole('button', { name: 'Engine 2 fuel cutoff' });
+    expect(left.getAttribute('aria-pressed')).toBe('false');
+    fireEvent.click(left);
+    expect(useSimStore.getState().pilotInputs.fuelCutoff1).toBe(true);
+    expect(useSimStore.getState().pilotInputs.fuelCutoff2).toBe(false);
+    expect(left.getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(screen.getByRole('button', { name: 'Throttle Up' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Set takeoff config' }));
+    expect(useSimStore.getState().effectiveControls.fuelCutoff1).toBe(true);
+    expect(right.getAttribute('aria-pressed')).toBe('false');
+    fireEvent.click(left);
+    expect(useSimStore.getState().pilotInputs.fuelCutoff1).toBe(false);
+  });
   beforeEach(() => {
     window.localStorage.clear();
     useSimStore.getState().setScenario(ENVA_TUTORIAL_SCENARIO.id);
