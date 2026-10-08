@@ -1,16 +1,8 @@
 import type { ScenarioWeatherMetadata } from '../weather';
+import { USSA_1976_CONSTANTS as C, USSA_1976_LAYERS } from '../data/atmosphere/ussa-1976.v1';
 
-const T0 = 288.15; // K at MSL
-const P0 = 101325; // Pa
-const LAPSE = -0.0065; // K/m troposphere
-const G = 9.80665;
-const R = 287.058;
-const GAMMA = 1.4;
-const TROPOPAUSE_M = 11000;
-const TROPOPAUSE_K = 216.65;
+const R = C.universalGasConstantJPerKmolK / C.dryAirMolarMassKgPerKmol;
 const FT_TO_M = 0.3048;
-const STRATOSPHERE_TOP_M = 20000;
-const STRAT_LAPSE = 0.001; // K/m (slight warming)
 
 export interface AtmoConditions {
   tempK: number;
@@ -23,30 +15,28 @@ export interface AtmoConditions {
 }
 
 export function isaAtAltitude(altFt: number): AtmoConditions {
-  const altM = altFt * FT_TO_M;
-  let tempK: number;
-  let pressPa: number;
-
-  if (altM <= TROPOPAUSE_M) {
-    tempK = T0 + LAPSE * altM;
-    pressPa = P0 * Math.pow(tempK / T0, -G / (R * LAPSE));
-  } else if (altM <= STRATOSPHERE_TOP_M) {
-    tempK = TROPOPAUSE_K;
-    const pTropo = P0 * Math.pow(TROPOPAUSE_K / T0, -G / (R * LAPSE));
-    pressPa = pTropo * Math.exp(-G / (R * TROPOPAUSE_K) * (altM - TROPOPAUSE_M));
-  } else {
-    const dAlt = altM - STRATOSPHERE_TOP_M;
-    tempK = TROPOPAUSE_K + STRAT_LAPSE * dAlt;
-    const pStratoTop = (() => {
-      const pTropo = P0 * Math.pow(TROPOPAUSE_K / T0, -G / (R * LAPSE));
-      return pTropo * Math.exp(-G / (R * TROPOPAUSE_K) * (STRATOSPHERE_TOP_M - TROPOPAUSE_M));
-    })();
-    pressPa = pStratoTop * Math.pow(tempK / TROPOPAUSE_K, -G / (R * STRAT_LAPSE));
+  const geometricM = altFt * FT_TO_M;
+  const geopotentialM = C.geopotentialEarthRadiusM * geometricM / (C.geopotentialEarthRadiusM + geometricM);
+  let tempK: number = C.seaLevelTemperatureK;
+  let pressPa: number = C.seaLevelPressurePa;
+  const layers = USSA_1976_LAYERS;
+  for (let i = 0; i < layers.length; i += 1) {
+    const layer = layers[i];
+    // Continuing the last lapse outside the packet's domain is an engineering
+    // extrapolation, not a claim to implement the remaining USSA layers.
+    const top = layers[i + 1]?.baseGeopotentialM ?? geopotentialM;
+    const deltaM = Math.min(geopotentialM, top) - layer.baseGeopotentialM;
+    const nextTempK = tempK + layer.lapseKPerM * deltaM;
+    pressPa *= layer.lapseKPerM === 0
+      ? Math.exp(-C.standardGravityMs2 * deltaM / (R * tempK))
+      : Math.pow(nextTempK / tempK, -C.standardGravityMs2 / (R * layer.lapseKPerM));
+    tempK = nextTempK;
+    if (geopotentialM <= top) break;
   }
 
   const density = pressPa / (R * tempK);
-  const speedOfSound = Math.sqrt(GAMMA * R * tempK);
-  const viscosity = 1.458e-6 * Math.pow(tempK, 1.5) / (tempK + 110.4);
+  const speedOfSound = Math.sqrt(C.heatCapacityRatio * R * tempK);
+  const viscosity = viscosityForTemperature(tempK);
 
   return {
     tempK, tempC: tempK - 273.15,
@@ -57,28 +47,22 @@ export function isaAtAltitude(altFt: number): AtmoConditions {
 
 // Scenario weather is a surface pressure/temperature offset on the ISA profile,
 // not a measured vertical sounding. All consumers share this same approximation.
-const SEA_LEVEL_PRESSURE_PA = 101_325;
-const GAS_CONSTANT_DRY_AIR = 287.058;
-const HEAT_CAPACITY_RATIO_AIR = 1.4;
-const SUTHERLAND_CONSTANT_K = 110.4;
-const SUTHERLAND_COEFFICIENT = 1.458e-6;
-
 export type DensityAltitudeWeather = Pick<ScenarioWeatherMetadata, 'qnhHpa' | 'surfaceTemperatureC'>;
 
 function viscosityForTemperature(tempK: number): number {
-  return SUTHERLAND_COEFFICIENT * Math.pow(tempK, 1.5) / (tempK + SUTHERLAND_CONSTANT_K);
+  return C.sutherlandCoefficient * Math.pow(tempK, 1.5) / (tempK + C.sutherlandTemperatureK);
 }
 
 export function atmosphereForDensityAltitude(altFt: number, weather: DensityAltitudeWeather | null = null): AtmoConditions {
   const standard = isaAtAltitude(altFt);
   if (!weather) return standard;
 
-  const qnhHpa = Number.isFinite(weather.qnhHpa) && weather.qnhHpa > 0 ? weather.qnhHpa : 1013.25;
-  const surfaceTemperatureC = Number.isFinite(weather.surfaceTemperatureC) ? weather.surfaceTemperatureC : 15;
-  const pressurePa = qnhHpa * 100 * (standard.pressurePa / SEA_LEVEL_PRESSURE_PA);
-  const isaSeaLevelDeltaK = (surfaceTemperatureC + 273.15) - 288.15;
+  const qnhHpa = Number.isFinite(weather.qnhHpa) && weather.qnhHpa > 0 ? weather.qnhHpa : C.seaLevelPressurePa / 100;
+  const surfaceTemperatureC = Number.isFinite(weather.surfaceTemperatureC) ? weather.surfaceTemperatureC : C.seaLevelTemperatureK - 273.15;
+  const pressurePa = qnhHpa * 100 * (standard.pressurePa / C.seaLevelPressurePa);
+  const isaSeaLevelDeltaK = (surfaceTemperatureC + 273.15) - C.seaLevelTemperatureK;
   const tempK = Math.max(150, standard.tempK + isaSeaLevelDeltaK);
-  const density = pressurePa / (GAS_CONSTANT_DRY_AIR * tempK);
+  const density = pressurePa / (R * tempK);
 
   return {
     tempK,
@@ -86,8 +70,7 @@ export function atmosphereForDensityAltitude(altFt: number, weather: DensityAlti
     pressurePa,
     pressureHpa: pressurePa / 100,
     density,
-    speedOfSound: Math.sqrt(HEAT_CAPACITY_RATIO_AIR * GAS_CONSTANT_DRY_AIR * tempK),
+    speedOfSound: Math.sqrt(C.heatCapacityRatio * R * tempK),
     viscosity: viscosityForTemperature(tempK),
   };
 }
-

@@ -50,7 +50,7 @@ describe('engine operating boundary', () => {
       updateEngines(state, idle, B737_800_SPEC, 0, null, weather);
       const standard = isaAtAltitude(altitudeFt);
       const localTempK = standard.tempK + surfaceTemperatureC - 15;
-      const expectedMach = 150 / Math.sqrt(1.4 * 287.058 * localTempK);
+      const expectedMach = 150 / (standard.speedOfSound * Math.sqrt(localTempK / standard.tempK));
       const expected = computeEngineThrustN(80, B737_800_SPEC, altitudeFt, expectedMach) * standard.tempK / localTempK;
       expect(state.engines[0].thrust).toBeCloseTo(expected, 6);
       return state.engines[0].thrust;
