@@ -3,6 +3,7 @@ node_modules/
 dist/
 coverage/
 test-results/
+test-results-pwa/
 playwright-report/
 
 # VCS and local review/dogfood artifacts
