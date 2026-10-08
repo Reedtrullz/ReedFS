@@ -56,6 +56,9 @@ test('actual full browser quota preserves previous saves and offers the pending 
 });
 
 test('stale overwrite and delete confirmations preserve another session version', async ({ page, context }) => {
+  // Two full rendered sessions and three arbitration phases: CPU6 diagnostic
+  // completed every assertion in102s. Bound this lane without weakening checks.
+  test.setTimeout(120000);
   const other = await context.newPage();
   await page.goto('/'); await other.goto('/');
   await page.getByLabel('Save slot name').fill('Shared');
