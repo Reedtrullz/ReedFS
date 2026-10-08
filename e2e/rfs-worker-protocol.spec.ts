@@ -8,10 +8,13 @@ test('a real browser worker rejects malformed execution messages and remains res
   const url = (await spawned).url();
   const replies = await page.evaluate(async (workerUrl) => {
     const worker = new Worker(workerUrl, { type: 'module' });
+    const codecPath = '/src/sim/workerCodec.ts'; const buildPath = '/src/config/buildIdentity.ts';
+    const { SIMULATION_WORKER_PROTOCOL_VERSION } = await import(/* @vite-ignore */ codecPath);
+    const { APP_BUILD_COHORT } = await import(/* @vite-ignore */ buildPath);
     const messages = [
-      { protocolVersion: 1, type: 'simulation.step.request', requestId: 'null-input', input: null },
+      { protocolVersion: SIMULATION_WORKER_PROTOCOL_VERSION, buildCohort: APP_BUILD_COHORT, type: 'simulation.step.request', requestId: 'null-input', input: null },
       { protocolVersion: 99, type: 'simulation.step.request', requestId: 'unsupported-version', input: {} },
-      { protocolVersion: 1, type: 'simulation.step.request', requestId: 'infinite-steps', input: { dt: 1 / 60, steps: Infinity } },
+      { protocolVersion: SIMULATION_WORKER_PROTOCOL_VERSION, buildCohort: APP_BUILD_COHORT, type: 'simulation.step.request', requestId: 'infinite-steps', input: { dt: 1 / 60, steps: Infinity } },
     ];
     try {
       const replies: Array<{ type: string; requestId: string; error?: { message: string } }> = [];

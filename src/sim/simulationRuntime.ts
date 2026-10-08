@@ -15,6 +15,7 @@ export type SimulationRuntimeKind = 'main-thread' | 'worker-handler-parity' | 'b
 
 export interface SimulationRuntime {
   readonly kind: SimulationRuntimeKind;
+  diagnosticState?(): { executionBackend: SimulationRuntimeKind | null; observedWorkerCohort: string | null };
   step(input: SimulationStepInput): SimulationStepResult;
   dispose?(): void;
 }
@@ -92,6 +93,10 @@ export class BrowserWorkerSimulationRuntime implements AsyncSimulationRuntime {
   readonly #timeoutMs: number;
   readonly #maxPendingRequests: number;
   readonly #pending = new Map<string, PendingWorkerRequest>();
+  #executionBackend: SimulationRuntimeKind | null = null;
+  #observedWorkerCohort: string | null = null;
+
+  diagnosticState() { return { executionBackend: this.#executionBackend, observedWorkerCohort: this.#observedWorkerCohort }; }
 
   constructor(options: {
     worker: SimulationWorkerLike;
@@ -113,6 +118,7 @@ export class BrowserWorkerSimulationRuntime implements AsyncSimulationRuntime {
     // Direct synchronous callers retain the validated main-thread path.
     const result = this.#fallback.step(input);
     assertSimulationStepResult(result);
+    this.#executionBackend = this.#fallback.kind;
     return result;
   }
 
@@ -123,6 +129,7 @@ export class BrowserWorkerSimulationRuntime implements AsyncSimulationRuntime {
     if (this.#disposed || this.#workerFailed || this.#pending.size >= this.#maxPendingRequests) {
       const result = this.#fallback.step(request.input);
       assertSimulationStepResult(result);
+      this.#executionBackend = this.#fallback.kind;
       return result;
     }
 
@@ -158,6 +165,7 @@ export class BrowserWorkerSimulationRuntime implements AsyncSimulationRuntime {
       const response = decodeSimulationStepResponse(event.data);
       const pending = this.#pending.get(response.requestId);
       if (!pending) return;
+      this.#observedWorkerCohort = response.buildCohort;
       if (response.type === 'simulation.step.error') {
         if (response.error.name === 'InvalidSimulationStateError') throw new InvalidSimulationStateError(response.error.message, response.error.invalidResult);
         if (response.error.kind !== 'protocol') throw new SimulationWorkerExecutionError(response.error.message);
@@ -167,6 +175,7 @@ export class BrowserWorkerSimulationRuntime implements AsyncSimulationRuntime {
       if (response.result.guidance.scenarioId !== pending.input.selectedScenarioId) throw new InvalidSimulationStateError('Worker result scenario identity mismatch', response.result);
       clearTimeout(pending.timeoutId);
       this.#pending.delete(response.requestId);
+      this.#executionBackend = 'browser-worker';
       pending.resolve(response.result);
     } catch (error) {
       if (error instanceof InvalidSimulationStateError || error instanceof SimulationWorkerExecutionError) {
@@ -193,6 +202,7 @@ export class BrowserWorkerSimulationRuntime implements AsyncSimulationRuntime {
     try {
       const result = this.#fallback.step(pending.input);
       assertSimulationStepResult(result);
+      this.#executionBackend = this.#fallback.kind;
       pending.resolve(result);
     } catch (error) {
       pending.reject(error);

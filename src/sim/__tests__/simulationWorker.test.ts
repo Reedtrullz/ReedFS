@@ -1,3 +1,4 @@
+import { APP_BUILD_COHORT } from '../../config/buildIdentity';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildGuidanceState } from '../guidanceState';
 import { KSEA_TUTORIAL_SCENARIO } from '../scenarios';
@@ -103,6 +104,7 @@ describe('simulationWorker', () => {
   it('returns an error response preserving requestId when a request is missing input', () => {
     const response = decodeSimulationStepResponse(handleSimulationWorkerMessage({
       protocolVersion: SIMULATION_WORKER_PROTOCOL_VERSION,
+      buildCohort: APP_BUILD_COHORT,
       type: SIMULATION_STEP_REQUEST_TYPE,
       requestId: 'worker-step-missing-input',
     }));

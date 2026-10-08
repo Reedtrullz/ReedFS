@@ -11,6 +11,7 @@ import { getAudioEngine } from '../audio/AudioEngine';
 import { effectiveMasterVolume, loadAudioSettings, saveAudioSettings, type AudioSettingsState } from '../audio/audioSettings';
 import type { AudioCaptionEvent } from '../audio/GPWS';
 import { useSimStore } from '../store/simStore';
+import { FlightUpdateBanner } from '../components/FlightUpdateBanner';
 import { readGamepadActions, type GamepadCommand } from '../input/GamepadManager';
 import {
   applyDiscreteKeyAction,
@@ -404,6 +405,7 @@ export function RfsShell() {
       controls={(
         <>
           <SimulationRecovery />
+          <FlightUpdateBanner />
           {audioCaptionNode}
           <AudioSettings
             settings={audioSettings}

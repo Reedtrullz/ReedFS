@@ -6,6 +6,7 @@ import bugReportTemplate from '../../../.github/ISSUE_TEMPLATE/bug_report.yml?ra
 import featureRequestTemplate from '../../../.github/ISSUE_TEMPLATE/feature_request.yml?raw';
 import pullRequestTemplate from '../../../.github/pull_request_template.md?raw';
 import ciWorkflow from '../../../.github/workflows/ci.yml?raw';
+import pwaConfig from '../../../playwright.pwa.config.ts?raw';
 import dockerfile from '../../../Dockerfile?raw';
 import nginxConf from '../../../nginx.conf?raw';
 import releaseMetadataScript from '../../../scripts/write-version-metadata.mjs?raw';
@@ -67,7 +68,7 @@ describe('canonical docs posture', () => {
       /Scene loading\/error states: partial/i,
       /PWA: partial/i,
       /The Vite build generates a service worker/i,
-      /Cesium tile\/terrain\/imagery requests and the simulation worker stay network-only/i,
+      /Bundled Cesium code\/fonts and the simulation worker are precached per build cohort/i,
       /Visual snapshots are not proof of audio, weather, PWA, or error-state behavior/i,
     ]) {
       expect(readme).toMatch(requiredDisposition);
@@ -88,20 +89,28 @@ describe('canonical docs posture', () => {
     expect(packageJson.scripts['test:e2e:full-flight']).toContain('e2e/rfs-full-flight-blackbox.spec.ts');
     expect(packageJson.scripts['test:visual']).toContain('e2e/rfs-visual.spec.ts');
     const workflow = parse(ciWorkflow) as { jobs: { test: { steps: Array<{
-      run?: string; id?: string; if?: string; with?: { name?: string; path?: string };
+      run?: string; id?: string; if?: string; with?: { name?: string; path?: string; 'retention-days'?: number };
     }> } } };
     const steps = workflow.jobs.test.steps;
     const browser = steps.findIndex((step) => step.run === 'npm run test:e2e');
     const visual = steps.findIndex((step) => step.run === 'npm run test:visual');
+    const fixtureBuild = steps.findIndex((step) => step.run === 'npm run test:e2e:pwa:build');
+    const pwa = steps.findIndex((step) => step.run === 'npm run test:e2e:pwa:run');
     expect(browser).toBeGreaterThanOrEqual(0);
     expect(visual).toBeGreaterThan(browser);
-    for (const [phase, start, end] of [['browser', browser, visual], ['visual', visual, steps.length]] as const) {
+    expect(fixtureBuild).toBeGreaterThan(visual);
+    expect(pwa).toBeGreaterThan(fixtureBuild);
+    expect(packageJson.scripts['test:e2e:pwa:run']).not.toContain('build-pwa-fixtures');
+    expect(pwaConfig).toMatch(/outputDir:\s*'test-results-pwa'/);
+    for (const [phase, start, end] of [['browser', browser, visual], ['visual', visual, pwa], ['pwa', pwa, steps.length]] as const) {
       expect(steps[start].id).toBe(phase);
       const upload = steps.slice(start + 1, end).find((step) => step.with?.name?.startsWith(`rfs-${phase}-evidence-`));
       expect(upload?.if).toContain('always()');
+      expect(upload?.if).toContain(`steps.${phase}.outcome == 'success'`);
       expect(upload?.if).toContain(`steps.${phase}.outcome == 'failure'`);
-      expect(upload?.with?.path).toContain('test-results/');
+      expect(upload?.with?.path).toContain(phase === 'pwa' ? 'test-results-pwa/' : 'test-results/');
       expect(upload?.with?.name).toContain('${{ github.run_attempt }}');
+      expect(upload?.with?.['retention-days']).toBe(7);
     }
     expect(ciWorkflow).toContain('npm run check:deps');
     expect(ciWorkflow).toContain('push: false');

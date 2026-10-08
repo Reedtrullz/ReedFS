@@ -22,15 +22,21 @@ const buildCohort = createBuildCohort(configuredCommit, local);
 export default defineConfig({
   define: { __RFS_BUILD_COHORT__: JSON.stringify(buildCohort) },
   plugins: [react(), cesium(), VitePWA({
-    registerType: 'autoUpdate',
+    registerType: 'prompt',
+    injectRegister: false,
     includeAssets: ['manifest.json', 'icons/*'],
     manifest: false,
     workbox: {
       globPatterns: ['**/*.{js,css,html,svg,woff2}'],
-      // Cesium tiles/workers stay network-only; only the app shell precaches.
-      globIgnores: ['cesium/**', 'assets/simulationWorker-*.js'],
+      // Owned bundled libraries and physics worker stay with this app cohort.
+      // Remote terrain/imagery remain network-only. Older controlled tabs retain
+      // their separate Workbox cohort cache until explicit origin-data removal.
+      cacheId: `rfs-${buildCohort}`,
+      maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
+      skipWaiting: false,
+      clientsClaim: false,
       navigateFallback: '/index.html',
-      cleanupOutdatedCaches: true,
+      cleanupOutdatedCaches: false,
     },
   })],
   resolve: {
