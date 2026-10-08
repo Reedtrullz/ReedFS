@@ -59,7 +59,10 @@ export const pfdObservation = (s: SimStore) => s.simulationCommit?.observation ?
 export const selectPfdFlightPlan = (s: SimStore) => pfdObservation(s).flightPlan;
 export const selectPfdRouteStatus = (s: SimStore) => pfdObservation(s).routeStatus;
 export const selectPfdApStateForGuidance = (s: SimStore) => pfdObservation(s).apState;
-export const selectPfdIas = (s: SimStore) => Math.max(0, computeDerived(pfdObservation(s).aircraft, pfdObservation(s).wind, pfdObservation(s).weather).ias);
+export const selectPfdIas = (s: SimStore): number | null => {
+  const observed = pfdObservation(s); const air = computeDerived(observed.aircraft, observed.wind, observed.weather);
+  return air.airDataValid ? Math.max(0, air.ias) : null;
+};
 const STANDARD_PRESSURE_HPA = 1013.25;
 const FEET_PER_HPA = 27;
 

@@ -2,7 +2,7 @@ import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { Telemetry } from '../Telemetry';
 import { useSimStore } from '../../store/simStore';
-import { selectPfdTakeoffCue, selectTelemetryViewModel } from '../../store/selectors';
+import { selectPfdIas, selectPfdTakeoffCue, selectTelemetryViewModel } from '../../store/selectors';
 
 describe('Telemetry', () => {
   beforeEach(() => {
@@ -33,6 +33,7 @@ describe('Telemetry', () => {
     expect(screen.queryByText(/TAKEOFF ROLL|ROTATE|POSITIVE RATE/)).toBeNull();
     expect(selectTelemetryViewModel(useSimStore.getState()).iasKt).toBeNull();
     expect(selectPfdTakeoffCue(useSimStore.getState())).toBeNull();
+    expect(selectPfdIas(useSimStore.getState())).toBeNull();
   });
 });
 
