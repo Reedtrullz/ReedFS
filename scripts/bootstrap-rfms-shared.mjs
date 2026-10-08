@@ -51,10 +51,14 @@ function assertSharedPackage() {
 function checkOnly() {
   assertSharedPackage();
   const head = rfmsHead();
-  if (head && head !== RFMS_COMMIT) {
-    process.stderr.write(
-      `RFMS shared package is available, but the sibling checkout is at ${head}, not the pinned CI/Docker commit ${RFMS_COMMIT}.\n`,
+  if (head !== RFMS_COMMIT) {
+    throw new Error(
+      `RFMS dependency identity is ${head ?? 'unversioned'}, not the pinned CI/Docker commit ${RFMS_COMMIT}. ` +
+      'Use an isolated sibling pair and run npm run bootstrap there; --check never modifies a checkout.',
     );
+  }
+  if (rfmsStatus().length > 0) {
+    throw new Error('RFMS pinned checkout has local changes; use a clean isolated sibling pair for reproducible verification.');
   }
   process.stdout.write(`RFMS shared dependency available at ${RFMS_SHARED_PACKAGE}\n`);
 }
