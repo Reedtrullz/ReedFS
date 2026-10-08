@@ -1,0 +1,3438 @@
+{
+  "schema": "rfs-all-issues-assessment/v1",
+  "date": "2026-10-08",
+  "canonical_head": "b3e3f937ac3be515ec17fdade97136fea20d580d",
+  "items": [
+    {
+      "number": 160,
+      "title": "Refresh runtime pcre2 to clear four HIGH image advisories",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/160",
+      "wave": 0,
+      "assessment_kind": "M",
+      "assessment": "PR #161 merged during assessment; Dockerfile and guard now include pcre2. Issue acceptance remains pending.",
+      "first_increment_dependencies": [],
+      "original_full_scope_dependencies": [],
+      "implementation": "Reuse the merged fix; read exact canonical CI/image package/native Pages/public identity evidence from the owning task; reconcile only after all required acceptance.",
+      "verification": "pcre2 fixed image and unchanged Trivy/non-root health gates; canonical run 37716227731 and normal delivery readback.",
+      "completion_residual": "Do not duplicate implementation or claim closure/live acceptance from PR checks; coordinating task owns the ongoing delivery.",
+      "issue_acceptance": "- [ ] Add pcre2 to the runtime targeted Alpine upgrade without changing base digest, OS series, shared dependency pin or application behavior; strengthen the existing guard.\n- [ ] Fresh runtime image contains pcre2>=10.49-r0 and unchanged HIGH/CRITICAL Trivy policy passes; non-root read-only nginx health/version smoke passes.\n- [ ] Run applicable Node22 composite/unit/build/bundle and native complete CI/browser/visual/CodeQL/secret/image checks on the exact candidate.\n- [ ] Merge the qualified focused fix through the normal path; verify canonical native gates and authorized normal Pages delivery/public exact revision before Issue closure and Project Done.",
+      "source_paths": [
+        "Dockerfile",
+        "scripts/release-hardening-check.mjs"
+      ],
+      "current_project": {
+        "status": "In Review",
+        "priority": "P1",
+        "phase": "Immediate",
+        "effort": "S",
+        "confidence": "Confirmed",
+        "category": "Security",
+        "area": "Testing dependencies and release"
+      }
+    },
+    {
+      "number": 162,
+      "title": "Refresh the remaining HIGH development source-map-js dependency",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/162",
+      "wave": 0,
+      "assessment_kind": "C",
+      "assessment": "Canonical lock still contains dev source-map-js 1.2.1; primary advisory/release and registry confirm 1.2.2.",
+      "first_increment_dependencies": [],
+      "original_full_scope_dependencies": [],
+      "implementation": "Recheck every owning range; make a narrow compatible lock refresh in a separate PR; clean-install/audit without forced override or policy suppression.",
+      "verification": "Full npm audit and remaining LOW detail; composite, native browser/visual/image/CodeQL/secret gates on fresh candidate.",
+      "completion_residual": "Current parents inspected use ^1.2.1, but clean-install qualification is still required; preserve runtime fix/shared pin.",
+      "issue_acceptance": "- [ ] Revalidate canonical package ownership, primary advisory and patched registry metadata; deduplicate current Issues/PRs and prove proposed version satisfies all parents.\n- [ ] Apply the smallest compatible dependency remediation in its own PR; preserve runtime pcre2 fix, pinned shared source, application behavior and scan policies.\n- [ ] Clean install/full npm audit, composite/unit/build/bundle and native complete browser/visual/image gates pass; state any remaining LOW findings explicitly.\n- [ ] Verify canonical/native and normally authorized delivery acceptance before closing this Issue/Project Done.",
+      "source_paths": [
+        "package-lock.json",
+        "package.json"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P1",
+        "phase": "Immediate",
+        "effort": "S",
+        "confidence": "Confirmed",
+        "category": "Security",
+        "area": "Testing dependencies and release"
+      }
+    },
+    {
+      "number": 91,
+      "title": "Harden saves and restore the exact flying conditions",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/91",
+      "wave": 1,
+      "assessment_kind": "C",
+      "assessment": "Snapshot excludes effective weather and uses shallow nested validation; invalid stored collections become empty on write.",
+      "first_increment_dependencies": [],
+      "original_full_scope_dependencies": [],
+      "implementation": "Add finite/ranged nested validation and exact effective weather; preserve corrupt raw collections; restore paused and migrate explicitly.",
+      "verification": "Malformed nested values, unsupported identities, quota failures and weather round-trip without other-slot loss.",
+      "completion_residual": "Add clock/profile/shared identities as #82/#93 land; restore must invalidate all older worker generations.",
+      "issue_acceptance": "Valid saves restore paused under the same atmosphere; malformed/quota-denied/version-incompatible data cannot corrupt active state or other slots. Restore invalidates in-flight worker results and rejects impossible state before physics runs.",
+      "source_paths": [
+        "src/store/scenarioPersistence.ts",
+        "src/store/slices/persistenceSlice.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P1",
+        "phase": "Foundation",
+        "effort": "M",
+        "confidence": "Confirmed",
+        "category": "Reliability",
+        "area": "Persistence worker and runtime"
+      }
+    },
+    {
+      "number": 92,
+      "title": "Make improvement acceptance reproducible and current",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/92",
+      "wave": 1,
+      "assessment_kind": "C",
+      "assessment": "bootstrap --check only warns on pinned-sibling mismatch; test lanes and current documentation differ in scope.",
+      "first_increment_dependencies": [],
+      "original_full_scope_dependencies": [],
+      "implementation": "Add read-only exact pin verification and an isolated sibling build recipe; create a capability/evidence matrix; add separate KSEA/KPDX continuous-flight coverage.",
+      "verification": "Clean Node22/pinned RFMC build; deliberate mismatch refusal; preserve ENVA, selected black-box, worker and visual contracts.",
+      "completion_residual": "Keep matrix current across all waves and add real-scene/cockpit acceptance without weakening existing release/CSP/PWA gates.",
+      "issue_acceptance": "A clean pinned checkout reproduces the gates; mismatched siblings fail clearly or use a separately authorized isolated build. No source presence, seeded screenshot or sampled endpoint is promoted into full-flight, aerodynamic, visual or production acceptance. Keep existing Pages/CSP/PWA/release protections and exact-SHA readback.",
+      "source_paths": [
+        "package.json",
+        "scripts/bootstrap-rfms-shared.mjs",
+        "scripts/check-blackbox-e2e.mjs"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P1",
+        "phase": "Foundation",
+        "effort": "M",
+        "confidence": "Needs validation",
+        "category": "Developer Experience",
+        "area": "Testing dependencies and release"
+      }
+    },
+    {
+      "number": 124,
+      "title": "Validate worker payloads and contain protocol failures",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/124",
+      "wave": 1,
+      "assessment_kind": "C",
+      "assessment": "Envelope checks cast request/result payloads; batch step count lacks a finite upper bound and decoding can throw in listener.",
+      "first_increment_dependencies": [],
+      "original_full_scope_dependencies": [],
+      "implementation": "Validate dt/steps/payload shape/identity at dispatch and commit; catch decoding errors; resolve failure/fallback once with validated input.",
+      "verification": "NaN/infinite/extreme counts, null, versions, duplicates/late responses, timeout and real browser worker.",
+      "completion_residual": "Add profile/build/cohort identity as #93/#118 land without per-substep recursive validation.",
+      "issue_acceptance": "NaN/infinite/extreme step counts, null payloads, wrong versions, duplicate/late responses and decode errors cannot hang execution or commit invalid state. Timeouts resolve exactly once; fallback receives validated inputs. Verify a real browser worker separately from handler-parity tests.",
+      "source_paths": [
+        "src/sim/simulationRuntime.ts",
+        "src/sim/simulationStep.ts",
+        "src/sim/workerCodec.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P1",
+        "phase": "Foundation",
+        "effort": "M",
+        "confidence": "Confirmed",
+        "category": "Reliability",
+        "area": "Persistence worker and runtime"
+      }
+    },
+    {
+      "number": 125,
+      "title": "Pause and preserve evidence when simulation state becomes invalid",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/125",
+      "wave": 1,
+      "assessment_kind": "V",
+      "assessment": "Physics mutates state without a user-visible last-valid-checkpoint recovery contract.",
+      "first_increment_dependencies": [
+        124
+      ],
+      "original_full_scope_dependencies": [
+        124
+      ],
+      "implementation": "Check compact committed-state invariants; stop on invalid result before publication; retain offending result/input and last valid checkpoint.",
+      "verification": "Inject NaN/unusable attitude/identity mismatch; no live invalid instruments/retry loop; extreme valid landings remain valid.",
+      "completion_residual": "Offer explicit restore/export/reset and integrate privacy-limited evidence with #150.",
+      "issue_acceptance": "Deliberately inject a nonfinite result and inconsistent attitude: instruments never continue displaying it as live truth, evidence survives, and restore is explicit. Legitimate hard landings/extreme but valid attitudes do not trigger numerical recovery. Verify no infinite retry loop or lost save.",
+      "source_paths": [
+        "docs/physics-invariants.md",
+        "src/sim/physics/integrate.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P1",
+        "phase": "Foundation",
+        "effort": "M",
+        "confidence": "Strong evidence",
+        "category": "Reliability",
+        "area": "Persistence worker and runtime"
+      }
+    },
+    {
+      "number": 152,
+      "title": "Prevent cross-tab save loss and make quota failures recoverable",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/152",
+      "wave": 1,
+      "assessment_kind": "V",
+      "assessment": "One localStorage read/modify/write collection has no cross-tab arbitration.",
+      "first_increment_dependencies": [
+        91
+      ],
+      "original_full_scope_dependencies": [
+        91
+      ],
+      "implementation": "Reproduce two-tab lost updates; choose supported atomic transaction or explicit enforced single-writer policy; preserve conflicting payloads and export on quota failure.",
+      "verification": "Concurrent create/update/delete, denied/quota storage and cancel; revision-only checks cannot claim atomicity.",
+      "completion_residual": "Coordinate companion windows as non-writers after #116; bound storage growth and retain previous valid collections.",
+      "issue_acceptance": "Concurrent create/update/delete cannot silently discard another session's slot; cancel preserves both versions. Quota exceptions retain the previous valid collection and offer export. Companion windows are not independent save writers. Test on actual supported browser storage, including denied persistence and full quota.",
+      "source_paths": [
+        "src/store/scenarioPersistence.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P1",
+        "phase": "Foundation",
+        "effort": "M",
+        "confidence": "Confirmed",
+        "category": "Reliability",
+        "area": "Persistence worker and runtime"
+      }
+    },
+    {
+      "number": 90,
+      "title": "Protect input latency while physics catches up",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/90",
+      "wave": 2,
+      "assessment_kind": "V",
+      "assessment": "Worker batching/generation protection exists; accelerated batches and end-to-end latency need measurement.",
+      "first_increment_dependencies": [],
+      "original_full_scope_dependencies": [],
+      "implementation": "Instrument frame/input/worker duration and target-versus-achieved rate; select measured limits; bound work and expose dropped time.",
+      "verification": "Low FPS/delayed worker/high rates with responsive input/pause/reset; fixed scenarios and representative devices.",
+      "completion_residual": "Add render-only interpolation/adaptive quality only where data shows need; never feed interpolated poses into truth.",
+      "issue_acceptance": "Low FPS/worker delay/high sim rates retain responsive pause/reset/control changes and discard stale generations. Interpolation never feeds physics or changes instrument truth; evaluate representative desktop/mobile devices before making performance claims.",
+      "source_paths": [
+        "src/store/simStore.ts",
+        "src/viewport/CameraManager.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P1",
+        "phase": "Near-term",
+        "effort": "M",
+        "confidence": "Strong evidence",
+        "category": "Performance",
+        "area": "Persistence worker and runtime"
+      }
+    },
+    {
+      "number": 100,
+      "title": "Make GPWS warnings depend on the condition they name",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/100",
+      "wave": 2,
+      "assessment_kind": "C",
+      "assessment": "GPWS GLIDESLOPE checks descent/AGL only; severe overlap can be masked by earlier SINK RATE.",
+      "first_increment_dependencies": [],
+      "original_full_scope_dependencies": [],
+      "implementation": "Define valid alert inputs and severity selection; suppress unsupported GLIDESLOPE until applicable deviation exists; add invalid-data behavior.",
+      "verification": "Climb/normal descent/gear/flap/invalid AGL and overlapping hazard predicate fixtures.",
+      "completion_residual": "When #113 offers a qualified signal, integrate deviation applicability without claiming certified GPWS/TAWS.",
+      "issue_acceptance": "No glideslope warning without a valid applicable signal/deviation; severe overlapping alerts are not masked by weaker predicates. Test climb, landing configuration, low-altitude normal descent, invalid radio altitude and overlapping hazards. No GPWS certification claim.",
+      "source_paths": [
+        "src/audio/GPWS.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P1",
+        "phase": "Near-term",
+        "effort": "M",
+        "confidence": "Confirmed",
+        "category": "Bug",
+        "area": "Audio training and session experience"
+      }
+    },
+    {
+      "number": 101,
+      "title": "Introduce a priority-aware alert and speech queue",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/101",
+      "wave": 2,
+      "assessment_kind": "C",
+      "assessment": "GPWS uses global cooldown, direct speech enqueue and reset without queued-speech cancellation.",
+      "first_increment_dependencies": [
+        100,
+        103
+      ],
+      "original_full_scope_dependencies": [
+        100
+      ],
+      "implementation": "Add one GPWS alert scheduler with per-identity priority/cooldown, interruption and session cancellation; report captions and audible delivery separately.",
+      "verification": "Rapid alert changes, urgent preemption, mute/reset, missing/rejected voice and no obsolete queue.",
+      "completion_residual": "Extend the same scheduler to crew/radio/system sources later; do not introduce competing queues.",
+      "issue_acceptance": "Rapidly changing alerts never build a stale speech backlog; a new urgent warning is not delayed by another warning's cooldown. Muting, reset and session changes cancel appropriately. Captions remain useful with missing voices or rejected speech, and do not falsely report spoken playback.",
+      "source_paths": [
+        "src/audio/GPWS.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P1",
+        "phase": "Near-term",
+        "effort": "M",
+        "confidence": "Confirmed",
+        "category": "Reliability",
+        "area": "Audio training and session experience"
+      }
+    },
+    {
+      "number": 102,
+      "title": "Give speech and sounds one understandable mixer",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/102",
+      "wave": 2,
+      "assessment_kind": "C",
+      "assessment": "Speech volume is fixed and shell gating only checks mute/enabled, so master zero does not silence speech.",
+      "first_increment_dependencies": [],
+      "original_full_scope_dependencies": [
+        59
+      ],
+      "implementation": "Apply validated effective master volume to speech and Web Audio; cancel/gate queued speech on zero/mute; preserve independent captions.",
+      "verification": "Master-zero/mute across all sources, queued utterance cancellation, persisted levels and keyboard controls.",
+      "completion_residual": "Add category gains for #86/#104/#105 through existing settings; full category UX can follow #59.",
+      "issue_acceptance": "Master zero and mute silence every enabled source, including queued speech. Caption-only warning access works independently. Levels restore predictably, do not clip under overlapping sources, and remain keyboard/touch operable.",
+      "source_paths": [
+        "src/app/RfsShell.tsx",
+        "src/audio/AudioEngine.ts",
+        "src/audio/audioMapping.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P1",
+        "phase": "Near-term",
+        "effort": "M",
+        "confidence": "Confirmed",
+        "category": "Bug",
+        "area": "Audio training and session experience"
+      }
+    },
+    {
+      "number": 103,
+      "title": "Make audio follow the flight session lifecycle",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/103",
+      "wave": 2,
+      "assessment_kind": "C",
+      "assessment": "AudioEngine.start exits once started even after later suspension; audio loop lacks status/rate lifecycle policy.",
+      "first_increment_dependencies": [],
+      "original_full_scope_dependencies": [],
+      "implementation": "Define observable locked/running/suspended/failed states; resume on gesture; make reset/teardown idempotent and cancel old audio.",
+      "verification": "Real browser first/later gesture, suspension, pause/resume, reset, StrictMode remount and node count.",
+      "completion_residual": "Cover supported desktop/mobile contexts and background/rate policy without tying pitch directly to simulation rate.",
+      "issue_acceptance": "First gesture, later suspension, mute/unmute, pause/resume, StrictMode remount and reset produce no duplicate oscillators or stale speech. UI reflects actual context state. Real-browser checks cover supported desktop/mobile audio behavior; mock success alone is insufficient.",
+      "source_paths": [
+        "src/audio/AudioEngine.ts",
+        "src/hooks/useAudioLoop.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P1",
+        "phase": "Near-term",
+        "effort": "M",
+        "confidence": "Confirmed",
+        "category": "Reliability",
+        "area": "Audio training and session experience"
+      }
+    },
+    {
+      "number": 107,
+      "title": "Verify the rendered audio, not only its mocks",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/107",
+      "wave": 2,
+      "assessment_kind": "V",
+      "assessment": "Mocked AudioContext and alert tests cannot establish actual waveform or browser speech.",
+      "first_increment_dependencies": [
+        101,
+        102,
+        103
+      ],
+      "original_full_scope_dependencies": [
+        101,
+        102,
+        103
+      ],
+      "implementation": "Offline-render fixed N1 steps through supported actual nodes; verify finite duration, silence and peaks; add real-browser alert/lifecycle capture.",
+      "verification": "Intentionally silent/clipped/discontinuous controls fail; speech/caption cancellation tested separately.",
+      "completion_residual": "Run short human listening checks for changed content/cameras after #86; platform voice quality remains separate evidence.",
+      "issue_acceptance": "The lane detects an intentionally silent, clipped or discontinuous source; bounds are meaningful rather than arbitrary snapshot hashes. Browser queue/cancellation tests pass separately. Numerical audio checks are not reported as listening acceptance or proof of consistent platform voices.",
+      "source_paths": [
+        "src/audio/__tests__/AudioEngine.test.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P1",
+        "phase": "Near-term",
+        "effort": "M",
+        "confidence": "Needs validation",
+        "category": "Testing",
+        "area": "Audio training and session experience"
+      }
+    },
+    {
+      "number": 118,
+      "title": "Defer PWA updates until a safe session boundary",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/118",
+      "wave": 2,
+      "assessment_kind": "V",
+      "assessment": "PWA autoUpdate and uncached worker bundles create a cohort/update risk; no incident reproduced here.",
+      "first_increment_dependencies": [
+        91,
+        124
+      ],
+      "original_full_scope_dependencies": [],
+      "implementation": "Expose app/worker version cohort and waiting update state; stage activation at parked/saved boundary; preserve saves and fallback.",
+      "verification": "Staged v1/v2 active flight, cancellation, save/reload/offline and failed-worker recovery in a real browser.",
+      "completion_residual": "Complete installed-PWA behavior without custom cache infrastructure or unsaved forced reload.",
+      "issue_acceptance": "A staged v1-to-v2 browser test covers active flight, save, reload, offline and failed-worker recovery. App and physics worker cannot silently form an incompatible cohort. Update cancellation preserves the current flight; no forced reload loses unsaved state.",
+      "source_paths": [
+        "src/main.tsx",
+        "vite.config.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P1",
+        "phase": "Foundation",
+        "effort": "M",
+        "confidence": "Needs validation",
+        "category": "Reliability",
+        "area": "Persistence worker and runtime"
+      }
+    },
+    {
+      "number": 123,
+      "title": "Order commands at explicit simulation boundaries",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/123",
+      "wave": 2,
+      "assessment_kind": "V",
+      "assessment": "Live pilot intent is reconciled, but dispatched AP/route/controller revisions stay batch-bound; races require injected schedules.",
+      "first_increment_dependencies": [
+        90,
+        124
+      ],
+      "original_full_scope_dependencies": [
+        90
+      ],
+      "implementation": "Trace accepted/applied command revisions and committed step index; specify AP/route/pilot boundaries; preserve immediate input feedback and generation rejection.",
+      "verification": "AP disconnect, EXEC, throttle and reset mid-batch; no stale modes/routes; sync/worker schedules and measured delay.",
+      "completion_residual": "Split batches only when needed and measured; no event-sourcing framework or last-write-wins replacement.",
+      "issue_acceptance": "Inject AP disconnect, EXEC, throttle movement and pause/reset while a batch is in flight. No result reactivates old modes/routes or overwrites newer intent; each committed state identifies its applied revisions. Test synchronous/worker parity for equivalent command schedules and explicit maximum command-to-simulation delay.",
+      "source_paths": [
+        "src/store/simStore.ts",
+        "src/store/simStoreInputReducers.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P1",
+        "phase": "Foundation",
+        "effort": "L",
+        "confidence": "Confirmed",
+        "category": "Reliability",
+        "area": "Persistence worker and runtime"
+      }
+    },
+    {
+      "number": 147,
+      "title": "Render instruments from coherent, age-labeled simulation snapshots",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/147",
+      "wave": 2,
+      "assessment_kind": "V",
+      "assessment": "Separate selectors compute current fields; mixed revisions and latency need measured evidence.",
+      "first_increment_dependencies": [
+        123
+      ],
+      "original_full_scope_dependencies": [
+        63,
+        123
+      ],
+      "implementation": "Derive a timestamped coherent observation snapshot for current overlays first; tag immediate selections separately; expose age/invalid state.",
+      "verification": "Delay worker and compare mode/speed/altitude revision; pause versus disconnect, no interpolated FMA capture.",
+      "completion_residual": "Reuse in #63/#116 and measured display refresh/readability; avoid blanket memoization.",
+      "issue_acceptance": "Mode/airspeed/altitude/source-validity fields identify one coherent revision; slow workers and owner loss show age/state honestly. Pause is not confused with disconnection. Camera interpolation cannot announce uncommitted mode capture. Verify rendered instrument latency/readability rather than only selector equality.",
+      "source_paths": [
+        "src/hooks/useSimLoop.ts",
+        "src/store/selectors.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P1",
+        "phase": "Medium-term",
+        "effort": "M",
+        "confidence": "Strong evidence",
+        "category": "Reliability",
+        "area": "Persistence worker and runtime"
+      }
+    },
+    {
+      "number": 148,
+      "title": "Recover from GPU context loss without losing the flight",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/148",
+      "wave": 2,
+      "assessment_kind": "V",
+      "assessment": "Generic scene retry/cleanup does not prove coupled Cesium/Three context restoration.",
+      "first_increment_dependencies": [
+        125
+      ],
+      "original_full_scope_dependencies": [
+        99,
+        125
+      ],
+      "implementation": "Probe forced loss on existing aircraft; use supported renderer restoration or explicit reduced-view fallback; preserve authority and debounce retries.",
+      "verification": "Approach loss/restore, same state/routes/saves, nonblank/fallback, listener/viewer/resource count on both canvases.",
+      "completion_residual": "Integrate asset recreation ownership with #99; no reload-first recovery or infinite renderer loop.",
+      "issue_acceptance": "Forced loss/restoration during approach retains state/route/saves and yields a nonblank correctly framed scene or honest fallback. No duplicate viewers/listeners, growing GPU allocations or unbounded retry loops. Render tests cover both Cesium and Three surfaces; mock cleanup alone is insufficient.",
+      "source_paths": [
+        "src/components/SceneStatus.tsx",
+        "src/viewport/CesiumViewport.tsx",
+        "src/viewport/ThreeLayer.tsx"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P1",
+        "phase": "Medium-term",
+        "effort": "M",
+        "confidence": "Needs validation",
+        "category": "Reliability",
+        "area": "Viewport scenery and weather"
+      }
+    },
+    {
+      "number": 150,
+      "title": "Add a privacy-reviewed diagnostic flight bundle",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/150",
+      "wave": 2,
+      "assessment_kind": "F",
+      "assessment": "Error/FPS paths expose useful state but no previewed redacted export exists.",
+      "first_increment_dependencies": [
+        125,
+        91
+      ],
+      "original_full_scope_dependencies": [
+        125,
+        126
+      ],
+      "implementation": "Whitelist bounded build/runtime/error/timing fields and optional location selection; preview/export locally; enforce size and redact secrets/names.",
+      "verification": "Planted token/name absent, preview equals payload, recursive error cap and no session mutation.",
+      "completion_residual": "Optional re-simulation capsule follows #126; diagnostic export should not be blocked by complete recorder.",
+      "issue_acceptance": "A planted token/name never appears in default output; preview matches actual exported fields. Size/trace limits are enforced and errors cannot recursively explode the bundle. Import/debug readers treat content as data, not instructions. Verify that exporting does not mutate or resume the session.",
+      "source_paths": [
+        "src/components/ErrorBoundary.tsx",
+        "src/components/FPSMonitor.tsx"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P1",
+        "phase": "Near-term",
+        "effort": "M",
+        "confidence": "Needs validation",
+        "category": "Security",
+        "area": "Persistence worker and runtime"
+      }
+    },
+    {
+      "number": 69,
+      "title": "Replace placeholder tuning with a source-qualified FDM envelope",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/69",
+      "wave": 3,
+      "assessment_kind": "G",
+      "assessment": "FDM data explicitly retains placeholder lineage; no aircraft-wide qualified replacement is available.",
+      "first_increment_dependencies": [],
+      "original_full_scope_dependencies": [],
+      "implementation": "Inventory each data group and permitted primary reference; build one source packet with units, permission, conditions and independent holdouts; replace only the qualified group.",
+      "verification": "Independent trim/performance residuals within declared tolerances; tests proving runtime consumption and lineage.",
+      "completion_residual": "Track aero, engine, gear, tires/brakes, performance and atmosphere separately; one qualified group cannot close the whole envelope issue.",
+      "issue_acceptance": "Every replaced group has citation, permission, confidence, units, applicability and independent acceptance tolerances. Tests distinguish preservation regressions from aircraft-validity evidence. No Boeing/AFM/training-grade claim without supporting evidence.",
+      "source_paths": [
+        "docs/runbooks/fdm-source-governance.md",
+        "src/sim/data/aircraft/b737-800-fdm.v1.ts"
+      ],
+      "current_project": {
+        "status": "Blocked",
+        "priority": "P1",
+        "phase": "Foundation",
+        "effort": "L",
+        "confidence": "Needs validation",
+        "category": "Research",
+        "area": "Flight model and contact physics"
+      }
+    },
+    {
+      "number": 70,
+      "title": "Audit force frames and rigid-body integration",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/70",
+      "wave": 3,
+      "assessment_kind": "V",
+      "assessment": "Longitudinal drag/lift resolution and diagonal inertia expressions warrant independent derivation; impact is not measured.",
+      "first_increment_dependencies": [],
+      "original_full_scope_dependencies": [],
+      "implementation": "Write analytic wind/body force and coupled-inertia fixtures; document signs/units; change the smallest proven discrepancy and retain integrator unless convergence demands more.",
+      "verification": "Nonzero AoA/sideslip/ixz cases, quaternion norm, timestep convergence and affected flight regressions.",
+      "completion_residual": "Requalify takeoff, stall and AP response after correction; no tuning to conceal a frame error.",
+      "issue_acceptance": "Analytic forces/moments and angular accelerations match the selected conventions; quaternion norm stays bounded and results converge with timestep refinement. Revalidate takeoff, stall and AP envelopes after any correction.",
+      "source_paths": [
+        "src/sim/physics/aero.ts",
+        "src/sim/physics/integrate.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P1",
+        "phase": "Foundation",
+        "effort": "M",
+        "confidence": "Strong evidence",
+        "category": "Bug",
+        "area": "Flight model and contact physics"
+      }
+    },
+    {
+      "number": 71,
+      "title": "Make configuration changes and stall behavior continuous",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/71",
+      "wave": 3,
+      "assessment_kind": "C",
+      "assessment": "Flap polar selection uses detent thresholds while actual flap position transits continuously.",
+      "first_increment_dependencies": [
+        70
+      ],
+      "original_full_scope_dependencies": [
+        69,
+        70
+      ],
+      "implementation": "Interpolate neighboring polar/configuration effects; prove force continuity throughout transit; review authority by flow/AoA separately.",
+      "verification": "Sweep every flap transit and verify no coefficient/force jumps; finite stall/recovery and sideslip cases.",
+      "completion_residual": "Aircraft-specific stall/buffet calibration waits for #69; #138 owns high-altitude compressibility.",
+      "issue_acceptance": "Flap transit produces no force discontinuity; clean/landing stalls, recovery, steep turns and sideslip remain finite and explainable. Preserve explicit limits on unsupported high-AoA/backward-flight behavior.",
+      "source_paths": [
+        "src/sim/physics/aero.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P2",
+        "phase": "Foundation",
+        "effort": "M",
+        "confidence": "Strong evidence",
+        "category": "Bug",
+        "area": "Flight model and contact physics"
+      }
+    },
+    {
+      "number": 74,
+      "title": "Give the engines correct idle semantics and weather-consistent thrust",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/74",
+      "wave": 3,
+      "assessment_kind": "C",
+      "assessment": "Zero throttle requests zero N1; engine Mach uses ISA while aero uses scenario weather.",
+      "first_increment_dependencies": [],
+      "original_full_scope_dependencies": [
+        69
+      ],
+      "implementation": "Separate running-idle from explicit fuel cutoff; create a shared atmosphere input; migrate engine thrust/spool consumers without broad start-system scope.",
+      "verification": "Idle/cutoff/depletion, hot/high/cold consistency, engine independence and synchronous/worker parity.",
+      "completion_residual": "Qualify quantitative lapse/spool data under #69; startup belongs to #108 and reversers to #73.",
+      "issue_acceptance": "Idle does not imply shutdown; explicit cutoff does. Hot/high and cold cases change thrust consistently, depletion remains safe, and independent engine response is reproduced through synchronous and worker paths.",
+      "source_paths": [
+        "src/sim/physics/aero.ts",
+        "src/sim/systems/engine.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P1",
+        "phase": "Foundation",
+        "effort": "M",
+        "confidence": "Confirmed",
+        "category": "Bug",
+        "area": "Flight model and contact physics"
+      }
+    },
+    {
+      "number": 82,
+      "title": "Use one simulation clock for sun, cockpit and weather",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/82",
+      "wave": 3,
+      "assessment_kind": "C",
+      "assessment": "Physics advances timeOfDay at dt/30 while sun lighting uses wall time.",
+      "first_increment_dependencies": [
+        91
+      ],
+      "original_full_scope_dependencies": [],
+      "implementation": "Add scenario UTC epoch plus explicit simulation-time progression; route sun/lighting/weather time through it; migrate saves without losing old slots.",
+      "verification": "Pause/rate/reset/save/restore clock agreement and fixed-date sunrise/night cases.",
+      "completion_residual": "Finish readable night/runway lighting while preserving the existing no-black-globe protection.",
+      "issue_acceptance": "Pause, acceleration and restore keep all clocks aligned; sunrise/night conditions are reproducible at a fixed location/date. Cockpit instruments and runway cues remain usable without flattening every night into daylight.",
+      "source_paths": [
+        "src/sim/physics/integrate.ts",
+        "src/viewport/sunLighting.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P2",
+        "phase": "Near-term",
+        "effort": "M",
+        "confidence": "Confirmed",
+        "category": "Feature",
+        "area": "Viewport scenery and weather"
+      }
+    },
+    {
+      "number": 120,
+      "title": "Make route geometry robust at coordinate boundaries",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/120",
+      "wave": 3,
+      "assessment_kind": "C",
+      "assessment": "Route generation uses raw longitude difference/linear interpolation; navigation only checks finiteness.",
+      "first_increment_dependencies": [],
+      "original_full_scope_dependencies": [],
+      "implementation": "Enforce coordinate ranges at input boundaries; add antimeridian/high-latitude/duplicate fixtures; replace unsuitable route math with existing helpers.",
+      "verification": "179/-179 short path, near-pole/zero distance validity, no partial mutation and unchanged local airport lengths.",
+      "completion_residual": "Preserve declared short-runway local approximation; fix only independently demonstrated geodesy failures.",
+      "issue_acceptance": "A route across 179/-179 degrees takes the intended short path; polar/high-latitude and duplicate-waypoint cases remain finite with sensible bearings/validity. Malformed imported coordinates are rejected without partial state mutation. Existing airport routes retain their expected lengths within declared tolerance.",
+      "source_paths": [
+        "src/sim/flightPlanLoader.ts",
+        "src/sim/physics/geodesy.ts",
+        "src/sim/systems/navigation.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P1",
+        "phase": "Foundation",
+        "effort": "M",
+        "confidence": "Strong evidence",
+        "category": "Bug",
+        "area": "FMS and navigation"
+      }
+    },
+    {
+      "number": 132,
+      "title": "Distinguish equivalent, calibrated and indicated airspeed",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/132",
+      "wave": 3,
+      "assessment_kind": "V",
+      "assessment": "Derived IAS is density-scaled TAS and Mach uses ISA while aero applies weather.",
+      "first_increment_dependencies": [
+        74
+      ],
+      "original_full_scope_dependencies": [
+        69
+      ],
+      "implementation": "Document approximation envelope; share atmosphere; add independent pressure-speed and low-/high-Mach fixtures; separate EAS/CAS/IAS.",
+      "verification": "Round trips/low-speed limit, invalid pressure/domain, and deliberate PFD/AP speed-quantity usage.",
+      "completion_residual": "Instrument error remains separate #110 calibration; aircraft-specific validity requires #69.",
+      "issue_acceptance": "Low-speed limits and round trips agree with independent references; zero/invalid pressure and out-of-domain regimes fail safely. PFD, AP speed loop and performance fixtures deliberately use the intended quantity. Weather changes cannot leave force and indication models using incompatible atmospheres unnoticed.",
+      "source_paths": [
+        "src/sim/physics/aero.ts",
+        "src/sim/physics/derived.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P1",
+        "phase": "Medium-term",
+        "effort": "M",
+        "confidence": "Strong evidence",
+        "category": "Bug",
+        "area": "Flight model and contact physics"
+      }
+    },
+    {
+      "number": 134,
+      "title": "Make true, magnetic and grid heading references explicit",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/134",
+      "wave": 3,
+      "assessment_kind": "F",
+      "assessment": "Heading paths implicitly use true north without explicit magnetic/reference identity.",
+      "first_increment_dependencies": [
+        120
+      ],
+      "original_full_scope_dependencies": [
+        113,
+        120
+      ],
+      "implementation": "Label true heading and add reference-tagged imported courses; qualify epoch/location variation data; convert once at defined boundaries.",
+      "verification": "Nonzero variation once-only, no physical rotation/AP offset on display switch, unsupported dates and runway-label distinction.",
+      "completion_residual": "Radio/ND/database integration follows #113/#78/#146; polar grid support is only for admitted scenarios.",
+      "issue_acceptance": "A supplied nonzero variation converts displayed/selected courses once, not twice; runway number is never treated as surveyed bearing. Date/location changes and unsupported epochs are labeled. True/magnetic mode changes do not silently rotate the aircraft or redirect AP by an unintended offset.",
+      "source_paths": [
+        "src/sim/systems/autopilot.ts",
+        "src/sim/types.ts",
+        "src/store/selectors.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P1",
+        "phase": "Medium-term",
+        "effort": "L",
+        "confidence": "Needs validation",
+        "category": "Feature",
+        "area": "Cockpit input and instruments"
+      }
+    },
+    {
+      "number": 136,
+      "title": "Initialize airborne scenarios from a complete equilibrium solution",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/136",
+      "wave": 3,
+      "assessment_kind": "V",
+      "assessment": "trimSolver solves pitch moment, while scenarios independently initialize other flight quantities.",
+      "first_increment_dependencies": [
+        70,
+        74,
+        132
+      ],
+      "original_full_scope_dependencies": [
+        69,
+        70
+      ],
+      "implementation": "Extend solver offline for one level equilibrium with AoA/pitch/trim/thrust residuals and finite iteration caps; report infeasible.",
+      "verification": "Short unassisted drift, raw residual tolerance, no limit-as-trim deception and sync/worker starts.",
+      "completion_residual": "Add supported climb/descent/bank cases with #69 holdouts; preserve deliberately upset scenarios.",
+      "issue_acceptance": "A converged state remains near its declared condition over a short unassisted run; residuals and tolerances are auditable. Unreachable configurations do not silently pick a limit and call it trimmed. Intentional upset scenarios retain their authored state, and reset/worker starts agree.",
+      "source_paths": [
+        "src/sim/physics/trimSolver.ts",
+        "src/sim/scenarios.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P2",
+        "phase": "Medium-term",
+        "effort": "L",
+        "confidence": "Strong evidence",
+        "category": "Feature",
+        "area": "Flight model and contact physics"
+      }
+    },
+    {
+      "number": 59,
+      "title": "Replace overlay clutter with a flight-first workspace",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/59",
+      "wave": 4,
+      "assessment_kind": "F",
+      "assessment": "The current layout combines fixed corner panels and a 332px compact-PFD minimum; usability still needs browser measurement.",
+      "first_increment_dependencies": [],
+      "original_full_scope_dependencies": [],
+      "implementation": "Introduce Briefing/Flight/Debrief shell state and a setup dock; centralize existing spacing and color tokens; retain the mounted viewport and visible flight controls.",
+      "verification": "Exercise existing black-box selectors at desktop/narrow widths, 200% zoom and keyboard focus; inspect cockpit sightlines.",
+      "completion_residual": "Finish every workspace and responsive variant before closure; recorder-backed debrief content follows #88.",
+      "issue_acceptance": "Desktop and narrow-screen views expose every essential control without overlap, clipping or hidden focus; cockpit mode preserves the outside sightline. Existing black-box controls remain usable.",
+      "source_paths": [
+        "src/app/RfsShell.tsx",
+        "src/components/layout/RfsLayout.tsx"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P1",
+        "phase": "Near-term",
+        "effort": "M",
+        "confidence": "Needs validation",
+        "category": "UX",
+        "area": "Cockpit input and instruments"
+      }
+    },
+    {
+      "number": 60,
+      "title": "Add genuinely usable touch and accessible flight controls",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/60",
+      "wave": 4,
+      "assessment_kind": "F",
+      "assessment": "Keyboard/gamepad and accessibility tests exist; touch axes and robust cancellation are additional scope.",
+      "first_increment_dependencies": [
+        59
+      ],
+      "original_full_scope_dependencies": [
+        59
+      ],
+      "implementation": "Add an optional pointer-controlled flight pad through input reducers; add numeric MCP entry and scale settings; neutralize held axes on cancel, blur, release and unmount.",
+      "verification": "Touch-only short flight, keyboard-only setup/MCP, accessible names, focus order and actual target-device checks.",
+      "completion_residual": "Complete rudder/throttle, cancellation and accessibility acceptance; phone support remains gated by actual devices.",
+      "issue_acceptance": "Complete a short takeoff/manual-flight exercise using touch alone and all setup/MCP actions using keyboard alone; verify zoom, screen-reader names, focus order and no stuck axes. Do not claim full phone support before device testing.",
+      "source_paths": [
+        "e2e/rfs-responsive-accessibility.spec.ts",
+        "src/app/RfsShell.tsx",
+        "src/components/BottomControlBar.tsx",
+        "src/instruments/RfsMCP.tsx"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P1",
+        "phase": "Near-term",
+        "effort": "M",
+        "confidence": "Needs validation",
+        "category": "Accessibility",
+        "area": "Cockpit input and instruments"
+      }
+    },
+    {
+      "number": 61,
+      "title": "Turn preflight setup into a compact electronic flight bag",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/61",
+      "wave": 4,
+      "assessment_kind": "F",
+      "assessment": "Setup values and reference-speed infrastructure exist; this is consolidation plus qualified calculations.",
+      "first_increment_dependencies": [
+        59
+      ],
+      "original_full_scope_dependencies": [
+        59,
+        69
+      ],
+      "implementation": "Build a preflight view from existing route/runway/weather/loading selectors; label provenance and unsupported combinations; add explicit dependent-value recomputation.",
+      "verification": "Change mass, runway, weather and configuration and verify references invalidate/update consistently.",
+      "completion_residual": "Add supported fuel/landing/performance calculations only after #69/#75 qualification; leave uncertain values labeled.",
+      "issue_acceptance": "Changing weight/weather/configuration updates dependent references consistently; impossible or unsupported configurations are clearly rejected or labeled. No generated takeoff distance is presented as dispatch data.",
+      "source_paths": [
+        "src/components/RouteBuilderPanel.tsx",
+        "src/components/TakeoffSetupPanel.tsx",
+        "src/sim/data/performance/b737PerformanceCards.ts",
+        "src/sim/data/performance/b737TakeoffProfiles.ts",
+        "src/sim/data/performance/b737TrimFixtures.ts",
+        "src/sim/scenarios.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P2",
+        "phase": "Near-term",
+        "effort": "M",
+        "confidence": "Needs validation",
+        "category": "UX",
+        "area": "Cockpit input and instruments"
+      }
+    },
+    {
+      "number": 62,
+      "title": "Rebuild cockpit geometry around a believable pilot eye point",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/62",
+      "wave": 4,
+      "assessment_kind": "G",
+      "assessment": "Box-based cockpit and fixed eye offset are present; licensed dimension references and visual acceptance remain required.",
+      "first_increment_dependencies": [],
+      "original_full_scope_dependencies": [],
+      "implementation": "Prepare a lawful reference/axis packet; rebuild captain eye, windshield and glareshield first; retain named interaction nodes and adjustable seat height.",
+      "verification": "Inspect horizon/runway/panel readability across bank and headings, near-plane clipping and named-node regressions.",
+      "completion_residual": "Complete captain/first-officer stations, pedestal/overhead proportions and human visual review.",
+      "issue_acceptance": "From captain eye level the horizon/runway and essential panel remain readable, with no near-plane clipping or impossible window framing across headings and bank angles. Human visual review is required, not bounding-box tests alone.",
+      "source_paths": [
+        "src/viewport/CameraManager.ts",
+        "src/viewport/CockpitModel.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P1",
+        "phase": "Near-term",
+        "effort": "L",
+        "confidence": "Needs validation",
+        "category": "Feature",
+        "area": "Cockpit input and instruments"
+      }
+    },
+    {
+      "number": 63,
+      "title": "Put live instruments on the cockpit panels",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/63",
+      "wave": 4,
+      "assessment_kind": "V",
+      "assessment": "Panel display cutouts are static meshes; a live overlay PFD already exists and must remain the authority.",
+      "first_increment_dependencies": [
+        62,
+        147
+      ],
+      "original_full_scope_dependencies": [
+        62,
+        78
+      ],
+      "implementation": "Probe one overlay/projection or texture approach with measured update cost; render the existing coherent PFD snapshot on its panel; add dimming, invalid and unpowered states.",
+      "verification": "Compare FMA/value revisions with the overlay through EXEC, AP handoff, pause and restore; measure readability/update memory.",
+      "completion_residual": "Add ND after #78 and engine/standby panels; close only after cockpit/pop-out parity and day/night review.",
+      "issue_acceptance": "Cockpit and pop-out values/FMA agree during AP handoff, route edits, pause and restore. Readability survives day/night lighting and display scaling within a measured texture/update budget.",
+      "source_paths": [
+        "src/app/RfsShell.tsx",
+        "src/viewport/CockpitLayer.tsx",
+        "src/viewport/CockpitModel.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P1",
+        "phase": "Near-term",
+        "effort": "L",
+        "confidence": "Needs validation",
+        "category": "Feature",
+        "area": "Cockpit input and instruments"
+      }
+    },
+    {
+      "number": 64,
+      "title": "Replace cockpit click shortcuts with real manipulation",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/64",
+      "wave": 4,
+      "assessment_kind": "C",
+      "assessment": "Cockpit clicks raise both throttles, cycle flaps and map the entire MCP to left FD; yoke is explicitly unavailable.",
+      "first_increment_dependencies": [
+        62,
+        123
+      ],
+      "original_full_scope_dependencies": [
+        62
+      ],
+      "implementation": "Read pilotInputs for manipulation; add reversible independent throttle controls and named MCP targets; use pointer capture and shared command reducers.",
+      "verification": "Mouse/touch/keyboard command parity; AP/A/T ownership, disabled controls and cancellation without stuck axes.",
+      "completion_residual": "Complete flap/gear/speedbrake/trim and continuous yoke manipulation with command-versus-position feedback.",
+      "issue_acceptance": "Mouse, touch and keyboard equivalents produce identical commands; cancellation never leaves a held control; AP commands are not accidentally copied into pilot intent. Disabled actions and command-versus-actual positions remain truthful.",
+      "source_paths": [
+        "src/viewport/cockpitInteractions.ts",
+        "src/viewport/useCockpitInteractions.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P1",
+        "phase": "Near-term",
+        "effort": "M",
+        "confidence": "Confirmed",
+        "category": "UX",
+        "area": "Cockpit input and instruments"
+      }
+    },
+    {
+      "number": 65,
+      "title": "Make cameras useful flying instruments",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/65",
+      "wave": 4,
+      "assessment_kind": "F",
+      "assessment": "Follow cameras use fixed offsets; tower is aircraft-relative and cockpit follow disables camera inputs.",
+      "first_increment_dependencies": [],
+      "original_full_scope_dependencies": [
+        62
+      ],
+      "implementation": "Add constrained look-around and reset using existing camera transforms; separate view input from flight input; add seat/FOV and chase distance settings.",
+      "verification": "Verify reset, horizon orientation, clipping, hidden-control hit testing and pause/free modes.",
+      "completion_residual": "Add panel presets after #62, a fixed airport observation point after #84, and optional reduced-motion-aware head motion.",
+      "issue_acceptance": "Looking around never steers the aircraft or clicks a hidden control; view reset restores a known eye point. Camera transitions preserve horizon orientation without clipping, and pause/free modes remain controllable.",
+      "source_paths": [
+        "src/viewport/CameraManager.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P1",
+        "phase": "Near-term",
+        "effort": "M",
+        "confidence": "Needs validation",
+        "category": "UX",
+        "area": "Viewport scenery and weather"
+      }
+    },
+    {
+      "number": 66,
+      "title": "Give the exterior a convincing 737-800 silhouette",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/66",
+      "wave": 4,
+      "assessment_kind": "G",
+      "assessment": "Procedural named parts exist; silhouette geometry is still simple and fidelity needs visual reference review.",
+      "first_increment_dependencies": [],
+      "original_full_scope_dependencies": [],
+      "implementation": "Qualify visual references and variant dimensions; replace rectangular wing/tail silhouettes and shape nose/nacelles; preserve named nodes and pivots.",
+      "verification": "Front/side/top/quarter visual comparison, model axes/bounds tests and measured triangle/draw budgets.",
+      "completion_residual": "Finish selected-variant winglets, pylons and cylindrical wheel assemblies; external GLB remains optional and rights-gated.",
+      "issue_acceptance": "Front/side/top/three-quarter comparisons support the selected 737-800 variant and model scale; existing axis/node tests pass and representative-device draw/triangle budgets are measured.",
+      "source_paths": [
+        "docs/assets/aircraft-model-strategy.md",
+        "src/viewport/AircraftModel.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P1",
+        "phase": "Near-term",
+        "effort": "L",
+        "confidence": "Needs validation",
+        "category": "Feature",
+        "area": "Viewport scenery and weather"
+      }
+    },
+    {
+      "number": 78,
+      "title": "Add an ND and extend staged FMS editing",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/78",
+      "wave": 4,
+      "assessment_kind": "F",
+      "assessment": "Staged DIRECT TO/discontinuity/Undo/EXEC already exists; a rendered ND and richer editing remain.",
+      "first_increment_dependencies": [
+        59,
+        120
+      ],
+      "original_full_scope_dependencies": [
+        59,
+        77
+      ],
+      "implementation": "Create an ND from active/draft route truth with range, track and cross-track error; reuse routeAdapter commands; add insert/delete and constraints.",
+      "verification": "Draft never steers before EXEC; Undo/replace recomputes route state and controls/panel remain equivalent.",
+      "completion_residual": "Trajectory preview follows #77; qualified procedure legs and database identity belong to #146.",
+      "issue_acceptance": "Preview never commands the aircraft before EXEC; route replacement/undo recomputes leg truth consistently. Synthetic routes and official-data limitations stay visible; editing through the display and panel yields identical active plans.",
+      "source_paths": [
+        "src/sim/fms/routeAdapter.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P2",
+        "phase": "Near-term",
+        "effort": "L",
+        "confidence": "Needs validation",
+        "category": "UX",
+        "area": "FMS and navigation"
+      }
+    },
+    {
+      "number": 85,
+      "title": "Add device profiles and real calibration",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/85",
+      "wave": 4,
+      "assessment_kind": "C",
+      "assessment": "Calibration parameters exist but the shell calls readGamepadActions with defaults and picks the first device.",
+      "first_increment_dependencies": [],
+      "original_full_scope_dependencies": [],
+      "implementation": "Persist validated selected-device/calibration profiles; wire the actual shell call; add live axis preview and editable mappings.",
+      "verification": "Two devices, reorder/reconnect, noise/inversion/deadzone and reset; actual controllers for compatibility claims.",
+      "completion_residual": "Complete multi-device HOTAS/pedals and independent throttle/brake axes after measured browser/device support.",
+      "issue_acceptance": "Two devices, reconnect/reorder, noisy axes and profile reset behave predictably; calibration actually changes flight input. Do not claim HOTAS compatibility from mocked browser tests alone.",
+      "source_paths": [
+        "src/app/RfsShell.tsx",
+        "src/components/ControlsSettings.tsx",
+        "src/input/GamepadManager.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P1",
+        "phase": "Near-term",
+        "effort": "M",
+        "confidence": "Confirmed",
+        "category": "Feature",
+        "area": "Cockpit input and instruments"
+      }
+    },
+    {
+      "number": 93,
+      "title": "Make the selected aircraft a complete simulation contract",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/93",
+      "wave": 4,
+      "assessment_kind": "F",
+      "assessment": "Two engines, B737 data and gear construction are embedded across simulation/store paths.",
+      "first_increment_dependencies": [
+        91,
+        124
+      ],
+      "original_full_scope_dependencies": [
+        69
+      ],
+      "implementation": "Thread a versioned profile through scenario/store/step/worker/save; preserve 737 output; use a single-engine fixture to expose concrete assumptions.",
+      "verification": "No fallback to B737 constants; sync/worker parity and unchanged supported 737 regressions.",
+      "completion_residual": "Generalize only capabilities required by #95-#98; qualified aircraft data remains #69 and pack-specific work.",
+      "issue_acceptance": "No selected-aircraft simulation path silently falls back to B737 constants; worker and synchronous execution agree for both fixtures. Existing 737 scenario regressions remain unchanged unless separately justified. Profile mismatches and unsupported capabilities fail clearly.",
+      "source_paths": [
+        "src/sim/physics/integrate.ts",
+        "src/sim/systems/engine.ts",
+        "src/sim/types.ts",
+        "src/store/slices/aircraftSlice.ts",
+        "src/store/slices/routeSlice.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P1",
+        "phase": "Medium-term",
+        "effort": "L",
+        "confidence": "Needs validation",
+        "category": "Architecture",
+        "area": "Flight model and contact physics"
+      }
+    },
+    {
+      "number": 99,
+      "title": "Add aircraft asset preflight and bounded loading",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/99",
+      "wave": 4,
+      "assessment_kind": "F",
+      "assessment": "Model factories and named visual nodes exist; admission/resource contracts are incomplete.",
+      "first_increment_dependencies": [],
+      "original_full_scope_dependencies": [
+        93
+      ],
+      "implementation": "Validate the current procedural model manifest for units/axes/bounds/eye/nodes/licenses and budgets; probe optional GLB cancellation/fallback.",
+      "verification": "Malformed/missing assets, stale completion, repeated load/unload resource ownership and nonblank framing.",
+      "completion_residual": "Integrate selected-profile assets after #93; add measured LODs only where required.",
+      "issue_acceptance": "Invalid/missing assets leave the current aircraft usable; stale load completion cannot replace a newer selection. Repeated selection/unload releases owned resources. Desktop/mobile visual checks verify scale, framing, animation and nonblank output within measured budgets.",
+      "source_paths": [
+        "src/viewport/AircraftRenderer.ts",
+        "src/viewport/ThreeLayer.tsx",
+        "src/viewport/aircraftVisualState.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P1",
+        "phase": "Near-term",
+        "effort": "M",
+        "confidence": "Needs validation",
+        "category": "Feature",
+        "area": "Viewport scenery and weather"
+      }
+    },
+    {
+      "number": 133,
+      "title": "Add pilot barometric settings and transition-aware indications",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/133",
+      "wave": 4,
+      "assessment_kind": "F",
+      "assessment": "Displayed altitude uses weather QNH directly; no separate pilot-selected pressure is present.",
+      "first_increment_dependencies": [
+        91,
+        132,
+        147
+      ],
+      "original_full_scope_dependencies": [
+        63,
+        110
+      ],
+      "implementation": "Add selected pressure/STD and unit formatting without modifying ambient pressure; persist it; author wrong-setting/transition cases.",
+      "verification": "Weather update leaves knob unchanged; wrong setting changes indication only; STD reversibility and hPa/inHg.",
+      "completion_residual": "Review guidance/source policy with #110 and finish #63 standby/panel indications and scenario transition datums.",
+      "issue_acceptance": "Wrong setting changes indicated altitude only through the documented observation model. Weather updates do not move the pilot knob; STD selection is reversible. Test climb/descent transition reminders, hPa/inHg conversion, disagreement, invalid settings and saved state without altering route truth secretly.",
+      "source_paths": [
+        "src/instruments/RfsPFD.tsx",
+        "src/store/selectors.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P1",
+        "phase": "Medium-term",
+        "effort": "M",
+        "confidence": "Needs validation",
+        "category": "Feature",
+        "area": "Cockpit input and instruments"
+      }
+    },
+    {
+      "number": 135,
+      "title": "Add source-aware speed limits and trends to the PFD",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/135",
+      "wave": 4,
+      "assessment_kind": "G",
+      "assessment": "Speed tapes/bugs exist; profile/configuration envelope markers and timestamped trends remain.",
+      "first_increment_dependencies": [
+        93,
+        132,
+        147
+      ],
+      "original_full_scope_dependencies": [
+        63,
+        69,
+        93,
+        132
+      ],
+      "implementation": "Add sourced/provisional limit identity and filtered committed-time speed trend; suppress unknown markers; consume selected profile.",
+      "verification": "Configuration changes, conflicting marker readability, pause/restore trend reset and cockpit/overlay equality.",
+      "completion_residual": "Qualified low-speed/buffet/load margins depend on #69/#138; no always-safe envelope band.",
+      "issue_acceptance": "Flap/gear/weight changes update only justified limits; unknown data suppresses markers. Trend resets at reposition/restore and does not grow from wall-time pause. Cockpit/pop-out/overlay match, labels remain readable on narrow views, and conflicting bugs/limits never conceal the current speed.",
+      "source_paths": [
+        "src/instruments/RfsPFD.tsx",
+        "src/store/selectors.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P2",
+        "phase": "Medium-term",
+        "effort": "M",
+        "confidence": "Needs validation",
+        "category": "Feature",
+        "area": "Cockpit input and instruments"
+      }
+    },
+    {
+      "number": 151,
+      "title": "Separate presentation language and units from simulation values",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/151",
+      "wave": 4,
+      "assessment_kind": "F",
+      "assessment": "Labels are English and unit formatting is inline; canonical conversion helpers exist.",
+      "first_increment_dependencies": [
+        59,
+        60,
+        93
+      ],
+      "original_full_scope_dependencies": [
+        59,
+        60,
+        93
+      ],
+      "implementation": "Extract shell copy for English/Norwegian and native formatting; add selectable fuel/weather display units; parse numeric input explicitly.",
+      "verification": "Decimal/paste magnitude, display-precision round trips, long labels/narrow zoom and no simulation changes.",
+      "completion_residual": "Review aviation terminology, captions/speech and save/profile compatibility; cockpit-standard units stay explicit.",
+      "issue_acceptance": "Decimal separators and pasted numbers cannot silently change magnitude; conversions round-trip within declared display precision. Long labels, zoom and narrow screens remain usable. Saves retain canonical units and locale changes do not move levers or route coordinates. Untranslated technical terms are labeled consistently.",
+      "source_paths": [
+        "src/instruments/RfsMCP.tsx",
+        "src/instruments/RfsPFD.tsx",
+        "src/sim/physics/units.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P2",
+        "phase": "Near-term",
+        "effort": "M",
+        "confidence": "Needs validation",
+        "category": "UX",
+        "area": "Cockpit input and instruments"
+      }
+    },
+    {
+      "number": 67,
+      "title": "Animate actual aircraft mechanics, not whole assemblies",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/67",
+      "wave": 5,
+      "assessment_kind": "F",
+      "assessment": "Animation scales entire gear groups and uses separate model/contact geometry constants.",
+      "first_increment_dependencies": [
+        66,
+        72
+      ],
+      "original_full_scope_dependencies": [
+        66,
+        72
+      ],
+      "implementation": "Create an explicit body-to-model contact mapping; animate individual struts and wheels; add articulated gear/doors and actual-position surface animation.",
+      "verification": "Visual/physical contact coincidence, asymmetric compression, gear transit and allocation/resource checks.",
+      "completion_residual": "Complete slats/spoilers and supported mechanics; wing flex stays a bounded visual approximation.",
+      "issue_acceptance": "Wheels meet the runway at modeled contact points; commands and actual transit differ visibly; spoilers/flaps show effective configuration. No allocation of geometry per frame, and animation never changes simulation truth.",
+      "source_paths": [
+        "src/sim/data/aircraft/b737-800-fdm.v1.ts",
+        "src/viewport/aircraftModelAnimation.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P2",
+        "phase": "Near-term",
+        "effort": "L",
+        "confidence": "Needs validation",
+        "category": "Feature",
+        "area": "Viewport scenery and weather"
+      }
+    },
+    {
+      "number": 68,
+      "title": "Add aircraft surface detail and readable lighting",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/68",
+      "wave": 5,
+      "assessment_kind": "G",
+      "assessment": "Shared solid materials and light meshes exist; original textures and exposure improvements are new work.",
+      "first_increment_dependencies": [
+        66,
+        82
+      ],
+      "original_full_scope_dependencies": [
+        66,
+        82
+      ],
+      "implementation": "Author one lawful original texture set; add window/door/seam details on the qualified model; implement readable light intensity/flash behavior.",
+      "verification": "Day/dusk/night images, cockpit-display readability and measured texture memory.",
+      "completion_residual": "Complete lighting and attribution before closure; additional liveries remain within the same budgets.",
+      "issue_acceptance": "Aircraft detail reads at practical camera distances in daylight/dusk/night, with no overbright windshield or unreadable displays. Assets have provenance; day/night screenshots and texture-memory measurements accompany review.",
+      "source_paths": [
+        "src/viewport/AircraftModel.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P2",
+        "phase": "Near-term",
+        "effort": "M",
+        "confidence": "Needs validation",
+        "category": "UX",
+        "area": "Viewport scenery and weather"
+      }
+    },
+    {
+      "number": 72,
+      "title": "Let rotation, touchdown and bounce emerge from contact forces",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/72",
+      "wave": 5,
+      "assessment_kind": "V",
+      "assessment": "Per-wheel spring/damper calculations coexist with liftoff gates, attitude clamps and runway-normal velocity removal.",
+      "first_increment_dependencies": [
+        70,
+        125,
+        83
+      ],
+      "original_full_scope_dependencies": [
+        69,
+        70
+      ],
+      "implementation": "Instrument station loads and contacts; add symmetric/asymmetric/drop/rotation fixtures; replace each clamp only after its shield is reproduced physically.",
+      "verification": "No false low-speed liftoff/stuck runway, timestep-refined bounce and geometric tail clearance; continuous flight regression.",
+      "completion_residual": "Qualify contact/gear parameters under #69 and retire remaining gameplay gates incrementally.",
+      "issue_acceptance": "No low-speed false liftoff, stuck-to-runway behavior or timestep-dependent bounce; asymmetric touchdowns and tailstrike follow geometry. Preserve full-flight progress and avoid silently changing the aircraft altitude reference.",
+      "source_paths": [
+        "src/sim/physics/integrate.ts",
+        "src/sim/systems/ground.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P1",
+        "phase": "Foundation",
+        "effort": "L",
+        "confidence": "Strong evidence",
+        "category": "Feature",
+        "area": "Flight model and contact physics"
+      }
+    },
+    {
+      "number": 73,
+      "title": "Model a complete landing and rejected-takeoff braking chain",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/73",
+      "wave": 5,
+      "assessment_kind": "F",
+      "assessment": "Differential brakes and simplified anti-skid exist; armed spoiler, reverser and autobrake chains are incomplete.",
+      "first_increment_dependencies": [
+        72,
+        74
+      ],
+      "original_full_scope_dependencies": [
+        69,
+        72,
+        74
+      ],
+      "implementation": "Add armed ground spoilers and ground-only reverse-idle interlocks; introduce explicit mode transitions; combine longitudinal/lateral grip budgets.",
+      "verification": "Dry/wet and RTO comparisons, asymmetric braking, airborne reverse rejection and energy/sign checks.",
+      "completion_residual": "Complete autobrake/disarm, reverse thrust and supported wheel/brake-energy behavior with #69 evidence.",
+      "issue_acceptance": "Compare manual/autobrake/RTO stopping runs, dry/wet bounds, asymmetric braking and airborne reverse inhibition. Brake forces cannot add energy; all new modes are visible and the current RETARD/rollout sequence remains observable.",
+      "source_paths": [
+        "src/sim/systems/ground.ts",
+        "src/sim/types.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P2",
+        "phase": "Foundation",
+        "effort": "L",
+        "confidence": "Needs validation",
+        "category": "Feature",
+        "area": "Flight model and contact physics"
+      }
+    },
+    {
+      "number": 80,
+      "title": "Replace flat gust waves with a spatial, repeatable atmosphere",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/80",
+      "wave": 5,
+      "assessment_kind": "F",
+      "assessment": "Current seeded gusts have no vertical component and only one wind layer.",
+      "first_increment_dependencies": [
+        70,
+        82
+      ],
+      "original_full_scope_dependencies": [
+        70
+      ],
+      "implementation": "Add smooth altitude layers and a seeded spatial three-axis field using explicit simulation time; author bounded shear profiles.",
+      "verification": "Same position/time/seed yields main/worker parity; smooth layers and FPS-independent exposure.",
+      "completion_residual": "Keep METAR surface observations and authored/estimated winds aloft distinct; advanced spectra require measured need.",
+      "issue_acceptance": "Same seed/position/time gives the same field in worker and main-thread runs; layer transitions are smooth and air-relative/ground-relative velocity conventions remain intact. Changing frame rate does not change turbulence exposure.",
+      "source_paths": [
+        "src/sim/systems/environment.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P2",
+        "phase": "Near-term",
+        "effort": "M",
+        "confidence": "Needs validation",
+        "category": "Feature",
+        "area": "Viewport scenery and weather"
+      }
+    },
+    {
+      "number": 81,
+      "title": "Make weather visibility match the flying conditions",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/81",
+      "wave": 5,
+      "assessment_kind": "C",
+      "assessment": "Cloud base is placed directly as globe altitude; observation age and request cancellation are absent from the data contract.",
+      "first_increment_dependencies": [
+        82
+      ],
+      "original_full_scope_dependencies": [
+        80
+      ],
+      "implementation": "Add station/datum/freshness/source identity and abort/timeout handling; convert cloud base correctly; render visibility and reuse cloud textures.",
+      "verification": "Station elevation, stale/offline fallback, late response, cloud-entry visibility and GPU budget tests.",
+      "completion_residual": "Use #80 spatial fields for weather movement and optional precipitation; label scenario fallback and validate ranges.",
+      "issue_acceptance": "Verify cloud base against station elevation, inside/outside-cloud visibility, stale/offline fallback and late station responses. GPU budgets are measured; no volumetric-cloud rewrite is assumed.",
+      "source_paths": [
+        "src/sim/weather.ts",
+        "src/viewport/CloudLayer.tsx"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P2",
+        "phase": "Near-term",
+        "effort": "M",
+        "confidence": "Confirmed",
+        "category": "Feature",
+        "area": "Viewport scenery and weather"
+      }
+    },
+    {
+      "number": 83,
+      "title": "Unify rendered and physical surfaces, including runway edits",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/83",
+      "wave": 5,
+      "assessment_kind": "C",
+      "assessment": "Rendered runway overrides are separate from static physics sampling; unsupported surface altitude is aircraft altitude.",
+      "first_increment_dependencies": [
+        91,
+        120
+      ],
+      "original_full_scope_dependencies": [],
+      "implementation": "Create a validated shared surface revision consumed by renderer, route and contact sampling; expose unknown terrain; apply edits atomically.",
+      "verification": "Move/elevate a runway and compare visuals/contact/guidance; stale/missing samples never claim known ground.",
+      "completion_residual": "Add bounded authoritative terrain/slope/datum coverage asynchronously; preserve surface identity in save/replay.",
+      "issue_acceptance": "A runway position/elevation edit moves both visual and contact geometry; surface validity and stale samples are explicit. Hills/off-airport contact work only where trusted coverage exists; missing tiles never masquerade as known terrain.",
+      "source_paths": [
+        "src/sim/runwaySurface.ts",
+        "src/viewport/RunwayLayer.tsx"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P1",
+        "phase": "Near-term",
+        "effort": "L",
+        "confidence": "Confirmed",
+        "category": "Bug",
+        "area": "Flight model and contact physics"
+      }
+    },
+    {
+      "number": 84,
+      "title": "Build small, flyable airport environments",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/84",
+      "wave": 5,
+      "assessment_kind": "G",
+      "assessment": "Runway endpoints/markings and KSEA reference scenery exist; ENVA taxi/stand/airport surfaces are additional scope.",
+      "first_increment_dependencies": [
+        83,
+        82
+      ],
+      "original_full_scope_dependencies": [
+        82,
+        83
+      ],
+      "implementation": "Build one original or licensed ENVA surface/marking pack; share geometry and datums with physics; add taxi route and hold-short/stand references.",
+      "verification": "Manual circuit-to-stand and visual/contact agreement, runway IDs, attribution and supported-area tests.",
+      "completion_residual": "Add approach/PAPI and restrained airport detail; retain explicit synthetic-versus-sourced data boundaries.",
+      "issue_acceptance": "Fly a circuit and taxi clear to a stand without visual/physical mismatch, floating markings or misleading runway IDs. Attribution, geometry datums and procedural-data non-claims are reviewed alongside visual quality.",
+      "source_paths": [
+        "src/viewport/RunwayLayer.tsx"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P2",
+        "phase": "Near-term",
+        "effort": "L",
+        "confidence": "Needs validation",
+        "category": "Feature",
+        "area": "Viewport scenery and weather"
+      }
+    },
+    {
+      "number": 86,
+      "title": "Make sound convey aircraft state and camera position",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/86",
+      "wave": 5,
+      "assessment_kind": "F",
+      "assessment": "EngineSound synthesizes simple N1 oscillators; routing/captions/autoplay activation already exist.",
+      "first_increment_dependencies": [
+        65,
+        74,
+        102,
+        103
+      ],
+      "original_full_scope_dependencies": [
+        65,
+        74
+      ],
+      "implementation": "Add bounded procedural engine/airflow layers and camera filtering; spatialize independent engines through current routing; preserve warning priority.",
+      "verification": "Cockpit/chase idle/climb/asymmetry listening, overlap clipping and lifecycle node cleanup.",
+      "completion_residual": "Add gear/flap/brake cues and optional lawful samples through #106; require human listening acceptance.",
+      "issue_acceptance": "Human listening compares cockpit/chase, idle/climb and asymmetry; no clipping, warning masking or autoplay regressions. Pause/reset/unmount stop obsolete cues and do not accumulate audio nodes.",
+      "source_paths": [
+        "src/audio/EngineSound.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P2",
+        "phase": "Near-term",
+        "effort": "M",
+        "confidence": "Needs validation",
+        "category": "Feature",
+        "area": "Audio training and session experience"
+      }
+    },
+    {
+      "number": 75,
+      "title": "Make loading, fuel imbalance and engine asymmetry matter",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/75",
+      "wave": 6,
+      "assessment_kind": "F",
+      "assessment": "Fuel uses fixed longitudinal arms and CG clamps; thrust is summed without explicit engine-arm yaw and inertias are fixed.",
+      "first_increment_dependencies": [
+        70,
+        74
+      ],
+      "original_full_scope_dependencies": [
+        69,
+        70,
+        74
+      ],
+      "implementation": "Add auditable loading stations and asymmetric-thrust moment; reject invalid authored loading; preserve corruption safeguards.",
+      "verification": "Mass/moment conservation, left/right symmetry, engine-out yaw sign and worker/save parity.",
+      "completion_residual": "Complete tank feed/crossfeed, lateral CG and loading-dependent inertia with qualified #69 data.",
+      "issue_acceptance": "Mass/CG conservation, left/right symmetry and engine-out yaw sign have analytic checks. Burning/transferring fuel updates loading consistently, and unsupported loading envelopes remain explicitly unavailable.",
+      "source_paths": [
+        "src/sim/physics/aero.ts",
+        "src/sim/physics/integrate.ts",
+        "src/sim/systems/fuel.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P2",
+        "phase": "Foundation",
+        "effort": "L",
+        "confidence": "Strong evidence",
+        "category": "Feature",
+        "area": "Flight model and contact physics"
+      }
+    },
+    {
+      "number": 76,
+      "title": "Connect electrical and hydraulic systems to real consequences",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/76",
+      "wave": 6,
+      "assessment_kind": "F",
+      "assessment": "Electrical/hydraulic state is modeled simply but does not consistently govern actuator/display availability.",
+      "first_increment_dependencies": [
+        74
+      ],
+      "original_full_scope_dependencies": [
+        63,
+        74
+      ],
+      "implementation": "Define a small bus/pump/consumer graph in existing systems; implement one bus-loss case; project availability to actuators and existing displays.",
+      "verification": "Healthy-flight preservation, power-loss causal effects, bounded pressure response and complete reset/restore.",
+      "completion_residual": "Finish A/B/standby controls, generator isolation, gear/flap/control dependencies and #63 cockpit indications.",
+      "issue_acceptance": "A selected failure causes documented, bounded effects through physics, instruments and sound. Restore/reset recovers all states; healthy flight is unchanged. Detailed pneumatic/pressurization/ice-protection systems are separate source-gated follow-ups.",
+      "source_paths": [
+        "src/sim/systems/electrical.ts",
+        "src/sim/systems/hydraulic.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P2",
+        "phase": "Foundation",
+        "effort": "L",
+        "confidence": "Strong evidence",
+        "category": "Feature",
+        "area": "Aircraft systems and autoflight"
+      }
+    },
+    {
+      "number": 77,
+      "title": "Make autoflight energy-aware across the flight envelope",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/77",
+      "wave": 6,
+      "assessment_kind": "V",
+      "assessment": "Energy fixes from PR #50 already exist; fixed VNAV path/minimum climb assumptions remain.",
+      "first_increment_dependencies": [
+        70,
+        74,
+        132
+      ],
+      "original_full_scope_dependencies": [
+        69,
+        70,
+        74
+      ],
+      "implementation": "Measure infeasible climb/descent cases; add explicit unable-path truth and constrain requests with existing controller limits; avoid rewriting FMA ownership.",
+      "verification": "Mass/wind/temperature matrix, speed floor, capture/handoff, constraints/discontinuities and RETARD observability.",
+      "completion_residual": "Add feasible route/deceleration trajectory and IAS/Mach scheduling only against qualified #69 envelopes.",
+      "issue_acceptance": "Light/heavy, head/tailwind and hot/high runs avoid speed collapse and mode chatter; MCP limits and discontinuities still govern authority. FMA reports effective behavior, including RETARD, not merely selected modes.",
+      "source_paths": [
+        "src/sim/systems/autopilot.ts",
+        "src/sim/systems/vnav.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P1",
+        "phase": "Foundation",
+        "effort": "L",
+        "confidence": "Strong evidence",
+        "category": "Feature",
+        "area": "Aircraft systems and autoflight"
+      }
+    },
+    {
+      "number": 108,
+      "title": "Add a cold-and-dark startup with real enabling conditions",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/108",
+      "wave": 6,
+      "assessment_kind": "F",
+      "assessment": "Current engine state initializes warm; starter/bleed/APU enabling sequence is absent.",
+      "first_increment_dependencies": [
+        64,
+        74,
+        76
+      ],
+      "original_full_scope_dependencies": [
+        64,
+        74,
+        76
+      ],
+      "implementation": "Add one bounded startup state machine with battery/external power, APU/starter availability and fuel introduction; expose real controls.",
+      "verification": "Impossible enables rejected, aborted start coherent, shutdown/warm starts, save/reset/worker parity.",
+      "completion_residual": "Document simplifications and source limits; add pneumatic complexity only for actual prerequisites.",
+      "issue_acceptance": "Engines cannot start from impossible enabling states; aborted/failed starts leave coherent temperatures, power and spool states within modeled fidelity. Warm starts and existing scenarios remain supported. Every simplification and reference limit is visible in the evidence packet.",
+      "source_paths": [
+        "src/sim/simulationStep.ts",
+        "src/sim/systems/engine.ts",
+        "src/sim/types.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P2",
+        "phase": "Medium-term",
+        "effort": "L",
+        "confidence": "Needs validation",
+        "category": "Feature",
+        "area": "Aircraft systems and autoflight"
+      }
+    },
+    {
+      "number": 110,
+      "title": "Separate aircraft truth from faulty air-data indications",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/110",
+      "wave": 6,
+      "assessment_kind": "F",
+      "assessment": "PFD derives ideal state directly; fault observation/validity is not separated.",
+      "first_increment_dependencies": [
+        76,
+        132,
+        147
+      ],
+      "original_full_scope_dependencies": [
+        69,
+        76
+      ],
+      "implementation": "Introduce a small air-data observation layer; add blocked-pitot/static-source cases with source/power/validity; declare each guidance consumer policy.",
+      "verification": "Fault indications diverge while physical truth remains unchanged; valid/invalid guidance, reset/save/worker preservation.",
+      "completion_residual": "Add standby/disagreement and AP availability; calibrated fault/fidelity claims require #69 evidence.",
+      "issue_acceptance": "Failed indications diverge as the documented fault model predicts while true flight remains coherent. Each AP/FD consumer explicitly chooses valid observed data or documented simulation truth; failures cannot secretly leave certified-looking guidance active. Save/worker/replay paths preserve validity and fault identity.",
+      "source_paths": [
+        "src/sim/physics/derived.ts",
+        "src/store/selectors.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P1",
+        "phase": "Medium-term",
+        "effort": "L",
+        "confidence": "Needs validation",
+        "category": "Feature",
+        "area": "Aircraft systems and autoflight"
+      }
+    },
+    {
+      "number": 112,
+      "title": "Add optional structural and configuration-limit consequences",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/112",
+      "wave": 6,
+      "assessment_kind": "F",
+      "assessment": "No dedicated exceedance/consequence contract exists.",
+      "first_increment_dependencies": [
+        70,
+        71,
+        72
+      ],
+      "original_full_scope_dependencies": [
+        69,
+        70,
+        71,
+        72
+      ],
+      "implementation": "Add opt-in sustained exceedance records using qualified limits and hysteresis; begin warnings/scoring; separate numerical invalidity from gameplay damage.",
+      "verification": "Spike versus sustained exceedance, reset/replay thresholds, practice recovery and no unsupported permanent damage.",
+      "completion_residual": "Degraded handling/contact effects wait for #69 and justified models; no arbitrary hit-point breakup.",
+      "issue_acceptance": "Brief numerical spikes do not produce unexplained permanent damage; sustained exceedances accumulate predictably. Thresholds, hysteresis, reset and replay are tested. Clearly separate gameplay consequence rules from engineering fatigue/crashworthiness claims.",
+      "source_paths": [
+        "src/sim/physics/derived.ts",
+        "src/sim/physics/integrate.ts",
+        "src/sim/types.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P2",
+        "phase": "Medium-term",
+        "effort": "L",
+        "confidence": "Needs validation",
+        "category": "Feature",
+        "area": "Aircraft systems and autoflight"
+      }
+    },
+    {
+      "number": 113,
+      "title": "Add tuned raw radio navigation with signal identity",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/113",
+      "wave": 6,
+      "assessment_kind": "G",
+      "assessment": "Approach guidance is synthetic runway geometry and does not require tuned signal identity.",
+      "first_increment_dependencies": [
+        78,
+        147,
+        120
+      ],
+      "original_full_scope_dependencies": [
+        63,
+        78
+      ],
+      "implementation": "Qualify a tiny station set; add NAV tune/ident and validity/deviation observations; render raw data before AP coupling.",
+      "verification": "Wrong frequency/range, loss/acquisition, front/back-course policy and invalid needles/modes.",
+      "completion_residual": "Integrate supported AP radio modes and #63 panel displays with preserved FMA/RETARD truth.",
+      "issue_acceptance": "Wrong frequency, out-of-range/invalid stations and unsuitable geometry cannot produce a valid-looking needle or arm a supported radio mode. Test front/back-course policy and acquisition/loss. Preserve existing FMA/RETARD boundaries and never imply current real-world navigation data.",
+      "source_paths": [
+        "src/sim/systems/effectiveAutoflightTruth.ts",
+        "src/sim/systems/guidanceTargets.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P1",
+        "phase": "Medium-term",
+        "effort": "L",
+        "confidence": "Needs validation",
+        "category": "Feature",
+        "area": "FMS and navigation"
+      }
+    },
+    {
+      "number": 127,
+      "title": "Add a coherent master-warning and system-annunciation layer",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/127",
+      "wave": 6,
+      "assessment_kind": "F",
+      "assessment": "GPWS, engine indications and FMA exist separately; system annunciation has no unified lifecycle.",
+      "first_increment_dependencies": [
+        76,
+        101,
+        147
+      ],
+      "original_full_scope_dependencies": [
+        63,
+        76,
+        101
+      ],
+      "implementation": "Derive one qualified bus/pressure alert set with active/new/acknowledged/cleared states; expose master caution and recall.",
+      "verification": "Acknowledgement does not clear fault; new fault reannunciates; power/invalid detection and GPWS priority/text parity.",
+      "completion_residual": "Complete test/inhibit/status behavior and #63/#116 display parity for modeled conditions only.",
+      "issue_acceptance": "Acknowledgement silences the eligible cue but never clears the underlying fault; a new qualifying fault reannunciates. Invalid/unpowered detection is distinct from healthy state. Simultaneous system/GPWS alerts respect priority and caption parity; cockpit/overlay/pop-out states agree.",
+      "source_paths": [
+        "src/components/EngineStrip.tsx",
+        "src/instruments/RfsPFD.tsx",
+        "src/sim/types.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P1",
+        "phase": "Medium-term",
+        "effort": "L",
+        "confidence": "Needs validation",
+        "category": "Feature",
+        "area": "Aircraft systems and autoflight"
+      }
+    },
+    {
+      "number": 131,
+      "title": "Add an explicit yaw-damper and rudder-authority model",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/131",
+      "wave": 6,
+      "assessment_kind": "G",
+      "assessment": "Rudder dynamics/Dutch-roll checks exist; dedicated augmentation is new scope.",
+      "first_increment_dependencies": [
+        70,
+        76
+      ],
+      "original_full_scope_dependencies": [
+        69,
+        70,
+        76
+      ],
+      "implementation": "Qualify one yaw-rate feedback condition; add bounded rudder command/actual power/availability and off/on comparison.",
+      "verification": "Direction, damping, timestep robustness, saturation, pilot rudder and engine asymmetry coexist.",
+      "completion_residual": "Add speed/rudder scheduling only with #69 data; intentional crosswind slip cannot be invisibly overridden.",
+      "issue_acceptance": "Off/on response has documented damping/authority and timestep robustness; loss of power removes only supported augmentation. Saturation, pilot rudder and engine asymmetry coexist without feedback runaway. Test direction/sign and preserve manual-input truth; aircraft-specific evidence is required before fidelity claims.",
+      "source_paths": [
+        "src/sim/physics/__tests__/dynamicModes.test.ts",
+        "src/sim/physics/aero.ts",
+        "src/sim/types.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P2",
+        "phase": "Medium-term",
+        "effort": "L",
+        "confidence": "Needs validation",
+        "category": "Feature",
+        "area": "Aircraft systems and autoflight"
+      }
+    },
+    {
+      "number": 79,
+      "title": "Add complete missed-approach and abnormal-flight exercises",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/79",
+      "wave": 7,
+      "assessment_kind": "F",
+      "assessment": "Current approach/autoland is delivered; complete go-around and supported abnormal exercise flows remain.",
+      "first_increment_dependencies": [
+        75,
+        76,
+        77,
+        87
+      ],
+      "original_full_scope_dependencies": [
+        75,
+        76,
+        77,
+        87
+      ],
+      "implementation": "Add one normal short-final go-around command/state transition; implement manual and coupled choices; score observed configuration/route/FMA transitions.",
+      "verification": "Visible-control manual/coupled departure from approach, truthful TOGA/modes and no forced pilot success.",
+      "completion_residual": "Complete supported engine-out, power-loss and aborted-landing variants; failures need their causal systems.",
+      "issue_acceptance": "Both manual and coupled paths can safely leave an unstable approach in simulator terms, with truthful modes and no premature success badge. Real-world procedure/training equivalence is explicitly out of scope.",
+      "source_paths": [
+        "src/instruments/mcpCommands.ts",
+        "src/sim/scenarios.ts",
+        "src/sim/simulationStep.ts",
+        "src/sim/systems/effectiveAutoflightTruth.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P3",
+        "phase": "Near-term",
+        "effort": "L",
+        "confidence": "Needs validation",
+        "category": "Feature",
+        "area": "Aircraft systems and autoflight"
+      }
+    },
+    {
+      "number": 87,
+      "title": "Turn the checklist coach into truthful, phased practice",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/87",
+      "wave": 7,
+      "assessment_kind": "C",
+      "assessment": "Cruise route monitoring is unconditionally complete in checklistCoach.",
+      "first_increment_dependencies": [
+        59
+      ],
+      "original_full_scope_dependencies": [
+        59,
+        77
+      ],
+      "implementation": "Replace unconditional completion with observed valid route/mode state; add one sustained takeoff-to-level objective and assisted/free modes.",
+      "verification": "Button presses alone cannot pass; hold-duration/invalid-data/assistance fixtures and visible lesson flight.",
+      "completion_residual": "Complete phase lessons and configured stabilized-approach scoring; managed exercises consume #77.",
+      "issue_acceptance": "Success requires sustained observable performance; unavailable route/system features cannot count as complete. Coaching never silently manipulates controls, distracts during critical phases or claims real pilot qualification.",
+      "source_paths": [
+        "src/sim/checklistCoach.ts",
+        "src/sim/tutorialState.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P2",
+        "phase": "Near-term",
+        "effort": "M",
+        "confidence": "Needs validation",
+        "category": "Feature",
+        "area": "Audio training and session experience"
+      }
+    },
+    {
+      "number": 88,
+      "title": "Add a bounded flight recorder, replay and debrief",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/88",
+      "wave": 7,
+      "assessment_kind": "F",
+      "assessment": "Persistence is snapshots; there is no bounded state-timeline recorder.",
+      "first_increment_dependencies": [
+        90,
+        91,
+        123,
+        87
+      ],
+      "original_full_scope_dependencies": [
+        87,
+        90,
+        91
+      ],
+      "implementation": "Add a capped local checkpoint/event recorder with identities; build read-only state playback and timeline seeking; separate live authority.",
+      "verification": "Cap/rollover, seek without commands, mode/route events, gaps and comparison of recorded versus displayed values.",
+      "completion_residual": "Complete supported energy/approach/touchdown debrief; deterministic re-simulation remains #126.",
+      "issue_acceptance": "Recording never grows without limit or sends data off-device; seeking does not command live physics. Playback and re-simulation are clearly distinguished, with exact FDM/scenario/build identity and honest missing-data gaps.",
+      "source_paths": [
+        "src/store/simStore.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P3",
+        "phase": "Near-term",
+        "effort": "L",
+        "confidence": "Needs validation",
+        "category": "Feature",
+        "area": "Audio training and session experience"
+      }
+    },
+    {
+      "number": 94,
+      "title": "Add an honest aircraft hangar and selection workflow",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/94",
+      "wave": 7,
+      "assessment_kind": "F",
+      "assessment": "There is one aircraft session today; a hangar needs atomic whole-contract selection.",
+      "first_increment_dependencies": [
+        59,
+        91,
+        93,
+        99
+      ],
+      "original_full_scope_dependencies": [
+        59,
+        91,
+        93
+      ],
+      "implementation": "Add a parked preflight selection transaction, current 737 preview and compatibility summary; preserve per-profile settings/saves.",
+      "verification": "Cancel leaves live flight intact; physics/model/instrument/input identities switch together; explain incompatible saves.",
+      "completion_residual": "Add the first completed additional pack in #95/#96; one 737 plus mock content cannot close the full hangar outcome.",
+      "issue_acceptance": "Selection changes model, physics, instruments, controls and scenario compatibility together. Cancel leaves the current session intact; incompatible saves offer an explanation without destructive conversion. The hangar stays out of the flying sightline.",
+      "source_paths": [
+        "src/app/RfsShell.tsx",
+        "src/store/slices/aircraftSlice.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P2",
+        "phase": "Medium-term",
+        "effort": "M",
+        "confidence": "Needs validation",
+        "category": "UX",
+        "area": "Flight model and contact physics"
+      }
+    },
+    {
+      "number": 104,
+      "title": "Add a local radio desk with ATIS and scripted ATC",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/104",
+      "wave": 7,
+      "assessment_kind": "F",
+      "assessment": "Warnings provide speech, but COM tuning/readback and deterministic ATIS do not exist.",
+      "first_increment_dependencies": [
+        101,
+        102,
+        82
+      ],
+      "original_full_scope_dependencies": [
+        101,
+        102,
+        113
+      ],
+      "implementation": "Add COM active/standby and captioned ATIS from scenario truth; implement one short deterministic tower exchange and bounded readbacks.",
+      "verification": "Wrong-frequency silence, current runway/weather, warning preemption and pause/reset message state.",
+      "completion_residual": "Complete departure/arrival workflow; COM/ATIS does not technically require #113 NAV implementation.",
+      "issue_acceptance": "Wrong frequency does not receive that station's scripted clearance; messages reference current runway/weather and correctly await supported readbacks. Radio never blocks warnings. Pause/reset/replay preserves message state; all voice content has equivalent accessible text.",
+      "source_paths": [
+        "src/audio/GPWS.ts",
+        "src/sim/scenarios.ts",
+        "src/sim/weather.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P2",
+        "phase": "Near-term",
+        "effort": "L",
+        "confidence": "Needs validation",
+        "category": "Feature",
+        "area": "Audio training and session experience"
+      }
+    },
+    {
+      "number": 105,
+      "title": "Add a procedural crew that reports observed state",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/105",
+      "wave": 7,
+      "assessment_kind": "F",
+      "assessment": "Existing coach and warning paths do not define procedural crew transitions.",
+      "first_increment_dependencies": [
+        101,
+        102,
+        87
+      ],
+      "original_full_scope_dependencies": [
+        101,
+        102
+      ],
+      "implementation": "Create optional observed-state callouts and one challenge/response checklist; share priority/mixer lifecycle; preserve tutorial separation.",
+      "verification": "Valid transition only, missing-data suppression, no repeated/reset duplicate calls and text parity.",
+      "completion_residual": "Review terminology for selected aircraft and extend the bounded takeoff/landing set.",
+      "issue_acceptance": "Calls trigger on valid transitions, not every frame; replay/reset creates no duplicate conversation. Missing/invalid source data suppresses unsupported calls. Captions, quiet mode and warning priority work without requiring audio, and callout terminology is reviewed for the selected aircraft.",
+      "source_paths": [
+        "src/audio/GPWS.ts",
+        "src/sim/simulationStep.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P2",
+        "phase": "Near-term",
+        "effort": "M",
+        "confidence": "Needs validation",
+        "category": "Feature",
+        "area": "Audio training and session experience"
+      }
+    },
+    {
+      "number": 106,
+      "title": "Make sound packs inspectable, licensed and aircraft-specific",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/106",
+      "wave": 7,
+      "assessment_kind": "F",
+      "assessment": "No flown sound-pack identity exists; synthetic audio must remain an inspectable fallback.",
+      "first_increment_dependencies": [
+        93,
+        102,
+        86
+      ],
+      "original_full_scope_dependencies": [
+        93,
+        102
+      ],
+      "implementation": "Create a small synthetic-pack manifest with ranges/filtering/level targets; add a one-layer audition harness and license review.",
+      "verification": "Missing/corrupt sample fallback, loop/loudness/clip listening and decoded-resource cleanup.",
+      "completion_residual": "Admit only required qualified samples/aircraft mappings; avoid a sample-library framework.",
+      "issue_acceptance": "Missing/corrupt samples fall back without silencing warnings; pack swaps release decoded resources and preserve master settings. Audition steady states and transitions for loops/clicks, loudness and clipping. No undocumented copyrighted cockpit recordings or misleading turbine recordings on a piston aircraft.",
+      "source_paths": [
+        "src/audio/EngineSound.ts",
+        "src/audio/audioMapping.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P2",
+        "phase": "Near-term",
+        "effort": "M",
+        "confidence": "Needs validation",
+        "category": "Feature",
+        "area": "Audio training and session experience"
+      }
+    },
+    {
+      "number": 109,
+      "title": "Model cabin pressure and environmental-system consequences",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/109",
+      "wave": 7,
+      "assessment_kind": "F",
+      "assessment": "Aircraft state lacks a cabin-pressure subsystem.",
+      "first_increment_dependencies": [
+        76,
+        108,
+        127
+      ],
+      "original_full_scope_dependencies": [
+        76,
+        108
+      ],
+      "implementation": "Add bounded cabin altitude/differential/rate and pack/bleed/outflow dependencies; show distinct cabin/ambient indications; author one loss case.",
+      "verification": "Normal climb/descent and bleed loss finite/bounded; reset/restore and sourced warning thresholds.",
+      "completion_residual": "Finish usable gauges/alerts and declared pressure schedule; comfort temperature/sound is optional follow-on.",
+      "issue_acceptance": "Normal schedules, rapid altitude changes, bleed loss and reset remain finite and physically bounded. Ambient altitude and cabin altitude cannot be confused in UI/alerts. Procedures and warning thresholds require sourced aircraft evidence; this is simulation gameplay, not emergency guidance.",
+      "source_paths": [
+        "src/sim/physics/derived.ts",
+        "src/sim/types.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P2",
+        "phase": "Medium-term",
+        "effort": "L",
+        "confidence": "Needs validation",
+        "category": "Feature",
+        "area": "Aircraft systems and autoflight"
+      }
+    },
+    {
+      "number": 115,
+      "title": "Extend a flight from parking brake to parking brake",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/115",
+      "wave": 7,
+      "assessment_kind": "F",
+      "assessment": "Runway-start scenarios exist; chock/service/pushback ownership is additional scope.",
+      "first_increment_dependencies": [
+        72,
+        73,
+        84,
+        108
+      ],
+      "original_full_scope_dependencies": [
+        72,
+        73,
+        84,
+        108
+      ],
+      "implementation": "Add one parked scenario with chocks/external power and bounded pushback stop/cancel; finish through observed taxi/parking milestones.",
+      "verification": "Immediate override/cancel, no attached services at takeoff, coherent start/finish and unchanged quick starts.",
+      "completion_residual": "Complete gate-to-gate scenario and service availability; scripted radio can integrate #104.",
+      "issue_acceptance": "Ground services cannot remain attached during takeoff; pushback stop/cancel and pilot override work immediately without invalid control ownership. Start/finish milestones depend on observed aircraft/service state. Existing runway-start scenarios remain a quick path to flying.",
+      "source_paths": [
+        "src/sim/scenarios.ts",
+        "src/sim/systems/ground.ts",
+        "src/viewport/RunwayLayer.tsx"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P2",
+        "phase": "Medium-term",
+        "effort": "L",
+        "confidence": "Needs validation",
+        "category": "Feature",
+        "area": "Aircraft systems and autoflight"
+      }
+    },
+    {
+      "number": 116,
+      "title": "Support a local companion instrument window safely",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/116",
+      "wave": 7,
+      "assessment_kind": "V",
+      "assessment": "A pop-out must consume one authority; same-origin transport and owner-loss behavior need a probe.",
+      "first_increment_dependencies": [
+        63,
+        123,
+        124,
+        147
+      ],
+      "original_full_scope_dependencies": [
+        63,
+        64,
+        93
+      ],
+      "implementation": "Probe same-origin native window/message channel; start read-only with session/age identity; then admit bounded validated MCP actions.",
+      "verification": "No duplicate stepping, wrong-origin/stale-session rejection, close/reload and owner-loss disconnect.",
+      "completion_residual": "Reuse RFMS displays where compatible and finish command ownership before closing interactive scope.",
+      "issue_acceptance": "Pop-out values/FMA match the owner; opening/closing/reloading windows cannot start duplicate stepping. Reject stale-session, unsupported and wrong-origin messages. Owner loss produces a visible disconnected state, not frozen live-looking instruments.",
+      "source_paths": [
+        "src/app/RfsShell.tsx",
+        "src/store/simStore.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P2",
+        "phase": "Medium-term",
+        "effort": "M",
+        "confidence": "Needs validation",
+        "category": "Feature",
+        "area": "Persistence worker and runtime"
+      }
+    },
+    {
+      "number": 119,
+      "title": "Add an in-flight diversion and alternate worksheet",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/119",
+      "wave": 7,
+      "assessment_kind": "F",
+      "assessment": "Route editing and weather exist; in-flight alternate comparison is additional scope.",
+      "first_increment_dependencies": [
+        61,
+        75,
+        78,
+        81
+      ],
+      "original_full_scope_dependencies": [
+        61,
+        75,
+        78,
+        81
+      ],
+      "implementation": "Compare a fixed verified airport set using current fuel/profile/weather freshness; stage diversion route until EXEC; show uncertainty.",
+      "verification": "Cancel preserves guidance; route handoff, unavailable weather and low-fuel unknowns do not claim safety.",
+      "completion_residual": "Finish compatible runway/fuel/time worksheet with qualified assumptions and gameplay reserve settings.",
+      "issue_acceptance": "Candidate evaluation uses the selected aircraft, current modeled fuel and weather freshness; unknown inputs never produce false precision or a green safe-to-land claim. Cancel leaves guidance intact. Test route handoff, unavailable weather and insufficient-fuel uncertainty.",
+      "source_paths": [
+        "src/components/RouteBuilderPanel.tsx",
+        "src/sim/flightPlanLoader.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P2",
+        "phase": "Near-term",
+        "effort": "M",
+        "confidence": "Needs validation",
+        "category": "UX",
+        "area": "FMS and navigation"
+      }
+    },
+    {
+      "number": 126,
+      "title": "Add deterministic re-simulation capsules with honest drift reports",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/126",
+      "wave": 7,
+      "assessment_kind": "F",
+      "assessment": "Deterministic step entry exists; recorded-state replay is not input re-simulation.",
+      "first_increment_dependencies": [
+        82,
+        88,
+        91,
+        123
+      ],
+      "original_full_scope_dependencies": [
+        82,
+        88,
+        91,
+        123
+      ],
+      "implementation": "Create one bounded capsule with initial state, commands, dt, seeds, external observations, surface/profile/shared/build IDs; rerun and report first divergence.",
+      "verification": "Equivalent main/worker tolerance, deliberate omitted command/change detection and missing identity refusal.",
+      "completion_residual": "Publish cross-platform tolerance and raw residuals; never silently refetch external inputs or repin expected traces.",
+      "issue_acceptance": "Identical supported runs agree within declared tolerances; changed weather/model/control data produces an attributable mismatch. Missing identity/input fails closed. A deliberately omitted command is detected. Preserve originals and never repair drift by repinning expected output without review.",
+      "source_paths": [
+        "src/sim/simulationRuntime.ts",
+        "src/sim/simulationStep.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P1",
+        "phase": "Foundation",
+        "effort": "L",
+        "confidence": "Needs validation",
+        "category": "Architecture",
+        "area": "Persistence worker and runtime"
+      }
+    },
+    {
+      "number": 137,
+      "title": "Build a bounded flight-model identification workbench",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/137",
+      "wave": 7,
+      "assessment_kind": "V",
+      "assessment": "Existing perturbation tests are broad smoke bounds; parameter identification needs qualified equilibrium and traces.",
+      "first_increment_dependencies": [
+        69,
+        126,
+        136
+      ],
+      "original_full_scope_dependencies": [
+        69,
+        126,
+        136
+      ],
+      "implementation": "Build offline step/pulse runs and raw transient measures; keep tuning and holdout cases separate; perturb parameters within bounds.",
+      "verification": "Detect sign/damping regression and reject untrimmed/nonlinear/saturated analysis cases.",
+      "completion_residual": "Add linearization/frequency methods only to answer a demonstrated missing question.",
+      "issue_acceptance": "A deliberate sign/damping regression is detected; analysis rejects untrimmed/nonlinear/saturated cases outside its assumptions. Fitted and holdout cases stay separate. No parameter is declared real-aircraft accurate merely because internal traces are smooth or stable.",
+      "source_paths": [
+        "src/sim/physics/__tests__/dynamicModes.test.ts",
+        "src/sim/physics/__tests__/performanceEnvelope.test.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P2",
+        "phase": "Medium-term",
+        "effort": "L",
+        "confidence": "Needs validation",
+        "category": "Testing",
+        "area": "Flight model and contact physics"
+      }
+    },
+    {
+      "number": 146,
+      "title": "Establish navigation-database identity and supported procedure semantics",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/146",
+      "wave": 7,
+      "assessment_kind": "G",
+      "assessment": "Canned/generated routes are synthetic and staged edits use RFMS shared semantics.",
+      "first_increment_dependencies": [
+        78,
+        113,
+        120,
+        134
+      ],
+      "original_full_scope_dependencies": [
+        78,
+        113,
+        120,
+        134
+      ],
+      "implementation": "Review RFMS contract; qualify tiny licensed airport/runway/cycle fixtures and supported leg subset; reject unsupported terminators atomically.",
+      "verification": "Exact leg geometry/turns, EXEC/save/replay identity, missing runway and unsupported-terminator rejection.",
+      "completion_residual": "Broaden holds/arcs/procedures only with independent fixtures and data rights.",
+      "issue_acceptance": "Insertion/EXEC/save/replay preserves database and leg identity; unsupported terminators or missing runway references fail without changing the active route. Track/turn fixtures match independently reviewed geometry. No claim of current navigation suitability or rights to redistribute a commercial database.",
+      "source_paths": [
+        "src/sim/flightPlanLoader.ts",
+        "src/sim/fms/routeAdapter.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P2",
+        "phase": "Medium-term",
+        "effort": "L",
+        "confidence": "Needs validation",
+        "category": "Feature",
+        "area": "FMS and navigation"
+      }
+    },
+    {
+      "number": 153,
+      "title": "Build an opt-in practice progression from demonstrated skills",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/153",
+      "wave": 7,
+      "assessment_kind": "F",
+      "assessment": "Current coach/tutorial steps do not establish aircraft-versioned longitudinal skill records.",
+      "first_increment_dependencies": [
+        87,
+        88,
+        91,
+        93
+      ],
+      "original_full_scope_dependencies": [
+        87,
+        88,
+        91,
+        93
+      ],
+      "implementation": "Add opt-in local record for one lesson with assistance/profile/scoring identity; recommend skippable repeat/harder variation.",
+      "verification": "Invalid/incomplete attempts unscored, reset cannot manufacture mastery and incompatible profile/model scores stay separate.",
+      "completion_residual": "Complete inspection/export/deletion and versioned scoring migrations without cloud-account dependency.",
+      "issue_acceptance": "Resetting a flight cannot manufacture mastery; incomplete/invalid observations remain unscored. Assistance level is explicit, records are inspectable/exportable/deletable, and no cloud account is required. Recommendations remain simulator practice, not a credential or assessment of real-flight competence.",
+      "source_paths": [
+        "src/sim/checklistCoach.ts",
+        "src/sim/tutorialState.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P2",
+        "phase": "Advanced",
+        "effort": "M",
+        "confidence": "Needs validation",
+        "category": "Feature",
+        "area": "Audio training and session experience"
+      }
+    },
+    {
+      "number": 89,
+      "title": "Add a local mission designer and shareable practice packets",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/89",
+      "wave": 8,
+      "assessment_kind": "F",
+      "assessment": "Curated scenarios and save slots exist; local mission remix/import are new capability.",
+      "first_increment_dependencies": [
+        91,
+        87,
+        154
+      ],
+      "original_full_scope_dependencies": [
+        80,
+        83,
+        87,
+        91
+      ],
+      "implementation": "Define a versioned bounded practice packet; remix one existing start/weather/loading/objective; install only validated declarative triggers.",
+      "verification": "Schema/size/range rejection, no executable content/fetches, atomic import and same initial conditions.",
+      "completion_residual": "Extend weather/surface options after #80/#83 and supported faults after causal systems; retain format/version limits.",
+      "issue_acceptance": "Imported packets have strict schema/size/range validation and no executable scripts or external resource fetches. Same packet reproduces initial conditions; unsupported versions fail visibly. No backend/community marketplace is required.",
+      "source_paths": [
+        "src/sim/scenarios.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P3",
+        "phase": "Near-term",
+        "effort": "L",
+        "confidence": "Needs validation",
+        "category": "Feature",
+        "area": "Audio training and session experience"
+      }
+    },
+    {
+      "number": 111,
+      "title": "Give icing and anti-ice bounded physical consequences",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/111",
+      "wave": 8,
+      "assessment_kind": "G",
+      "assessment": "Weather lacks ice accumulation and METAR alone cannot supply accretion inputs.",
+      "first_increment_dependencies": [
+        69,
+        71,
+        80,
+        108,
+        110
+      ],
+      "original_full_scope_dependencies": [
+        69,
+        71,
+        80,
+        108,
+        110
+      ],
+      "implementation": "Define one authored icing exposure and qualified component response; model bounded accumulation/decay and actual anti-ice power/bleed availability.",
+      "verification": "Same inputs replay, dry cases no ice, affected components respond and unsupported severity is explicit.",
+      "completion_residual": "Complete qualified aero/engine/sensor consequences and reversible practice scenario.",
+      "issue_acceptance": "Identical seeds/inputs replay identical accretion; dry/no-icing conditions do not create ice. Protection changes the modeled affected component, not a cosmetic icon. Unsupported severity regimes are rejected/labeled and recovery respects the chosen aircraft evidence.",
+      "source_paths": [
+        "src/sim/physics/aero.ts",
+        "src/sim/weather.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P2",
+        "phase": "Medium-term",
+        "effort": "L",
+        "confidence": "Needs validation",
+        "category": "Feature",
+        "area": "Aircraft systems and autoflight"
+      }
+    },
+    {
+      "number": 114,
+      "title": "Add deterministic local traffic with honest scope",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/114",
+      "wave": 8,
+      "assessment_kind": "F",
+      "assessment": "Only the player aircraft has a simulation/render actor contract.",
+      "first_increment_dependencies": [
+        84,
+        93,
+        99,
+        82
+      ],
+      "original_full_scope_dependencies": [
+        84,
+        93,
+        99
+      ],
+      "implementation": "Add capped scripted actors driven by scenario time; begin a runway-crossing actor and approach conflict; reuse measured LOD/model rendering.",
+      "verification": "Repeatable pause/rate/reset scheduling, no frame-drop teleport, actor/render bounds and clear labels.",
+      "completion_residual": "Complete supported taxi/departure/arrival behaviors; advisories are separate #145.",
+      "issue_acceptance": "Traffic follows pause/rate/reset and repeatable scenario time, never teleports because frames dropped, and respects a declared actor/render budget. Conflict cues identify simulated traffic and remain readable without obscuring the runway. Separate visual-contact gameplay from certified collision avoidance.",
+      "source_paths": [
+        "src/sim/scenarios.ts",
+        "src/viewport/ThreeLayer.tsx"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P2",
+        "phase": "Medium-term",
+        "effort": "L",
+        "confidence": "Needs validation",
+        "category": "Feature",
+        "area": "Viewport scenery and weather"
+      }
+    },
+    {
+      "number": 117,
+      "title": "Add a local live instructor station",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/117",
+      "wave": 8,
+      "assessment_kind": "F",
+      "assessment": "Scenario starts exist but safe live intervention/timeline is new capability.",
+      "first_increment_dependencies": [
+        89,
+        110,
+        123
+      ],
+      "original_full_scope_dependencies": [
+        79,
+        89,
+        110
+      ],
+      "implementation": "Add same-window pause and validated sensor-failure intervention first; add paused reposition with complete derived/contact/guidance reinitialization.",
+      "verification": "Unsupported failure rejection, acknowledged/recorded reposition, reset and pilot/instructor distinction.",
+      "completion_residual": "Integrate weather changes, supported #79 failures and optional companion #116 after authority tests.",
+      "issue_acceptance": "Reposition reinitializes derived/contact/guidance state coherently; destructive interventions require visible acknowledgement and are recorded. Unsupported failures cannot be selected. Reset removes prior interventions, and replay/debrief distinguishes pilot actions from instructor changes.",
+      "source_paths": [
+        "src/sim/scenarios.ts",
+        "src/sim/simulationStep.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P2",
+        "phase": "Medium-term",
+        "effort": "M",
+        "confidence": "Needs validation",
+        "category": "Feature",
+        "area": "Persistence worker and runtime"
+      }
+    },
+    {
+      "number": 128,
+      "title": "Add a bounded engine-fire and suppression exercise",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/128",
+      "wave": 8,
+      "assessment_kind": "G",
+      "assessment": "Engine fire/detection/suppression has no causal state contract.",
+      "first_increment_dependencies": [
+        74,
+        76,
+        108,
+        127
+      ],
+      "original_full_scope_dependencies": [
+        74,
+        76,
+        108,
+        127
+      ],
+      "implementation": "Qualify a simplification packet; implement one authored fire with detection validity, supported isolation and finite bottle charge/outcome.",
+      "verification": "Acknowledge cannot extinguish, depleted bottle cannot reuse, supported dependency effects, reset/save/replay.",
+      "completion_residual": "Keep fire, false warning and detector failure distinct; no probabilistic/heat rewrite without evidence.",
+      "issue_acceptance": "Acknowledging a fire alert cannot extinguish the fire; an unavailable/used bottle cannot discharge again; reset restores scenario resources. Isolation affects only supported dependencies without silently deleting engine mass/thrust. Save/worker/debrief preserve cause and actions. No certified procedure claim.",
+      "source_paths": [
+        "src/sim/systems/engine.ts",
+        "src/sim/systems/fuel.ts",
+        "src/sim/types.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P2",
+        "phase": "Medium-term",
+        "effort": "L",
+        "confidence": "Needs validation",
+        "category": "Feature",
+        "area": "Aircraft systems and autoflight"
+      }
+    },
+    {
+      "number": 129,
+      "title": "Model actuator position and asymmetric configuration faults",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/129",
+      "wave": 8,
+      "assessment_kind": "G",
+      "assessment": "One scalar actual flap/gear state cannot express left/right fault mechanics.",
+      "first_increment_dependencies": [
+        67,
+        71,
+        76,
+        127
+      ],
+      "original_full_scope_dependencies": [
+        67,
+        71,
+        76,
+        127
+      ],
+      "implementation": "Add independent actual flap positions and one qualified jam/protection rule; consume actual positions in force and animation.",
+      "verification": "Jammed side fixed, signs/moments and supported surviving motion, detector/power invalidity and symmetric regressions.",
+      "completion_residual": "Extend other mechanisms only after coherent first fault; commands remain pilot-owned.",
+      "issue_acceptance": "The jammed side stops at the fault position; surviving motion and roll/yaw consequences follow documented assumptions. Detector/power loss is not falsely healthy. Restore/replay preserves mechanism state; existing symmetric transitions retain their behavior and no discontinuity is hidden by the visual model.",
+      "source_paths": [
+        "src/sim/physics/integrate.ts",
+        "src/sim/types.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P2",
+        "phase": "Medium-term",
+        "effort": "L",
+        "confidence": "Needs validation",
+        "category": "Feature",
+        "area": "Aircraft systems and autoflight"
+      }
+    },
+    {
+      "number": 130,
+      "title": "Add stabilizer-runaway, cutout and trim-authority behavior",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/130",
+      "wave": 8,
+      "assessment_kind": "G",
+      "assessment": "Trim position and static solve exist; motor/cutout/runaway authority does not.",
+      "first_increment_dependencies": [
+        64,
+        76,
+        127
+      ],
+      "original_full_scope_dependencies": [
+        64,
+        69,
+        76,
+        127
+      ],
+      "implementation": "Add source-qualified motor rate/limits, pilot/AP precedence, cutout and one authored runaway; project actual position.",
+      "verification": "Cutout stops motor without reset, saturation, disconnect/reset stale commands and reproducible pitch response.",
+      "completion_residual": "Manual-wheel authority waits for #69/usable reference; preserve recoverable practice exit.",
+      "issue_acceptance": "Cutout stops the modeled powered motion without resetting trim; reset/disconnect cannot leave a stale motor command. Saturation and mechanical limits are explicit. Fault timelines and pitch response reproduce; support a simulator practice exit without presenting the exercise as real emergency instruction.",
+      "source_paths": [
+        "src/sim/physics/aero.ts",
+        "src/sim/physics/trimSolver.ts",
+        "src/sim/types.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P2",
+        "phase": "Medium-term",
+        "effort": "L",
+        "confidence": "Needs validation",
+        "category": "Feature",
+        "area": "Aircraft systems and autoflight"
+      }
+    },
+    {
+      "number": 138,
+      "title": "Define a source-qualified high-altitude Mach and buffet envelope",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/138",
+      "wave": 8,
+      "assessment_kind": "G",
+      "assessment": "Current Mach lift factor is a simple heuristic without qualified high-altitude envelope.",
+      "first_increment_dependencies": [
+        69,
+        71,
+        132,
+        137
+      ],
+      "original_full_scope_dependencies": [
+        69,
+        71,
+        132,
+        137
+      ],
+      "implementation": "Audit declared validity; qualify one drag-rise/buffet group and independent conditions; bound/labeled extrapolation and continuous transitions.",
+      "verification": "Cruise/turn/load residuals, threshold continuity and unsupported-region indication.",
+      "completion_residual": "Expand Mach trim/downwash/control groups separately; never induce arbitrary high-altitude upsets.",
+      "issue_acceptance": "Boundary crossings are continuous, source residuals are published, and extrapolation is bounded/labeled. Matched-condition cruise/turn/load cases agree with references where available. There is no arbitrary high-altitude forced upset or claim of certified maneuver margin.",
+      "source_paths": [
+        "src/sim/physics/aero.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P2",
+        "phase": "Medium-term",
+        "effort": "L",
+        "confidence": "Needs validation",
+        "category": "Research",
+        "area": "Flight model and contact physics"
+      }
+    },
+    {
+      "number": 140,
+      "title": "Add synthetic convective cells and a truthful weather-radar display",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/140",
+      "wave": 8,
+      "assessment_kind": "F",
+      "assessment": "METAR/cloud billboards contain no radar reflectivity observation contract.",
+      "first_increment_dependencies": [
+        78,
+        80,
+        82,
+        147
+      ],
+      "original_full_scope_dependencies": [
+        63,
+        78,
+        80,
+        82
+      ],
+      "implementation": "Author one synthetic deterministic cell; add bounded beam/scan snapshot and ND tilt/range/gain layer with age/invalid states.",
+      "verification": "Tilt/range geometry, no-return versus invalid, pause/rate/reset, CPU/memory and non-color cues.",
+      "completion_residual": "Add attenuation/masking only under documented approximations; never portray cloud billboards as measured radar.",
+      "issue_acceptance": "Tilt/range changes affect observed geometry predictably; no-return, unpowered and stale scan are distinguishable. Pause/rate/reset preserve scan policy; cockpit/ND projections agree. Cell fields and scan resolution have measured CPU/memory budgets; colors alone are not the only cue.",
+      "source_paths": [
+        "src/sim/weather.ts",
+        "src/viewport/CloudLayer.tsx"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P3",
+        "phase": "Advanced",
+        "effort": "L",
+        "confidence": "Needs validation",
+        "category": "Feature",
+        "area": "Viewport scenery and weather"
+      }
+    },
+    {
+      "number": 141,
+      "title": "Add a source-aware terrain corridor and clearance display",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/141",
+      "wave": 8,
+      "assessment_kind": "G",
+      "assessment": "Physical surface and Cesium terrain coverage differ; forward corridor needs an authoritative source.",
+      "first_increment_dependencies": [
+        78,
+        83,
+        110
+      ],
+      "original_full_scope_dependencies": [
+        78,
+        83,
+        110
+      ],
+      "implementation": "Asynchronously sample a bounded source-identified corridor; display height datum, coverage/age/uncertainty and chosen route path.",
+      "verification": "Ridge/missing/stale cases; unknown never sea level/green clearance; fixed step never waits for tiles.",
+      "completion_residual": "Optional simulator clearance alerts share captured surface data; no predictive TAWS equivalence.",
+      "issue_acceptance": "Missing terrain cannot appear as sea level or green clearance. Height datums and route/true/indicated altitude are distinguished. Ridge, unsupported coverage and stale-response scenarios remain truthful; cached/network imagery never silently overrides physical surface identity.",
+      "source_paths": [
+        "src/sim/runwaySurface.ts",
+        "src/store/selectors.ts",
+        "src/viewport/CesiumViewport.tsx"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P2",
+        "phase": "Medium-term",
+        "effort": "L",
+        "confidence": "Needs validation",
+        "category": "Feature",
+        "area": "Flight model and contact physics"
+      }
+    },
+    {
+      "number": 143,
+      "title": "Give authored obstacles collision semantics independent of scenery meshes",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/143",
+      "wave": 8,
+      "assessment_kind": "F",
+      "assessment": "Streamed OSM buildings are visual assets without collision authority.",
+      "first_increment_dependencies": [
+        72,
+        83,
+        99,
+        112
+      ],
+      "original_full_scope_dependencies": [
+        72,
+        83,
+        99,
+        112
+      ],
+      "implementation": "Create one authored obstacle collider with validated wing/fuselage/gear volumes; define taxi contact policy; test swept motion.",
+      "verification": "Wing-only collision, different timesteps, unloaded visual mesh and declared unknown coverage.",
+      "completion_residual": "Expand only supported speeds/obstacles; independent authoritative collider must survive renderer unload.",
+      "issue_acceptance": "Wings cannot pass through the authored obstacle while the fuselage alone remains clear; frame-rate differences do not skip supported contacts. Unloaded visual scenery does not delete an authoritative collider. Unknown collision coverage is disclosed; no detailed crashworthiness claim or unbounded mesh intersection loop.",
+      "source_paths": [
+        "src/sim/runwaySurface.ts",
+        "src/sim/systems/ground.ts",
+        "src/viewport/CesiumViewport.tsx"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P2",
+        "phase": "Medium-term",
+        "effort": "L",
+        "confidence": "Needs validation",
+        "category": "Feature",
+        "area": "Flight model and contact physics"
+      }
+    },
+    {
+      "number": 144,
+      "title": "Add inertial-navigation alignment and position-source integrity",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/144",
+      "wave": 8,
+      "assessment_kind": "F",
+      "assessment": "Navigation consumes exact physical position; inertial alignment/source quality is absent.",
+      "first_increment_dependencies": [
+        76,
+        78,
+        110,
+        134
+      ],
+      "original_full_scope_dependencies": [
+        76,
+        78,
+        110,
+        134
+      ],
+      "implementation": "Add one off/aligning/ready/invalid source lifecycle and stationary initialization/power case; make consumers select source.",
+      "verification": "Move-during-alignment rejection, invalid guidance, reset/save/replay epoch and power restoration.",
+      "completion_residual": "Add bounded sourced drift/update comparison; sensor drift never moves physical aircraft.",
+      "issue_acceptance": "Moving during an unsupported alignment cannot produce ready state; invalid source suppresses eligible guidance instead of freezing a live-looking track. Save/reset/replay preserve alignment epoch and quality. Power restoration does not instantly invent certified position accuracy.",
+      "source_paths": [
+        "src/sim/systems/navigation.ts",
+        "src/sim/types.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P2",
+        "phase": "Medium-term",
+        "effort": "L",
+        "confidence": "Needs validation",
+        "category": "Feature",
+        "area": "FMS and navigation"
+      }
+    },
+    {
+      "number": 154,
+      "title": "Keep mission triggers finite, declarative and reversible",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/154",
+      "wave": 8,
+      "assessment_kind": "F",
+      "assessment": "Finite trigger execution rules must exist before expanding mission/instructor actions.",
+      "first_increment_dependencies": [
+        123,
+        124
+      ],
+      "original_full_scope_dependencies": [
+        89,
+        117,
+        124
+      ],
+      "implementation": "Define declarative allowed predicates/actions, deterministic step order and bounded one-shot/rearm budgets; reject cycles/conflicts atomically.",
+      "verification": "Self-trigger/oversize/unsupported action rejection, deterministic simultaneous events and restore consumed-event state.",
+      "completion_residual": "Integrate #89 and #117 afterward; contract precedes authoring so full-issue dependency text cannot create an execution cycle.",
+      "issue_acceptance": "Self-triggering events, impossible thresholds, oversized packets and unsupported failure actions are rejected without partial state changes. Equivalent events at one step have deterministic ordering. Reset/restore/replay does not refire already-consumed triggers unexpectedly; render/audio effects cannot issue hidden physics writes.",
+      "source_paths": [
+        "src/sim/scenarios.ts",
+        "src/sim/simulationStep.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P1",
+        "phase": "Near-term",
+        "effort": "M",
+        "confidence": "Needs validation",
+        "category": "Security",
+        "area": "Audio training and session experience"
+      }
+    },
+    {
+      "number": 139,
+      "title": "Add scripted wake encounters with persistent vortex fields",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/139",
+      "wave": 9,
+      "assessment_kind": "G",
+      "assessment": "Ambient turbulence and visual traffic do not produce persistent wake fields.",
+      "first_increment_dependencies": [
+        69,
+        80,
+        114,
+        126
+      ],
+      "original_full_scope_dependencies": [
+        69,
+        80,
+        114,
+        126
+      ],
+      "implementation": "Qualify one authored vortex pair; emit world-position field with bounded strength/advection/decay/lifetime; record producers/inputs.",
+      "verification": "Persistent after producer departure, encounter/non-encounter, sign/energy, bounds and replay.",
+      "completion_residual": "Expand emitters/ground interactions only with evidence and costs; synthetic educational spacing stays labeled.",
+      "issue_acceptance": "Wake persists after the producer moves away, samples consistently in physics space and replays identically with captured inputs. Fields cannot grow without bound or inject energy through frame/sign mistakes. Clearly synthetic separation rules are never represented as safe real-flight spacing.",
+      "source_paths": [
+        "src/sim/systems/environment.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P3",
+        "phase": "Advanced",
+        "effort": "L",
+        "confidence": "Needs validation",
+        "category": "Feature",
+        "area": "Flight model and contact physics"
+      }
+    },
+    {
+      "number": 142,
+      "title": "Detect wrong-runway alignment and authored surface incursions",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/142",
+      "wave": 9,
+      "assessment_kind": "F",
+      "assessment": "Runway footprint membership does not establish selected-runway alignment or clearance.",
+      "first_increment_dependencies": [
+        84,
+        114,
+        115,
+        134
+      ],
+      "original_full_scope_dependencies": [
+        84,
+        114,
+        115,
+        134
+      ],
+      "implementation": "Author one airport's hold lines/hotspots and explicit simulator clearance state; distinguish selected/occupied runway; debounce events.",
+      "verification": "Parallel/opposite identity, threshold/boundary stops, cancellation and repeated-alert suppression.",
+      "completion_residual": "Add occupancy advisories from traffic truth and debrief distinction after base crossing exercise.",
+      "issue_acceptance": "Parallel/opposite runways, threshold crossings, canceled clearance and stopped-on-boundary cases behave predictably without repeated alert spam. Heading-reference labels agree. Debrief distinguishes wrong selection from clearance violation and avoids claiming operational runway-awareness certification.",
+      "source_paths": [
+        "src/sim/runwaySurface.ts",
+        "src/viewport/runwayData.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P2",
+        "phase": "Medium-term",
+        "effort": "M",
+        "confidence": "Needs validation",
+        "category": "Feature",
+        "area": "FMS and navigation"
+      }
+    },
+    {
+      "number": 145,
+      "title": "Add transponder state and clearly simulated traffic advisories",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/145",
+      "wave": 9,
+      "assessment_kind": "V",
+      "assessment": "Visual traffic is not transponder/traffic-advisory avionics.",
+      "first_increment_dependencies": [
+        101,
+        110,
+        114,
+        144,
+        147
+      ],
+      "original_full_scope_dependencies": [
+        63,
+        101,
+        110,
+        114,
+        144
+      ],
+      "implementation": "Add transponder mode/code and a clearly simulated observed traffic display; implement one bounded authored proximity cue.",
+      "verification": "Standby/unpowered/invalid, time/source altitude closure, duplicate actors and speech priority.",
+      "completion_residual": "Resolution advisories require separate primary-source feasibility; initial scope must not invent maneuver instructions.",
+      "issue_acceptance": "Standby/unpowered/invalid observations do not appear as operational advisories. Relative altitude/closure use stated sources and times; duplicate actors do not duplicate speech. Clearly label simplified logic, avoid unsafe-looking maneuver instructions, and preserve visual awareness without audio.",
+      "source_paths": [
+        "src/sim/types.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P3",
+        "phase": "Medium-term",
+        "effort": "L",
+        "confidence": "Needs validation",
+        "category": "Feature",
+        "area": "FMS and navigation"
+      }
+    },
+    {
+      "number": 149,
+      "title": "Package one lawful offline practice airport",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/149",
+      "wave": 9,
+      "assessment_kind": "G",
+      "assessment": "App-shell caching does not provide lawful offline scenery/physical coverage.",
+      "first_increment_dependencies": [
+        83,
+        84,
+        99,
+        118,
+        152
+      ],
+      "original_full_scope_dependencies": [
+        83,
+        84,
+        99,
+        118
+      ],
+      "implementation": "Qualify one original/licensed practice-airport pack; specify bounds/version/size; add explicit cancellable install/delete and quota-safe storage.",
+      "verification": "Network-disabled airplane/instruments/contact, corrupt/interrupted download, quota and active-session version/delete handling.",
+      "completion_residual": "Unknown exterior stays unknown; commercial/Ion/OSM redistribution is never inferred from cacheability.",
+      "issue_acceptance": "Airplane, instruments and physical surfaces work in the declared area with the network disabled. Unknown exterior terrain stays unknown. Interrupted/corrupt download never replaces a valid pack; quota errors preserve saves, and deletion/version update respects the active session.",
+      "source_paths": [
+        "src/viewport/CesiumViewport.tsx",
+        "vite.config.ts"
+      ],
+      "current_project": {
+        "status": "Blocked",
+        "priority": "P2",
+        "phase": "Advanced",
+        "effort": "L",
+        "confidence": "Needs validation",
+        "category": "Feature",
+        "area": "Viewport scenery and weather"
+      }
+    },
+    {
+      "number": 95,
+      "title": "Add a genuinely distinct 737 family variant",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/95",
+      "wave": 10,
+      "assessment_kind": "G",
+      "assessment": "Only the 737-800 pack exists; 737-700 data/geometry/rights are unqualified.",
+      "first_increment_dependencies": [
+        66,
+        69,
+        93,
+        99
+      ],
+      "original_full_scope_dependencies": [
+        66,
+        69,
+        93,
+        99
+      ],
+      "implementation": "Select lawful variant references; build dimension/mass/performance profile and matching exterior/contact stations; reuse explicitly common systems.",
+      "verification": "Matched-condition qualified reference cases, silhouette and differentiated handling review.",
+      "completion_residual": "Complete versioned pack integration and hangar acceptance; unsupported envelopes stay unavailable.",
+      "issue_acceptance": "Variant identity affects more than the title and livery; dimensions and reference cases match the chosen evidence packet within declared tolerances. Unsupported operating regions remain labeled. Include side-by-side silhouette and matched-condition handling review.",
+      "source_paths": [
+        "src/sim/types.ts",
+        "src/viewport/AircraftModel.ts",
+        "src/viewport/CockpitModel.ts"
+      ],
+      "current_project": {
+        "status": "Blocked",
+        "priority": "P2",
+        "phase": "Medium-term",
+        "effort": "L",
+        "confidence": "Needs validation",
+        "category": "Research",
+        "area": "Flight model and contact physics"
+      }
+    },
+    {
+      "number": 96,
+      "title": "Add a light piston trainer with its own flight character",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/96",
+      "wave": 10,
+      "assessment_kind": "G",
+      "assessment": "Jet/two-engine UI and flap assumptions prevent a genuinely distinct trainer.",
+      "first_increment_dependencies": [
+        69,
+        71,
+        72,
+        93,
+        99
+      ],
+      "original_full_scope_dependencies": [
+        69,
+        71,
+        72,
+        93,
+        99
+      ],
+      "implementation": "Select one lawful trainer packet; implement single-engine propeller power/RPM and its instruments/configuration; begin warm-engine circuits.",
+      "verification": "Trainer-specific climb/level/stall/circuit cases, RPM-animation/audio and sync/worker parity.",
+      "completion_residual": "Complete convincing manual-flight pack and separate pilot review; richer starts/avionics are explicit follow-ons.",
+      "issue_acceptance": "A reproducible climb, level-flight, stall/recovery and circuit set uses trainer data and instruments, not scaled 737 constants. Propeller animation/audio agrees with RPM. Instructor/pilot review remains a separate acceptance gate; no flight-training certification claim.",
+      "source_paths": [
+        "src/components/EngineStrip.tsx",
+        "src/input/flapDetents.ts",
+        "src/sim/systems/engine.ts"
+      ],
+      "current_project": {
+        "status": "Blocked",
+        "priority": "P2",
+        "phase": "Medium-term",
+        "effort": "L",
+        "confidence": "Needs validation",
+        "category": "Research",
+        "area": "Flight model and contact physics"
+      }
+    },
+    {
+      "number": 97,
+      "title": "Explore a regional turboprop and short-field route pack",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/97",
+      "wave": 10,
+      "assessment_kind": "G",
+      "assessment": "Turboprop propulsion/reference eligibility has not been established.",
+      "first_increment_dependencies": [
+        69,
+        73,
+        84,
+        93,
+        99
+      ],
+      "original_full_scope_dependencies": [
+        69,
+        73,
+        84,
+        93,
+        99
+      ],
+      "implementation": "Produce a bounded propulsion/source feasibility case; choose one supported airplane and airport pair; implement torque/RPM/feather/beta only after qualification.",
+      "verification": "Engine-out/feather drag signs, ground-only beta/reverse and runway eligibility.",
+      "completion_residual": "Deliver exploration findings if infeasible; full pack proceeds only with demonstrated source/playability gates.",
+      "issue_acceptance": "Engine-out asymmetry, feathered drag and ground reverse have bounded tests and explicit evidence status. Route/runway eligibility is validated; beta cannot silently operate in unsupported flight conditions. Ship only after source and playability gates pass.",
+      "source_paths": [
+        "src/sim/scenarios.ts",
+        "src/sim/systems/engine.ts",
+        "src/sim/systems/ground.ts"
+      ],
+      "current_project": {
+        "status": "Blocked",
+        "priority": "P3",
+        "phase": "Medium-term",
+        "effort": "L",
+        "confidence": "Needs validation",
+        "category": "Research",
+        "area": "Flight model and contact physics"
+      }
+    },
+    {
+      "number": 98,
+      "title": "Explore a glider energy laboratory",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/98",
+      "wave": 10,
+      "assessment_kind": "G",
+      "assessment": "Current jet-oriented contract cannot represent a qualified unpowered glider by simply removing thrust.",
+      "first_increment_dependencies": [
+        69,
+        71,
+        80,
+        93,
+        99
+      ],
+      "original_full_scope_dependencies": [
+        69,
+        71,
+        80,
+        93,
+        99
+      ],
+      "implementation": "Select a lawful glide polar; implement an unpowered profile/airbrake/variometer and one still-air air start; then author bounded lift fields.",
+      "verification": "Independent sink/glide residuals, total-energy variometer assumptions and captured-seed replay.",
+      "completion_residual": "Deliver feasibility boundary honestly; thermals/ridge lift and complete pack need qualified baseline and synthetic-weather labels.",
+      "issue_acceptance": "Still-air sink/glide cases match the chosen polar within published tolerances; variometer total-energy behavior is documented. Lift-field seeds replay consistently. Clearly distinguish educational gameplay fields from real soaring-weather advice.",
+      "source_paths": [
+        "src/sim/physics/aero.ts",
+        "src/sim/physics/derived.ts",
+        "src/sim/weather.ts"
+      ],
+      "current_project": {
+        "status": "Blocked",
+        "priority": "P3",
+        "phase": "Stretch",
+        "effort": "L",
+        "confidence": "Needs validation",
+        "category": "Research",
+        "area": "Flight model and contact physics"
+      }
+    },
+    {
+      "number": 121,
+      "title": "Add optional, bounded haptic flight feedback",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/121",
+      "wave": 11,
+      "assessment_kind": "V",
+      "assessment": "Input/output availability does not establish real controller haptic support.",
+      "first_increment_dependencies": [
+        72,
+        85
+      ],
+      "original_full_scope_dependencies": [
+        72,
+        85
+      ],
+      "implementation": "Probe one actual supported controller; implement opt-in bounded touchdown/stall pulses with intensity and cancellation.",
+      "verification": "No output on pause/disable/disconnect/reset; rate limit and actual-hardware observation.",
+      "completion_residual": "Publish supported/unsupported browser-device matrix; keep equivalent visual/audio cues.",
+      "issue_acceptance": "No actuator output while paused, muted-for-feedback, disconnected or reset; pulses are rate-limited and cancel on user disable. Visual/audio equivalents remain available. Verify on real hardware and document unsupported paths instead of treating feature detection as proof.",
+      "source_paths": [
+        "src/input/GamepadManager.ts",
+        "src/input/InputManager.ts",
+        "src/input/__tests__/GamepadManager.hotplug.test.ts",
+        "src/input/__tests__/GamepadManager.test.ts",
+        "src/input/__tests__/InputManager.test.ts",
+        "src/input/__tests__/controlBindings.test.ts",
+        "src/input/__tests__/gearCommand.test.ts",
+        "src/input/__tests__/keyboardControls.test.ts",
+        "src/input/controlBindings.ts",
+        "src/input/flapDetents.ts",
+        "src/input/gearCommand.ts",
+        "src/input/keyboardControls.ts",
+        "src/sim/systems/ground.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P3",
+        "phase": "Near-term",
+        "effort": "M",
+        "confidence": "Needs validation",
+        "category": "Feature",
+        "area": "Cockpit input and instruments"
+      }
+    },
+    {
+      "number": 122,
+      "title": "Make aircraft effects match their emitters and conditions",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/122",
+      "wave": 11,
+      "assessment_kind": "F",
+      "assessment": "Contrails use one aircraft emitter, engine 0 and altitude threshold.",
+      "first_increment_dependencies": [
+        67,
+        81,
+        82,
+        93,
+        99
+      ],
+      "original_full_scope_dependencies": [
+        67,
+        81,
+        82,
+        93,
+        99
+      ],
+      "implementation": "Add named per-engine anchors and simulation-time effects; explicitly mark simplified atmosphere eligibility; implement contact-conditioned spray/smoke.",
+      "verification": "Correct-engine shutdown, pause/replay, dry/airborne/no-slip suppression and particle cleanup/budget.",
+      "completion_residual": "Add prop-specific effects for admitted packs; never invent humidity truth.",
+      "issue_acceptance": "Engine shutdown affects the correct trail; paused/replayed effects align with simulation time. Spray/smoke cannot appear airborne or on incompatible dry/no-slip states. Desktop/mobile captures verify emitter placement, density and cleanup without hiding aircraft details or sacrificing frame budgets.",
+      "source_paths": [
+        "src/viewport/ContrailLayer.tsx"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P2",
+        "phase": "Near-term",
+        "effort": "M",
+        "confidence": "Needs validation",
+        "category": "Feature",
+        "area": "Viewport scenery and weather"
+      }
+    },
+    {
+      "number": 155,
+      "title": "Add flight-aware photo capture with honest provenance",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/155",
+      "wave": 11,
+      "assessment_kind": "V",
+      "assessment": "Composite-scene capture/cross-origin behavior needs proof before a photo workflow.",
+      "first_increment_dependencies": [
+        65,
+        88,
+        99
+      ],
+      "original_full_scope_dependencies": [
+        65,
+        88,
+        99
+      ],
+      "implementation": "Probe capture from paused/replay scene; add bounded framing/resolution, optional overlays and local provenance metadata.",
+      "verification": "No blank download/state change, cross-origin fallback, memory cap and live/degraded/replay labels.",
+      "completion_residual": "Finish accessible framing and attribution; video/camera paths remain measured follow-ons.",
+      "issue_acceptance": "Capturing leaves the flight/controls intact and cannot silently claim a degraded screenshot is production scenery. Unsupported capture reports a clear fallback without blank downloads or memory spikes. Asset license/attribution requirements remain accessible; clean images do not erase provenance from the accompanying metadata.",
+      "source_paths": [
+        "src/viewport/CameraManager.ts",
+        "src/viewport/ThreeLayer.tsx"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P2",
+        "phase": "Stretch",
+        "effort": "M",
+        "confidence": "Needs validation",
+        "category": "UX",
+        "area": "Viewport scenery and weather"
+      }
+    },
+    {
+      "number": 156,
+      "title": "Add a bounded original-livery workshop",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/156",
+      "wave": 11,
+      "assessment_kind": "F",
+      "assessment": "One original texture set is distinct from a user preset/workshop contract.",
+      "first_increment_dependencies": [
+        68,
+        93,
+        99
+      ],
+      "original_full_scope_dependencies": [
+        68,
+        93,
+        99
+      ],
+      "implementation": "Add bounded color/registration/stripe editing on one qualified template; preview and save versioned local preset with canonical compatibility.",
+      "verification": "Long text/alpha/colors/size, incompatible UV version, texture disposal and no script/HTML injection.",
+      "completion_residual": "Import logos/textures only with separate bounded file/rights validation; no general editor or marketplace.",
+      "issue_acceptance": "Presets identify the compatible aircraft/template; incompatible UV/model revisions fail visibly. Long registrations, transparency, bad colors and excessive texture size are handled without clipping or GPU overload. Repeated previews dispose old textures; user content cannot execute scripts or inject HTML.",
+      "source_paths": [
+        "src/viewport/AircraftModel.ts"
+      ],
+      "current_project": {
+        "status": "Intake",
+        "priority": "P3",
+        "phase": "Stretch",
+        "effort": "M",
+        "confidence": "Needs validation",
+        "category": "UX",
+        "area": "Viewport scenery and weather"
+      }
+    },
+    {
+      "number": 157,
+      "title": "Investigate VR without committing the main runtime to it",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/157",
+      "wave": 12,
+      "assessment_kind": "V",
+      "assessment": "XR support for the dual renderer and actual headset ergonomics is unverified.",
+      "first_increment_dependencies": [
+        62,
+        63,
+        64,
+        99,
+        147
+      ],
+      "original_full_scope_dependencies": [
+        62,
+        63,
+        64,
+        99,
+        147
+      ],
+      "implementation": "Design one target-headset/browser probe and stereo owner contract; measure eye scale, readability, input, motion timing and desktop return.",
+      "verification": "Actual headset evidence and resource/frame budget; desktop nonblank output is insufficient.",
+      "completion_residual": "Deliver feasibility/limits and cockpit-only alternative; full VR renderer/product commitment needs explicit reviewed decision.",
+      "issue_acceptance": "Exit gate requires actual headset evidence of correctly framed stereo, readable instruments, usable input, stable motion timing and successful return to desktop. A nonblank desktop canvas is not VR proof. Report unsupported devices, resource costs and comfort limitations without claiming medical safety.",
+      "source_paths": [
+        "src/viewport/CameraManager.ts",
+        "src/viewport/CesiumViewport.tsx",
+        "src/viewport/ThreeLayer.tsx"
+      ],
+      "current_project": {
+        "status": "Blocked",
+        "priority": "P3",
+        "phase": "Stretch",
+        "effort": "L",
+        "confidence": "Needs validation",
+        "category": "Research",
+        "area": "Viewport scenery and weather"
+      }
+    },
+    {
+      "number": 158,
+      "title": "Design a single-authority shared-cockpit experiment",
+      "url": "https://github.com/Reedtrullz/ReedFS/issues/158",
+      "wave": 12,
+      "assessment_kind": "V",
+      "assessment": "Same-origin pop-outs do not establish a networked authority/security/latency design.",
+      "first_increment_dependencies": [
+        116,
+        123,
+        124,
+        126,
+        147
+      ],
+      "original_full_scope_dependencies": [
+        116,
+        123,
+        124,
+        126,
+        147
+      ],
+      "implementation": "Write observer/copilot roles, authoritative host, session/sequence epochs, command limits and disconnect policy; review protocol/threat/latency design.",
+      "verification": "Specify adversarial reorder/duplicate/jitter/unauthorized/ownership cases and reconnect snapshot age/version.",
+      "completion_residual": "Design is the initial deliverable; two-client service/transport probe and deployment remain separately authorized.",
+      "issue_acceptance": "A future probe must survive jitter, reorder, duplicate messages, malicious commands, pilot/copilot conflicts and disconnect without stale control capture or unauthorized actions. Rejoining receives a version-compatible snapshot with age indicators. Capture reproducible latency/authority evidence; never call same-machine message tests multiplayer acceptance.",
+      "source_paths": [
+        "src/sim/simulationRuntime.ts",
+        "src/store/simStore.ts"
+      ],
+      "current_project": {
+        "status": "Blocked",
+        "priority": "P3",
+        "phase": "Stretch",
+        "effort": "L",
+        "confidence": "Needs validation",
+        "category": "Research",
+        "area": "Persistence worker and runtime"
+      }
+    }
+  ]
+}
