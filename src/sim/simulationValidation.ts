@@ -104,9 +104,8 @@ export function isWind(value: unknown): value is WindInfo | null {
 export function isFlightPlan(value: unknown): value is FlightPlan | null {
   return value === null || (fields(value, '', '', 'origin destination flightNumber route') && Array.isArray(value.waypoints)
     && value.waypoints.length <= 2048 && value.waypoints.every((waypoint) => fields(waypoint, '', 'discontinuity', 'ident')
-      && (waypoint.lat === undefined) === (waypoint.lon === undefined)
-      && optionalNumbers(waypoint, 'lat lon') && (waypoint.lat == null || range(waypoint.lat, -90, 90))
-      && (waypoint.lon == null || range(waypoint.lon, -180, 180))) && isFiniteSimulationData(value));
+      && ((waypoint.lat === undefined && waypoint.lon === undefined)
+        || (range(waypoint.lat, -90, 90) && range(waypoint.lon, -180, 180)))) && isFiniteSimulationData(value));
 }
 export function isAutopilotState(value: unknown): value is AutopilotState | null {
   return value === null || (isRecord(value)

@@ -124,3 +124,18 @@ it('preserves existing coordinate-free discontinuities while guidance stays unav
   expect(() => useSimStore.getState().setFlightPlan(plan)).not.toThrow();
   expect(useSimStore.getState().routeStatus.lnavAvailable).toBe(false);
 });
+
+
+it('rejects explicit null route coordinates at shared boundaries without mutation', () => {
+  for (const [lat, lon] of [[null, 0], [0, null], [null, null]]) {
+    const plan = route([[0, 0], [0, 1]]);
+    const malformed = { ...plan, waypoints: [{ ...plan.waypoints[0], lat, lon }, plan.waypoints[1]] } as unknown as FlightPlan;
+    expect(isFlightPlan(malformed)).toBe(false);
+    const before = useSimStore.getState();
+    expect(() => before.setFlightPlan(malformed)).toThrow(/flight plan/i);
+    expect(useSimStore.getState()).toBe(before);
+    expect(() => before.setFlightPlanAtRunway(malformed, KSEA_RUNWAY_16L)).toThrow(/flight plan/i);
+    expect(useSimStore.getState()).toBe(before);
+    expect(() => createRouteSourceFromFlightPlan(malformed, { id: 'null', type: 'manual', label: 'Null' })).toThrow(/flight plan/i);
+  }
+});
