@@ -22,6 +22,10 @@ date and historical atmosphere-model identity are unknowable, and the load messa
 states this migration. Version 3 historical identities are checked separately;
 unknown current identities, future versions, missing anchors and inconsistent
 derived hours are refused. Writing a new v4 slot preserves valid legacy neighbors.
+The exported loader returns a runtime-normalized legacy payload while retaining
+its historical version for the warning. Directly passing that payload to the
+writer is refused; restore it into the store, then capture a fresh v4 snapshot.
+This keeps historical evidence from being stamped with a new model identity.
 
 Cesium stops its independent animation clock and uses the committed instant before
 rendering. JavaScript Date drops fractional milliseconds, and Cesium's conversion
@@ -29,6 +33,8 @@ back to Date can truncate another millisecond. Native qualification compares the
 actual Julian clock and frame time exactly against the projected Date; the lossy
 display roundtrip is bounded separately below two milliseconds. Saves and worker
 results retain the original floating-point simulation milliseconds.
+The whole-second panel allows one microsecond of cancellation error when an edit
+subtracts and re-adds a large elapsed time. This affects presentation only.
 
 Globe, aircraft and cockpit use the same approximate geometric solar calculation
 from latitude, longitude and UTC. Aircraft light direction converts local solar

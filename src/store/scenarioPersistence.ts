@@ -85,6 +85,9 @@ export interface ScenarioSaveOptions {
 }
 
 export type ScenarioSnapshotLoadResult =
+  // Legacy payloads are normalized for runtime use but retain their historical
+  // version for the migration warning. Capture restored store state to write v4;
+  // directly reserializing this normalized legacy payload is deliberately refused.
   | { ok: true; snapshot: ScenarioSnapshot; metadata: ScenarioSaveSlotMetadata }
   | { ok: false; reason: string };
 

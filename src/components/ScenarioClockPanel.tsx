@@ -3,8 +3,9 @@ import { useSimStore } from '../store/simStore';
 import { DEFAULT_SCENARIO_UTC_MS, scenarioUtcMs } from '../sim/scenarioClock';
 
 export function ScenarioClockPanel() {
-  // Whole-second presentation avoids rebuilding this panel at physics frequency.
-  const utc = useSimStore((s) => s.aircraft ? Math.floor(scenarioUtcMs(s.aircraft) / 1000) * 1000 : DEFAULT_SCENARIO_UTC_MS);
+  // Whole-second presentation avoids physics-frequency rebuilds. A microsecond
+  // allowance absorbs anchor-edit cancellation at the supported date bounds.
+  const utc = useSimStore((s) => s.aircraft ? Math.floor((scenarioUtcMs(s.aircraft) + 0.001) / 1000) * 1000 : DEFAULT_SCENARIO_UTC_MS);
   const anchor = useSimStore((s) => s.aircraft?.utcEpochMs);
   const status = useSimStore((s) => s.status);
   const setUtc = useSimStore((s) => s.setScenarioUtc);

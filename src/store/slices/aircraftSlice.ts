@@ -117,7 +117,8 @@ export function createAircraftSlice(set: SimStoreSet): Pick<
       let changed = false;
       set((s) => {
         if (utc === null || s.status === 'running' || (s.simulationFailure && !s.simulationFailure.recovered)) return {};
-        const aircraft = { ...s.aircraft, utcEpochMs: utc - s.aircraft.simTime, timeOfDay: utcHours(utc) };
+        const utcEpochMs = utc - s.aircraft.simTime;
+        const aircraft = { ...s.aircraft, utcEpochMs, timeOfDay: utcHours(utcEpochMs + s.aircraft.simTime) };
         if (!hasCoherentScenarioClock(aircraft)) return {};
         changed = true;
         return {

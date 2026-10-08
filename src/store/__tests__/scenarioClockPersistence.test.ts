@@ -20,6 +20,7 @@ describe('UTC save and replacement boundaries', () => {
     if (version === 1) delete old.apControllerState;
     const raw = JSON.stringify(old); storage.setItem(SCENARIO_SAVE_KEY, raw);
     const loaded = loadScenarioSnapshot(storage); expect(loaded.ok).toBe(true);
+    if (loaded.ok) expect(() => saveScenarioSnapshot(storage, loaded.snapshot, { slotId: 'copy' })).toThrow('Invalid scenario snapshot');
     useSimStore.getState().loadScenarioState(storage);
     const state = useSimStore.getState();
     expect(scenarioUtcMs(state.aircraft)).toBeCloseTo(LEGACY_SCENARIO_MIDNIGHT_MS + legacyV3.aircraft.timeOfDay * 3_600_000, 3);
