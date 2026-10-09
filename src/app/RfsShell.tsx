@@ -1,5 +1,8 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { DiagnosticExport } from '../components/DiagnosticExport';
+import { AttitudeIndicator } from '../components/AttitudeIndicator';
+import { ControlsHelp } from '../components/ControlsHelp';
+import { ControlsSettings } from '../components/ControlsSettings';
 import { Telemetry } from '../components/Telemetry';
 import type { Viewer as CesiumViewer } from 'cesium';
 import { getCesiumScenePolicy } from '../config/cesium';
@@ -51,9 +54,6 @@ const RunwayLayer = lazy(() => import('../viewport/RunwayLayer').then((m) => ({ 
 const RunwayEditor = lazy(() => import('../viewport/RunwayEditor').then((m) => ({ default: m.RunwayEditor })));
 const RfsPFD = lazy(() => import('../instruments/RfsPFD').then((m) => ({ default: m.RfsPFD })));
 const RfsMCP = lazy(() => import('../instruments/RfsMCP').then((m) => ({ default: m.RfsMCP })));
-const AttitudeIndicator = lazy(() => import('../components/AttitudeIndicator').then((m) => ({ default: m.AttitudeIndicator })));
-const ControlsHelp = lazy(() => import('../components/ControlsHelp').then((m) => ({ default: m.ControlsHelp })));
-const ControlsSettings = lazy(() => import('../components/ControlsSettings').then((m) => ({ default: m.ControlsSettings })));
 
 const cesiumScenePolicy = getCesiumScenePolicy();
 
@@ -328,20 +328,6 @@ export function RfsShell() {
 
   const showDebugOverlays = shouldShowDebugOverlays(overlayMode);
   const showFlightInstruments = shouldShowFlightInstruments(overlayMode);
-  useEffect(() => {
-    if (showDebugOverlays) return undefined;
-    const warmup = () => {
-      void import('../components/ControlsHelp');
-      void import('../components/ControlsSettings');
-      void import('../components/AttitudeIndicator');
-    };
-    if (typeof window.requestIdleCallback === 'function') {
-      const idleId = window.requestIdleCallback(warmup);
-      return () => window.cancelIdleCallback(idleId);
-    }
-    const timerId = window.setTimeout(warmup, 1_000);
-    return () => window.clearTimeout(timerId);
-  }, [showDebugOverlays]);
   const viewerReady = viewerGeneration > 0;
   const audioCaptionNode = audioSettings.captionsEnabled && audioCaption ? (
     <div aria-label="Audio caption" aria-live="polite" role="status" style={audioCaptionStyle}>
@@ -388,10 +374,10 @@ export function RfsShell() {
       debugPanels={showDebugOverlays ? (
         <>
           <div data-rfs-debug-panel="telemetry"><Telemetry /></div>
-          <div data-rfs-debug-panel="help"><Suspense fallback={null}><ControlsHelp /></Suspense></div>
-          <div data-rfs-debug-panel="settings"><Suspense fallback={null}><ControlsSettings /></Suspense></div>
+          <div data-rfs-debug-panel="help"><ControlsHelp /></div>
+          <div data-rfs-debug-panel="settings"><ControlsSettings /></div>
           <div data-rfs-debug-panel="diagnostics"><DiagnosticExport /></div>
-          <div data-rfs-debug-panel="attitude"><Suspense fallback={null}><AttitudeIndicator /></Suspense></div>
+          <div data-rfs-debug-panel="attitude"><AttitudeIndicator /></div>
         </>
       ) : null}
       flightInstruments={showFlightInstruments ? (
