@@ -40,7 +40,7 @@ test.describe('RFS visible route descent proof', () => {
 
       await page.clock.install();
       await openRfsBlackbox(page);
-      await setVisibleSimRateTarget(page, 4);
+      await setVisibleSimRateTarget(page, 16);
       await selectKseaScenarioThroughVisibleControls(page);
       await expect(page.getByLabel('Route status')).toContainText('NO ROUTE');
 
