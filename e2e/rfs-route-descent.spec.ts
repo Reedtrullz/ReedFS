@@ -102,7 +102,7 @@ test.describe('RFS visible route descent proof', () => {
         autopilotStatus: 'CMD_A',
       });
       await record('autoflight-engaged');
-      await setVisibleSimRateTarget(page, 4);
+      await setVisibleSimRateTarget(page, 16);
       // A per-leg distance decrease alone does not establish an airborne descent entry.
       await driveVisibleSimUntil(page, 'airborne climb above the KSEA descent-entry floor', async () => {
         const flight = await readVisibleFlightNumbers(page);
@@ -114,7 +114,6 @@ test.describe('RFS visible route descent proof', () => {
       }, { timeoutMs: 120_000, stepMs: 1000 });
       expect(await waitForVisibleFlightPhase(page, /^(CLIMB|CRUISE)$/)).toMatch(/^(CLIMB|CRUISE)$/);
       await record('airborne-route-climb');
-      await setVisibleSimRateTarget(page, 16);
       await expect(page.getByRole('button', { name: /Cycle simulator rate/ })).toHaveText('SIM RATE TARGET: 16X');
 
       await driveVisibleSimUntil(page, 'visible route progress toward KPDX and descent phase entry', async () => {
