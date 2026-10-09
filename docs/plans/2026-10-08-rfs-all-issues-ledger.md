@@ -2327,3 +2327,5 @@ Bounded flight evidence already exists in CI: run 37982083531 at 3cf5c8a passed 
 
 Non-claims: the aero model remains placeholder B737-800 data with the provisional notice; no Boeing-source model qualification has been done; convergence and drift thresholds are solver and bounded-flight receipts, not a performance qualification. #136 remains open with climb/descent/banked equilibria and source qualification residual.
 
+CI run 37996511085 at 9255040: CodeQL and secret-scan green, unit suite passed, 52 of 54 e2e passed in 54.0m including the level-equilibrium spec at 36.4 s (fresh bounded-flight receipt at this exact head). test:e2e failed on the documented overloaded-runner family (heading-reference 240 s cap; route-descent 480 s cap, both retries); the visual step never ran. Disclosure comment 6090671924; no rerun per the ledger rule. PR #184 merge remains an owner decision.
+
