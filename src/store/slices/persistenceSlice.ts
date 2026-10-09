@@ -20,6 +20,7 @@ import {
 } from '../scenarioPersistence';
 import type { SimStoreSet } from './aircraftSlice';
 import { cloneWeather } from './aircraftSlice';
+import { levelEquilibriumReceiptForScenario } from '../levelEquilibrium';
 import { createRouteState } from './routeSlice';
 import { withBrowserScenarioSaveLock } from '../browserScenarioStorage';
 
@@ -65,6 +66,7 @@ export function restoreSnapshotSlice(snapshot: ScenarioSnapshot, slotName = 'Sav
     wind: structuredClone(snapshot.wind),
     weather: cloneWeather(snapshot.weather ?? scenario.weather),
     weatherRestored: true,
+    levelEquilibriumReceipt: levelEquilibriumReceiptForScenario(scenario),
     guidance: buildGuidanceState({
       scenario,
       status: restoredStatus,

@@ -62,6 +62,11 @@ function noopRefreshScenarioSaveSlots(): void {
   // App-level tests sometimes provide partial mocked store state without persistence actions.
 }
 
+function formatSigned(value: number, unit: string): string {
+  const rounded = Math.abs(value) < 0.0005 ? 0 : Math.round(value * 1000) / 1000;
+  return `${rounded > 0 ? '+' : ''}${rounded} ${unit}`;
+}
+
 export function ScenarioPanel() {
   const selectedScenarioId = useSimStore((s) => s.selectedScenarioId);
   const status = useSimStore((s) => s.status);
@@ -76,6 +81,7 @@ export function ScenarioPanel() {
   const loadScenarioState = useSimStore((s) => s.loadScenarioState);
   const refreshScenarioSaveSlots = useSimStore((s) => s.refreshScenarioSaveSlots ?? noopRefreshScenarioSaveSlots);
   const persistenceMessage = useSimStore((s) => s.scenarioPersistenceMessage);
+  const levelEquilibriumReceipt = useSimStore((s) => s.levelEquilibriumReceipt ?? null);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
   const [slotName, setSlotName] = useState('Default save');
   const [selectedSlotId, setSelectedSlotId] = useState('default');
@@ -146,6 +152,30 @@ export function ScenarioPanel() {
         ))}
       </select>
       <div style={{ color: '#9db2bc', fontSize: 11, marginTop: 6 }}>{scenario.description}</div>
+      {levelEquilibriumReceipt ? (
+        <div
+          aria-label="Level equilibrium receipt"
+          data-testid="level-equilibrium-receipt"
+          style={{ border: '1px solid rgba(157,220,255,0.25)', borderRadius: 4, padding: 6, fontSize: 11, marginTop: 6, lineHeight: 1.5 }}
+        >
+          <strong style={{ color: levelEquilibriumReceipt.status === 'converged' ? '#6dff8d' : '#ffd84a' }}>
+            {levelEquilibriumReceipt.status === 'converged' ? 'Level equilibrium solved' : 'Level equilibrium infeasible'}
+          </strong>
+          <div style={{ color: '#cfe5ef', marginTop: 3 }}>
+            {levelEquilibriumReceipt.status === 'converged' ? (
+              <>
+                <div>Target {levelEquilibriumReceipt.targetTasKt} kt TAS</div>
+                <div>Throttle {formatSigned(levelEquilibriumReceipt.solvedThrottle ?? 0, '')}</div>
+                <div>Trim {formatSigned(levelEquilibriumReceipt.solvedTrimUnits ?? 0, 'units')} · Pitch {formatSigned(levelEquilibriumReceipt.solvedPitchDeg ?? 0, 'deg')}</div>
+                <div>Residuals normal {formatSigned(levelEquilibriumReceipt.residualNormalForceN ?? 0, 'N')} · axial {formatSigned(levelEquilibriumReceipt.residualAxialForceN ?? 0, 'N')} · pitch {formatSigned(levelEquilibriumReceipt.residualPitchMomentNm ?? 0, 'N·m')}</div>
+              </>
+            ) : (
+              <div>{levelEquilibriumReceipt.reason}</div>
+            )}
+            <div style={{ color: '#ffd84a', marginTop: 3 }}>{levelEquilibriumReceipt.provisionalDataNotice}</div>
+          </div>
+        </div>
+      ) : null}
       <ScenarioClockPanel />
       <HeadingReferenceControl />
 

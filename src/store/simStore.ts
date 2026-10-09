@@ -25,6 +25,7 @@ import { createAutoflightSlice } from './slices/autoflightSlice';
 import { createRouteSlice } from './slices/routeSlice';
 import { createPersistenceSlice, restoreSnapshotSlice } from './slices/persistenceSlice';
 import { captureScenarioSnapshot, type ScenarioSnapshot } from './scenarioPersistence';
+import type { LevelEquilibriumReceipt } from './levelEquilibrium';
 import { assertCommittedSimulationResult, assertSimulationStepInput, InvalidSimulationStateError } from '../sim/simulationValidation';
 
 import { appliedCommandLatency, commandBoundaryPatch, commitRate, type CommandRevisions, type SimulationCommit } from './commandBoundaries';
@@ -87,6 +88,8 @@ export interface SimStore {
   selectedScenarioId: string;
   guidance: GuidanceState;
   controlFeedbackMessage: string | null;
+  /** Solver receipt for the active scenario when it declares a level-equilibrium target. */
+  levelEquilibriumReceipt: LevelEquilibriumReceipt | null;
   scenarioPersistenceMessage: string | null;
   scenarioSaveSlots: ScenarioSaveSlotMetadata[];
   setInput: (partial: Partial<ControlInputs>) => void;

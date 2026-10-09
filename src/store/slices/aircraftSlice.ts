@@ -14,6 +14,10 @@ import {
   inputManagerForScenario,
   inputsForScenario,
 } from '../simStoreInputReducers';
+import {
+  levelEquilibriumReceiptForScenario,
+  solvedScenarioInitialization,
+} from '../levelEquilibrium';
 
 export type SimStoreSet = (partial: Partial<SimStore> | ((state: SimStore) => Partial<SimStore>), options?: { trimIntentOnly: boolean }) => void;
 
@@ -59,6 +63,7 @@ export function createAircraftSlice(set: SimStoreSet): Pick<
   | 'asyncPhysicsInFlight'
   | 'guidance'
   | 'controlFeedbackMessage'
+  | 'levelEquilibriumReceipt'
   | 'scenarioPersistenceMessage'
   | 'scenarioSaveSlots'
   | 'start'
@@ -82,11 +87,12 @@ export function createAircraftSlice(set: SimStoreSet): Pick<
   });
   const initialRouteStatus = createNoRouteStatus();
   const initialAutopilotControllerState = createAutopilotControllerState();
+  const initialSolved = solvedScenarioInitialization(ENVA_TUTORIAL_SCENARIO);
 
   return {
     aircraft: initialAircraft,
     ...initialControls,
-    inputManager: inputManagerForScenario(ENVA_TUTORIAL_SCENARIO),
+    inputManager: initialSolved ? initialSolved.inputManager : inputManagerForScenario(ENVA_TUTORIAL_SCENARIO),
     spec: B737_800_SPEC,
     status: 'stopped',
     lastFrameTime: 0,
@@ -109,6 +115,7 @@ export function createAircraftSlice(set: SimStoreSet): Pick<
     selectedScenarioId: ENVA_TUTORIAL_SCENARIO.id,
     guidance: initialGuidance,
     controlFeedbackMessage: null,
+    levelEquilibriumReceipt: levelEquilibriumReceiptForScenario(ENVA_TUTORIAL_SCENARIO),
     scenarioPersistenceMessage: null,
     scenarioSaveSlots: [],
 
@@ -239,14 +246,16 @@ export function createAircraftSlice(set: SimStoreSet): Pick<
     reset: () => set((s) => {
       resetGPWS();
       const scenario = scenarioById(s.selectedScenarioId);
-      const pilotInputs = inputsForScenario(scenario);
-      const aircraft = createAircraftStateForScenario(B737_800_SPEC, scenario);
+      const solved = solvedScenarioInitialization(scenario);
+      const pilotInputs = solved ? solved.pilotInputs : inputsForScenario(scenario);
+      const aircraft = solved ? structuredClone(solved.aircraft) : createAircraftStateForScenario(B737_800_SPEC, scenario);
       const controlsSlice = composeControlsSlice(pilotInputs);
       const apControllerState = createAutopilotControllerState();
       return {
         aircraft,
         ...controlsSlice,
-        inputManager: inputManagerForScenario(scenario),
+        inputManager: solved ? solved.inputManager : inputManagerForScenario(scenario),
+        levelEquilibriumReceipt: levelEquilibriumReceiptForScenario(scenario),
         status: 'stopped',
         simulationFailure: s.simulationFailure ? { ...s.simulationFailure, recovered: true } : null,
         lastValidCheckpoint: null,
@@ -281,15 +290,17 @@ export function createAircraftSlice(set: SimStoreSet): Pick<
     setScenario: (scenarioId) => set((s) => {
       resetGPWS();
       const scenario = scenarioById(scenarioId);
-      const pilotInputs = inputsForScenario(scenario);
-      const aircraft = createAircraftStateForScenario(B737_800_SPEC, scenario);
+      const solved = solvedScenarioInitialization(scenario);
+      const pilotInputs = solved ? solved.pilotInputs : inputsForScenario(scenario);
+      const aircraft = solved ? structuredClone(solved.aircraft) : createAircraftStateForScenario(B737_800_SPEC, scenario);
       const controlsSlice = composeControlsSlice(pilotInputs);
       const apControllerState = createAutopilotControllerState();
       return {
         selectedScenarioId: scenario.id,
         aircraft,
         ...controlsSlice,
-        inputManager: inputManagerForScenario(scenario),
+        inputManager: solved ? solved.inputManager : inputManagerForScenario(scenario),
+        levelEquilibriumReceipt: levelEquilibriumReceiptForScenario(scenario),
         status: 'stopped',
         simulationFailure: s.simulationFailure ? { ...s.simulationFailure, recovered: true } : null,
         lastValidCheckpoint: null,
