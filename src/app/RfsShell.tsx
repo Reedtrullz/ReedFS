@@ -328,6 +328,20 @@ export function RfsShell() {
 
   const showDebugOverlays = shouldShowDebugOverlays(overlayMode);
   const showFlightInstruments = shouldShowFlightInstruments(overlayMode);
+  useEffect(() => {
+    if (showDebugOverlays) return undefined;
+    const warmup = () => {
+      void import('../components/ControlsHelp');
+      void import('../components/ControlsSettings');
+      void import('../components/AttitudeIndicator');
+    };
+    if (typeof window.requestIdleCallback === 'function') {
+      const idleId = window.requestIdleCallback(warmup);
+      return () => window.cancelIdleCallback(idleId);
+    }
+    const timerId = window.setTimeout(warmup, 1_000);
+    return () => window.clearTimeout(timerId);
+  }, [showDebugOverlays]);
   const viewerReady = viewerGeneration > 0;
   const audioCaptionNode = audioSettings.captionsEnabled && audioCaption ? (
     <div aria-label="Audio caption" aria-live="polite" role="status" style={audioCaptionStyle}>
