@@ -6,6 +6,7 @@ import type { ScenarioWeatherMetadata, WindInfo } from './weather';
 import type { AutopilotControllerState } from './systems/autopilot';
 import { SCENARIOS } from './scenarios';
 import { eulerToQuat } from './physics/quaternion';
+import { hasCoherentScenarioClock } from './scenarioClock';
 
 type RecordValue = Record<string, unknown>;
 export const MAX_SIMULATION_BATCH_STEPS = 4096;
@@ -59,6 +60,7 @@ export function isControlInputs(value: unknown): value is ControlInputs {
   return ['elevator', 'aileron', 'rudder'].every((key) => range(value[key], -1, 1))
     && ['throttle1', 'throttle2', 'spoilers', 'brake'].every((key) => range(value[key], 0, 1))
     && ['leftBrake', 'rightBrake'].every((key) => value[key] === undefined || range(value[key], 0, 1))
+    && ['fuelCutoff1', 'fuelCutoff2'].every((key) => value[key] === undefined || typeof value[key] === 'boolean')
     && range(value.flapLever, 0, 40) && ['UP', 'DOWN'].includes(String(value.gearLever));
 }
 export function isAutopilotCommands(value: unknown): value is AutopilotCommands {
@@ -86,7 +88,7 @@ export function isAircraftState(value: unknown): value is AircraftState {
     && range(aircraft.config.speedBrake, 0, 1) && range(aircraft.config.stabilizerTrimUnits, 0, 15)
     && aircraft.grossWeight > 0 && aircraft.zeroFuelWeight > 0 && aircraft.payloadWeight >= 0 && aircraft.simTime >= 0
     && Object.values(aircraft.fuel).every((number) => number >= 0)
-    && range(aircraft.timeOfDay, 0, 24) && ['none', 'gear', 'belly', 'crashed'].includes(aircraft.ground.contact)
+    && hasCoherentScenarioClock(aircraft) && ['none', 'gear', 'belly', 'crashed'].includes(aircraft.ground.contact)
     && ['PARKED', 'TAXI', 'TAKEOFF', 'CLIMB', 'CRUISE', 'DESCENT', 'APPROACH', 'TOUCHDOWN', 'DEROTATION', 'ROLLOUT', 'STOPPED', 'LANDED'].includes(aircraft.flightPhase);
 }
 export function isWeather(value: unknown): value is ScenarioWeatherMetadata {
@@ -103,8 +105,8 @@ export function isWind(value: unknown): value is WindInfo | null {
 export function isFlightPlan(value: unknown): value is FlightPlan | null {
   return value === null || (fields(value, '', '', 'origin destination flightNumber route') && Array.isArray(value.waypoints)
     && value.waypoints.length <= 2048 && value.waypoints.every((waypoint) => fields(waypoint, '', 'discontinuity', 'ident')
-      && optionalNumbers(waypoint, 'lat lon') && (waypoint.lat == null || range(waypoint.lat, -90, 90))
-      && (waypoint.lon == null || range(waypoint.lon, -180, 180))) && isFiniteSimulationData(value));
+      && ((waypoint.lat === undefined && waypoint.lon === undefined)
+        || (range(waypoint.lat, -90, 90) && range(waypoint.lon, -180, 180)))) && isFiniteSimulationData(value));
 }
 export function isAutopilotState(value: unknown): value is AutopilotState | null {
   return value === null || (isRecord(value)

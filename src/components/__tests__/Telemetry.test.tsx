@@ -2,6 +2,7 @@ import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { Telemetry } from '../Telemetry';
 import { useSimStore } from '../../store/simStore';
+import { selectPfdIas, selectPfdTakeoffCue, selectTelemetryViewModel } from '../../store/selectors';
 
 describe('Telemetry', () => {
   beforeEach(() => {
@@ -12,7 +13,7 @@ describe('Telemetry', () => {
     render(<Telemetry />);
     expect(screen.getByText(/ALT:/)).toBeTruthy();
     expect(screen.getByText(/TAS:/)).toBeTruthy();
-    expect(screen.getByText(/HDG:/)).toBeTruthy();
+    expect(screen.getByText(/HDG TRUE:/)).toBeTruthy();
   });
 
   it('renders takeoff cue during takeoff phase', () => {
@@ -22,6 +23,17 @@ describe('Telemetry', () => {
     render(<Telemetry />);
 
     expect(screen.getByText(/TAKEOFF ROLL|ROTATE|POSITIVE RATE/)).toBeTruthy();
+  });
+
+  it('shows invalid IAS and suppresses speed-derived cues when the pitot domain is unsupported', () => {
+    useSimStore.getState().startTakeoffRoll(); const s = useSimStore.getState();
+    useSimStore.setState({ wind: null, aircraft: { ...s.aircraft, velocity: { u: 400, v: 0, w: 0 } } });
+    render(<Telemetry />);
+    expect(screen.getByText('INVALID', { exact: true })).toBeTruthy();
+    expect(screen.queryByText(/TAKEOFF ROLL|ROTATE|POSITIVE RATE/)).toBeNull();
+    expect(selectTelemetryViewModel(useSimStore.getState()).iasKt).toBeNull();
+    expect(selectPfdTakeoffCue(useSimStore.getState())).toBeNull();
+    expect(selectPfdIas(useSimStore.getState())).toBeNull();
   });
 });
 

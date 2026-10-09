@@ -8,12 +8,18 @@ import { AircraftRenderer } from './AircraftRenderer';
 import { createCockpitModel } from './CockpitModel';
 import { useCockpitInteractions } from './useCockpitInteractions';
 import { installCockpitPointerInteractions } from './cockpitPointerInteractions';
+import { scenarioUtcMs } from '../sim/scenarioClock';
+import { computeSunPosition, daylightBlend } from '../sim/sun';
+import { enuDirectionEcef } from './solarDirection';
+import { disposeThreeBridge } from './disposeThreeBridge';
+import type { CesiumSceneFailure } from './CesiumViewport';
 
 export interface CockpitLayerProps {
   viewerRef: RefObject<Cesium.Viewer | null>;
+  onSceneFailure?: (failure: CesiumSceneFailure) => void;
 }
 
-export function CockpitLayer({ viewerRef }: CockpitLayerProps) {
+export function CockpitLayer({ viewerRef, onSceneFailure }: CockpitLayerProps) {
   const { activateCockpitInteraction } = useCockpitInteractions();
 
   useEffect(() => {
@@ -22,15 +28,20 @@ export function CockpitLayer({ viewerRef }: CockpitLayerProps) {
     const scene = viewer.scene;
     if (!scene) return;
 
-    const ttc = ThreeToCesium(viewer, {
-      cameraFar: 10000000,
-      cameraNear: 0.1,
-    });
+    let ttc: ReturnType<typeof ThreeToCesium>;
+    try {
+      ttc = ThreeToCesium(viewer, { cameraFar: 10000000, cameraNear: 0.1 });
+    } catch (error: unknown) {
+      onSceneFailure?.({ stage: 'context', surface: 'cockpit', error });
+      return;
+    }
+    ttc.threeRenderer.domElement.dataset.rfsSurface = 'cockpit';
     const ambient = new THREE.AmbientLight(0xffffff, 0.65);
     const panelLight = new THREE.DirectionalLight(0xffffff, 0.7);
     panelLight.position.set(0, 3, 4);
     ttc.threeScene.add(ambient);
     ttc.threeScene.add(panelLight);
+    ttc.threeScene.add(panelLight.target);
     const cockpitRenderer = new AircraftRenderer(ttc, createCockpitModel);
     const pointerCleanup = installCockpitPointerInteractions({
       scene: ttc.threeScene,
@@ -41,6 +52,14 @@ export function CockpitLayer({ viewerRef }: CockpitLayerProps) {
 
     const sync = () => {
       const { aircraft, effectiveControls } = useSimStore.getState();
+      const { lat, lon, alt } = aircraft.position;
+      const sun = computeSunPosition(lat, lon, scenarioUtcMs(aircraft));
+      ambient.intensity = 0.25 + 0.4 * daylightBlend(sun.elevation);
+      const position = Cesium.Cartesian3.fromDegrees(lon, lat, alt * 0.3048);
+      const fill = enuDirectionEcef(lat, lon, 0, 3, 4);
+      panelLight.target.position.set(position.x, position.y, position.z);
+      panelLight.position.set(position.x + fill.x, position.y + fill.y, position.z + fill.z);
+      panelLight.target.updateMatrixWorld();
       cockpitRenderer.render(aircraft, effectiveControls);
     };
 
@@ -62,12 +81,12 @@ export function CockpitLayer({ viewerRef }: CockpitLayerProps) {
         // three-to-cesium may already be partially torn down.
       }
       try {
-        ttc.destroy();
+        disposeThreeBridge(ttc);
       } catch {
         // Cesium may have already torn down the container during React cleanup.
       }
     };
-  }, [viewerRef, activateCockpitInteraction]);
+  }, [viewerRef, activateCockpitInteraction, onSceneFailure]);
 
   return null;
 }

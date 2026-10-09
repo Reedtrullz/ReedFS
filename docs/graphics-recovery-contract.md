@@ -1,0 +1,9 @@
+# Graphics recovery
+
+WebGL context loss is a rendering failure. It does not reset, restore, pause, or replace simulation authority. The PFD continues to show its committed observation and validity/age label. A graphics-unavailable status remains visible after library context restoration until the user explicitly restores the 3D view.
+
+The viewport captures non-bubbling context-loss events from its Cesium, aircraft and cockpit canvases, permits native restoration and reports a bounded surface identity. Repeated failures retain one status. `RESTORE 3D VIEW` recreates the viewer and dependent render layers only. There is no automatic reload or recreation loop. Initialization failure keeps flight controls and instruments available; scenery retry can rebuild the view after graphics support returns.
+
+Retired viewer callbacks are fenced. Camera cleanup keeps its event object rather than reading a destroyed viewer. Model factories currently create renderer-owned procedural resources; disposal deduplicates geometry/material/texture release, including after bridge removal fails. Bridges and Cesium retire their detached native contexts. Future shared or cached asset packs (#99) require an explicit release/ownership contract.
+
+Verification distinguishes native WebGL handles from driver memory. The seeded-approach browser lane loses/restores Cesium, Three and cockpit contexts, checks unchanged route/save and paused flight state, advancing simulation while graphics are unavailable, two live contexts with draw calls after explicit recovery, and zero tracked resources in retired lost contexts. It also denies native WebGL initialization, exercises flight controls, then permits explicit recovery. These are bounded local Chromium lifecycle checks, not a continuous full-flight result or physical GPU/device qualification.

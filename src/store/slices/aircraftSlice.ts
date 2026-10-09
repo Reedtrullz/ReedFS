@@ -9,6 +9,7 @@ import { createInputManagerState } from '../../input/InputManager';
 import { resetGPWS } from '../../audio/GPWS';
 import type { ScenarioWeatherMetadata, WindInfo } from '../../sim/weather';
 import type { SimStore } from '../simStore';
+import { hasCoherentScenarioClock, parseScenarioUtc, utcHours } from '../../sim/scenarioClock';
 import {
   inputManagerForScenario,
   inputsForScenario,
@@ -51,6 +52,8 @@ export function createAircraftSlice(set: SimStoreSet): Pick<
   | 'routeStatus'
   | 'wind'
   | 'weather'
+  | 'weatherEpoch'
+  | 'weatherRestored'
   | 'selectedScenarioId'
   | 'asyncPhysicsGeneration'
   | 'asyncPhysicsInFlight'
@@ -66,6 +69,7 @@ export function createAircraftSlice(set: SimStoreSet): Pick<
   | 'reset'
   | 'setScenario'
   | 'setTutorialStep'
+  | 'setScenarioUtc'
 > {
   const initialPilotInputs = inputsForScenario(ENVA_TUTORIAL_SCENARIO);
   const initialControls = composeControlsSlice(initialPilotInputs);
@@ -98,6 +102,8 @@ export function createAircraftSlice(set: SimStoreSet): Pick<
     routeStatus: initialRouteStatus,
     wind: cloneWind(ENVA_TUTORIAL_SCENARIO.wind),
     weather: cloneWeather(ENVA_TUTORIAL_SCENARIO.weather),
+    weatherEpoch: 0,
+    weatherRestored: false,
     asyncPhysicsGeneration: 0,
     asyncPhysicsInFlight: false,
     selectedScenarioId: ENVA_TUTORIAL_SCENARIO.id,
@@ -105,6 +111,25 @@ export function createAircraftSlice(set: SimStoreSet): Pick<
     controlFeedbackMessage: null,
     scenarioPersistenceMessage: null,
     scenarioSaveSlots: [],
+
+    setScenarioUtc: (text) => {
+      const utc = parseScenarioUtc(text);
+      let changed = false;
+      set((s) => {
+        if (utc === null || s.status === 'running' || (s.simulationFailure && !s.simulationFailure.recovered)) return {};
+        const utcEpochMs = utc - s.aircraft.simTime;
+        const aircraft = { ...s.aircraft, utcEpochMs, timeOfDay: utcHours(utcEpochMs + s.aircraft.simTime) };
+        if (!hasCoherentScenarioClock(aircraft)) return {};
+        changed = true;
+        return {
+          aircraft,
+          asyncPhysicsGeneration: s.asyncPhysicsGeneration + 1, asyncPhysicsInFlight: false,
+          asyncReservedSteps: 0, fixedStepAccumulatorSeconds: 0, lastFrameTime: 0,
+          simulationCommit: null,
+        };
+      });
+      return changed;
+    },
 
     start: () => set((s) => {
       if (s.simulationFailure && !s.simulationFailure.recovered) return {};
@@ -239,6 +264,8 @@ export function createAircraftSlice(set: SimStoreSet): Pick<
         routeEditMessage: null,
         wind: cloneWind(scenario.wind),
         weather: cloneWeather(scenario.weather),
+        weatherEpoch: s.weatherEpoch + 1,
+        weatherRestored: false,
         asyncPhysicsGeneration: s.asyncPhysicsGeneration + 1,
         asyncPhysicsInFlight: false,
         controlFeedbackMessage: null,
@@ -279,6 +306,8 @@ export function createAircraftSlice(set: SimStoreSet): Pick<
         routeEditMessage: null,
         wind: cloneWind(scenario.wind),
         weather: cloneWeather(scenario.weather),
+        weatherEpoch: s.weatherEpoch + 1,
+        weatherRestored: false,
         asyncPhysicsGeneration: s.asyncPhysicsGeneration + 1,
         asyncPhysicsInFlight: false,
         controlFeedbackMessage: null,

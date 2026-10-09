@@ -126,7 +126,7 @@ vi.mock('../store/simStore', () => {
         { n1: 0, n2: 0, egt: 0, fuelFlow: 0, thrust: 0, running: false },
       ],
       fuel: { totalFuel: 0, fuelFlowTotal: 0, centerTank: 0, leftTank: 0, rightTank: 0 },
-      grossWeight: 0, cg: 0, simTime: 0, flightPhase: 'PARKED' as const,
+      grossWeight: 0, cg: 0, simTime: 0, utcEpochMs: Date.UTC(2026, 8, 24, 12), timeOfDay: 12, flightPhase: 'PARKED' as const,
     },
     status: 'stopped' as const,
     selectedScenarioId: 'ksea-tutorial',
@@ -227,10 +227,13 @@ const mockEntityAdd = vi.fn((entity) => entity);
 const mockEntityRemove = vi.fn();
 
 vi.mock('cesium', () => ({
+  JulianDate: { fromDate: vi.fn((date: Date, result: { utcMs: number }) => { result.utcMs = date.getTime(); return result; }) },
   Ion: { defaultAccessToken: '' },
   Viewer: class {
     destroy = mockDestroy;
     isDestroyed = vi.fn(() => false);
+    clock = { shouldAnimate: true, currentTime: { utcMs: 0 }, onTick: { addEventListener: vi.fn(() => vi.fn()) } };
+    imageryLayers = { length: 0, get: vi.fn() };
     camera = {
       flyTo: mockFlyTo,
       cancelFlight: mockCancelFlight,
@@ -247,7 +250,7 @@ vi.mock('cesium', () => ({
         removeEventListener: mockPreRenderRemove,
       },
       screenSpaceCameraController: { enableInputs: true },
-      globe: { enableLighting: true },
+      globe: { enableLighting: true, baseColor: { clone: () => ({ red: 0.2, green: 0.3, blue: 0.4, clone: () => ({ red: 0.2, green: 0.3, blue: 0.4 }) }) } },
       skyAtmosphere: { show: true },
       primitives: { add: vi.fn(() => ({})), remove: vi.fn() },
     };
@@ -353,7 +356,7 @@ vi.mock('three', () => {
       return {};
     }),
     DirectionalLight: vi.fn(function () {
-      return { position: vec() };
+      return { position: vec(), target: { position: vec(), updateMatrixWorld: vi.fn() } };
     }),
     DoubleSide: 2,
     Vector3: vi.fn(vec),
@@ -370,7 +373,10 @@ vi.mock('three-to-cesium', () => ({
     threeScene: { add: vi.fn(), children: [] },
     threeCamera: {},
     threeRenderer: {
+      forceContextLoss: vi.fn(),
       domElement: {
+        dataset: {},
+        remove: vi.fn(),
         style: { pointerEvents: 'none' },
         addEventListener: vi.fn(),
         removeEventListener: vi.fn(),

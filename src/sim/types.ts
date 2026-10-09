@@ -3,6 +3,7 @@
 import { eulerToQuat, type Quaternion } from './physics/quaternion';
 import { B737_800_AIRCRAFT_DATA } from './data/aircraft/b737-800.v1';
 import { B737_800_FDM } from './data/aircraft/b737-800-fdm.v1';
+import { DEFAULT_SCENARIO_UTC_MS } from './scenarioClock';
 
 export interface GeoPosition {
   lat: number; // decimal degrees
@@ -31,8 +32,11 @@ export interface AngularVelocity {
 // ── Derived (computed from state) ──
 
 export interface DerivedState {
-  ias: number;     // indicated airspeed, knots
+  ias: number;     // ideal IAS = CAS, knots; zero fallback requires airDataValid
   tas: number;     // true airspeed, knots
+  eas: number;     // equivalent airspeed, knots (dynamic-pressure quantity)
+  cas: number | null; // calibrated airspeed, knots; null outside supported pitot domain
+  airDataValid: boolean;
   gs: number;      // ground speed, knots
   mach: number;
   vs: number;      // vertical speed, ft/min
@@ -88,6 +92,8 @@ export interface ControlInputs {
   rudder: number;     // -1 (full left) to +1 (full right)
   throttle1: number;  // 0 (idle) to 1 (TOGA)
   throttle2: number;
+  fuelCutoff1?: boolean; // explicit combustion cutoff; omitted legacy value means fuel on
+  fuelCutoff2?: boolean;
   flapLever: number;  // detent: 0, 1, 2, 5, 10, 15, 25, 30, 40
   gearLever: 'UP' | 'DOWN';
   spoilers: number;   // 0 to 1
@@ -203,7 +209,8 @@ export interface AircraftState {
   cg: number; // % MAC
   ground: GroundState;
   simTime: number; // ms
-  timeOfDay: number; // hours (0-24)
+  utcEpochMs: number; // UTC at simTime0; resolved UTC is anchor + committed simTime
+  timeOfDay: number; // derived UTC hours (0-24)
   flightPhase: FlightPhase;
   flightPhaseStartedMs?: number;
 }
@@ -305,6 +312,7 @@ export function createInitialState(spec: AircraftSpec): AircraftState {
       gearStations: createB737GearStations(grossWeight * 9.80665, true),
     },
     simTime: 0,
+    utcEpochMs: DEFAULT_SCENARIO_UTC_MS,
     timeOfDay: 12,
     flightPhase: 'PARKED',
     flightPhaseStartedMs: 0,

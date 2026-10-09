@@ -9,9 +9,11 @@ import { fileURLToPath, URL } from 'node:url';
 const DIST_DIR = fileURLToPath(new URL('../dist/assets/', import.meta.url));
 
 const BUDGETS = {
-  // Node 22 measured baseline including command/observation boundaries and local diagnostics: 402.8 / 127.5 KiB.
-  // Keep roughly two percent headroom; lazy diagnostics remain counted in the whole app allowance.
-  app: { rawBytes: 410 * 1024, gzipBytes: 130 * 1024, required: true },
+  // Node 22 explicit-heading/WMM2025 increment: 429.9 / 137.0 KiB.
+  // Adds 8.5 raw / 3.7 gzip KiB over the UTC clock (421.4 / 133.3).
+  // Bounded feature allowance retains about 2% headroom; other budgets stay fixed.
+  // Lazy diagnostics and the physics worker remain counted in this whole app allowance.
+  app: { rawBytes: 440 * 1024, gzipBytes: 140 * 1024, required: true },
   // React/Zustand framework chunk baseline: raw 182.4 KiB / gzip 56.7 KiB.
   vendorReact: { rawBytes: 212 * 1024, gzipBytes: 66 * 1024, required: true },
   // Generic vendor chunk baseline: raw 3.5 KiB / gzip 1.5 KiB.

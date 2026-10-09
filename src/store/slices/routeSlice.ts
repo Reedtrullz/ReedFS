@@ -18,9 +18,12 @@ import {
 } from '../../sim/systems/navigation';
 import { createAircraftStateForRunway, scenarioById } from '../../sim/scenarios';
 import { createAutopilotControllerState } from '../../sim/systems/autopilot';
+import { isFlightPlan } from '../../sim/simulationValidation';
+import { hasValidCoordinates } from '../../sim/physics/routeGeometry';
 import { inputManagerForScenario, inputsForScenario } from '../simStoreInputReducers';
 import type { SimStore } from '../simStore';
 import type { SimStoreSet } from './aircraftSlice';
+import { scenarioUtcMs, utcHours } from '../../sim/scenarioClock';
 
 function gustSeedForRunway(runway: RunwayReference): number {
   const sourceIdSeed = runway.sourceId ? Number(runway.sourceId) % 10_000 : Number.NaN;
@@ -53,6 +56,7 @@ function routeEditSessionFor(fp: FlightPlan): RouteEditSession {
 export function createRouteSlice(set: SimStoreSet): Pick<SimStore, 'setFlightPlan' | 'setFlightPlanAtRunway' | 'setWind' | 'setWeather' | 'stageDirectTo' | 'stageInsertDiscontinuity' | 'undoRouteEditOperation' | 'executeRouteEdit'> {
   return {
     setFlightPlan: (fp) => set((s) => {
+      if (!isFlightPlan(fp)) throw new TypeError('Invalid flight plan coordinates or data');
       const { activeLegIndex, routeStatus } = createRouteState(s, fp);
       const controlsSlice = composeControlsSlice(s.pilotInputs, s.apCommands, s.apState, {
         aircraft: s.aircraft,
@@ -72,8 +76,15 @@ export function createRouteSlice(set: SimStoreSet): Pick<SimStore, 'setFlightPla
     }),
 
     setFlightPlanAtRunway: (fp: FlightPlan, originRunway: RunwayReference) => set((s) => {
+      if (!fp || !isFlightPlan(fp) || !hasValidCoordinates(originRunway.start)
+        || (originRunway.end !== undefined && !hasValidCoordinates(originRunway.end))) {
+        throw new TypeError('Invalid flight plan or runway coordinates');
+      }
       const scenario = scenarioById(s.selectedScenarioId);
       const aircraft = createAircraftStateForRunway(B737_800_SPEC, originRunway, scenario);
+      const utc = scenarioUtcMs(s.aircraft);
+      aircraft.utcEpochMs = utc - aircraft.simTime;
+      aircraft.timeOfDay = utcHours(utc);
       const runwayStartTemplate = {
         ...scenario,
         flapSetting: 5,
@@ -104,7 +115,7 @@ export function createRouteSlice(set: SimStoreSet): Pick<SimStore, 'setFlightPla
         routeEditMessage: null,
         activeLegIndex,
         routeStatus,
-        wind: { dir: Math.round(originRunway.headingDeg), speed: 0, gustSeed: gustSeedForRunway(originRunway) },
+        wind: s.weatherRestored ? s.wind : { dir: Math.round(originRunway.headingDeg), speed: 0, gustSeed: gustSeedForRunway(originRunway) },
         asyncPhysicsGeneration: s.asyncPhysicsGeneration + 1,
         asyncPhysicsInFlight: false,
         controlFeedbackMessage: null,

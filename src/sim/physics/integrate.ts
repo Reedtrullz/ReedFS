@@ -12,6 +12,7 @@ import { bodyToNed } from './frames';
 import { ftToM, ktToMs, mToFt } from './units';
 import { quatDerivative, quatNormalize, quatToEuler } from './quaternion';
 import type { WindInfo } from '../weather';
+import { scenarioUtcMs, utcHours } from '../scenarioClock';
 import { sampleSupportedAirportSurface } from '../runwaySurface';
 import { computeAirRelativeVelocity } from '../systems/environment';
 
@@ -209,7 +210,7 @@ export function integrate(
   // Pilot-facing configuration controls must be visible to the same tick's aero solve.
   // Ground contact re-applies the gear safety rule after liftoff/contact resolution.
   applyPilotConfiguration(state, controls, dt);
-  updateEngines(state, controls, spec, dt, wind ?? null);
+  updateEngines(state, controls, spec, dt, wind ?? null, weather ?? null);
   updateFuel(state, spec, dt);
   updateElectrical(state, dt);
   updateHydraulic(state, dt);
@@ -220,9 +221,14 @@ export function integrate(
 
   // ── Angular acceleration (Euler's equations) ──
   const ixx = spec.ixx, iyy = spec.iyy, izz = spec.izz, ixz = spec.ixz;
-  const pDot = (aero.rollMoment + (iyy - izz) * q * r + ixz * p * q) / ixx;
+  // I has off-diagonal entries -Ixz. Solve the coupled roll/yaw block of
+  // I*omegaDot = M - omega cross (I*omega), rather than dividing it diagonally.
+  const rollRhs = aero.rollMoment + (iyy - izz) * q * r + ixz * p * q;
+  const yawRhs = aero.yawMoment + (ixx - iyy) * p * q - ixz * q * r;
+  const inertiaDeterminant = ixx * izz - ixz * ixz;
+  const pDot = (izz * rollRhs + ixz * yawRhs) / inertiaDeterminant;
   const qDot = (aero.pitchMoment + (izz - ixx) * p * r + ixz * (r * r - p * p)) / iyy;
-  const rDot = (aero.yawMoment + (ixx - iyy) * p * q - ixz * q * r) / izz;
+  const rDot = (ixz * rollRhs + ixx * yawRhs) / inertiaDeterminant;
 
   state.angularVel.p += pDot * dt;
   state.angularVel.q += qDot * dt;
@@ -323,5 +329,5 @@ export function integrate(
   // ── Clock ──
   state.simTime += dt * 1000;
   // Time of day: 1 hour per 30 real seconds at 1x simulation
-  state.timeOfDay = (state.timeOfDay + dt / 30) % 24;
+  state.timeOfDay = utcHours(scenarioUtcMs(state));
 }

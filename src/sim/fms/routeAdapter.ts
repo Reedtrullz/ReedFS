@@ -1,4 +1,5 @@
 import type { FlightPlan, FlightPlanWaypoint } from '@shared/types/fmc';
+import { isFlightPlan } from '../simulationValidation';
 
 export type RouteSourceType = 'canned' | 'manual' | 'rfms';
 
@@ -103,6 +104,7 @@ export function createRouteSourceFromFlightPlan(
   flightPlan: FlightPlan,
   options: { id: string; type: RouteSourceType; label: string; limitations?: string[] },
 ): RouteSource {
+  if (!flightPlan || !isFlightPlan(flightPlan)) throw new TypeError('Invalid flight plan coordinates or data');
   return {
     ...options,
     limitations: options.limitations ?? [],

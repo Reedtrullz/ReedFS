@@ -1,45 +1,14 @@
 import type { AircraftState, AircraftSpec, ControlInputs } from '../types';
-import { isaAtAltitude } from './atmosphere';
+import { atmosphereForDensityAltitude, type DensityAltitudeWeather } from './atmosphere';
 import { computeAirRelativeVelocity } from '../systems/environment';
 import type { AeroModel, FlapPolar } from '../systems/AeroModel';
 import { B737_AERO } from '../systems/AeroModel';
-import type { WindInfo, ScenarioWeatherMetadata } from '../weather';
+import type { WindInfo } from '../weather';
 
 const G = 9.80665;
 const FT_TO_M = 0.3048;
-const SEA_LEVEL_PRESSURE_PA = 101_325;
-const GAS_CONSTANT_DRY_AIR = 287.058;
-const HEAT_CAPACITY_RATIO_AIR = 1.4;
-const SUTHERLAND_CONSTANT_K = 110.4;
-const SUTHERLAND_COEFFICIENT = 1.458e-6;
-
-export type DensityAltitudeWeather = Pick<ScenarioWeatherMetadata, 'qnhHpa' | 'surfaceTemperatureC'>;
-
-function viscosityForTemperature(tempK: number): number {
-  return SUTHERLAND_COEFFICIENT * Math.pow(tempK, 1.5) / (tempK + SUTHERLAND_CONSTANT_K);
-}
-
-export function atmosphereForDensityAltitude(altFt: number, weather: DensityAltitudeWeather | null = null): ReturnType<typeof isaAtAltitude> {
-  const standard = isaAtAltitude(altFt);
-  if (!weather) return standard;
-
-  const qnhHpa = Number.isFinite(weather.qnhHpa) ? weather.qnhHpa : 1013.25;
-  const surfaceTemperatureC = Number.isFinite(weather.surfaceTemperatureC) ? weather.surfaceTemperatureC : 15;
-  const pressurePa = qnhHpa * 100 * (standard.pressurePa / SEA_LEVEL_PRESSURE_PA);
-  const isaSeaLevelDeltaK = (surfaceTemperatureC + 273.15) - 288.15;
-  const tempK = Math.max(150, standard.tempK + isaSeaLevelDeltaK);
-  const density = pressurePa / (GAS_CONSTANT_DRY_AIR * tempK);
-
-  return {
-    tempK,
-    tempC: tempK - 273.15,
-    pressurePa,
-    pressureHpa: pressurePa / 100,
-    density,
-    speedOfSound: Math.sqrt(HEAT_CAPACITY_RATIO_AIR * GAS_CONSTANT_DRY_AIR * tempK),
-    viscosity: viscosityForTemperature(tempK),
-  };
-}
+export { atmosphereForDensityAltitude } from './atmosphere';
+export type { DensityAltitudeWeather } from './atmosphere';
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
@@ -80,13 +49,21 @@ function cgPitchMomentCoefficient(state: AircraftState, spec: AircraftSpec, cl: 
 }
 
 function flapPolarForSetting(aeroModel: AeroModel, flapSetting: number): FlapPolar {
-  for (let i = aeroModel.flapPolars.length - 1; i >= 0; i -= 1) {
-    if (flapSetting >= aeroModel.flapPolars[i].detent) {
-      return aeroModel.flapPolars[i];
-    }
+  const polars = aeroModel.flapPolars;
+  const setting = finiteOrDefault(flapSetting, polars[0].detent);
+  if (setting <= polars[0].detent) return polars[0];
+  for (let i = 1; i < polars.length; i += 1) {
+    const upper = polars[i]; const lower = polars[i - 1];
+    if (setting > upper.detent) continue;
+    if (setting === upper.detent) return upper;
+    const fraction = (setting - lower.detent) / (upper.detent - lower.detent);
+    const interpolate = (key: Exclude<keyof FlapPolar, 'detent'>) => lower[key] + fraction * (upper[key] - lower[key]);
+    // Interpolate the existing gameplay polars; no calibrated data is inferred.
+    return { detent: setting, alphaZeroLiftRad: interpolate('alphaZeroLiftRad'), clAlpha: interpolate('clAlpha'),
+      clMax: interpolate('clMax'), cd0: interpolate('cd0'), k: interpolate('k'),
+      deltaCm: interpolate('deltaCm'), stallDragRise: interpolate('stallDragRise') };
   }
-
-  return aeroModel.flapPolars[0];
+  return polars[polars.length - 1];
 }
 
 function liftCoefficientAtAoA(aoa: number, mach: number, polar: FlapPolar): { cl: number; stallFraction: number } {

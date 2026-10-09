@@ -153,9 +153,47 @@ describe('checklistCoach', () => {
       spoilers: 1,
     }, KSEA_TUTORIAL_SCENARIO);
 
-    expect(message).toMatch(/landing|landed/i);
-    expect(message).toMatch(/rollout|brak/i);
-    expect(message).toMatch(/reset/i);
-    expect(message).not.toMatch(/takeoff thrust/i);
+  expect(message).toMatch(/landing|landed/i);
+  expect(message).toMatch(/rollout|brak/i);
+  expect(message).toMatch(/reset/i);
+  expect(message).not.toMatch(/takeoff thrust/i);
+});
+
+  it('marks descent established only on observed NED descent motion (#87)', () => {
+    const aircraft = createAircraftStateForScenario(B737_800_SPEC, KSEA_TUTORIAL_SCENARIO);
+    aircraft.ground.weightOnWheels = false;
+    aircraft.ground.aglFt = 5000;
+    const descentItem = () => buildGuidanceChecklist(KSEA_TUTORIAL_SCENARIO, aircraft, configuredInputs, 'descent')
+      .find((item) => item.id === 'descent-established');
+
+    setFlightPhaseForTest(aircraft, 'DESCENT');
+    expect(descentItem()).toMatchObject({ complete: false });
+
+    aircraft.attitude.theta = 0.15;
+    aircraft.velocity.u = 220;
+    aircraft.velocity.w = 2;
+    expect(descentItem()).toMatchObject({ complete: false });
+
+    aircraft.attitude.theta = -0.12;
+    aircraft.velocity.u = 210;
+    aircraft.velocity.w = 0;
+    expect(descentItem()).toMatchObject({ complete: true });
+
+    aircraft.attitude.theta = 0;
+    aircraft.velocity.u = 0;
+    aircraft.velocity.w = 0.5079;
+    expect(descentItem()).toMatchObject({ complete: false });
+    aircraft.velocity.w = 0.5081;
+    expect(descentItem()).toMatchObject({ complete: true });
+
+    aircraft.ground.weightOnWheels = true;
+    expect(descentItem()).toMatchObject({ complete: false });
+    aircraft.ground.weightOnWheels = false;
+
+    aircraft.velocity.w = Number.NaN;
+    expect(descentItem()).toMatchObject({ complete: false });
+    aircraft.velocity.w = 0.509;
+    aircraft.attitude.theta = Number.POSITIVE_INFINITY;
+    expect(descentItem()).toMatchObject({ complete: false });
   });
 });

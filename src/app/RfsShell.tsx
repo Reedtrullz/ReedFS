@@ -1,5 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { DiagnosticExport } from '../components/DiagnosticExport';
+import { Telemetry } from '../components/Telemetry';
 import type { Viewer as CesiumViewer } from 'cesium';
 import { getCesiumScenePolicy } from '../config/cesium';
 import type { RunwayLayerProps } from '../viewport/RunwayLayer';
@@ -50,7 +51,6 @@ const RunwayLayer = lazy(() => import('../viewport/RunwayLayer').then((m) => ({ 
 const RunwayEditor = lazy(() => import('../viewport/RunwayEditor').then((m) => ({ default: m.RunwayEditor })));
 const RfsPFD = lazy(() => import('../instruments/RfsPFD').then((m) => ({ default: m.RfsPFD })));
 const RfsMCP = lazy(() => import('../instruments/RfsMCP').then((m) => ({ default: m.RfsMCP })));
-const Telemetry = lazy(() => import('../components/Telemetry').then((m) => ({ default: m.Telemetry })));
 const AttitudeIndicator = lazy(() => import('../components/AttitudeIndicator').then((m) => ({ default: m.AttitudeIndicator })));
 const ControlsHelp = lazy(() => import('../components/ControlsHelp').then((m) => ({ default: m.ControlsHelp })));
 const ControlsSettings = lazy(() => import('../components/ControlsSettings').then((m) => ({ default: m.ControlsSettings })));
@@ -114,7 +114,7 @@ export function RfsShell() {
   const status = useSimStore((s) => s.status);
   const selectedScenarioId = useSimStore((s) => s.selectedScenarioId);
   const setInput = useSimStore((s) => s.setInput);
-  const { activeScenario, metarData } = useScenarioWeather(selectedScenarioId);
+  const { metarData, effectiveWeather } = useScenarioWeather(selectedScenarioId);
 
   const [camMode, setCamMode] = useState<CameraMode>('chase');
   const [overlayMode, setOverlayMode] = useState<OverlayMode>('flight');
@@ -191,13 +191,15 @@ export function RfsShell() {
       const cameraManager = new CameraManager(viewer);
 
       const updateCamera = () => {
+        if (viewerRef.current !== viewer || viewer.isDestroyed()) return;
         const { status: currentStatus, aircraft: a } = useSimStore.getState();
         cameraManager.update({ status: currentStatus, mode: camMode, aircraft: a });
       };
 
       updateCamera();
-      viewer.scene.preRender.addEventListener(updateCamera);
-      cleanup = () => viewer.scene.preRender.removeEventListener(updateCamera);
+      const preRender = viewer.scene.preRender;
+      preRender.addEventListener(updateCamera);
+      cleanup = () => preRender.removeEventListener(updateCamera);
     });
 
     return () => {
@@ -219,10 +221,12 @@ export function RfsShell() {
   }, []);
 
   const handleSceneFailure = useCallback((failure: CesiumSceneFailure) => {
-    setSceneFailure((current) => current ?? failure);
+    setSceneFailure((current) => current?.stage === 'context' ? current : failure.stage === 'context' ? failure : current ?? failure);
   }, []);
 
   const handleSceneRetry = useCallback(() => {
+    viewerRef.current = null;
+    setViewerGeneration(0);
     setSceneFailure(null);
     setRetryKey((key) => key + 1);
   }, []);
@@ -354,14 +358,14 @@ export function RfsShell() {
             </Suspense>
           )}
           <Suspense key={`aircraft-${viewerGeneration}-${camMode}`} fallback={null}>
-            {camMode === 'cockpit' ? <CockpitLayer viewerRef={viewerRef} /> : <ThreeLayer viewerRef={viewerRef} />}
+            {camMode === 'cockpit' ? <CockpitLayer viewerRef={viewerRef} onSceneFailure={handleSceneFailure} /> : <ThreeLayer viewerRef={viewerRef} onSceneFailure={handleSceneFailure} />}
           </Suspense>
           <Suspense key={`weather-${viewerGeneration}`} fallback={null}>
             <CloudLayer
               viewerRef={viewerRef}
               metar={metarData}
-              cloudSeed={activeScenario.weather.cloudSeed}
-              cloudAnchor={activeScenario.weather.cloudAnchor}
+              cloudSeed={effectiveWeather.cloudSeed}
+              cloudAnchor={effectiveWeather.cloudAnchor}
             />
             <ContrailLayer viewerRef={viewerRef} registerFrameEffect={registerFrameEffect} />
           </Suspense>
@@ -369,7 +373,7 @@ export function RfsShell() {
       ) : null}
       debugPanels={showDebugOverlays ? (
         <>
-          <div data-rfs-debug-panel="telemetry"><Suspense fallback={null}><Telemetry /></Suspense></div>
+          <div data-rfs-debug-panel="telemetry"><Telemetry /></div>
           <div data-rfs-debug-panel="help"><Suspense fallback={null}><ControlsHelp /></Suspense></div>
           <div data-rfs-debug-panel="settings"><Suspense fallback={null}><ControlsSettings /></Suspense></div>
           <div data-rfs-debug-panel="diagnostics"><DiagnosticExport /></div>

@@ -4,6 +4,8 @@ import * as Cesium from 'cesium';
 import { getCesiumScenePolicy, rememberCesiumIonToken, type CesiumScenePolicy } from '../config/cesium';
 import { isVisualTestMode } from '../config/visualTest';
 import { applySunAwareLighting } from './sunLighting';
+import { useSimStore } from '../store/simStore';
+import { scenarioUtcMs } from '../sim/scenarioClock';
 
 export interface CesiumViewportProps {
   /** Overrides the resolved Cesium scene asset policy */
@@ -17,16 +19,8 @@ export interface CesiumViewportProps {
 export type CesiumSceneFailure =
   | { stage: 'load'; error: unknown }
   | { stage: 'buildings'; error: unknown }
-  | { stage: 'imagery'; error: unknown };
-
-function setupSceneFailureHandling(
-  viewer: Cesium.Viewer,
-  onSceneFailure: ((failure: CesiumSceneFailure) => void) | undefined,
-): void {
-  viewer.scene.renderError?.addEventListener((_scene: unknown, error: unknown) => {
-    onSceneFailure?.({ stage: 'imagery', error });
-  });
-}
+  | { stage: 'imagery'; error: unknown }
+  | { stage: 'context'; surface: 'cesium' | 'three' | 'cockpit' | 'unknown'; error: unknown };
 
 type GlobeWithOptionalEffects = Cesium.Globe & {
   terrainExaggeration?: number;
@@ -69,11 +63,38 @@ export function CesiumViewport({ onReady, onSceneFailure, scenePolicy }: CesiumV
       ...(policy.mode === 'degraded' ? { baseLayer: false as const } : {}),
       ...(policy.terrain === 'world' ? { terrain: Cesium.Terrain.fromWorldTerrain() } : {}),
     };
-    const viewer = new Cesium.Viewer(containerRef.current, viewerOptions);
+    const container = containerRef.current;
+    let viewer: Cesium.Viewer;
+    try {
+      viewer = new Cesium.Viewer(container, viewerOptions);
+    } catch (error: unknown) {
+      onSceneFailure?.({ stage: 'load', error });
+      return;
+    }
     viewerRef.current = viewer;
+    viewer.clock.shouldAnimate = false;
+    const syncUtc = () => {
+      const date = new Date(scenarioUtcMs(useSimStore.getState().aircraft));
+      Cesium.JulianDate.fromDate(date, viewer.clock.currentTime);
+      return date;
+    };
+    syncUtc();
+    const removeClockTick = viewer.clock.onTick.addEventListener(syncUtc);
     viewer.scene.screenSpaceCameraController.enableInputs = false;
-
-    setupSceneFailureHandling(viewer, onSceneFailure);
+    if (viewer.canvas) viewer.canvas.dataset.rfsSurface = 'cesium';
+    const reportRenderError = (_scene: unknown, error: unknown) => {
+      if (!disposed && viewerRef.current === viewer) onSceneFailure?.({ stage: 'imagery', error });
+    };
+    const removeRenderError = viewer.scene.renderError?.addEventListener(reportRenderError);
+    // WebGL loss does not bubble. Capture covers the Cesium and owned overlay canvases.
+    const contextLost = (event: Event) => {
+      if (disposed || viewerRef.current !== viewer || !(event.target instanceof HTMLCanvasElement)) return;
+      event.preventDefault();
+      const owner = event.target.dataset.rfsSurface;
+      const surface = owner === 'cesium' || owner === 'three' || owner === 'cockpit' ? owner : 'unknown';
+      onSceneFailure?.({ stage: 'context', surface, error: new Error('Graphics context lost.') });
+    };
+    container.addEventListener('webglcontextlost', contextLost, true);
 
     // Enable Cesium OSM 3D buildings
     if (policy.osmBuildings) {
@@ -91,10 +112,22 @@ export function CesiumViewport({ onReady, onSceneFailure, scenePolicy }: CesiumV
     // Scene enhancements
     const globe = viewer.scene.globe as GlobeWithOptionalEffects;
     const visualTest = isVisualTestMode();
+    let removeSolar: (() => void) | undefined;
     globe.terrainExaggeration = 1;
     if (!visualTest) {
       globe.enableLighting = true;
-      applySunAwareLighting(viewer);
+      const baseColor = globe.baseColor.clone();
+      const dimmedColor = baseColor.clone();
+      removeSolar = applySunAwareLighting(viewer, syncUtc, (brightness) => {
+        for (let i = 0; i < viewer.imageryLayers.length; i++) viewer.imageryLayers.get(i).brightness = brightness;
+        dimmedColor.red = baseColor.red * brightness;
+        dimmedColor.green = baseColor.green * brightness;
+        dimmedColor.blue = baseColor.blue * brightness;
+        globe.baseColor = dimmedColor;
+        // The night-side visibility guard disables physical globe lighting;
+        // keep its sky atmosphere on the same bounded scenario twilight blend.
+        if (viewer.scene.skyAtmosphere) viewer.scene.skyAtmosphere.brightnessShift = brightness - 1;
+      });
       globe.showWaterEffect = true;
       viewer.scene.requestRenderMode = false;
       if (viewer.scene.skyAtmosphere) viewer.scene.skyAtmosphere.show = true;
@@ -111,7 +144,21 @@ export function CesiumViewport({ onReady, onSceneFailure, scenePolicy }: CesiumV
 
     return () => {
       disposed = true;
-      viewer.destroy();
+      removeClockTick();
+      removeSolar?.();
+      container.removeEventListener('webglcontextlost', contextLost, true);
+      removeRenderError?.();
+      delete container.dataset.rfsReady;
+      const canvas = viewer.canvas;
+      try {
+        if (!viewer.isDestroyed()) viewer.destroy();
+      } finally {
+        // Cesium releases resources, but does not retire the native context itself.
+        // A detached context must not accumulate across explicit view recreations.
+        canvas?.remove();
+        const gl = canvas?.getContext('webgl2') ?? canvas?.getContext('webgl');
+        gl?.getExtension('WEBGL_lose_context')?.loseContext();
+      }
       if (viewerRef.current === viewer) {
         viewerRef.current = null;
       }

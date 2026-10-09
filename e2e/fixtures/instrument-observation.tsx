@@ -1,13 +1,16 @@
 import { createRoot } from 'react-dom/client';
 import { RfsPFD } from '../../src/instruments/RfsPFD';
+import { Telemetry } from '../../src/components/Telemetry';
 import { useSimStore } from '../../src/store/simStore';
 import { createDefaultAutopilotState } from '../../src/instruments/defaultAutopilotState';
 import { createSimulationRuntime, setSimulationRuntimeForTests, type AsyncSimulationRuntime } from '../../src/sim/simulationRuntime';
 import type { SimulationStepInput } from '../../src/sim/simulationStep';
+import { computeDerived } from '../../src/sim/physics/derived';
 
 let release = () => {};
 let cleanup = () => {};
 let nativeResponses = 0;
+let validatedBackend = (): string | null => null;
 
 async function settle() {
   const deadline = performance.now() + 10000;
@@ -17,7 +20,7 @@ async function settle() {
   }
 }
 
-export async function mountObservedPfd() {
+export async function mountObservedPfd(includeTelemetry = false) {
   useSimStore.getState().reset(); useSimStore.getState().start();
   const s = useSimStore.getState(); const ap = createDefaultAutopilotState();
   ap.boeing.cmdA = true; ap.boeing.hdgSel = true; ap.boeing.altHold = true;
@@ -29,10 +32,11 @@ export async function mountObservedPfd() {
     fallback: { kind: 'main-thread', step: () => { throw new Error('native instrument test forbids fallback'); } } });
   if (created.kind !== 'browser-worker') throw new Error('native instrument worker unavailable');
   const runtime = created as AsyncSimulationRuntime;
+  validatedBackend = () => runtime.diagnosticState?.().executionBackend ?? null;
   const restore = setSimulationRuntimeForTests(runtime);
   useSimStore.getState().tickAsync(16); await settle();
   const element = document.createElement('div'); document.body.append(element);
-  const root = createRoot(element); root.render(<RfsPFD />);
+  const root = createRoot(element); root.render(<><RfsPFD />{includeTelemetry && <Telemetry />}</>);
   cleanup = () => { root.unmount(); element.remove(); restore(); runtime.dispose?.(); };
   let defer = false;
   setSimulationRuntimeForTests({ kind: runtime.kind, step: runtime.step.bind(runtime), stepAsync: async (input: SimulationStepInput) => {
@@ -54,3 +58,21 @@ export function releaseObservation() { release(); }
 export function pauseObservation() { useSimStore.getState().pause(); }
 export function disposeObservedPfd() { cleanup(); }
 export function responseCount() { return nativeResponses; }
+
+export async function commitAirDataCase(surfaceTemperatureC: number, speedMs: number) {
+  const s = useSimStore.getState();
+  useSimStore.getState().setWeather({ ...s.weather!, qnhHpa: 1013.25, surfaceTemperatureC });
+  const ap = createDefaultAutopilotState(); ap.boeing.speedMode = true; ap.boeing.speed = 250; ap.truth.thrustActive = 'SPEED';
+  useSimStore.getState().setApState(ap);
+  useSimStore.setState({ status: 'running', wind: null, lastFrameTime: 16, fixedStepAccumulatorSeconds: 1 / 60,
+    aircraft: { ...s.aircraft, position: { ...s.aircraft.position, alt: 35000 }, velocity: { u: speedMs, v: 0, w: 0 },
+      angularVelocity: { p: 0, q: 0, r: 0 }, ground: { ...s.aircraft.ground, weightOnWheels: false, aglFt: 34500 } } });
+  const before = useSimStore.getState();
+  const expectedAir = computeDerived(before.aircraft, before.wind, before.weather);
+  const beforeController = structuredClone(before.apControllerState);
+  useSimStore.getState().tickAsync(16); await settle(); useSimStore.getState().pause();
+  const committed = useSimStore.getState().simulationCommit!;
+  const air = computeDerived(committed.observation.aircraft, committed.observation.wind, committed.observation.weather);
+  return { air, expectedAir, beforeController, controller: useSimStore.getState().apControllerState, commands: useSimStore.getState().apCommands,
+    weather: committed.observation.weather, backend: validatedBackend(), stepIndex: committed.stepIndex };
+}

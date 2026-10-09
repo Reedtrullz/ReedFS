@@ -297,7 +297,7 @@ describe('RfsMCP', () => {
     const aircraft = structuredClone(useSimStore.getState().aircraft);
     aircraft.velocity = { u: ktToMs(149), v: 0, w: 0 };
     useSimStore.setState({ aircraft, wind: null });
-    const expectedSpeed = Math.round(Math.max(0, computeDerived(aircraft).ias));
+    const expectedSpeed = Math.round(Math.max(0, computeDerived(aircraft, null, useSimStore.getState().weather).ias));
     render(
       <>
         <RfsMCP />
@@ -390,7 +390,7 @@ describe('RfsMCP', () => {
     aircraft.quaternion = eulerToQuat(aircraft.attitude.phi, aircraft.attitude.theta, aircraft.attitude.psi);
     aircraft.velocity = { u: ktToMs(149), v: 0, w: 0 };
     useSimStore.setState({ aircraft, wind: null });
-    const expectedSpeed = Math.round(Math.max(0, computeDerived(aircraft).ias));
+    const expectedSpeed = Math.round(Math.max(0, computeDerived(aircraft, null, useSimStore.getState().weather).ias));
 
     render(<RfsMCP />);
 
@@ -442,7 +442,7 @@ describe('RfsMCP', () => {
 
     render(<RfsMCP />);
 
-    expect(screen.getByText(`HDG ${String(seededHeading).padStart(3, '0')}`)).toBeTruthy();
+    expect(screen.getByText(`HDG ${String(seededHeading).padStart(3, '0')}T`)).toBeTruthy();
     expect(screen.getByText(`ALT ${seededAltitude}`)).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: 'HDG -5' }));
@@ -453,7 +453,7 @@ describe('RfsMCP', () => {
     expect(ap?.boeing.heading).toBe(seededHeading - 5);
     expect(ap?.boeing.altitude).toBe(seededAltitude + 1000);
     expect(ap?.boeing.verticalSpeed).toBe(100);
-    expect(screen.getByText(`HDG ${String(seededHeading - 5).padStart(3, '0')}`)).toBeTruthy();
+    expect(screen.getByText(`HDG ${String(seededHeading - 5).padStart(3, '0')}T`)).toBeTruthy();
     expect(screen.getByText(`ALT ${seededAltitude + 1000}`)).toBeTruthy();
     expect(screen.getByText('VS +100')).toBeTruthy();
   });

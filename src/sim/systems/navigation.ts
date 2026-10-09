@@ -1,7 +1,7 @@
 import type { AircraftState } from '../types';
 import type { FlightPlan, FlightPlanWaypoint } from '@shared/types/fmc';
 
-const EARTH_RADIUS_M = 6371000;
+import { hasValidCoordinates, routeAngularDistance, routeBearingRad, routeDistanceM, routeProjectionM } from '../physics/routeGeometry';
 const M_PER_NM = 1852;
 const DEFAULT_CAPTURE_RADIUS_M = 0.5 * M_PER_NM;
 const DEFAULT_ROUTE_COMPATIBILITY_RADIUS_M = 50 * M_PER_NM;
@@ -86,10 +86,6 @@ function isFiniteNumber(value: number | null | undefined): value is number {
   return typeof value === 'number' && Number.isFinite(value);
 }
 
-function toRad(deg: number): number {
-  return deg * Math.PI / 180;
-}
-
 function normalizeRad(rad: number): number {
   const twoPi = Math.PI * 2;
   return ((rad % twoPi) + twoPi) % twoPi;
@@ -121,6 +117,7 @@ function waypointCoordReason(waypoint: FlightPlanWaypoint, index: number): strin
   if (!isFiniteNumber(waypoint.lat) || !isFiniteNumber(waypoint.lon)) {
     return `missing coordinates for waypoint ${waypoint.ident || index}`;
   }
+  if (!hasValidCoordinates(waypoint)) return `invalid coordinates for waypoint ${waypoint.ident || index}`;
   return null;
 }
 
@@ -203,19 +200,11 @@ function validateAndBuildLegs(flightPlan: FlightPlan | null | undefined): RouteV
 }
 
 function distanceM(fromLat: number, fromLon: number, toLat: number, toLon: number): number {
-  const meanLat = toRad((fromLat + toLat) / 2);
-  const dLat = toRad(toLat - fromLat);
-  const dLon = toRad(toLon - fromLon);
-  const x = dLon * Math.cos(meanLat);
-  const y = dLat;
-  return Math.hypot(x, y) * EARTH_RADIUS_M;
+  return routeDistanceM({ lat: fromLat, lon: fromLon }, { lat: toLat, lon: toLon });
 }
 
 function bearingRad(fromLat: number, fromLon: number, toLat: number, toLon: number): number {
-  const meanLat = toRad((fromLat + toLat) / 2);
-  const dLat = toRad(toLat - fromLat);
-  const dLon = toRad(toLon - fromLon);
-  return normalizeRad(Math.atan2(dLon * Math.cos(meanLat), dLat));
+  return routeBearingRad({ lat: fromLat, lon: fromLon }, { lat: toLat, lon: toLon });
 }
 
 function groundOrTasMps(state: AircraftState): number | null {
@@ -235,16 +224,7 @@ function computeTurnAnticipationDistanceM(speedMps: number | null, turnAngleRad:
 
 function positionRelativeToLegM(leg: RouteLeg, lat: number, lon: number): { alongTrackM: number; crossTrackM: number; legLengthM: number } | null {
   if (leg.fromLat === null || leg.fromLon === null) return null;
-  const refLat = toRad((leg.fromLat + leg.toLat) / 2);
-  const bx = toRad(leg.toLon - leg.fromLon) * Math.cos(refLat) * EARTH_RADIUS_M;
-  const by = toRad(leg.toLat - leg.fromLat) * EARTH_RADIUS_M;
-  const px = toRad(lon - leg.fromLon) * Math.cos(refLat) * EARTH_RADIUS_M;
-  const py = toRad(lat - leg.fromLat) * EARTH_RADIUS_M;
-  const legLengthM = Math.hypot(bx, by);
-  if (legLengthM <= 0) return null;
-  const alongTrackM = (px * bx + py * by) / legLengthM;
-  const crossTrackM = (px * by - py * bx) / legLengthM;
-  return { alongTrackM, crossTrackM, legLengthM };
+  return routeProjectionM({ lat: leg.fromLat, lon: leg.fromLon }, { lat: leg.toLat, lon: leg.toLon }, { lat, lon });
 }
 
 function distanceToRouteLegM(leg: RouteLeg, lat: number, lon: number): number {
@@ -428,7 +408,12 @@ export function computeRouteStatus(
   activeLegIndex: number | null,
   options: RouteStatusOptions = {},
 ): RouteStatusSnapshot {
+  if (!hasValidCoordinates(state.position)) return createNoRouteStatus(flightPlan, 'invalid aircraft coordinates');
   const route = validateAndBuildLegs(flightPlan);
+  if (route.legs.some((leg) => leg.fromLat !== null && leg.fromLon !== null
+    && Math.PI - routeAngularDistance({ lat: leg.fromLat, lon: leg.fromLon }, { lat: leg.toLat, lon: leg.toLon }) < 1e-8)) {
+    return createNoRouteStatus(flightPlan, 'ambiguous antipodal route coordinates');
+  }
   if (route.unavailableReason) return createNoRouteStatus(flightPlan, route.unavailableReason);
 
   const legs = route.legs;
@@ -552,7 +537,7 @@ export function computeLNAV(
   const idx = Math.min(activeWptIndex, wpts.length - 1);
   const wpt = wpts[idx];
 
-  if (wpt.lat === undefined || wpt.lon === undefined) return def;
+  if (!hasValidCoordinates(wpt) || !hasValidCoordinates(state.position)) return def;
 
   const desiredTrack = bearingRad(state.position.lat, state.position.lon, wpt.lat, wpt.lon);
   const distM = distanceM(state.position.lat, state.position.lon, wpt.lat, wpt.lon);
