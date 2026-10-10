@@ -2,6 +2,7 @@ import type { AutoflightTruthState, AutopilotState } from '@shared/autopilot/aut
 import type { FlightPlan } from '@shared/types/fmc';
 import type { SimulationStatus } from './simulationStatus';
 import type { WindInfo } from './weather';
+import type { RunwayOverrides } from '../viewport/runwayData';
 import type { AircraftSpec, AircraftState, AutopilotCommands, ControlInputs, FlightPhase } from './types';
 import { integrate } from './physics/integrate';
 import { deriveRouteDrivenFlightPhase } from './flightPhasePredicates';
@@ -135,6 +136,11 @@ export interface SimulationStepInput {
    * weather when omitted, which keeps direct callers scenario-only.
    */
   weather?: ScenarioWeatherMetadata | null;
+  /**
+   * Shared authoritative runway editor overrides. Rendering and physics
+   * sampling must consume the same revision so visuals and contact agree.
+   */
+  runwayOverrides?: RunwayOverrides | null;
   dt: number;
   /**
    * Number of fixed steps the runtime should execute for this dispatch.
@@ -269,7 +275,7 @@ export function advanceSimulationStep(input: SimulationStepInput): SimulationSte
   const apCommands = apCommandResult.commands;
   const controlsForIntegration = composeControlsSlice(input.pilotInputs, apCommands, input.apState, truthContext);
 
-  integrate(state, controlsForIntegration.effectiveControls, input.spec, input.dt, input.wind, weather);
+  integrate(state, controlsForIntegration.effectiveControls, input.spec, input.dt, input.wind, weather, input.runwayOverrides);
 
   const routeStatus = input.flightPlan
     ? computeRouteStatus(state, input.flightPlan, routeBeforeTick.activeLegIndex)

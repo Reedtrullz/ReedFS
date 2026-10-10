@@ -4,7 +4,7 @@ import type { AutopilotState } from '@shared/autopilot/autopilotTypes';
 import type { FlightPlan } from '@shared/types/fmc';
 import type { WindInfo } from '../sim/weather';
 import type { ScenarioWeatherMetadata } from '../sim/weather';
-import type { RunwayReference } from '../viewport/runwayData';
+import type { RunwayOverrides, RunwayReference } from '../viewport/runwayData';
 import type { GuidanceState } from '../sim/guidanceState';
 import type { RouteEditSession } from '../sim/fms/routeAdapter';
 import { composeControlsSlice, type SimulationStepInput } from '../sim/simulationStep';
@@ -77,6 +77,8 @@ export interface SimStore {
   wind: WindInfo | null;
   /** Live weather (scenario seed updated by METAR QNH/temperature) fed to physics. */
   weather: ScenarioWeatherMetadata | null;
+  /** Shared authoritative runway editor overrides consumed by rendering and physics. */
+  runwayOverrides: RunwayOverrides | null;
   /** A scenario/reset/restore epoch fences asynchronous weather requests. */
   weatherEpoch: number;
   /** Saved conditions remain authoritative until reset or scenario selection. */
@@ -121,6 +123,7 @@ export interface SimStore {
   undoRouteEditOperation: () => void;
   executeRouteEdit: () => void;
   setWind: (w: WindInfo | null) => void;
+  setRunwayOverrides: (overrides: RunwayOverrides | null) => void;
   setWeather: (w: ScenarioWeatherMetadata | null) => void;
   pendingScenarioSave: ScenarioSnapshot | null;
   discardPendingScenarioSave: () => void;
@@ -168,6 +171,7 @@ export const useSimStore = create<SimStore>((set, get) => {
   return {
     commandRevisions: { pilot: 0, autoflight: 0, route: 0, environment: 0 },
     commandAcceptedAtMs: 0, simulationCommit: null, asyncReservedSteps: 0,
+    runwayOverrides: null,
     ...createAircraftSlice(storeSet),
     ...createInputSlice(storeSet),
     simulationFailure: null,
@@ -204,6 +208,7 @@ export const useSimStore = create<SimStore>((set, get) => {
         activeLegIndex,
         routeStatus,
         wind,
+        runwayOverrides,
         selectedScenarioId,
         guidance,
       } = get();
@@ -259,6 +264,7 @@ export const useSimStore = create<SimStore>((set, get) => {
           routeStatus: nextRouteStatus,
           wind,
           weather,
+          runwayOverrides,
           dt: FIXED_STEP_SECONDS,
           status,
           selectedScenarioId,
@@ -377,6 +383,7 @@ export const useSimStore = create<SimStore>((set, get) => {
             aircraft: current.aircraft, spec: current.spec, pilotInputs: current.pilotInputs,
             apState: current.apState, flightPlan: current.flightPlan, activeLegIndex: current.activeLegIndex,
             routeStatus: current.routeStatus, wind: current.wind, weather: current.weather,
+            runwayOverrides: current.runwayOverrides,
             dt: FIXED_STEP_SECONDS, status: current.status, selectedScenarioId: current.selectedScenarioId,
             guidance: current.guidance, apControllerState: current.apControllerState,
             cloneAircraft: true, steps: batchSteps,

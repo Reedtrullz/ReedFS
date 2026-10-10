@@ -3,6 +3,7 @@ import type { FlightPlan } from '@shared/types/fmc';
 import type { SimulationStepInput, SimulationStepResult } from './simulationStep';
 import { B737_800_SPEC, createInitialState, type AircraftState, type ControlInputs, type AutopilotCommands } from './types';
 import type { ScenarioWeatherMetadata, WindInfo } from './weather';
+import type { RunwayOverrides } from '../viewport/runwayData';
 import type { AutopilotControllerState } from './systems/autopilot';
 import { SCENARIOS } from './scenarios';
 import { eulerToQuat } from './physics/quaternion';
@@ -48,6 +49,21 @@ function range(value: unknown, min: number, max: number): value is number {
 function index(value: unknown): boolean {
   return value === null || (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0);
 }
+function isRunwayOverrides(value: unknown): value is RunwayOverrides {
+  if (!isRecord(value)) return false;
+  return Object.entries(value).every(([key, override]) => {
+    if (!/^[A-Z0-9]+-[0-9]{2}[A-Z]?$/.test(key) || !isRecord(override)) return false;
+    if (override.start !== undefined) {
+      if (!fields(override.start, 'lat lon altFt')
+        || !range(override.start.lat, -90, 90)
+        || !range(override.start.lon, -180, 180)) return false;
+    }
+    if (override.headingDeg !== undefined && (typeof override.headingDeg !== 'number' || !Number.isFinite(override.headingDeg))) return false;
+    if (override.elevationFt !== undefined && (typeof override.elevationFt !== 'number' || !Number.isFinite(override.elevationFt))) return false;
+    return true;
+  });
+}
+
 function optionalNumbers(value: RecordValue, names: string): boolean {
   return names.split(' ').every((key) => value[key] == null || typeof value[key] === 'number');
 }
@@ -156,6 +172,7 @@ export function assertSimulationStepInput(value: unknown): asserts value is Simu
     || (value.weather != null && !isWeather(value.weather)) || !['running', 'paused', 'stopped'].includes(String(value.status))
     || !SCENARIOS.some((scenario) => scenario.id === value.selectedScenarioId) || !isGuidance(value.guidance)
     || value.guidance.scenarioId !== value.selectedScenarioId || (value.apControllerState !== undefined && !isAutopilotControllerState(value.apControllerState))
+    || (value.runwayOverrides != null && !isRunwayOverrides(value.runwayOverrides))
     || (value.cloneAircraft !== undefined && typeof value.cloneAircraft !== 'boolean')) throw new TypeError('Invalid simulation step input');
   assertSimulationExecutionBounds(value.dt as number, (value.steps ?? 1) as number);
 }

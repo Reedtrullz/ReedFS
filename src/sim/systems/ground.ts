@@ -717,6 +717,8 @@ export function applyGroundContact(
   const preliminarySurfaceOnRunway = contactSurface.onRunway;
 
   if (contactSurface.kind === 'unsupportedTerrain' && !state.ground.weightOnWheels) {
+    // groundAltFt here is a placeholder (aircraft altitude), not trusted
+    // terrain truth: airborne flight over unknown ground gets no contact.
     return setGroundState(state, groundAltFt, 'none', false, 0, undefined, undefined, false);
   }
 

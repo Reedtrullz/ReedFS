@@ -1,4 +1,5 @@
 import type { GeoPosition } from './types';
+import { applyRunwayOverrides, type RunwayOverrides } from '../viewport/runwayData';
 import { KSEA_RUNWAYS, SUPPORTED_RUNWAYS, type RunwayReference, type SupportedAirport } from '../viewport/runwayData';
 
 export type GroundSurfaceKind = 'runway' | 'offRunway' | 'unsupportedTerrain';
@@ -13,6 +14,8 @@ export interface GroundSurfaceSample {
   kind: GroundSurfaceKind;
   onRunway: boolean;
   groundAltFt: number;
+  /** False when groundAltFt is a placeholder, not trusted terrain truth. */
+  groundAltValid?: boolean;
   frictionScale: GroundSurfaceFrictionScale;
   airport?: SupportedAirport;
   runwayId?: string;
@@ -138,7 +141,10 @@ function sampleRunwaySurface(position: GeoPosition, runways: readonly RunwayRefe
     return {
       kind: 'unsupportedTerrain',
       onRunway: false,
+      // Placeholder: aircraft altitude masquerading as ground truth until
+      // bounded terrain tiles land; ground contact treats it as unknown.
       groundAltFt: position.alt,
+      groundAltValid: false,
       frictionScale: OFF_RUNWAY_FRICTION_SCALE,
     };
   }
@@ -155,8 +161,12 @@ function sampleRunwaySurface(position: GeoPosition, runways: readonly RunwayRefe
   };
 }
 
-export function sampleSupportedAirportSurface(position: GeoPosition): GroundSurfaceSample {
-  return sampleRunwaySurface(position, SUPPORTED_RUNWAYS);
+export function sampleSupportedAirportSurface(
+  position: GeoPosition,
+  runwayOverrides?: RunwayOverrides | null,
+): GroundSurfaceSample {
+  const runways = runwayOverrides ? applyRunwayOverrides(SUPPORTED_RUNWAYS, runwayOverrides) : SUPPORTED_RUNWAYS;
+  return sampleRunwaySurface(position, runways);
 }
 
 export function sampleKseaSurface(position: GeoPosition): GroundSurfaceSample {
