@@ -66,3 +66,32 @@ describe('useScenarioWeather', () => {
     expect(mockSetWind).toHaveBeenLastCalledWith(expect.objectContaining({ dir: 270, speed: 12, gustSpeed: 18, gustSeed: 9009 }));
   });
 });
+
+describe('authored-calm fixed weather policy', () => {
+  beforeEach(() => {
+    mockFetchMetar.mockClear();
+    mockSetWind.mockClear();
+    mockSetWeather.mockClear();
+  });
+
+  it(
+    'bootstrap never issues a METAR request for scenarios declaring authored-calm',
+    async () => {
+      mockStoreState.selectedScenarioId = 'level-equilibrium-engineering';
+      renderHook(() => useScenarioWeather(mockStoreState.selectedScenarioId));
+
+      await waitFor(() => expect(mockSetWind).toHaveBeenCalled());
+      expect(mockFetchMetar).not.toHaveBeenCalled();
+    },
+  );
+
+  it(
+    'still fetches METAR for ordinary scenarios after the policy branch',
+    async () => {
+      mockStoreState.selectedScenarioId = 'enva-tutorial';
+      renderHook(() => useScenarioWeather(mockStoreState.selectedScenarioId));
+
+      await waitFor(() => expect(mockFetchMetar).toHaveBeenCalledWith('ENVA'));
+    },
+  );
+});

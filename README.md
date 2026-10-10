@@ -233,7 +233,7 @@ See `docs/physics-invariants.md` for the regression checklist.
 
 ## Runtime heartbeat
 
-Current implementation is still main-thread physics:
+Default implementation is browser-Worker physics:
 
 ```text
 React App
@@ -243,8 +243,9 @@ React App
       -> computeRouteStatus before physics for active-leg AP targets
       -> computeAutopilotCommandsForStateWithControllerState (HDG/LNAV/VNAV/VS plus SPEED/N1 thrust; AP PID/rate-limit state is explicit and serializable)
       -> compose pilotInputs + apCommands into effectiveControls
-      -> getSimulationRuntime().step(...)
-        -> MainThreadSimulationRuntime (default) or BrowserWorkerSimulationRuntime sync fallback when explicitly flagged
+      -> getSimulationRuntime().stepAsync(...)
+        -> BrowserWorkerSimulationRuntime (default; request/response IDs, backpressure, timeout/error main-thread fallback)
+           or MainThreadSimulationRuntime when VITE_RFS_WORKER_PHYSICS=0
         -> advanceSimulationStep(..., cloneAircraft=false inside the store loop)
           -> integrate(state, effectiveControls, spec, dt, wind)
         -> updateEngines

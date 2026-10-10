@@ -41,6 +41,11 @@ export function useScenarioWeather(selectedScenarioId: string): ScenarioWeatherS
     const scenario = activeScenario;
     if (weatherRestored) return;
     let cancelled = false;
+    if (scenario.fixedWeatherPolicy === 'authored-calm') {
+      useSimStore.getState().setWind(parseMetarWind(fallbackMetarData, weatherWindSeed));
+      useSimStore.getState().setWeather(parseMetarWeather(fallbackMetarData, scenario.weather));
+      return;
+    }
 
     useSimStore.getState().setWind(parseMetarWind(fallbackMetarData, weatherWindSeed));
     useSimStore.getState().setWeather(parseMetarWeather(fallbackMetarData, scenario.weather));

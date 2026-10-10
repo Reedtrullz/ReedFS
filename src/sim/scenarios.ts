@@ -54,6 +54,10 @@ export interface FlightScenario {
     throttle: number;
     weightOnWheels: boolean;
   };
+  levelEquilibrium?: {
+    targetTasKt: number;
+  };
+  fixedWeatherPolicy?: 'authored-calm';
 }
 
 const KT_TO_MPS = 0.514444;
@@ -337,12 +341,66 @@ export const KPDX_10R_SHORT_FINAL_SCENARIO: FlightScenario = {
   ],
 };
 
+export const LEVEL_EQUILIBRIUM_ENGINEERING_SCENARIO: FlightScenario = {
+  id: 'level-equilibrium-engineering',
+  name: 'Level Equilibrium Engineering',
+  description: 'Clean-config 737-800 holding 220 kt TAS at 10,000 ft over KPDX; state is solved at initialization and all data remains provisional placeholder quality.',
+  position: { lat: KPDX_RUNWAY_10R.start.lat, lon: KPDX_RUNWAY_10R.start.lon, alt: 10_000 + KPDX_RUNWAY_10R.elevationFt },
+  runway: { airport: KPDX_RUNWAY_10R.airport, runway: KPDX_RUNWAY_10R.id, elevationFt: KPDX_RUNWAY_10R.elevationFt, headingDeg: KPDX_RUNWAY_10R.headingDeg },
+  fuel: { centerTank: 8_000, leftTank: 2_000, rightTank: 2_000, totalFuel: 12_000 },
+  zeroFuelWeightKg: 49_913,
+  grossWeightKg: 61_913,
+  payloadWeightKg: 8_500,
+  cgPercent: 25,
+  stabilizerTrimUnits: 2.2,
+  flapSetting: 0,
+  initialAircraft: {
+    flightPhase: 'CRUISE',
+    airspeedKt: 220,
+    verticalSpeedFpm: 0,
+    pitchDeg: 5,
+    throttle: 0.62,
+    weightOnWheels: false,
+  },
+  levelEquilibrium: { targetTasKt: 220 },
+  fixedWeatherPolicy: 'authored-calm',
+  wind: { dir: 0, speed: 0, gustSeed: 1020 },
+  weather: scenarioWeather({
+    stationIcao: 'KPDX',
+    surfaceTemperatureC: 15,
+    qnhHpa: 1013.25,
+    visibilityM: 9999,
+    clouds: [{ cover: 'FEW', base: 6_000 }],
+    cloudSeed: 1020,
+    gustSeed: 1020,
+    cloudAnchor: { lat: KPDX_RUNWAY_10R.start.lat, lon: KPDX_RUNWAY_10R.start.lon },
+  }),
+  tutorialSteps: [
+    {
+      id: 'solved-initialization',
+      title: 'Solved initialization',
+      body: 'The aircraft starts at a numerically solved level equilibrium: pitch, trim, and throttle hold 220 kt TAS at 10,000 ft with declared residual tolerances. All numbers are provisional placeholder data.',
+    },
+    {
+      id: 'unassisted-observation',
+      title: 'Unassisted observation',
+      body: 'Start the simulation with autopilot off and watch altitude, speed, and pitch drift against the declared thresholds in the level equilibrium receipt.',
+    },
+    {
+      id: 'evidence-boundary',
+      title: 'Evidence boundary',
+      body: 'Convergence is a solver receipt, not a performance qualification. No official Boeing data, training value, or continuous-flight claim is implied.',
+    },
+  ],
+};
+
 export const SCENARIOS: FlightScenario[] = [
   ENVA_TUTORIAL_SCENARIO,
   KSEA_TUTORIAL_SCENARIO,
   KSEA_LIGHT_PATTERN_SCENARIO,
   KPDX_TUTORIAL_SCENARIO,
   KPDX_10R_SHORT_FINAL_SCENARIO,
+  LEVEL_EQUILIBRIUM_ENGINEERING_SCENARIO,
 ];
 
 const CENTER_TANK_ARM_PERCENT_MAC = 22;

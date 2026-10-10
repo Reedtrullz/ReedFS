@@ -13,7 +13,9 @@ const BUDGETS = {
   // Adds 8.5 raw / 3.7 gzip KiB over the UTC clock (421.4 / 133.3).
   // Bounded feature allowance retains about 2% headroom; other budgets stay fixed.
   // Lazy diagnostics and the physics worker remain counted in this whole app allowance.
-  app: { rawBytes: 440 * 1024, gzipBytes: 140 * 1024, required: true },
+  // Level-equilibrium solver increment (#136): measured 444.7 / 141.1 KiB at 7b387b5.
+  // Adds 4.7 raw / 1.1 gzip KiB over the WMM2025 allowance; about 1% headroom remains.
+  app: { rawBytes: 448 * 1024, gzipBytes: 143 * 1024, required: true },
   // React/Zustand framework chunk baseline: raw 182.4 KiB / gzip 56.7 KiB.
   vendorReact: { rawBytes: 212 * 1024, gzipBytes: 66 * 1024, required: true },
   // Generic vendor chunk baseline: raw 3.5 KiB / gzip 1.5 KiB.
