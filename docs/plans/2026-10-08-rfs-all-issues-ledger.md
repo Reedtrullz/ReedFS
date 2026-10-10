@@ -78,6 +78,12 @@ GitHub: [#91](https://github.com/Reedtrullz/ReedFS/issues/91) · draft **RFS-33*
 
 **Issue acceptance retained:** Valid saves restore paused under the same atmosphere; malformed/quota-denied/version-incompatible data cannot corrupt active state or other slots. Restore invalidates in-flight worker results and rejects impossible state before physics runs.
 
+**Execution evidence (2026-10-10):** Revalidated against master at 196bd98: every #91 acceptance criterion is already implemented. v4 scenario snapshots carry effective weather plus clock/profile/aircraft identities (`SCENARIO_SNAPSHOT_IDENTITIES`); restore keeps saved weather and starts paused when the saved aircraft was airborne; `collectionForWrite` preserves corrupt raw collections instead of emptying them; ranged finite nested validation runs across `simulationValidation.ts`; cross-tab save serialization uses `withBrowserScenarioSaveLock`; restore bumps `asyncPhysicsGeneration` and sets `lastValidCheckpoint`, invalidating in-flight worker results.
+
+Verification: all 27 persistence-focused unit tests pass locally. Project item PVTI_lAHOAB-TC84BmFlSzg_L15E was already Done from prior work. No product-code PR needed.
+
+Non-claims: explicit format migration rules and cross-version import/export compatibility remain out of scope per the issue text; no live-deploy or cross-tab integration was run this session. Closed as covered.
+
 <a id="issue-92"></a>
 ## #92 — Make improvement acceptance reproducible and current
 
