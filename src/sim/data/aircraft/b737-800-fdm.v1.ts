@@ -2,7 +2,9 @@ import type { AeroModel } from '../../systems/AeroModel';
 import { B737_800_AIRCRAFT_DATA } from './b737-800.v1';
 import type { ConfigurationTransitModelData, EngineModelData, FdmLineageMetadata, FdmSourceMetadata, GearStationDefinition, GroundModelData } from './fdmTypes';
 
-export const B737_800_FDM_DATA_VERSION = '1.0.0';
+export const B737_800_FDM_DATA_VERSION = '1.1.0';
+
+export const ENGINE_STATIC_THRUST_ANCHOR_LBF = 27300;
 
 export interface VersionedAircraftFdmData {
   schemaVersion: 1;
@@ -22,6 +24,23 @@ const RFS_PLACEHOLDER_SOURCE_ID = 'rfs-gameplay-calibrated-placeholder-v1';
 
 const lineage: FdmLineageMetadata = {
   sourceReferences: [
+    {
+      id: 'faa-tcds-a16we-rev45-b738-takeoff-thrust',
+      title: 'FAA Type Certificate Data Sheet A16WE Rev 45, Boeing 737-800 CFM56-7B27 takeoff thrust',
+      role: 'engine',
+      classification: 'manufacturer-published',
+      confidence: 'high',
+      notes: 'Anchors takeoff static thrust at 27,300 lbf per engine (five-minute, standard day, sea level static) from TCDS A16WE Rev 45, Section VII. This reference covers the static-thrust anchor only; engine spool, EGT, fuel flow, and thrust lapse remain placeholder-lineage values. Packet: docs/runbooks/faa-tcds-a16we-b738-engine-thrust-packet.md.',
+      url: 'https://drs.faa.gov/browse/excelExternalWindow/61A6984192278637852567A10072C1DCB',
+    },
+    {
+      id: 'b737-800-static-thrust-anchor',
+      title: 'RFS B737-800 static-thrust anchor derivation',
+      role: 'engine',
+      classification: 'manufacturer-published',
+      confidence: 'high',
+      notes: 'Runtime anchor equal to the TCDS A16WE Rev 45 CFM56-7B27 rating of 27,300 lbf. Sea-level-static thrust at N1 100 under the placeholder lapse table is exactly this value; no certified-performance or whole-engine claim follows.',
+    },
     {
       id: RFS_PLACEHOLDER_SOURCE_ID,
       title: 'RFS gameplay-calibrated placeholder FDM constants',
@@ -132,12 +151,13 @@ export const B737_800_FDM: VersionedAircraftFdmData = {
     highN2EgtReliefStartPercent: 80,
     highN2EgtReliefPerPercentC: 2,
     fuelSfcKgPerNewtonHour: 0.55 * 0.4536 / 4.4482216152605,
-    // Lapse grid generated from the legacy placeholder density/Mach formula to
-    // preserve current simulator behavior while making ownership data-driven.
+    // Lapse grid generated from the legacy placeholder density/Mach formula while
+    // making ownership data-driven; the sea-level-static point is pinned to 1.0
+    // so runtime SLS thrust is exactly the TCDS-anchored static-thrust constant.
     // OAT is documented per point, but current Task 19 intentionally does not
     // claim temperature interpolation; Task 25 binds weather/scenario metadata.
     thrustLapseTable: [
-      { altitudeFt: 0, mach: 0.2, oatC: 15, lapseFactor: 1.000007 },
+      { altitudeFt: 0, mach: 0.2, oatC: 15, lapseFactor: 1 },
       { altitudeFt: 0, mach: 0.45, oatC: 15, lapseFactor: 0.912506 },
       { altitudeFt: 0, mach: 0.78, oatC: 15, lapseFactor: 0.796196 },
       { altitudeFt: 0, mach: 0.82, oatC: 15, lapseFactor: 0.778595 },
