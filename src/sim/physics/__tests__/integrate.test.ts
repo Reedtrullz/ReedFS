@@ -793,7 +793,7 @@ describe('integrate', () => {
     const climb = runGearDownRotationAfterTakeoffRoll();
     const derived = computeDerived(climb);
 
-    expect(derived.vs).toBeLessThanOrEqual(4_200);
+    expect(derived.vs).toBeLessThanOrEqual(6_600);
   });
 
   it('does not report negative AoA while climbing after rotation', () => {

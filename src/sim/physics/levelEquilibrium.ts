@@ -256,8 +256,9 @@ function normalForceResidualForPitch(
   candidate.velocity.w = targetTasMs * Math.sin(pitchRad);
   const aero = computeAero(candidate, controls, spec, undefined, null, weather);
   const weightN = candidate.grossWeight * G;
-  const theta = candidate.attitude.theta;
-  return { residual: aero.lift - weightN * Math.cos(theta), lift: aero.lift };
+  const tasMs = Math.hypot(candidate.velocity.u, candidate.velocity.v, candidate.velocity.w);
+  const cosThetaW = tasMs > 0 ? candidate.velocity.u / tasMs : 1;
+  return { residual: aero.lift - weightN * cosThetaW, lift: aero.lift };
 }
 
 function bracketRoot(lower: number, upper: number, evaluate: (value: number) => number, maxIterations: number): { root: number; iterations: number } | null {
@@ -287,8 +288,13 @@ function throttleResidualFor(state: AircraftState, controls: ControlInputs, spec
   seedEngines(candidate, controls, throttle, spec, weather);
   const aero = computeAero(candidate, { ...controls, throttle1: throttle, throttle2: throttle }, spec, undefined, null, weather);
   const weightN = candidate.grossWeight * G;
-  const theta = candidate.attitude.theta;
-  return { residual: aero.thrust + aero.dragBodyX - weightN * Math.sin(theta), thrust: aero.thrust, dragBodyX: aero.dragBodyX };
+  const tasMs = Math.hypot(candidate.velocity.u, candidate.velocity.v, candidate.velocity.w);
+  const sinThetaW = tasMs > 0 ? candidate.velocity.w / tasMs : 0;
+  return {
+    residual: aero.thrust + aero.dragBodyX + aero.liftBodyX - weightN * sinThetaW,
+    thrust: aero.thrust,
+    dragBodyX: aero.dragBodyX,
+  };
 }
 
 export function solveLevelEquilibrium(
@@ -367,11 +373,13 @@ export function solveLevelEquilibrium(
   };
   const aero = computeAero(state, committedControls, spec, undefined, null, weather);
   const weightN = request.grossWeightKg * G;
-  const theta = state.attitude.theta;
+  const tasMs = Math.hypot(state.velocity.u, state.velocity.v, state.velocity.w);
+  const cosThetaW = tasMs > 0 ? state.velocity.u / tasMs : 1;
+  const sinThetaW = tasMs > 0 ? state.velocity.w / tasMs : 0;
   const residuals = {
-    normalForceN: aero.lift - weightN * Math.cos(theta),
-    axialForceN: aero.thrust + aero.dragBodyX - weightN * Math.sin(theta),
-    sideForceN: aero.side,
+    normalForceN: aero.lift - weightN * cosThetaW,
+    axialForceN: aero.thrust + aero.dragBodyX + aero.liftBodyX - weightN * sinThetaW,
+    sideForceN: aero.side + aero.dragBodyY,
     pitchMomentNm: aero.pitchMoment,
     rollMomentNm: aero.rollMoment,
     yawMomentNm: aero.yawMoment,

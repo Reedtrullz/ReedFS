@@ -93,7 +93,9 @@ function liftCoefficientAtAoA(aoa: number, mach: number, polar: FlapPolar): { cl
 }
 
 export interface AeroResult {
-  thrust: number; drag: number; dragBodyX: number; lift: number; side: number; weight: number;
+  thrust: number; drag: number; lift: number; side: number; weight: number;
+  dragBodyX: number; dragBodyY: number; dragBodyZ: number;
+  liftBodyX: number; liftBodyZ: number;
   rollMoment: number; pitchMoment: number; yawMoment: number;
 }
 
@@ -174,7 +176,18 @@ export function computeAero(
 
   const lift = q * S * effectiveCl;
   const drag = q * S * cd;
-  const dragBodyX = tasMs > 1 ? -drag * (u / tasMs) : 0;
+  // Drag acts opposite the air-relative velocity; lift is perpendicular to it
+  // and points up (body axes: x forward, y right, z down), so both resolve
+  // into all three body components at any AoA or sideslip.
+  const tasInverse = tasMs > 1 ? 1 / tasMs : 0;
+  const airU = u * tasInverse;
+  const airV = v * tasInverse;
+  const airW = w * tasInverse;
+  const dragBodyX = -drag * airU;
+  const dragBodyY = -drag * airV;
+  const dragBodyZ = -drag * airW;
+  const liftBodyX = lift * airW;
+  const liftBodyZ = -lift * airU;
   const side = q * S * cy;
   const weight = state.grossWeight * G;
 
@@ -197,5 +210,5 @@ export function computeAero(
   const cn = aeroModel.cnBeta * beta + aeroModel.cnRudder * inputs.rudder + aeroModel.cnr * rHat;
   const yawMoment = q * S * b * cn;
 
-  return { thrust, drag, dragBodyX, lift, side, weight, rollMoment, pitchMoment, yawMoment };
+  return { thrust, drag, lift, side, weight, dragBodyX, dragBodyY, dragBodyZ, liftBodyX, liftBodyZ, rollMoment, pitchMoment, yawMoment };
 }
