@@ -88,11 +88,13 @@ describe('canonical docs posture', () => {
     expect(packageJson.scripts['test:e2e']).not.toContain('e2e/rfs-full-flight-blackbox.spec.ts');
     expect(packageJson.scripts['test:e2e:full-flight']).toContain('e2e/rfs-full-flight-blackbox.spec.ts');
     expect(packageJson.scripts['test:visual']).toContain('e2e/rfs-visual.spec.ts');
-    const workflow = parse(ciWorkflow) as { jobs: { test: { steps: Array<{
+    type CiStep = {
       run?: string; id?: string; if?: string; with?: { name?: string; path?: string; 'retention-days'?: number };
-    }> } } };
+    };
+    const workflow = parse(ciWorkflow) as { jobs: { test: { steps: CiStep[] }; 'e2e-shard': { steps: CiStep[] } } };
     const steps = workflow.jobs.test.steps;
-    const browser = steps.findIndex((step) => step.run === 'npm run test:e2e');
+    const shardSteps = workflow.jobs['e2e-shard'].steps;
+    const browser = shardSteps.findIndex((step) => step.run === 'npm run test:e2e -- --shard=${{ matrix.shard }}/3');
     const visual = steps.findIndex((step) => step.run === 'npm run test:visual');
     const fixtureBuild = steps.findIndex((step) => step.run === 'npm run test:e2e:pwa:build');
     const pwa = steps.findIndex((step) => step.run === 'npm run test:e2e:pwa:run');
@@ -102,9 +104,15 @@ describe('canonical docs posture', () => {
     expect(pwa).toBeGreaterThan(fixtureBuild);
     expect(packageJson.scripts['test:e2e:pwa:run']).not.toContain('build-pwa-fixtures');
     expect(pwaConfig).toMatch(/outputDir:\s*'test-results-pwa'/);
-    for (const [phase, start, end] of [['browser', browser, visual], ['visual', visual, pwa], ['pwa', pwa, steps.length]] as const) {
-      expect(steps[start].id).toBe(phase);
-      const upload = steps.slice(start + 1, end).find((step) => step.with?.name?.startsWith(`rfs-${phase}-evidence-`));
+    const visualStepsEnd = pwa;
+    for (const [phase, phaseSteps, start, end] of [
+      ['browser', shardSteps, browser, shardSteps.length],
+      ['visual', steps, visual, visualStepsEnd],
+      ['pwa', steps, pwa, steps.length],
+    ] as const) {
+      expect(phaseSteps[start].id).toBe(phase);
+      const evidencePrefix = phase === 'browser' ? 'rfs-e2e-evidence-shard-' : `rfs-${phase}-evidence-`;
+      const upload = phaseSteps.slice(start + 1, end).find((step) => step.with?.name?.startsWith(evidencePrefix));
       expect(upload?.if).toContain('always()');
       expect(upload?.if).toContain(`steps.${phase}.outcome == 'success'`);
       expect(upload?.if).toContain(`steps.${phase}.outcome == 'failure'`);
