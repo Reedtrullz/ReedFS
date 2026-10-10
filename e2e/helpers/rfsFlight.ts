@@ -864,8 +864,8 @@ export async function flyDescentApproachToLandingRolloutAndReset(page: Page): Pr
     }
 
     useSimStore.getState().setInput({
-      throttle1: 0.65,
-      throttle2: 0.65,
+      throttle1: 0.55,
+      throttle2: 0.55,
       flapLever: 30,
       gearLever: 'DOWN',
       brake: 0,
@@ -909,7 +909,7 @@ export async function flyDescentApproachToLandingRolloutAndReset(page: Page): Pr
     for (let frame = 0; frame < 60 * 70; frame += 1) {
       const beforeTick = snapshot();
       if (!beforeTick.weightOnWheels && beforeTick.aglFt < 120) {
-        useSimStore.getState().setInput({ throttle1: 0.65, throttle2: 0.65, elevator: -0.8 });
+        useSimStore.getState().setInput({ throttle1: 0.55, throttle2: 0.55, elevator: -0.8 });
       }
       stepFrame();
       const current = snapshot();
