@@ -37,7 +37,9 @@ function actualGearExtensionFraction(state: AircraftState): number {
 
 export const B737_GROUND_MODEL: GroundModelData = B737_800_FDM.ground;
 
-export type GroundContactResult = GroundState;
+export interface GroundContactResult extends GroundState {
+  liftoffGates?: LiftoffGateDiagnostics;
+}
 
 export interface GroundContactOptions {
   normalForceN?: number;
@@ -47,6 +49,26 @@ export interface GroundContactOptions {
   airRelativeSpeedMps?: number;
   rotationReferenceSpeedMps?: number;
   minimumSupportedNormalForceN?: number;
+  liftoffGates?: LiftoffGateDiagnostics;
+}
+
+export interface WheelStationOleoLoad {
+  stationId: GearStationState['id'];
+  compressionM: number;
+  normalForceN: number;
+}
+
+export interface LiftoffGateDiagnostics {
+  allowLiftoff: boolean;
+  hasDeliberateRotationInput: boolean;
+  normalForceN: number;
+  weightN: number;
+  normalForceFraction: number;
+  normalForceLimitN: number;
+  minimumLiftoffSpeedMps: number;
+  airspeedMps: number;
+  pitchRad: number;
+  minimumPitchRad: number;
 }
 
 export interface GroundRollForceBreakdown {
@@ -225,7 +247,9 @@ function setGroundState(
   touchdownSinkRateMps?: number,
   onRunway = contact !== 'none',
   tailstrike = false,
-): GroundState {
+  stationLoads: WheelStationOleoLoad[] = [],
+  liftoffGates?: LiftoffGateDiagnostics,
+): GroundContactResult {
   const aglFt = Math.max(0, state.position.alt - groundAltFt);
   const gearStations = gearStationsOverride ?? createB737GearStations(
     contact === 'gear' && weightOnWheels ? normalForceN : 0,
@@ -236,7 +260,7 @@ function setGroundState(
     : contact === 'gear' && weightOnWheels
       ? state.ground.lastTouchdownSinkRateMps
       : 0;
-  const ground: GroundState = {
+  const ground: GroundContactResult = {
     aglFt,
     groundAltFt,
     weightOnWheels,
@@ -246,6 +270,8 @@ function setGroundState(
     contact,
     tailstrike,
     gearStations,
+    stationLoads,
+    liftoffGates,
   };
   state.ground = ground;
   return ground;
@@ -717,20 +743,20 @@ export function applyGroundContact(
   const preliminarySurfaceOnRunway = contactSurface.onRunway;
 
   if (contactSurface.kind === 'unsupportedTerrain' && !state.ground.weightOnWheels) {
-    return setGroundState(state, groundAltFt, 'none', false, 0, undefined, undefined, false);
+    return setGroundState(state, groundAltFt, 'none', false, 0, undefined, undefined, false, false);
   }
 
   if (!atOrBelowGround && !hasWheelContact) {
-    return setGroundState(state, groundAltFt, 'none', false, 0);
+    return setGroundState(state, groundAltFt, 'none', false, 0, undefined, undefined, undefined, false);
   }
 
   if (!state.ground.weightOnWheels && state.position.alt >= groundAltFt && runwayDownMps < 0) {
-    return setGroundState(state, groundAltFt, 'none', false, 0);
+    return setGroundState(state, groundAltFt, 'none', false, 0, undefined, undefined, undefined, false);
   }
 
   if (options.allowLiftoff && gearAvailableForContact && state.ground.weightOnWheels) {
     state.position.alt = Math.max(state.position.alt, groundAltFt + 0.001);
-    return setGroundState(state, groundAltFt, 'none', false, 0);
+    return setGroundState(state, groundAltFt, 'none', false, 0, undefined, undefined, undefined, false, [], options.liftoffGates);
   }
 
   if (!gearAvailableForContact) {
@@ -803,5 +829,11 @@ export function applyGroundContact(
     touchdownSinkRateMps,
     finalSurfaceOnRunway,
     tailstrike,
+    loadedGearStations.map((station) => ({
+      stationId: station.id,
+      compressionM: station.compressionM,
+      normalForceN: station.normalForceN,
+    })),
+    options.liftoffGates,
   );
 }

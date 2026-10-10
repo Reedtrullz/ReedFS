@@ -35,6 +35,7 @@ function createRunwayState(options: {
   thetaRad?: number;
   psiRad?: number;
   velocity?: AircraftState['velocity'];
+  angularVel?: AircraftState['angularVel'];
 } = {}): AircraftState {
   const state = createInitialState(B737_800_SPEC);
   state.position = kseaPositionMeters(
@@ -49,6 +50,7 @@ function createRunwayState(options: {
   };
   state.quaternion = eulerToQuat(state.attitude.phi, state.attitude.theta, state.attitude.psi);
   state.velocity = options.velocity ?? { u: 0, v: 0, w: 0 };
+  state.angularVel = options.angularVel ?? { p: 0, q: 0, r: 0 };
   state.ground = {
     ...state.ground,
     groundAltFt: KSEA_RUNWAY_16L.elevationFt,
@@ -125,6 +127,26 @@ describe('computeWheelContactGeometry', () => {
 
     expect(rightMain.runwayClearanceM).toBeLessThan(leftMain.runwayClearanceM);
     expect(rightMain.runwayPenetrationM).toBeGreaterThan(leftMain.runwayPenetrationM);
+  });
+
+  it('supports one-main-wheel touchdown by separating left and right normal sink rates', () => {
+    const rightMainFirst = createRunwayState({
+      altitudeFt: KSEA_RUNWAY_16L.elevationFt + 9.59,
+      phiRad: 2 * Math.PI / 180,
+      velocity: { u: 70, v: 0, w: 0.8 },
+      angularVel: { p: 0.1, q: 0, r: 0 },
+    });
+    const surface = sampleSupportedAirportSurface(rightMainFirst.position);
+    const geometry = computeWheelContactGeometry(rightMainFirst, B737_800_SPEC, surface);
+
+    const leftMain = stationContactById(geometry, 'leftMain');
+    const rightMain = stationContactById(geometry, 'rightMain');
+
+    expect(leftMain.runwayPenetrationM).toBeCloseTo(0, 3);
+    expect(rightMain.runwayPenetrationM).toBeGreaterThan(0.1);
+    expect(rightMain.runwayNormalSinkRateMps).toBeGreaterThan(0);
+    expect(leftMain.runwayNormalSinkRateMps).toBeGreaterThan(0);
+    expect(rightMain.runwayNormalSinkRateMps).toBeGreaterThan(leftMain.runwayNormalSinkRateMps);
   });
 
   it('computes runway-normal sink rate from body velocity and attitude', () => {
