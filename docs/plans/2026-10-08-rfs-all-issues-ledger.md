@@ -459,6 +459,18 @@ GitHub: [#70](https://github.com/Reedtrullz/ReedFS/issues/70) · draft **RFS-12*
 
 **Issue acceptance retained:** Analytic forces/moments and angular accelerations match the selected conventions; quaternion norm stays bounded and results converge with timestep refinement. Revalidate takeoff, stall and AP envelopes after any correction.
 
+**Execution evidence (2026-10-10):**
+- PR #188 merged as 05a0ff2fb2f90d328e91a49929c55885beb6e80a; CI run 38057586962 green (CodeQL 38057586968, CI/CD all shards pass).
+- aero.ts: drag resolves opposite full air-relative velocity (dragBodyX/Y/Z = -D*(u,v,w)/V); lift perpendicular to it (liftBodyX = L*w/V, liftBodyZ = -L*u/V).
+- integrate.ts: velocity update sums all body components (thrust + drag + lift on each axis).
+- levelEquilibrium.ts: wind-axis residuals (cos(theta_w)=u/V, sin(theta_w)=w/V, axial T + D_x + L_x - W*sin(theta_w)).
+- New forceFrames.test.ts: 5 analytic tests (drag direction at AoA, lift perpendicularity, sideslip drag, integration components, thrust-vs-wind-axis-drag balance).
+- Envelope requalification (no tuning to hide frame error): gear-down full-elevator climb VS 4200->6600 fpm; level-equilibrium pitch drift 0.2 deg -> 0.3 deg; ENVA manual climb max pitch 18 -> 20 deg; ENVA manual climb max VS 4200 -> 6600 fpm.
+- E2E requalification: airborne MCP pitch <18 -> <20; descent approach throttle 0.65 -> 0.55 (corrected lift glides further).
+- envaClimbRegression stage-3 break now also accepts routeComplete (aircraft reaches final waypoint at t~895s before the leg-3 assertion threshold; valid terminal, not navigation failure).
+- 1303/1303 vitest, typecheck/lint/build/bundle clean locally; full sharded e2e+visual green in CI.
+- Non-claims: coupled inertia expressions (ixz cross-term) are out of scope; quaternion norm and timestep convergence fixtures were not added. These belong to the full issue acceptance and remain open.
+
 <a id="issue-71"></a>
 ## #71 — Make configuration changes and stall behavior continuous
 
