@@ -364,6 +364,31 @@ export const KSEA_RUNWAYS: RunwayReference[] = [KSEA_RUNWAY_16L, KSEA_RUNWAY_16C
 export const KPDX_RUNWAYS: RunwayReference[] = [KPDX_RUNWAY_10L, KPDX_RUNWAY_10R, KPDX_RUNWAY_03];
 export const SUPPORTED_RUNWAYS: RunwayReference[] = [...NORWAY_RUNWAYS, ...KSEA_RUNWAYS, ...KPDX_RUNWAYS];
 
+export type RunwayOverride = Partial<Pick<RunwayReference, 'start' | 'headingDeg' | 'elevationFt'>>;
+export type RunwayOverrides = Record<string, RunwayOverride>;
+
+/**
+ * Apply validated runway editor overrides to the static runway catalog.
+ * This is the single override definition shared by the renderer and physics
+ * surface sampling, so one edit moves both visual and contact geometry.
+ */
+export function applyRunwayOverrides(
+  runways: readonly RunwayReference[],
+  overrides: RunwayOverrides | null | undefined,
+): RunwayReference[] {
+  if (!overrides) return [...runways];
+  return runways.map((runway) => {
+    const override = overrides[`${runway.airport}-${runway.id}`];
+    if (!override) return runway;
+    return {
+      ...runway,
+      ...(override.start ? { start: { ...runway.start, ...override.start } } : {}),
+      ...(override.headingDeg !== undefined ? { headingDeg: override.headingDeg } : {}),
+      ...(override.elevationFt !== undefined ? { elevationFt: override.elevationFt } : {}),
+    };
+  });
+}
+
 export function runwayByAirportAndId(airport: string, runwayId: string): RunwayReference | undefined {
   return SUPPORTED_RUNWAYS.find(
     (runway) => runway.airport === airport && (runway.id === runwayId || runway.oppositeId === runwayId),

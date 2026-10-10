@@ -53,7 +53,7 @@ function routeEditSessionFor(fp: FlightPlan): RouteEditSession {
   );
 }
 
-export function createRouteSlice(set: SimStoreSet): Pick<SimStore, 'setFlightPlan' | 'setFlightPlanAtRunway' | 'setWind' | 'setWeather' | 'stageDirectTo' | 'stageInsertDiscontinuity' | 'undoRouteEditOperation' | 'executeRouteEdit'> {
+export function createRouteSlice(set: SimStoreSet): Pick<SimStore, 'setFlightPlan' | 'setFlightPlanAtRunway' | 'setWind' | 'setRunwayOverrides' | 'setWeather' | 'stageDirectTo' | 'stageInsertDiscontinuity' | 'undoRouteEditOperation' | 'executeRouteEdit'> {
   return {
     setFlightPlan: (fp) => set((s) => {
       if (!isFlightPlan(fp)) throw new TypeError('Invalid flight plan coordinates or data');
@@ -124,6 +124,7 @@ export function createRouteSlice(set: SimStoreSet): Pick<SimStore, 'setFlightPla
     }),
 
     setWind: (w) => set({ wind: w }),
+    setRunwayOverrides: (overrides) => set({ runwayOverrides: overrides }),
     setWeather: (w) => set({ weather: w }),
 
     stageDirectTo: (ident) => set((s) => {

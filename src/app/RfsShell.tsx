@@ -6,7 +6,6 @@ import { ControlsSettings } from '../components/ControlsSettings';
 import { Telemetry } from '../components/Telemetry';
 import type { Viewer as CesiumViewer } from 'cesium';
 import { getCesiumScenePolicy } from '../config/cesium';
-import type { RunwayLayerProps } from '../viewport/RunwayLayer';
 import type { CesiumSceneFailure } from '../viewport/CesiumViewport';
 import { LoadingScreen } from '../components/LoadingScreen';
 import { useSimLoop } from '../hooks/useSimLoop';
@@ -121,7 +120,7 @@ export function RfsShell() {
   const [viewerGeneration, setViewerGeneration] = useState(0);
   const [retryKey, setRetryKey] = useState(0);
   const [sceneFailure, setSceneFailure] = useState<CesiumSceneFailure | null>(null);
-  const [runwayOverrides, setRunwayOverrides] = useState<RunwayLayerProps['runwayOverrides']>(undefined);
+  const runwayOverrides = useSimStore((s) => s.runwayOverrides);
   const [routeLoadMessage, setRouteLoadMessage] = useState<string | null>(null);
 
   // Keyboard controls — tracks pressed keys for simultaneous input
@@ -354,7 +353,7 @@ export function RfsShell() {
           </Suspense>
           {showDebugOverlays && (
             <Suspense fallback={null}>
-              <RunwayEditor onOverridesChange={setRunwayOverrides} />
+              <RunwayEditor onOverridesChange={useSimStore.getState().setRunwayOverrides} />
             </Suspense>
           )}
           <Suspense key={`aircraft-${viewerGeneration}-${camMode}`} fallback={null}>
