@@ -12,6 +12,7 @@ import {
   KSEA_RUNWAY_ALT_FT,
 } from '../ground';
 import { B737_800_FDM } from '../../data/aircraft/b737-800-fdm.v1';
+import { integrate } from '../../physics/integrate';
 import { bodyToNed, nedToBody } from '../../physics/frames';
 import { eulerToQuat } from '../../physics/quaternion';
 import { KSEA_RUNWAY_16L } from '../../../viewport/runwayData';
@@ -58,6 +59,35 @@ describe('applyGroundContact', () => {
     expect(state.ground.contact).toBe('gear');
     expect(state.ground.onRunway).toBe(true);
     expect(state.ground.normalForceN).toBeGreaterThan(0);
+  });
+
+  it('deploys armed ground spoilers when weight settles and both throttles are idle', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.config.spoilersArmed = true;
+
+    integrate(state, { ...idle, spoilersArmed: true }, B737_800_SPEC, 1 / 60);
+
+    expect(state.config.spoilersDeployed).toBe(true);
+    expect(state.config.speedBrake).toBe(1);
+  });
+
+  it('does not auto-deploy armed ground spoilers while thrust is high or airborne', () => {
+    const rollingState = createInitialState(B737_800_SPEC);
+    rollingState.config.spoilersArmed = true;
+
+    integrate(rollingState, { ...idle, throttle1: 1, throttle2: 1, spoilersArmed: true }, B737_800_SPEC, 1 / 60);
+
+    expect(rollingState.config.spoilersDeployed).toBe(false);
+
+    const airborneState = createInitialState(B737_800_SPEC);
+    airborneState.config.spoilersArmed = true;
+    airborneState.ground.weightOnWheels = false;
+    airborneState.position.alt = KSEA_RUNWAY_ALT_FT + 1000;
+
+    integrate(airborneState, { ...idle, spoilersArmed: true }, B737_800_SPEC, 1 / 60);
+
+    expect(airborneState.config.spoilersDeployed).toBe(false);
+    expect(airborneState.config.speedBrake).toBe(0);
   });
 
   it('treats commanded-down but actually retracted gear as gear-up runway contact', () => {
@@ -762,6 +792,24 @@ describe('applyGroundContact', () => {
     expect(Math.abs(sideForces.sideForceN)).toBeLessThanOrEqual(45_000);
     expect(sideForces.frictionLimited).toBe(true);
     expect(sideForces.lateralAccelerationMps2).toBeCloseTo(sideForces.sideForceN / state.grossWeight, 8);
+  });
+
+  it('spends the side-force grip budget before brakes through the shared brake grip share', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.velocity.u = 35;
+    state.velocity.v = 1;
+    const gearStations = createB737GearStations(100_000, true);
+
+    const sideForces = computeTireSideForces(state, gearStations);
+    const gripShare = Math.max(0, 1 - Math.abs(sideForces.sideForceN) / sideForces.peakSideForceN);
+    const braking = { leftBrake: 1, rightBrake: 1 };
+    const freeBrakes = computeWheelBrakeForces(state, braking, gearStations, undefined, undefined, 1);
+    const sharedBrakes = computeWheelBrakeForces(state, braking, gearStations, undefined, undefined, gripShare);
+
+    expect(gripShare).toBeGreaterThan(0);
+    expect(gripShare).toBeLessThan(1);
+    expect(sharedBrakes.brakeForceN).toBeLessThan(freeBrakes.brakeForceN);
+    expect(sharedBrakes.brakeForceN).toBeCloseTo(freeBrakes.brakeForceN * gripShare, 0);
   });
 
   it('scales rolling resistance higher on off-runway ground than prepared runway', () => {

@@ -76,6 +76,27 @@ describe('updateEngines', () => {
     expect(s.engines[0].fuelFlow).toBeGreaterThan(100);
   });
 
+  it('produces idle-reverse thrust only when reverse is commanded on the ground at idle', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.engines[0].n1 = 30;
+    s.engines[1].n1 = 30;
+    s.engines[0].running = true;
+    s.engines[1].running = true;
+    updateEngines(s, { ...idle, reverse: -1 }, B737_800_SPEC, 0);
+
+    expect(s.engines[0].thrust).toBeLessThan(0);
+    expect(s.engines[1].thrust).toBeLessThan(0);
+    expect(s.engines[0].fuelFlow).toBeGreaterThan(0);
+
+    const airborne = createInitialState(B737_800_SPEC);
+    airborne.ground.weightOnWheels = false;
+    airborne.engines[0].n1 = 30;
+    airborne.engines[1].n1 = 30;
+    updateEngines(airborne, { ...idle, reverse: -1 }, B737_800_SPEC, 0);
+
+    expect(airborne.engines[0].thrust).toBeGreaterThanOrEqual(0);
+  });
+
   it('keeps engine spool, fuel-flow, and thrust-lapse parameters in the FDM shell', () => {
     const engine = (B737_800_FDM as unknown as { engine?: TestEngineModel }).engine;
 

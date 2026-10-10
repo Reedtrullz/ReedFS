@@ -195,8 +195,11 @@ function applyPilotConfiguration(
   const gearStep = configModel.gearTransitSeconds > 0 ? dt / configModel.gearTransitSeconds : 1;
   state.config.gearPosition = moveToward(state.config.gearPosition, gearTarget, Math.max(0, gearStep));
   state.config.gearDown = state.config.gearPosition >= 0.999;
-  state.config.spoilersDeployed = controls.spoilers > 0.5;
-  state.config.speedBrake = controls.spoilers;
+  const spoilerArmed = controls.spoilersArmed ?? state.config.spoilersArmed;
+  const autoSpoilerDeploy = spoilerArmed && weightOnWheels && controls.throttle1 <= 0.2 && controls.throttle2 <= 0.2;
+  state.config.spoilersArmed = spoilerArmed;
+  state.config.spoilersDeployed = controls.spoilers > 0.5 || autoSpoilerDeploy;
+  state.config.speedBrake = state.config.spoilersDeployed ? Math.max(controls.spoilers, 1) : controls.spoilers;
 }
 
 export function integrate(

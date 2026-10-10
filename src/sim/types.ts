@@ -97,6 +97,8 @@ export interface ControlInputs {
   flapLever: number;  // detent: 0, 1, 2, 5, 10, 15, 25, 30, 40
   gearLever: 'UP' | 'DOWN';
   spoilers: number;   // 0 to 1
+  spoilersArmed?: boolean;
+  reverse?: number;   // -1 idle reverse to 0 forward idle
   brake: number;      // 0 to 1
   leftBrake?: number;  // 0 to 1, optional side-specific override combined with brake
   rightBrake?: number; // 0 to 1, optional side-specific override combined with brake

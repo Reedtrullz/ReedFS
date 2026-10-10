@@ -76,6 +76,10 @@ export function applyDiscreteKeyAction(key: string): InputActions | null {
       return { gearToggle: true };
     case 'f':
       return { flapNext: true };
+    case 'k':
+      return { spoilerArmToggle: true };
+    case 'r':
+      return { reverseToggle: true };
     default:
       return null;
   }

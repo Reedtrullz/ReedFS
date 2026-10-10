@@ -134,12 +134,17 @@ export function updateEngines(
     for (let i = 0; i < 2; i++) {
       const eng = state.engines[i];
       const throttle = clamp(i === 0 ? inputs.throttle1 : inputs.throttle2, 0, 1);
+      const reverseIdle = (inputs.reverse ?? 0) < 0
+        && state.ground.weightOnWheels
+        && Math.max(inputs.throttle1, inputs.throttle2) <= 0.1;
       const fuelCutoff = i === 0 ? inputs.fuelCutoff1 : inputs.fuelCutoff2;
       const combusting = fuelAvailable && fuelCutoff !== true;
 
       // Fuel-on throttle spans idle to TOGA; shutdown is a separate command.
       const n1Target = combusting
-        ? engineModel.idleN1Percent + throttle * (engineModel.togaN1Percent - engineModel.idleN1Percent)
+        ? reverseIdle
+          ? engineModel.reverseIdleN1Percent
+          : engineModel.idleN1Percent + throttle * (engineModel.togaN1Percent - engineModel.idleN1Percent)
         : 0;
 
       // N1 spool: slower spool-down than spool-up
@@ -166,8 +171,11 @@ export function updateEngines(
         : atmosphere.tempC;
 
       // Fuel flow (kg/hr): SFC-based, using the same table-backed thrust source exposed to physics.
-      eng.thrust = combusting ? computeEngineThrustN(eng.n1, spec, state.position.alt, mach, engineModel) * relativeDensity : 0;
-      eng.fuelFlow = combusting ? eng.thrust * engineModel.fuelSfcKgPerNewtonHour : 0;
+      const forwardThrustN = computeEngineThrustN(eng.n1, spec, state.position.alt, mach, engineModel) * relativeDensity;
+      eng.thrust = combusting
+        ? (reverseIdle ? -forwardThrustN : forwardThrustN)
+        : 0;
+      eng.fuelFlow = combusting ? Math.abs(eng.thrust) * engineModel.fuelSfcKgPerNewtonHour : 0;
       eng.running = combusting && eng.n1 > 0.5;
     }
   }

@@ -79,6 +79,11 @@ describe('keyboardControls', () => {
     expect(applyDiscreteKeyAction('g')).toEqual({ gearToggle: true });
   });
 
+  it('dispatches K and R as spoiler-arm and reverse-toggle actions', () => {
+    expect(applyDiscreteKeyAction('k')).toEqual({ spoilerArmToggle: true });
+    expect(applyDiscreteKeyAction('r')).toEqual({ reverseToggle: true });
+  });
+
   it('uses the shared B737 flap detent sequence for keyboard flap cycling', () => {
     expect(B737_FLAP_DETENTS).toEqual([0, 1, 2, 5, 10, 15, 25, 30, 40]);
     expect(B737_FLAP_DETENTS.map(nextB737FlapDetent)).toEqual([1, 2, 5, 10, 15, 25, 30, 40, 0]);
