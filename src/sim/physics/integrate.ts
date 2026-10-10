@@ -6,7 +6,12 @@ import { updateEngines } from '../systems/engine';
 import { updateFuel } from '../systems/fuel';
 import { updateElectrical } from '../systems/electrical';
 import { updateHydraulic } from '../systems/hydraulic';
-import { applyGroundContact, constrainRunwayNormalVelocity, GROUND_CONTACT_EPSILON_FT } from '../systems/ground';
+import {
+  applyGroundContact,
+  constrainRunwayNormalVelocity,
+  GROUND_CONTACT_EPSILON_FT,
+  type LiftoffGateDiagnostics,
+} from '../systems/ground';
 import { geodeticToEcef, ecefToGeodetic, ecefToEnu, enuToEcef } from './geodesy';
 import { bodyToNed } from './frames';
 import { ftToM, ktToMs, mToFt } from './units';
@@ -170,6 +175,29 @@ function shouldAllowLiftoff(
   );
 }
 
+function liftoffGateDiagnostics(
+  allowLiftoff: boolean,
+  controls: ControlInputs,
+  state: AircraftState,
+  airspeedMps: number,
+  normalForceN: number,
+  weightN: number,
+): LiftoffGateDiagnostics {
+  const normalForceFraction = weightN > 0 ? normalForceN / weightN : 0;
+  return {
+    allowLiftoff,
+    hasDeliberateRotationInput: hasDeliberateRotationInput(controls),
+    normalForceN,
+    weightN,
+    normalForceFraction: clamp(normalForceFraction, 0, 1),
+    normalForceLimitN: weightN * LIFTOFF_NORMAL_FORCE_FRACTION,
+    minimumLiftoffSpeedMps: estimateMinimumLiftoffSpeedMps(state),
+    airspeedMps,
+    pitchRad: state.attitude.theta,
+    minimumPitchRad: MIN_LIFTOFF_PITCH_RAD,
+  };
+}
+
 function moveToward(current: number, target: number, maxStep: number): number {
   if (!Number.isFinite(current)) return target;
   if (Math.abs(target - current) <= maxStep) return target;
@@ -277,6 +305,14 @@ export function integrate(
   const allowLiftoff = state.ground.weightOnWheels
     && nearRunwaySurface
     && shouldAllowLiftoff(state, controls, airspeedMps, normalForceN, aero.weight);
+  const liftoffGates = liftoffGateDiagnostics(
+    allowLiftoff,
+    controls,
+    state,
+    airspeedMps,
+    normalForceN,
+    aero.weight,
+  );
 
   if (state.ground.weightOnWheels && nearRunwaySurface && !allowLiftoff) {
     constrainRunwayNormalVelocity(state);
@@ -320,6 +356,7 @@ export function integrate(
     airRelativeSpeedMps: airspeedMps,
     rotationReferenceSpeedMps,
     minimumSupportedNormalForceN: state.ground.weightOnWheels && !allowLiftoff ? aero.weight : 0,
+    liftoffGates,
   });
 
   // ── Config ──

@@ -82,6 +82,13 @@ export interface GroundState {
   contact: GroundContactType;
   tailstrike: boolean;
   gearStations: GearStationState[];
+  stationLoads?: WheelStationOleoLoad[];
+}
+
+export interface WheelStationOleoLoad {
+  stationId: GearStationState['id'];
+  compressionM: number;
+  normalForceN: number;
 }
 
 // ── Control Inputs ──

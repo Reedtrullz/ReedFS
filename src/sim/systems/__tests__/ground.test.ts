@@ -116,6 +116,83 @@ describe('applyGroundContact', () => {
     expect(contact.gearStations.reduce((sum, station) => sum + station.normalForceN, 0)).toBeCloseTo(120_000, 6);
   });
 
+  it('reports per-station oleo loads without changing the distributed static loads', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.position.alt = KSEA_RUNWAY_ALT_FT;
+    state.config.gearDown = true;
+
+    const contact = applyGroundContact(state, idle, 1 / 60, KSEA_RUNWAY_ALT_FT, { normalForceN: 120_000 });
+
+    expect(contact.stationLoads?.map((station) => station.stationId)).toEqual(['nose', 'leftMain', 'rightMain']);
+    expect(contact.stationLoads?.map((station) => station.normalForceN)).toEqual([12_000, 54_000, 54_000]);
+    expect(contact.stationLoads?.every((station) => station.compressionM > 0 && station.compressionM < 1)).toBe(true);
+  });
+
+  it('exposes liftoff-gate diagnostics for the release guardrails', () => {
+    const state = createInitialState(B737_800_SPEC);
+    state.position.alt = KSEA_RUNWAY_ALT_FT;
+    state.config.gearDown = true;
+    const weightN = (B737_800_SPEC.emptyWeight + B737_800_SPEC.maxFuel) * 9.80665;
+
+    const blocked = applyGroundContact(state, idle, 1 / 60, KSEA_RUNWAY_ALT_FT, {
+      normalForceN: 120_000,
+      liftoffGates: {
+        allowLiftoff: false,
+        hasDeliberateRotationInput: false,
+        normalForceN: 120_000,
+        weightN,
+        normalForceFraction: 1,
+        normalForceLimitN: weightN * 0.14,
+        minimumLiftoffSpeedMps: ktToMs(150),
+        airspeedMps: ktToMs(89),
+        pitchRad: 0,
+        minimumPitchRad: 3 * DEG_TO_RAD,
+      },
+    });
+
+    expect(blocked.liftoffGates).toEqual(expect.objectContaining({
+      allowLiftoff: false,
+      hasDeliberateRotationInput: false,
+      normalForceN: 120_000,
+      weightN,
+      normalForceFraction: 1,
+      normalForceLimitN: weightN * 0.14,
+      minimumLiftoffSpeedMps: ktToMs(150),
+      airspeedMps: ktToMs(89),
+      pitchRad: 0,
+      minimumPitchRad: 3 * DEG_TO_RAD,
+    }));
+    expect(blocked.contact).toBe('gear');
+    expect(blocked.stationLoads?.map((station) => station.stationId)).toEqual(['nose', 'leftMain', 'rightMain']);
+
+    const released = applyGroundContact(
+      state,
+      { ...idle, elevator: -1 },
+      1 / 60,
+      KSEA_RUNWAY_ALT_FT,
+      {
+        allowLiftoff: true,
+        normalForceN: 12_000,
+        liftoffGates: {
+          allowLiftoff: true,
+          hasDeliberateRotationInput: true,
+          normalForceN: 12_000,
+          weightN,
+          normalForceFraction: 12_000 / weightN,
+          normalForceLimitN: weightN * 0.14,
+          minimumLiftoffSpeedMps: ktToMs(150),
+          airspeedMps: ktToMs(150),
+          pitchRad: 8 * DEG_TO_RAD,
+          minimumPitchRad: 3 * DEG_TO_RAD,
+        },
+      },
+    );
+
+    expect(released.liftoffGates?.allowLiftoff).toBe(true);
+    expect(released.contact).toBe('none');
+    expect(released.stationLoads).toEqual([]);
+  });
+
   it('keeps nose gear loaded and clamps pitch below VR with neutral elevator', () => {
     const state = createInitialState(B737_800_SPEC);
     state.position.alt = KSEA_RUNWAY_ALT_FT;
