@@ -15,7 +15,10 @@ const BUDGETS = {
   // Lazy diagnostics and the physics worker remain counted in this whole app allowance.
   // Level-equilibrium solver increment (#136): measured 444.7 / 141.1 KiB at 7b387b5.
   // Adds 4.7 raw / 1.1 gzip KiB over the WMM2025 allowance; about 1% headroom remains.
-  app: { rawBytes: 448 * 1024, gzipBytes: 143 * 1024, required: true },
+  // Ground-contact diagnostics increment (#72 first increment): measured 448.6 / 141.8 KiB
+  // at 31ffb39; station loads, liftoff-gate telemetry, and wheel-contact fixtures add
+  // 3.9 raw / 0.7 gzip KiB, and the app budget re-measures with this feature increment.
+  app: { rawBytes: 450 * 1024, gzipBytes: 143 * 1024, required: true },
   // React/Zustand framework chunk baseline: raw 182.4 KiB / gzip 56.7 KiB.
   vendorReact: { rawBytes: 212 * 1024, gzipBytes: 66 * 1024, required: true },
   // Generic vendor chunk baseline: raw 3.5 KiB / gzip 1.5 KiB.
