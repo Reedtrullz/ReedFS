@@ -1123,6 +1123,14 @@ GitHub: [#83](https://github.com/Reedtrullz/ReedFS/issues/83) · draft **RFS-25*
 
 **Issue acceptance retained:** A runway position/elevation edit moves both visual and contact geometry; surface validity and stale samples are explicit. Hills/off-airport contact work only where trusted coverage exists; missing tiles never masquerade as known terrain.
 
+**Implementation receipt - first increment (2026-10-10):** [PR #193](https://github.com/Reedtrullz/ReedFS/pull/193) merged as `827021df51a49a096ee88bab3512fdb4b25c5787` (branch codex/rfs-83-surface-parity).
+
+- Scope landed: shared applyRunwayOverrides (src/viewport/runwayData.ts) consumed by the renderer and sampleSupportedAirportSurface; SimulationStepInput.runwayOverrides validated by isRunwayOverrides and threaded through the worker protocol to integrate(); store-owned runwayOverrides with setRunwayOverrides; RunwayEditor writes store state; unsupported terrain samples carry groundAltValid: false.
+- Gates: local tsc, ESLint (touched files), targeted Vitest 88/88 including new runwayOverrideParity.test.ts, production build and bundle budget on 827021d. PR CI fully green (test, e2e shards 1-3, docker-smoke, CodeQL, secret-scan, analyze; workflow runs 38078959411 and 38078959416). Master CI on 86b0cb4 green before queue entry (runs 38077080336, 38077080376).
+- Project item PVTI_lAHOAB-TC84BmFlSzg_L128 moved to In Progress after merge; issue reopened after an unexpected auto-close and stays open for residual scope.
+- Residual scope: bounded authoritative terrain tiles, runway slope/height datums with asynchronous sampling outside the deterministic fixed step, save/replay surface identity.
+- Non-claims: no terrain coverage beyond the airport catalog is asserted; groundAltValid: false marks placeholder truth and never claims known terrain.
+
 <a id="issue-84"></a>
 ## #84 — Build small, flyable airport environments
 
