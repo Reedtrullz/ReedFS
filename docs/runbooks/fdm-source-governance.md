@@ -84,6 +84,22 @@ To unblock any row, add a reviewed source packet with citation, license/redistri
 
 The `weather/atmosphere` group now has a separate [USSA 1976 source packet](ussa-1976-atmosphere-source-packet.md) and versioned shell at `src/sim/data/atmosphere/ussa-1976.v1.ts`. The generic dry-air reference is derived from permitted public-reference equations, with independent published holdouts and runtime-consumer tests. Its geometric/geopotential altitude domain, out-of-domain extrapolation and scenario-weather approximation are explicit. This changes no classification or source permission for the missing aircraft-specific groups above.
 
+## 2026-10-10 B737-800 engine takeoff-thrust anchor packet
+
+The engine static-thrust anchor is now source-qualified by the
+[FAA TCDS A16WE engine thrust packet](faa-tcds-a16we-b738-engine-thrust-packet.md).
+Source ID: `faa-tcds-a16we-rev45-b738-takeoff-thrust`; data group: `engine`;
+confidence: `derived-from-source` (manufacturer-published rating, exact
+runtime derivation). `computeEngineThrustN(100, spec, 0, 0.2)` is exactly
+`lbfToN(27,300)` for the modeled CFM56-7B27 rating; the placeholder lapse
+table's sea-level-static point is pinned to 1.0 for that exactness. Engine
+spool, EGT, fuel flow, the remaining lapse grid, and relative-density
+scaling stay `gameplay-calibrated placeholder` values under the
+`missing-b738-engine-lapse-source-packet` row, and the engine section keeps
+placeholder section metadata so no mixed-claim wording appears. This packet
+supports no climb, cruise, altitude, Mach, temperature, dispatch, AFM,
+certified-performance, or whole-issue #69 completion claim.
+
 ## 2026-06-17 Norway runway source packet
 
 The Norway-wide runway catalog in `src/viewport/norwayRunwayData.generated.ts` is a reviewed runway/airport source packet for simulator geometry, not for procedures, navigation, terrain, slope, displaced-threshold operations, or certified airport claims.

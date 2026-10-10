@@ -7,7 +7,6 @@ import type { WindInfo } from '../sim/weather';
 import type { ScenarioWeatherMetadata } from '../sim/weather';
 import { SCENARIOS, scenarioById } from '../sim/scenarios';
 import { B737_800_AIRCRAFT_DATA } from '../sim/data/aircraft/b737-800.v1';
-import { B737_800_FDM_DATA_VERSION } from '../sim/data/aircraft/b737-800-fdm.v1';
 import { isAircraftState, hasCoherentAttitude, isAutopilotCommands, isAutopilotControllerState, isAutopilotState, isControlInputs, isFiniteSimulationData, isFlightPlan, isWeather, isWind } from '../sim/simulationValidation';
 import type { SimStatus, SimStore } from './simStore';
 import { LEGACY_SCENARIO_MIDNIGHT_MS, SCENARIO_CLOCK_ID } from '../sim/scenarioClock';
@@ -23,7 +22,7 @@ type ScenarioSaveVersion = 1 | 2 | 3 | typeof SCENARIO_SAVE_VERSION;
 export const LEGACY_V3_SNAPSHOT_IDENTITIES = {
   aircraft: B737_800_AIRCRAFT_DATA.id,
   aircraftData: B737_800_AIRCRAFT_DATA.dataVersion,
-  fdmData: B737_800_FDM_DATA_VERSION,
+  fdmData: '1.0.0',
   sharedCommit: '810fc9652da431eaf8978b85bf4af131605559b5',
   clock: 'sim-time-ms/time-of-day-hours/v1',
 } as const;
