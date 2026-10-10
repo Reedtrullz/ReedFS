@@ -19,6 +19,7 @@ import { quatDerivative, quatNormalize, quatToEuler } from './quaternion';
 import type { WindInfo } from '../weather';
 import { scenarioUtcMs, utcHours } from '../scenarioClock';
 import { sampleSupportedAirportSurface } from '../runwaySurface';
+import type { RunwayOverrides } from '../../viewport/runwayData';
 import { computeAirRelativeVelocity } from '../systems/environment';
 
 const G = 9.80665;
@@ -233,6 +234,7 @@ export function integrate(
   dt: number,
   wind?: WindInfo | null,
   weather?: DensityAltitudeWeather | null,
+  runwayOverrides?: RunwayOverrides | null,
 ): void {
   // ── Systems (must run before aero so engine/fuel state is current) ──
   // Pilot-facing configuration controls must be visible to the same tick's aero solve.
@@ -295,7 +297,7 @@ export function integrate(
   state.velocity.v += vdot * dt;
   state.velocity.w += wdot * dt;
 
-  const preIntegrationSurface = sampleSupportedAirportSurface(state.position);
+  const preIntegrationSurface = sampleSupportedAirportSurface(state.position, runwayOverrides);
   const nearRunwaySurface = state.position.alt <= preIntegrationSurface.groundAltFt + GROUND_CONTACT_EPSILON_FT;
   const normalForceN = nearRunwaySurface ? estimateNormalForceN(state, aero) : 0;
   const airspeedMps = airRelativeSpeedMps(state, wind ?? null);
@@ -346,7 +348,7 @@ export function integrate(
   // ground surface as a post-solve constraint so free-flight equations and
   // wind/velocity sign conventions remain unchanged.
   const wasPostLandingTaxiBeforeGroundContact = state.flightPhase === 'TAXI' && hasLandingTouchdownRecord(state);
-  const groundSurface = sampleSupportedAirportSurface(state.position);
+  const groundSurface = sampleSupportedAirportSurface(state.position, runwayOverrides);
   const groundContact = applyGroundContact(state, controls, dt, groundSurface.groundAltFt, {
     allowLiftoff,
     normalForceN,

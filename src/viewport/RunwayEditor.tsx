@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ENVA_RUNWAY_09, SUPPORTED_RUNWAYS, type RunwayReference } from './runwayData';
-import type { RunwayLayerProps } from './RunwayLayer';
+import type { RunwayOverrides } from './runwayData';
 
 const NUDGE_STEPS_M = [1, 5, 10, 50, 100];
 const HEADING_STEPS_DEG = [0.1, 0.5, 1, 5];
@@ -11,7 +11,7 @@ const M_PER_DEG_LON = (lat: number) => 111_320 * Math.cos((lat * Math.PI) / 180)
 
 interface Props {
   /** Called when runway overrides change — pass this to RunwayLayer */
-  onOverridesChange: (overrides: RunwayLayerProps['runwayOverrides']) => void;
+  onOverridesChange: (overrides: RunwayOverrides | null) => void;
 }
 
 interface EditableRunway {
@@ -36,7 +36,7 @@ function toOverrideKey(rw: RunwayReference): string {
   return `${rw.airport}-${rw.id}`;
 }
 
-function toOverrides(rw: RunwayReference, ed: EditableRunway): RunwayLayerProps['runwayOverrides'] {
+function toOverrides(rw: RunwayReference, ed: EditableRunway): RunwayOverrides {
   return {
     [toOverrideKey(rw)]: {
       start: { lat: ed.lat, lon: ed.lon, altFt: ed.altFt },
