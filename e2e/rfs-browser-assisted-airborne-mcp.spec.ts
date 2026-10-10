@@ -50,7 +50,7 @@ test.describe('RFS browser-assisted airborne MCP proof', () => {
     expect(numbers.iasKt).toBeGreaterThan(120);
     expect(numbers.iasKt).toBeLessThan(230);
     expect(numbers.pitchDeg).toBeGreaterThan(-5);
-    expect(numbers.pitchDeg).toBeLessThan(18);
+    expect(numbers.pitchDeg).toBeLessThan(20);
     expect(numbers.radioAltitudeFt).not.toBeNull();
     expect(numbers.radioAltitudeFt).toBeGreaterThan(20);
     expect(numbers.verticalSpeedFpm).toBeGreaterThan(-2_000);

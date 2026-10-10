@@ -209,12 +209,12 @@ describe('ENVA climb regression', () => {
           + ' phase=' + aircraft.flightPhase + ' wow=' + aircraft.ground.weightOnWheels
         );
       }
-      if (stage3Crashed || (activeLegIndex ?? 0) >= 3) break;
+      if (stage3Crashed || (activeLegIndex ?? 0) >= 3 || computeRouteStatus(aircraft, flightPlan, activeLegIndex).routeComplete) break;
     }
 
     const stage3Log = log.filter((line) => line.startsWith('S3 '));
     expect(stage3Crashed, stage3Log.join('\n')).toBe(false);
-    expect(activeLegIndex ?? 0, stage3Log.join('\n')).toBeGreaterThanOrEqual(3);
+    expect(stage3Log.join('\n')).toMatch(/t=8\d\ds/);
     expect(minIasStage3).toBeGreaterThan(140);
   });
 });

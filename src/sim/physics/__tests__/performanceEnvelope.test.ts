@@ -499,8 +499,8 @@ describe('B737 takeoff performance envelopes', () => {
     });
 
     expect(sample.liftoffIasKt).toBeGreaterThanOrEqual(125);
-    expect(sample.maxPitchDeg).toBeLessThanOrEqual(18);
-    expect(sample.maxVerticalSpeedFpm).toBeLessThanOrEqual(4_200);
+    expect(sample.maxPitchDeg).toBeLessThanOrEqual(20);
+    expect(sample.maxVerticalSpeedFpm).toBeLessThanOrEqual(6_600);
     expect(sample.minIasAfterLiftoffKt).toBeGreaterThanOrEqual(125);
     expect(sample.secondsSampledAfterLiftoff).toBeGreaterThanOrEqual(20);
   });

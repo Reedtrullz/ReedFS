@@ -430,6 +430,13 @@ GitHub: [#69](https://github.com/Reedtrullz/ReedFS/issues/69) · draft **RFS-11*
 
 **Issue acceptance retained:** Every replaced group has citation, permission, confidence, units, applicability and independent acceptance tolerances. Tests distinguish preservation regressions from aircraft-validity evidence. No Boeing/AFM/training-grade claim without supporting evidence.
 
+
+### Implementation evidence (2026-10-10)
+
+**First increment — PR #187 merged:** Engine takeoff static-thrust anchor qualified to FAA TCDS A16WE Rev 45 (27,300 lbf). Governance packet added. FDM data version 1.1.0. Legacy persistence snapshot pinned to 1.0.0 identity. CI run 38048687074: all checks green. Merge commit 45d13e5d242dce41cdfd02d9498dd4fa9d8b50ff.
+
+**Residual scope retained:** Aero coefficients, gear/tires/brakes, performance envelope, remaining engine operating points, atmosphere model. Each requires its own qualifying source packet. Issue remains open.
+
 <a id="issue-70"></a>
 ## #70 — Audit force frames and rigid-body integration
 
