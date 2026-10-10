@@ -14,14 +14,35 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
-function effectiveElevatorInput(input: number, pitchRad: number, aeroModel: AeroModel): number {
+// Nose-up elevator authority fades for two independent reasons. Near the
+// active configuration stall boundary the separated wing wake blankets the
+// tail, so authority decays as linear lift approaches cl-max (provisional
+// 0.8-1.0 cl-max band, not source-qualified data). Beyond the pitch envelope
+// the simulator intentionally stops supporting nose-up rotation. Nose-down
+// push authority is never faded so stall recovery stays available.
+const FLOW_AUTHORITY_FADE_START = 0.8;
+
+function effectiveElevatorInput(
+  input: number,
+  aoaRad: number,
+  pitchRad: number,
+  polar: FlapPolar,
+  aeroModel: AeroModel,
+): number {
   if (input >= 0) return input;
-  const authority = clamp(
+  const linearCl = polar.clAlpha * (aoaRad - polar.alphaZeroLiftRad);
+  const stallProximity = linearCl / polar.clMax;
+  const flowAuthority = 1 - clamp(
+    (stallProximity - FLOW_AUTHORITY_FADE_START) / (1 - FLOW_AUTHORITY_FADE_START),
+    0,
+    1,
+  );
+  const envelopeAuthority = clamp(
     (aeroModel.elevator.noseUpFadeEndRad - pitchRad) / (aeroModel.elevator.noseUpFadeEndRad - aeroModel.elevator.noseUpFadeStartRad),
     0,
     1,
   );
-  return input * authority;
+  return input * flowAuthority * envelopeAuthority;
 }
 
 function finiteOrDefault(value: number, fallback: number): number {
@@ -196,7 +217,7 @@ export function computeAero(
 
   // --- Moments ---
   const qHat = state.angularVel.q * c / (2 * Math.max(tasMs, 1));
-  const elevatorDeflectionRad = effectiveElevatorInput(inputs.elevator, state.attitude.theta, aeroModel) * aeroModel.elevator.maxDeflectionRad;
+  const elevatorDeflectionRad = effectiveElevatorInput(inputs.elevator, aoa, state.attitude.theta, polar, aeroModel) * aeroModel.elevator.maxDeflectionRad;
   const cmTrim = stabilizerTrimMomentCoefficient(state.config.stabilizerTrimUnits, aeroModel);
   const cmCg = cgPitchMomentCoefficient(state, spec, effectiveCl);
   const cm = aeroModel.cm0 + polar.deltaCm + aeroModel.cmAlpha * aoa + aeroModel.cmElevator * elevatorDeflectionRad + cmTrim + cmCg + aeroModel.cmq * qHat;
