@@ -325,4 +325,32 @@ describe('computeAero', () => {
     expect(tailwindAero.drag).toBeGreaterThan(0);
     expect(tailwindAero.dragBodyX).toBeGreaterThan(0);
   });
+
+  it('fades nose-up elevator by flow AoA toward stall while keeping the pitch envelope limit', () => {
+    const polar = B737_AERO.flapPolars[0];
+    const aoaForProximity = (proximity: number) => (proximity * polar.clMax) / polar.clAlpha + polar.alphaZeroLiftRad;
+    const fullPullMoment = (aoaRad: number, pitchRad: number) => {
+      const s = createInitialState(B737_800_SPEC);
+      s.velocity.u = 90 * Math.cos(aoaRad);
+      // Match the model convention aoa = atan2(w, |u| + 0.01) exactly.
+      s.velocity.w = Math.tan(aoaRad) * (90 * Math.cos(aoaRad) + 0.01);
+      s.attitude.theta = pitchRad;
+      const withPull = computeAero(s, { ...cruise, elevator: -1, throttle1: 0, throttle2: 0 }, B737_800_SPEC).pitchMoment;
+      const neutral = computeAero(s, { ...cruise, elevator: 0, throttle1: 0, throttle2: 0 }, B737_800_SPEC).pitchMoment;
+      return withPull - neutral;
+    };
+
+    // Elevator -1 is full nose-up. The moment contribution scales exactly
+    // with the authority fade applied to the deflection.
+    const fullAuthority = fullPullMoment(aoaForProximity(0.5), 0);
+
+    expect(fullAuthority).toBeGreaterThan(0);
+    expect(fullPullMoment(aoaForProximity(0.5), 7 * Math.PI / 180)).toBeCloseTo(fullAuthority, 3);
+
+    const halfAuthority = fullPullMoment(aoaForProximity(0.9), 0);
+    expect(Math.abs(halfAuthority / fullAuthority - 0.5)).toBeLessThan(1e-5);
+    expect(fullPullMoment(aoaForProximity(1.4), 0)).toBe(0);
+
+    expect(fullPullMoment(aoaForProximity(0.5), 13 * Math.PI / 180)).toBe(0);
+  });
 });
