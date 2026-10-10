@@ -493,6 +493,14 @@ GitHub: [#71](https://github.com/Reedtrullz/ReedFS/issues/71) · draft **RFS-13*
 
 **Issue acceptance retained:** Flap transit produces no force discontinuity; clean/landing stalls, recovery, steep turns and sideslip remain finite and explainable. Preserve explicit limits on unsupported high-AoA/backward-flight behavior.
 
+**Execution evidence (2026-10-10):**
+- PR #190 merged as a3e452eb01c401dae184354ff1d57d357cf2e52e; branch commit f9ff7cf. Issue #71 closed as COMPLETED on merge.
+- aero.ts: effectiveElevatorInput multiplies a new flow fade (authority decays linearly from 0.8 cl-max to 1.0 cl-max of the active flap polar's linear lift; provisional band marked in source, #69 owns calibration) by the kept 8-12.5 deg pitch-envelope fade; nose-down push is never faded.
+- New relative-structure test in src/sim/physics/__tests__/aero.test.ts; pre-existing over-rotation guards pass unchanged, so no e2e bounds requalification was needed.
+- Local gates green: typecheck, lint, 1304/1304 vitest, build, bundle.
+- CI run 38066529702: secret-scan, CodeQL, unit test, e2e shards 1/3 and 3/3 pass. Shard 2/3 failed twice on the single documented fixture-family case rfs-heading-reference.spec.ts (startup-predicate 15 s timeout under runner load, both attempts, all other specs passing). The AGENT_WORKFLOW.md one-rerun rule was applied; disclosure comment 6100131354 records it. No test weakened, no timeout raised.
+- Non-claims: the 0.8-1.0 cl-max flow-fade band is provisional until #69 sources it; stall/buffet cue acceptance belongs to #69; compressibility behavior belongs to #138.
+
 <a id="issue-74"></a>
 ## #74 — Give the engines correct idle semantics and weather-consistent thrust
 
