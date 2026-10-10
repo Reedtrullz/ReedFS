@@ -387,6 +387,9 @@ export interface TelemetryViewModel {
   grossWeightKg: number;
   flapSetting: number;
   gearDown: boolean;
+  spoilerArmed: boolean;
+  spoilerDeployed: boolean;
+  reverseIdle: boolean;
 }
 
 let lastTelemetryVm: TelemetryViewModel | null = null;
@@ -418,6 +421,11 @@ export function selectTelemetryViewModel(s: SimStore): TelemetryViewModel {
     grossWeightKg: s.aircraft.grossWeight,
     flapSetting: s.aircraft.config.flapSetting,
     gearDown: s.aircraft.config.gearDown,
+    spoilerArmed: s.aircraft.config.spoilersArmed,
+    spoilerDeployed: s.aircraft.config.spoilersDeployed,
+    reverseIdle: (s.effectiveControls.reverse ?? 0) < 0
+      && Math.max(s.effectiveControls.throttle1, s.effectiveControls.throttle2) <= 0.1
+      && s.aircraft.ground.weightOnWheels,
   };
   if (shallowEqualRecord(lastTelemetryVm, next)) return lastTelemetryVm as TelemetryViewModel;
   lastTelemetryVm = next;

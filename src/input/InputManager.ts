@@ -36,6 +36,8 @@ export interface InputActions {
   flapNext?: boolean;
   /** Edge-triggered request to toggle commanded gear UP/DOWN. */
   gearToggle?: boolean;
+  spoilerArmToggle?: boolean;
+  reverseToggle?: boolean;
 }
 
 export interface InputManagerState {
@@ -151,6 +153,8 @@ export function mergeInputActions(...actions: Array<InputActions | null | undefi
   let trimRate: number | undefined;
   let flapNext = false;
   let gearToggle = false;
+  let spoilerArmToggle = false;
+  let reverseToggle = false;
 
   for (const action of actions) {
     if (!action) continue;
@@ -167,6 +171,8 @@ export function mergeInputActions(...actions: Array<InputActions | null | undefi
     trimRate = sumDefined(trimRate, action.trimRate);
     flapNext = flapNext || action.flapNext === true;
     gearToggle = gearToggle || action.gearToggle === true;
+    spoilerArmToggle = spoilerArmToggle || action.spoilerArmToggle === true;
+    reverseToggle = reverseToggle || action.reverseToggle === true;
   }
 
   const merged: InputActions = {};
@@ -183,6 +189,8 @@ export function mergeInputActions(...actions: Array<InputActions | null | undefi
   if (trimRate !== undefined) merged.trimRate = clampSigned(trimRate);
   if (flapNext) merged.flapNext = true;
   if (gearToggle) merged.gearToggle = true;
+  if (spoilerArmToggle) merged.spoilerArmToggle = true;
+  if (reverseToggle) merged.reverseToggle = true;
   return merged;
 }
 

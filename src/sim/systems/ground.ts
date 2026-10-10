@@ -308,6 +308,7 @@ export function computeWheelBrakeForces(
   gearStations: GearStationState[] = state.ground.gearStations,
   surface?: GroundSurfaceSample,
   groundModel: GroundModelData = B737_GROUND_MODEL,
+  brakeGripShare?: number,
 ): WheelBrakeForceBreakdown {
   let brakeNormalForceN = 0;
   let requestedBrakeForceN = 0;
@@ -321,16 +322,16 @@ export function computeWheelBrakeForces(
   const rollingForBraking = longitudinalForceDirection !== 0;
   const frictionScale = frictionScaleForSurface(surface);
   const stationForces: WheelBrakeStationForce[] = [];
-
   for (const station of gearStations) {
     const normalForceN = station.weightOnWheel && station.brakeCapable ? Math.max(0, station.normalForceN) : 0;
     const brakeCommand = brakeCommandForStation(command, station);
     const requestedStationBrakeForceN = brakeCommand * groundModel.friction.maxBrakeCoefficient * normalForceN;
     const availableStationBrakeForceN = groundModel.friction.maxBrakeFrictionCoefficient * frictionScale.brake * normalForceN;
-    const stationAntiSkidLimited = rollingForBraking && useAntiSkid && requestedStationBrakeForceN > availableStationBrakeForceN + 1e-9;
+    const shareLimitedStationBrakeForceN = availableStationBrakeForceN * (brakeGripShare ?? 1);
+    const stationAntiSkidLimited = rollingForBraking && useAntiSkid && requestedStationBrakeForceN > shareLimitedStationBrakeForceN + 1e-9;
     const stationBrakeForceN = rollingForBraking
       ? useAntiSkid
-        ? Math.min(requestedStationBrakeForceN, availableStationBrakeForceN)
+        ? Math.min(requestedStationBrakeForceN, shareLimitedStationBrakeForceN)
         : requestedStationBrakeForceN
       : 0;
 
@@ -374,6 +375,7 @@ export function computeGroundRollForces(
   gearStations: GearStationState[] = state.ground.gearStations,
   surface?: GroundSurfaceSample,
   groundModel: GroundModelData = B737_GROUND_MODEL,
+  brakeGripShare?: number,
 ): GroundRollForceBreakdown {
   const loadedStations = gearStations.filter((station) => station.weightOnWheel);
   const rollingNormalForceN = loadedStations.reduce((sum, station) => sum + Math.max(0, station.normalForceN), 0);
@@ -384,6 +386,7 @@ export function computeGroundRollForces(
     gearStations,
     surface,
     groundModel,
+    brakeGripShare,
   );
   const rollingFrictionForceN = groundModel.friction.rollingFrictionCoefficient * frictionScale.rolling * rollingNormalForceN;
   const retardingForceN = rollingFrictionForceN + brakeForces.brakeForceN;
@@ -567,6 +570,7 @@ function applyLongitudinalGroundDecel(
   gearStations: GearStationState[],
   surface?: GroundSurfaceSample,
   groundModel: GroundModelData = B737_GROUND_MODEL,
+  brakeGripShare?: number,
 ): void {
   const speed = state.velocity.u;
   const breakawayThrust = hasBreakawayThrustCommand(inputs, groundModel);
@@ -576,7 +580,7 @@ function applyLongitudinalGroundDecel(
     return;
   }
 
-  const forces = computeGroundRollForces(state, inputs, gearStations, surface, groundModel);
+  const forces = computeGroundRollForces(state, inputs, gearStations, surface, groundModel, brakeGripShare);
   const decel = forces.accelerationMps2 * Math.max(0, dt);
   state.angularVel.r += forces.yawAccelerationRadps2 * Math.max(0, dt);
 
@@ -779,7 +783,11 @@ export function applyGroundContact(
   applyTouchdownDamping(state, touchdownSinkRateMps ?? 0, groundModel);
   loadedGearStations = applyNosewheelSteering(state, inputs, loadedGearStations, groundModel);
   applyTireSideForces(state, dt, loadedGearStations, contactSurface, groundModel);
-  applyLongitudinalGroundDecel(state, inputs, dt, loadedGearStations, contactSurface, groundModel);
+  const sideForceBudget = computeTireSideForces(state, loadedGearStations, contactSurface, groundModel);
+  const sideUtilization = sideForceBudget.peakSideForceN > 0
+    ? Math.abs(sideForceBudget.sideForceN) / sideForceBudget.peakSideForceN
+    : 0;
+  applyLongitudinalGroundDecel(state, inputs, dt, loadedGearStations, contactSurface, groundModel, Math.max(0, 1 - sideUtilization));
   if (Math.abs(state.velocity.u) <= groundModel.friction.stopEpsilonMps && !hasBreakawayThrustCommand(inputs, groundModel)) {
     state.velocity.u = 0;
   }

@@ -17,6 +17,8 @@ describe('controlBindings', () => {
       'differentialBrake',
       'gear',
       'flaps',
+      'groundSpoilers',
+      'reverseIdle',
       'trim',
       'camera',
       'overlay',
