@@ -910,7 +910,14 @@ GitHub: [#99](https://github.com/Reedtrullz/ReedFS/issues/99) · draft **RFS-41*
 
 **Issue acceptance retained:** Invalid/missing assets leave the current aircraft usable; stale load completion cannot replace a newer selection. Repeated selection/unload releases owned resources. Desktop/mobile visual checks verify scale, framing, animation and nonblank output within measured budgets.
 
-<a id="issue-133"></a>
+**Implementation receipt - first increment (2026-10-11):** [PR #206](https://github.com/Reedtrullz/ReedFS/pull/206) merged as ad0cdbd4dd4f715194402baf5cffb3efc8b4f62a (branch codex/rfs-99-asset-preflight), before issue #99 closure. CI run 38146910678 attempt 1 failed only the test:visual timing budget (80.7s vs 80s, all six tests passed) and attempt 2 failed only e2e shard 2 on the known heading-reference flake; both are disclosed flake classes. Attempt 3 passed test, secret-scan, e2e shards 1 and 3, and CodeQL; shard 2 hit the same heading-reference flake class again after the one rerun for this class, disclosed at PR comment 6110687638 and merged per green-or-disclosed protocol.
+
+- Scope landed: `src/viewport/aircraftAssetManifest.ts` defines the `AircraftModelManifest` contract (unit meters, +Y forward/+Z up axes, eye point, 23 required nodes, material budget, licenses) and `validateAircraftModelManifest`; `AircraftRenderer` rejects violating models before admission with a clear constructor error; the cockpit layer opts out; manifest and renderer admission/rejection tests added. App bundle allowance re-measured 459 -> 461 KiB (gzip stays 146; measured 460.5/145.5 KiB).
+- Local gates at 49d3b5f: tsc, ESLint, full Vitest 1343/1343 across 156 files, production build, bundle budget, visual 6/6.
+- Residual scope: optional GLB probe/cancellation/fallback, profile-asset integration after #93, measured LODs, physical desktop/mobile acceptance.
+- Non-claims: no GLB probing landed, no LODs, no physical device acceptance; deterministic CI green is not a deployment. Issue #99 stays open; Project item moved to In Progress.
+
+ <a id="issue-133"></a>
 ## #133 — Add pilot barometric settings and transition-aware indications
 
 GitHub: [#133](https://github.com/Reedtrullz/ReedFS/issues/133) · draft **RFS-75** · **W04: Workspace, input, cockpit and model contracts** · current **Intake / P1 / M / Needs validation**
