@@ -21,6 +21,9 @@ const BUDGETS = {
   // Loading-sheet increment (#75 first increment): measured 450.7 / 142.6 KiB on
   // codex/rfs-75-mass-balance; loading telemetry, engine yaw arm, and tests add 0.7
   // raw KiB over the #72 allowance. Budget re-measures per campaign convention.
+  // Braking-chain increment (#73 first increment): measured 450.6 / 142.5 KiB at a1bcb97;
+  // reverse thrust, armed ground spoilers, and coupled-braking telemetry add 2.0 raw
+  // KiB over the #72 allowance while gzip improves by 0.5 KiB. Budget re-measures.
   app: { rawBytes: 452 * 1024, gzipBytes: 143 * 1024, required: true },
   // React/Zustand framework chunk baseline: raw 182.4 KiB / gzip 56.7 KiB.
   vendorReact: { rawBytes: 212 * 1024, gzipBytes: 66 * 1024, required: true },

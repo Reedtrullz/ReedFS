@@ -45,6 +45,8 @@ export function Telemetry() {
         : `${(vm.asymmetricThrustYawMomentNm / 1000).toFixed(1)} kN·m`)}
       {row('FLAPS', `${vm.flapSetting}°`)}
       {row('GEAR', vm.gearDown ? 'DN' : 'UP')}
+      {row('SPLR', vm.spoilerDeployed ? 'DEPLOYED' : vm.spoilerArmed ? 'ARMED' : 'OFF')}
+      {row('REV', vm.reverseIdle ? 'IDLE' : 'FWD')}
     </div>
   );
 }

@@ -1057,6 +1057,13 @@ GitHub: [#73](https://github.com/Reedtrullz/ReedFS/issues/73) · draft **RFS-15*
 
 **Issue acceptance retained:** Compare manual/autobrake/RTO stopping runs, dry/wet bounds, asymmetric braking and airborne reverse inhibition. Brake forces cannot add energy; all new modes are visible and the current RETARD/rollout sequence remains observable.
 
+**Implementation receipt - first increment (2026-10-11):** [PR #196](https://github.com/Reedtrullz/ReedFS/pull/196) merged as `ab2070e` sequence head (branch codex/rfs-73-braking-chain), before issue #73 closure.
+
+- Scope landed: idle-reverse interlock (weight-on-wheels + both throttles <= 0.1 + reverse command below zero) with negative thrust and |thrust|-based fuel flow in src/sim/systems/engine.ts; armed ground spoilers and reverse toggle input plumbing (controlBindings, keyboardControls, InputManager, mergeInputActions, simStoreInputReducers) with e.repeat guards for g/f/k/r; coupled brake grip share from tire-side utilization (computeTireSideForces -> applyGroundContact -> brakeGripShare) in src/sim/systems/ground.ts; SPLR/REV telemetry rows.
+- Gates: local tsc, ESLint, Vitest (763 sim/input tests), production build and bundle allowance re-measure on branch head. CI workflow 38097543827: test/shards 1+3/CodeQL/secret/analyze green; shard 2 failed twice on the documented heading-reference fixture family; the final serialized rerun attempt is disclosed on the PR with startup-artifact and trace evidence (predicate satisfied at 12.7s on attempt; retry trace ends inside the first observe() with GPU ReadPixels stalls), and master run 38096885346 failed identically on the same commit window while the content-identical #195 branch run 38094566809 passed 40 minutes earlier. Master rerun passed. No test weakening; no timeout change.
+- Residual scope: reverse thrust above idle, autobrake/disarm modes, RTO-specific brake schedule, brake-energy modeling, asymmetric braking comparison evidence, airborne reverse rejection observability.
+- Non-claims: no Boeing reverser geometry or bleed/spoiler deployment logic asserted; braking grip coupling is a friction-budget share, not tire-model data; CI shard-2 failure is attributed to environment by evidence, not proven by local reproduction on the exact CI host.
+
 <a id="issue-80"></a>
 ## #80 — Replace flat gust waves with a spatial, repeatable atmosphere
 

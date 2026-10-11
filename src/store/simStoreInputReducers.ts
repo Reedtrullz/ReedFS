@@ -125,6 +125,8 @@ export function controlPatchFromInputManager(
   }
   if (actions.flapNext) patch.flapLever = nextB737FlapDetent(current.flapLever);
   if (actions.gearToggle) patch.gearLever = current.gearLever === 'UP' ? 'DOWN' : 'UP';
+  if (actions.spoilerArmToggle) patch.spoilersArmed = !(current.spoilersArmed ?? false);
+  if (actions.reverseToggle) patch.reverse = (current.reverse ?? 0) < 0 ? 0 : -1;
 
   return patch;
 }

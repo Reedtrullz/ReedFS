@@ -76,6 +76,7 @@ export interface EngineModelData extends FdmSourceMetadata {
   idleN1Percent: number;
   togaN1Percent: number;
   idleN2Percent: number;
+  reverseIdleN1Percent: number;
   n2PerN1Percent: number;
   spoolUpTimeConstantSeconds: number;
   spoolDownTimeConstantSeconds: number;
