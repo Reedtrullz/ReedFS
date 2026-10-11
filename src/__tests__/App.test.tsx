@@ -367,6 +367,11 @@ vi.mock('three', () => {
   };
 });
 
+vi.mock('../viewport/aircraftAssetManifest', () => ({
+  BOEING_737_MODEL_MANIFEST: {},
+  validateAircraftModelManifest: vi.fn(() => []),
+}));
+
 vi.mock('three-to-cesium', () => ({
   default: vi.fn(() => ({
     add: vi.fn(),

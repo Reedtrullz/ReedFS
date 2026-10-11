@@ -42,7 +42,7 @@ export function CockpitLayer({ viewerRef, onSceneFailure }: CockpitLayerProps) {
     ttc.threeScene.add(ambient);
     ttc.threeScene.add(panelLight);
     ttc.threeScene.add(panelLight.target);
-    const cockpitRenderer = new AircraftRenderer(ttc, createCockpitModel);
+    const cockpitRenderer = new AircraftRenderer(ttc, createCockpitModel, { manifest: undefined });
     const pointerCleanup = installCockpitPointerInteractions({
       scene: ttc.threeScene,
       camera: ttc.threeCamera,

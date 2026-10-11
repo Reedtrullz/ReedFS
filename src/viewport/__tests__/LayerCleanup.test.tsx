@@ -49,6 +49,11 @@ vi.mock('../CockpitModel', () => ({
   })),
 }));
 
+vi.mock('../aircraftAssetManifest', () => ({
+  BOEING_737_MODEL_MANIFEST: {},
+  validateAircraftModelManifest: vi.fn(() => []),
+}));
+
 vi.mock('cesium', () => ({
   Cartesian3: { fromDegrees: vi.fn(() => ({ x: 0, y: 0, z: 0 })) },
   Transforms: { eastNorthUpToFixedFrame: vi.fn(() => ({})) },
