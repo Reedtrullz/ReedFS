@@ -18,7 +18,10 @@ const BUDGETS = {
   // Ground-contact diagnostics increment (#72 first increment): measured 448.6 / 141.8 KiB
   // at 31ffb39; station loads, liftoff-gate telemetry, and wheel-contact fixtures add
   // 3.9 raw / 0.7 gzip KiB, and the app budget re-measures with this feature increment.
-  app: { rawBytes: 450 * 1024, gzipBytes: 143 * 1024, required: true },
+  // Loading-sheet increment (#75 first increment): measured 450.7 / 142.6 KiB on
+  // codex/rfs-75-mass-balance; loading telemetry, engine yaw arm, and tests add 0.7
+  // raw KiB over the #72 allowance. Budget re-measures per campaign convention.
+  app: { rawBytes: 452 * 1024, gzipBytes: 143 * 1024, required: true },
   // React/Zustand framework chunk baseline: raw 182.4 KiB / gzip 56.7 KiB.
   vendorReact: { rawBytes: 212 * 1024, gzipBytes: 66 * 1024, required: true },
   // Generic vendor chunk baseline: raw 3.5 KiB / gzip 1.5 KiB.
