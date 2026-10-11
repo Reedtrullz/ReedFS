@@ -4,6 +4,8 @@ import { eulerToQuat } from '../../sim/physics/quaternion';
 import { B737_800_SPEC, createInitialState, type AircraftState, type Attitude } from '../../sim/types';
 import { AircraftRenderer } from '../AircraftRenderer';
 import { createCockpitModel } from '../CockpitModel';
+import { createBoeing737Model } from '../AircraftModel';
+import { BOEING_737_MODEL_MANIFEST } from '../aircraftAssetManifest';
 
 type FakeBridge = {
   add: ReturnType<typeof vi.fn<(object: THREE.Object3D, position?: unknown) => THREE.Group>>;
@@ -49,10 +51,35 @@ function createBridge() {
 }
 
 describe('AircraftRenderer', () => {
+  it('admits the default Boeing model against the declared manifest contract', () => {
+    const { bridge } = createBridge();
+    const renderer = new AircraftRenderer(bridge);
+
+    expect(() => renderer.render(aircraftAt())).not.toThrow();
+  });
+
+  it('rejects a model missing required manifest nodes instead of silently rendering it', () => {
+    const { bridge } = createBridge();
+    const degraded = createBoeing737Model();
+    degraded.getObjectByName('leftEngine')?.removeFromParent();
+
+    expect(() => new AircraftRenderer(bridge, () => degraded)).toThrow('missing required node: leftEngine');
+  });
+
+  it('rejects a model whose material count exceeds the manifest budget', () => {
+    const { bridge } = createBridge();
+    const bloated = new THREE.Group();
+    for (let index = 0; index < BOEING_737_MODEL_MANIFEST.materialBudget + 1; index += 1) {
+      bloated.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial()));
+    }
+
+    expect(() => new AircraftRenderer(bridge, () => bloated)).toThrow(/material budget exceeded/);
+  });
+
   it('releases owned resources even when an already-retired bridge cannot remove the model', () => {
     const { bridge } = createBridge(); const geometry = new THREE.BoxGeometry(); const material = new THREE.MeshBasicMaterial();
     const released = vi.spyOn(geometry, 'dispose'); const releasedMaterial = vi.spyOn(material, 'dispose');
-    const renderer = new AircraftRenderer(bridge, () => new THREE.Group().add(new THREE.Mesh(geometry, material)));
+    const renderer = new AircraftRenderer(bridge, () => new THREE.Group().add(new THREE.Mesh(geometry, material)), { manifest: undefined });
     renderer.render(aircraftAt()); bridge.remove.mockImplementation(() => { throw new Error('Retired bridge'); });
     expect(() => renderer.dispose()).toThrow('Retired bridge');
     expect(released).toHaveBeenCalledTimes(1); expect(releasedMaterial).toHaveBeenCalledTimes(1);
@@ -64,7 +91,7 @@ describe('AircraftRenderer', () => {
     const first = new THREE.MeshStandardMaterial({ map: texture }); const second = new THREE.MeshStandardMaterial({ map: texture });
     model.add(new THREE.Mesh(geometry, first), new THREE.Mesh(geometry, [first, second]));
     const dispose = [geometry, texture, first, second].map((resource) => vi.spyOn(resource, 'dispose'));
-    const renderer = new AircraftRenderer(bridge, () => model); renderer.render(aircraftAt()); renderer.dispose(); renderer.dispose();
+    const renderer = new AircraftRenderer(bridge, () => model, { manifest: undefined }); renderer.render(aircraftAt()); renderer.dispose(); renderer.dispose();
     expect(dispose.map((spy) => spy.mock.calls.length)).toEqual([1, 1, 1, 1]);
     renderer.render(aircraftAt()); expect(bridge.add).toHaveBeenCalledTimes(1); expect(bridge.remove).toHaveBeenCalledTimes(1);
   });
@@ -111,7 +138,7 @@ describe('AircraftRenderer', () => {
 
   it('rotates a cockpit model shell with aircraft heading instead of leaving its station offset in parent ENU', () => {
     const { bridge, wrapper } = createBridge();
-    const renderer = new AircraftRenderer(bridge, createCockpitModel);
+    const renderer = new AircraftRenderer(bridge, createCockpitModel, { manifest: undefined });
 
     renderer.render(aircraftAt({ attitude: { phi: 0, theta: 0, psi: Math.PI / 2 } }));
     wrapper.updateMatrixWorld(true);

@@ -6,11 +6,16 @@ import { quatToEuler } from '../sim/physics/quaternion';
 import { createAircraftModelQuaternion } from './aircraftOrientation';
 import { applyAircraftModelAnimations } from './aircraftModelAnimation';
 import { createBoeing737Model } from './AircraftModel';
+import { BOEING_737_MODEL_MANIFEST, validateAircraftModelManifest } from './aircraftAssetManifest';
+import type { AircraftModelManifest } from './aircraftAssetManifest';
 
 type ThreeToCesiumBridge = Pick<ReturnType<typeof ThreeToCesium>, 'add' | 'remove' | 'update'>;
 
 /** The factory creates resources owned by this renderer; cached/shared packs need their own release contract. */
 type AircraftModelFactory = () => THREE.Group;
+
+/** Exhaustive manifest admission; absent manifest skips validation for cockpit and non-contract models. */
+type AircraftModelContract = { manifest?: AircraftModelManifest };
 
 function cesiumMatrixToThreeMatrix(matrix: Cesium.Matrix4): THREE.Matrix4 {
   const m = matrix as unknown as ArrayLike<number>;
@@ -44,8 +49,13 @@ export class AircraftRenderer {
   constructor(
     private readonly bridge: ThreeToCesiumBridge,
     modelFactory: AircraftModelFactory = createBoeing737Model,
+   modelContract: AircraftModelContract = { manifest: BOEING_737_MODEL_MANIFEST },
   ) {
     this.model = modelFactory();
+    if (modelContract.manifest) {
+      const violations = validateAircraftModelManifest(this.model, modelContract.manifest);
+      if (violations.length > 0) throw new Error(`Aircraft model rejected: ${violations.join('; ')}`);
+    }
   }
 
   render(aircraft: AircraftState, controls?: Partial<ControlInputs>): void {
