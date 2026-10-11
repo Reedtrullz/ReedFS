@@ -16,6 +16,7 @@ import type { AudioCaptionEvent } from '../audio/GPWS';
 import { useSimStore } from '../store/simStore';
 import { FlightUpdateBanner } from '../components/FlightUpdateBanner';
 import { readGamepadActions, type GamepadCommand } from '../input/GamepadManager';
+import { loadGamepadSettings, saveGamepadSettings, type GamepadSettingsState } from '../input/gamepadSettings';
 import {
   applyDiscreteKeyAction,
   computeHeldKeyActions,
@@ -71,6 +72,8 @@ export function RfsShell() {
   const [audioEnabled, setAudioEnabled] = useState(false);
   const [audioStatus, setAudioStatus] = useState<AudioUiStatus>('off');
   const [audioSettings, setAudioSettings] = useState<AudioSettingsState>(() => loadAudioSettings());
+  const [gamepadSettings, setGamepadSettings] = useState<GamepadSettingsState>(() => loadGamepadSettings());
+  const gamepadCalibrationRef = useRef(gamepadSettings);
   const [audioCaption, setAudioCaption] = useState<AudioCaptionEvent | null>(null);
   const handleAudioCaption = useCallback((event: AudioCaptionEvent) => {
     setAudioCaption(event);
@@ -85,7 +88,7 @@ export function RfsShell() {
     onSessionSilenced: clearAudioCaption,
   });
   const inputFrame = useCallback(({ dt }: FramePhaseContext) => {
-    const gamepadActions = readGamepadActions();
+    const gamepadActions = readGamepadActions(gamepadCalibrationRef.current);
     const actions = mergeInputActions(computeHeldKeyActions(keysRef.current), gamepadActions);
     useSimStore.getState().applyInputActions(actions, dt);
     if (gamepadActions?.commands?.length) {
@@ -238,6 +241,11 @@ export function RfsShell() {
     }
   }, [audioEnabled]);
 
+  const handleGamepadSettingsChange = useCallback((nextSettings: GamepadSettingsState) => {
+    setGamepadSettings(nextSettings);
+    gamepadCalibrationRef.current = nextSettings;
+    saveGamepadSettings(nextSettings);
+  }, []);
   const handleToggleAudio = useCallback(async () => {
     if (audioEnabled && getAudioEngine().sessionState === 'running') {
       getAudioEngine().setMasterVolume(0);
@@ -374,7 +382,7 @@ export function RfsShell() {
         <>
           <div data-rfs-debug-panel="telemetry"><Telemetry /></div>
           <div data-rfs-debug-panel="help"><ControlsHelp /></div>
-          <div data-rfs-debug-panel="settings"><ControlsSettings /></div>
+          <div data-rfs-debug-panel="settings"><ControlsSettings gamepadSettings={gamepadSettings} onGamepadSettingsChange={handleGamepadSettingsChange} /></div>
           <div data-rfs-debug-panel="diagnostics"><DiagnosticExport /></div>
           <div data-rfs-debug-panel="attitude"><AttitudeIndicator /></div>
         </>
