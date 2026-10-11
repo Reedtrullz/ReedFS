@@ -1255,6 +1255,13 @@ GitHub: [#77](https://github.com/Reedtrullz/ReedFS/issues/77) · draft **RFS-19*
 
 **Issue acceptance retained:** Light/heavy, head/tailwind and hot/high runs avoid speed collapse and mode chatter; MCP limits and discontinuities still govern authority. FMA reports effective behavior, including RETARD, not merely selected modes.
 
+**Implementation receipt - first increment (2026-10-11):** [PR #200](https://github.com/Reedtrullz/ReedFS/pull/200) merged as 79b7dc22c0a509a1e2ca9aa3754f639c39acf8f9 (branch codex/rfs-77-energy), before issue #77 closure. CI/CD run 38124012241 fully green on merge head 30d9249, including all three e2e shards and docker-smoke.
+
+- Scope landed: VNAV separates the raw path VS demand from the clamped command; pathInfeasible and requiredVsFpm on VnavOutput when demand exceeds the 3000 fpm capability, confined to PATH lifecycle; truth metadata vnavPathInfeasible/vnavRequiredVsFpm through deriveEffectiveAutoflightTruth with metadata omission on capture; MCP VNAV engagement selector surfaces the required-fpm message instead of silently clamping; tests cover infeasible climb, infeasible descent, and feasible-path negatives. App bundle allowance re-measured 453 -> 454 KiB (measured 453.4/143.6 KiB at 534035b).
+- Local gates at branch heads: tsc, ESLint, full Vitest, production build, bundle budget. First CI attempt 38120956851 failed only check:bundle (453.2 vs 453.0 KiB), fixed by the budget re-measure rather than any test change.
+- Residual scope: feasible trajectory planning (range/cruise-speed arbitration), IAS/Mach scheduling with bumpless capture/handoff, RETARD callout/observability, and the light/heavy, head/tailwind, hot/high acceptance runs.
+- Non-claims: no performance-model qualification; the 3000 fpm clamp remains the placeholder capability bound. Issue #77 stays open; Project item moved to In Progress.
+
 <a id="issue-108"></a>
 ## #108 — Add a cold-and-dark startup with real enabling conditions
 
