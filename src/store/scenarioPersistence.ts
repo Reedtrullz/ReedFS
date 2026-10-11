@@ -104,7 +104,7 @@ function aircraftForSnapshot(value: Record<string, unknown>): unknown {
       || electrical.acBusPowered === true || batteryVolts > 18;
     electrical.hotBatteryBusPowered = electrical.hotBatteryBusPowered === true || batteryVolts > 18;
   }
-  if (value.version === 4) return raw;
+  if (value.version === 4) return electrical ? { ...raw, electrical } : raw;
   if (![1, 2, 3].includes(Number(value.version)) || raw.utcEpochMs !== undefined
     || typeof raw.simTime !== 'number' || !Number.isFinite(raw.simTime) || raw.simTime < 0
     || typeof raw.timeOfDay !== 'number' || !Number.isFinite(raw.timeOfDay) || raw.timeOfDay < 0 || raw.timeOfDay >= 24) return null;
