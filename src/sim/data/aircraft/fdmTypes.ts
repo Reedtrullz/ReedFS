@@ -71,6 +71,8 @@ export interface EngineThrustLapsePointData {
 
 export interface EngineModelData extends FdmSourceMetadata {
   sourceReferenceIds: string[];
+  /** Lateral engine thrust arm in body +y meters (right positive); gameplay placeholder pending #69 data. */
+  lateralArmYMeters: [number, number];
   idleN1Percent: number;
   togaN1Percent: number;
   idleN2Percent: number;

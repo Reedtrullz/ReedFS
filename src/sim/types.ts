@@ -151,6 +151,17 @@ export interface FuelState {
   rightTank: number;
 }
 
+export interface LoadingSheet {
+  payloadWeightKg: number;
+  fuelKg: { center: number; left: number; right: number };
+  zeroFuelWeightKg: number;
+  grossWeightKg: number;
+  cgPercentMac: number;
+  engineYArmMeters: [number, number];
+  asymmetricThrustYawMomentNm: number;
+  envelope: 'valid' | 'invalid';
+}
+
 // ── Aircraft Config ──
 
 export interface AircraftConfig {
@@ -216,6 +227,7 @@ export interface AircraftState {
   grossWeight: number;
   payloadWeight: number;
   cg: number; // % MAC
+  loading?: LoadingSheet;
   ground: GroundState;
   simTime: number; // ms
   utcEpochMs: number; // UTC at simTime0; resolved UTC is anchor + committed simTime

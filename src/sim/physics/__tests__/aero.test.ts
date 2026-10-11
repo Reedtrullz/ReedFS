@@ -353,4 +353,23 @@ describe('computeAero', () => {
 
     expect(fullPullMoment(aoaForProximity(0.5), 13 * Math.PI / 180)).toBe(0);
   });
+
+  describe('asymmetric engine yaw moment', () => {
+    it('adds left-engine-out yaw nose-left and cancels on symmetric thrust', () => {
+      const s = stateAtAoA(5, 80);
+      s.engines[0] = { ...s.engines[0], thrust: 110_000, running: true };
+      s.engines[1] = { ...s.engines[1], thrust: 0, running: false };
+      const result = computeAero(s, cruise, B737_800_SPEC);
+      expect(result.engineYawMomentNm).toBeGreaterThan(0);
+      expect(result.yawMoment).toBeGreaterThan(result.engineYawMomentNm - 1);
+    });
+
+    it('contributes zero yaw moment on symmetric thrust', () => {
+      const s = stateAtAoA(5, 80);
+      s.engines[0] = { ...s.engines[0], thrust: 90_000, running: true };
+      s.engines[1] = { ...s.engines[1], thrust: 90_000, running: true };
+      const result = computeAero(s, cruise, B737_800_SPEC);
+      expect(result.engineYawMomentNm).toBeCloseTo(0, 9);
+    });
+  });
 });

@@ -137,6 +137,9 @@ export const B737_800_FDM: VersionedAircraftFdmData = {
   engine: {
     ...sourceMetadataFor('Engine spool, fuel-flow, and thrust-lapse model'),
     sourceReferenceIds: sourceRefsForSection(),
+    // Wing-mounted engines at roughly 5.5 m from the centerline, mirrored.
+    // Gameplay placeholder arm; not Boeing geometry data.
+    lateralArmYMeters: [-5.5, 5.5],
     // Legacy behavior moved into data: idle ~20% N1, TOGA ~100% N1, with slower
     // spool-down than spool-up. Placeholder values only; not certified engine data.
     idleN1Percent: 20,
