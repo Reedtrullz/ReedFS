@@ -924,6 +924,14 @@ GitHub: [#99](https://github.com/Reedtrullz/ReedFS/issues/99) · draft **RFS-41*
 - Residual scope: optional GLB probe/cancellation/fallback, profile-asset integration after #93, measured LODs, physical desktop/mobile acceptance.
 - Non-claims: no GLB probing landed, no LODs, no physical device acceptance; deterministic CI green is not a deployment. Issue #99 stays open; Project item moved to In Progress.
 
+
+**Implementation receipt - first increment (2026-10-11):** [PR #211](https://github.com/Reedtrullz/ReedFS/pull/211) merged as 777ebf0742745328d2cf781ee1aee73059c55287 (branch codex/rfs-133-baro). CI run 38171788495 attempt 1: CodeQL, secret-scan and test (units + build + bundle) passed; e2e shard 3 passed while shards 1 and 2 failed: shard 2 hit the known heading-reference flake class (#210) and shard 1 a new audio-session speech-cancellation timeout flake (no audio code in the diff). The single rerun covered both classes once and produced all-shards green; merged per green-or-disclosed protocol. Issue #133 auto-closed on merge and was reopened with residual comment 6113945884 because first-increment scope is partial.
+
+- Scope landed: standalone `baroStore` (`{mode, qnhHpa, unit}`) with a `NaN` unset sentinel and seed-once semantics (scenario weather seeds the knob only while unset; knob changes, scenario switches and weather updates never re-seed); `baroSettingHpa` resolution (STD 1013.25, stored valid QNH, fallback otherwise); interactive PFD altimeter block (+/- 1 hPa, STD toggle, hPa/inHg display-only toggle); `selectPfdAltitude` and the PFD indication consume the knob; optional validated `baroSetting` (880-1080 hPa) on v4 snapshots with exact restore and legacy-snapshot compatibility. Bundle allowance re-measured 463 -> 466 KiB raw / 147 -> 148 gzip (measured 464.6/146.6 at 4570f97).
+- Local gates at aa22c67: tsc, ESLint, production build and bundle budget green; full Vitest 1357 passed with the known load-induced `vnavClimbRegression` 10s timeout (passes isolated). Manual browser QA: ENVA seeded QNH 1016; +/-/STD/IN behaved; airborne QNH/STD shift was exactly 74 ft (2.75 hPa x 27 ft/hPa); scenario switch left the knob untouched.
+- Residual scope: transition-altitude scenario authoring and per-scenario transition datums, AP/target altitude-source coupling review, and remaining acceptance rows (transition reminders, wrong-setting practice, disagreement and invalid-saved-state paths beyond the unit-tested rejection and unset-skip).
+- Non-claims: no transition-altitude authoring, no AP coupling change, no standby source; CI green is not a deployment. Issue #133 stays open; Project item moved to In Progress.
+
  <a id="issue-133"></a>
 ## #133 — Add pilot barometric settings and transition-aware indications
 
