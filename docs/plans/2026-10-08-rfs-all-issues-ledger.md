@@ -1204,6 +1204,13 @@ GitHub: [#75](https://github.com/Reedtrullz/ReedFS/issues/75) · draft **RFS-17*
 
 **Issue acceptance retained:** Mass/CG conservation, left/right symmetry and engine-out yaw sign have analytic checks. Burning/transferring fuel updates loading consistently, and unsupported loading envelopes remain explicitly unavailable.
 
+**Implementation receipt - first increment (2026-10-11):** [PR #197](https://github.com/Reedtrullz/ReedFS/pull/197) merged as b2895d7 (branch codex/rfs-75-mass-balance), before issue #75 closure.
+
+- Scope landed: LoadingSheet type derived in src/sim/systems/fuel.ts (zero-fuel and ramp weights, per-tank/per-station breakdown, longitudinal CG with limit checks and out-of-envelope refusal instead of silent clamping); engine lateral arm lateralArmYMeters [-5.5, 5.5] in the B737-800 FDM; asymmetric engine yaw moment engineYawMomentNm = -arm0*thrust0 - arm1*thrust1 in src/sim/physics/aero.ts; LCG and ENG YAW telemetry rows with selectors in Telemetry.tsx; analytic tests for symmetry and engine-out yaw sign in aero.test.ts and loading-sheet conservation/refusal in fuel.test.ts.
+- Gates: local tsc, ESLint, Vitest, production build and check-bundle-budget on branch head; combined #73+#75 layout measured 452.5/143.2 KiB against the previous 452/143 allowance, re-measured to 453/144 on merge commit 14a5389 with the undercount explained in the commit message. CI workflow 38113570194 fully green on the final merge commit including all e2e shards.
+- Residual scope: tank feed/crossfeed selection, lateral CG, loading-dependent inertia, real fuel-transfer paths, full loading-envelope qualification.
+- Non-claims: no Boeing loading/station data qualification; the lateral arm value is bounded engineering data, not source-lineaged geometry; first increment only, remaining issue #75 scope stays open until this receipt.
+
 <a id="issue-76"></a>
 ## #76 — Connect electrical and hydraulic systems to real consequences
 
