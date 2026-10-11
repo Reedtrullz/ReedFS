@@ -27,7 +27,10 @@ const BUDGETS = {
   // Combined #73 + #75 merge commit f082bb5 measures 452.5 / 143.2 KiB; the sum of
   // separate branch measurements undercounts merged chunk layout, so the app
   // allowance re-measures once more on the combined result.
-  app: { rawBytes: 453 * 1024, gzipBytes: 144 * 1024, required: true },
+  // Power-distribution increment (#76 first increment): measured 454.2 / 143.8 KiB
+  // at d83647d; electrical bus derivation, hydraulically gated gear retraction,
+  // and engine-strip pressure readouts add 1.0 raw KiB. Budget re-measures.
+  app: { rawBytes: 455 * 1024, gzipBytes: 144 * 1024, required: true },
   // React/Zustand framework chunk baseline: raw 182.4 KiB / gzip 56.7 KiB.
   vendorReact: { rawBytes: 212 * 1024, gzipBytes: 66 * 1024, required: true },
   // Generic vendor chunk baseline: raw 3.5 KiB / gzip 1.5 KiB.
