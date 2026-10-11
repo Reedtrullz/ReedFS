@@ -338,6 +338,10 @@ const layoutCss = `
   .rfs-layout__controls {
     width: 560px;
   }
+
+  .rfs-layout__bottom-right {
+    width: min(80vw, 860px);
+  }
 }
 
 @media (min-width: 1800px) {

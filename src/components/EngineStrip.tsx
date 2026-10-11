@@ -43,12 +43,12 @@ export function EngineStrip() {
 
       <div style={indicatorBlock}>
         <span style={labelStyle}>HYD A</span>
-        <span style={{ ...valueStyle, color: vm.hydAPsi > 2500 ? '#0f0' : '#ff0' }}>{Math.round(vm.hydAPsi)}</span>
+        <span style={{ ...hydValueStyle, color: vm.hydAPsi > 2500 ? '#0f0' : '#ff0' }}>{Math.round(vm.hydAPsi)}</span>
       </div>
 
       <div style={indicatorBlock}>
         <span style={labelStyle}>HYD B</span>
-        <span style={{ ...valueStyle, color: vm.hydBPsi > 2500 ? '#0f0' : '#ff0' }}>{Math.round(vm.hydBPsi)}</span>
+        <span style={{ ...hydValueStyle, color: vm.hydBPsi > 2500 ? '#0f0' : '#ff0' }}>{Math.round(vm.hydBPsi)}</span>
       </div>
 
       <div style={indicatorBlock}>
@@ -132,6 +132,11 @@ const valueStyle: React.CSSProperties = {
   fontVariantNumeric: 'tabular-nums',
   minWidth: 52,
   textAlign: 'center',
+};
+
+const hydValueStyle: React.CSSProperties = {
+  ...valueStyle,
+  minWidth: 36,
 };
 
 const barTrack: React.CSSProperties = {
