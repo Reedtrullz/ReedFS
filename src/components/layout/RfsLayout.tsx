@@ -270,17 +270,17 @@ const layoutCss = `
 }
 
 .rfs-layout__dock [data-rfs-panel="scenario"] {
-  max-height: clamp(120px, calc(100vh - 580px), 240px);
+  max-height: clamp(120px, calc(100vh - 580px), 220px);
   overflow: auto;
 }
 
 .rfs-layout__dock [data-rfs-panel="route-builder"] {
-  max-height: clamp(90px, calc(100vh - 700px), 150px);
+  max-height: clamp(90px, calc(100vh - 700px), 130px);
   overflow: auto;
 }
 
 .rfs-layout__dock [data-rfs-panel="takeoff-setup"] {
-  max-height: clamp(90px, calc(100vh - 700px), 150px);
+  max-height: clamp(90px, calc(100vh - 700px), 130px);
   overflow: auto;
 }
 
@@ -418,15 +418,15 @@ const layoutCss = `
   }
 
   .rfs-layout__dock [data-rfs-panel="scenario"] {
-    max-height: clamp(130px, calc(100vh - 560px), 180px);
+    max-height: clamp(120px, calc(100vh - 640px), 170px);
   }
 
   .rfs-layout__dock [data-rfs-panel="route-builder"] {
-    max-height: clamp(112px, calc(100vh - 570px), 160px);
+    max-height: clamp(90px, calc(100vh - 700px), 140px);
   }
 
   .rfs-layout__dock [data-rfs-panel="takeoff-setup"] {
-    max-height: clamp(150px, calc(100vh - 560px), 200px);
+    max-height: clamp(90px, calc(100vh - 700px), 180px);
   }
 }
 
