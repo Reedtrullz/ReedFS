@@ -1233,6 +1233,13 @@ GitHub: [#76](https://github.com/Reedtrullz/ReedFS/issues/76) · draft **RFS-18*
 
 **Issue acceptance retained:** A selected failure causes documented, bounded effects through physics, instruments and sound. Restore/reset recovers all states; healthy flight is unchanged. Detailed pneumatic/pressurization/ice-protection systems are separate source-gated follow-ups.
 
+**Implementation receipt - first increment (2026-10-11):** [PR #202](https://github.com/Reedtrullz/ReedFS/pull/202) merged as 942ae8e74b8849492cbd782fd79606ec6fd5d396 (branch codex/rfs-76-power), before issue #76 closure. CI/CD run 38130696042 fully green on head de5d69e, including all three e2e shards and docker-smoke.
+
+- Scope landed: dcBusPowered/hotBatteryBusPowered derived from >18V sources; hydraulic pump commands with a dt-stable 0.5s standby-pump ramp; gear retract gated on >=500 psi max(A, B, standby); HYD A/B readouts on Engine Strip; v4 snapshot backfill of electrical flags regression-tested; one-row Engine Strip layout guard at 1440px+; app bundle allowance 454 -> 456 KiB (combined #77+#76 measured 454.9/144.0 KiB at 59bd39b).
+- Local gates at branch heads: tsc, ESLint, full Vitest 1330/1330 (153 files), production build, bundle budget, visual suite 6/6. First CI attempt 38128451140 failed only test:visual (strip wrapped to 2 rows, lifted PFD under takeoff-setup panel), fixed by the layout guard rather than any test change.
+- Residual scope: pump switches, generator isolation, bus-loss annunciator, indications beyond Engine Strip, sound cues, electrical-load model, full #76 acceptance runs.
+- Non-claims: no electrical-load qualification; standby ramp is a first-order approximation. Issue #76 stays open; Project item moved to In Progress.
+
 <a id="issue-77"></a>
 ## #77 — Make autoflight energy-aware across the flight envelope
 
