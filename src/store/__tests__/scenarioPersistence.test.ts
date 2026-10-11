@@ -308,6 +308,23 @@ it('rejects a stored incoherent attitude before publishing it', () => {
   expect(loadScenarioSnapshot(storage).ok).toBe(false);
 });
 
+it('backfills electrical bus flags into v4 snapshots saved before they existed', () => {
+  const storage = memoryStorage();
+  saveScenarioSnapshot(storage, createScenarioSnapshot(useSimStore.getState()));
+  const collection = JSON.parse(storage.getItem(SCENARIO_SAVE_KEY)!);
+  delete collection.slots.default.snapshot.aircraft.electrical.dcBusPowered;
+  delete collection.slots.default.snapshot.aircraft.electrical.hotBatteryBusPowered;
+  storage.setItem(SCENARIO_SAVE_KEY, JSON.stringify(collection));
+
+  const loaded = loadScenarioSnapshot(storage);
+
+  expect(loaded.ok).toBe(true);
+  if (loaded.ok) {
+    expect(loaded.snapshot.aircraft.electrical.dcBusPowered).toBe(true);
+    expect(loaded.snapshot.aircraft.electrical.hotBatteryBusPowered).toBe(true);
+  }
+});
+
 it('preserves an earlier pending payload until explicit discard even if a later save succeeds', () => {
   const full = memoryStorage();
   full.setItem = () => { throw new DOMException('full', 'QuotaExceededError'); };

@@ -6,6 +6,8 @@ export function updateElectrical(state: AircraftState, dt: number): void {
   e.gen1Online = state.engines[0].running && state.engines[0].n2 > 55;
   e.gen2Online = state.engines[1].running && state.engines[1].n2 > 55;
   e.acBusPowered = e.gen1Online || e.gen2Online;
+  e.dcBusPowered = e.acBusPowered || e.batteryVolts > 18;
+  e.hotBatteryBusPowered = e.batteryVolts > 18;
 
   if (!e.acBusPowered && e.batteryVolts > 18) {
     e.batteryVolts -= 0.5 * (dt / 60);

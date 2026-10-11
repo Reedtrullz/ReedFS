@@ -458,6 +458,8 @@ export interface EngineStripViewModel {
   leftN1: number;
   rightN1: number;
   flapsActual: number;
+  hydAPsi: number;
+  hydBPsi: number;
   gearDownActual: boolean;
   gearPositionActual: number;
   throttleCommandPercent: number;
@@ -472,6 +474,8 @@ export function selectEngineStripViewModel(s: SimStore): EngineStripViewModel {
     leftN1: s.aircraft.engines[0].n1,
     rightN1: s.aircraft.engines[1].n1,
     flapsActual: s.aircraft.config.flapSetting,
+    hydAPsi: s.aircraft.hydraulic?.systemAPsi ?? 0,
+    hydBPsi: s.aircraft.hydraulic?.systemBPsi ?? 0,
     gearDownActual: s.aircraft.config.gearDown,
     gearPositionActual: s.aircraft.config.gearPosition,
     throttleCommandPercent: Math.round(Math.max(s.effectiveControls.throttle1, s.effectiveControls.throttle2) * 100),

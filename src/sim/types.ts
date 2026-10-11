@@ -130,6 +130,8 @@ export interface ElectricalState {
   gen1Online: boolean;
   gen2Online: boolean;
   acBusPowered: boolean;
+  dcBusPowered: boolean;
+  hotBatteryBusPowered: boolean;
   batteryVolts: number;
 }
 
@@ -314,7 +316,7 @@ export function createInitialState(spec: AircraftSpec): AircraftState {
       { n1: 0, n2: 0, egt: 20, fuelFlow: 0, thrust: 0, running: false },
     ],
     fuel: { totalFuel: spec.maxFuel, fuelFlowTotal: 0, centerTank: spec.fuelCapacity.center, leftTank: spec.fuelCapacity.left, rightTank: spec.fuelCapacity.right },
-    electrical: { gen1Online: false, gen2Online: false, acBusPowered: false, batteryVolts: 28 },
+    electrical: { gen1Online: false, gen2Online: false, acBusPowered: false, dcBusPowered: true, hotBatteryBusPowered: true, batteryVolts: 28 },
     hydraulic: { systemAPsi: 0, systemBPsi: 0, standbyPsi: 0 },
     zeroFuelWeight,
     zeroFuelCg: 25,

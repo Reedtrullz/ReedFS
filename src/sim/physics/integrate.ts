@@ -220,8 +220,13 @@ function applyPilotConfiguration(
   );
 
   const gearTarget = weightOnWheels || controls.gearLever === 'DOWN' ? 1 : 0;
+  // Gear retraction is hydraulically powered; extension falls with gravity
+  // and free-falls to the down-and-locked position when pressure is lost.
+  const hydraulicPressurePsi = Math.max(state.hydraulic.systemAPsi, state.hydraulic.systemBPsi, state.hydraulic.standbyPsi);
   const gearStep = configModel.gearTransitSeconds > 0 ? dt / configModel.gearTransitSeconds : 1;
-  state.config.gearPosition = moveToward(state.config.gearPosition, gearTarget, Math.max(0, gearStep));
+  const retracting = gearTarget < state.config.gearPosition;
+  const gatedGearStep = retracting && hydraulicPressurePsi < 500 ? 0 : gearStep;
+  state.config.gearPosition = moveToward(state.config.gearPosition, gearTarget, Math.max(0, gatedGearStep));
   state.config.gearDown = state.config.gearPosition >= 0.999;
   const spoilerArmed = controls.spoilersArmed ?? state.config.spoilersArmed;
   const autoSpoilerDeploy = spoilerArmed && weightOnWheels && controls.throttle1 <= 0.2 && controls.throttle2 <= 0.2;
