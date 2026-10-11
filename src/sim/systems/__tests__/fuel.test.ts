@@ -4,6 +4,35 @@ import { createInitialState, B737_800_SPEC } from '../../types';
 import { createAircraftStateForScenario, KSEA_TUTORIAL_SCENARIO } from '../../scenarios';
 
 describe('updateFuel', () => {
+  it('derives a loading sheet with mass-consistent totals and both engine arms', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.engines[0] = { ...s.engines[0], thrust: 120_000, running: true };
+    s.engines[1] = { ...s.engines[1], thrust: 60_000, running: true };
+    updateFuel(s, B737_800_SPEC, 1 / 3600);
+
+    const sheet = s.loading;
+    expect(sheet).toBeDefined();
+    expect(sheet!.grossWeightKg).toBeCloseTo(s.grossWeight, 6);
+    expect(sheet!.zeroFuelWeightKg).toBeCloseTo(s.zeroFuelWeight, 6);
+    expect(sheet!.cgPercentMac).toBeCloseTo(s.cg, 6);
+    expect(sheet!.fuelKg.center).toBeCloseTo(s.fuel.centerTank, 6);
+    expect(sheet!.fuelKg.left).toBeCloseTo(s.fuel.leftTank, 6);
+    expect(sheet!.fuelKg.right).toBeCloseTo(s.fuel.rightTank, 6);
+    expect(sheet!.engineYArmMeters[0]).toBeLessThan(0);
+    expect(sheet!.engineYArmMeters[1]).toBeGreaterThan(0);
+    expect(sheet!.envelope).toBe('valid');
+  });
+
+  it('reports an out-of-limits envelope when the computed CG sits outside aircraft limits', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.zeroFuelCg = 1;
+    s.fuel = { centerTank: 0, leftTank: 100, rightTank: 100, totalFuel: 200, fuelFlowTotal: 0 };
+    updateFuel(s, B737_800_SPEC, 1 / 3600);
+
+    expect(s.loading!.envelope).toBe('invalid');
+    expect(s.cg).toBe(B737_800_SPEC.cgLimits[0]);
+  });
+
   it('burns center tank first', () => {
     const s = createInitialState(B737_800_SPEC);
     s.fuel.fuelFlowTotal = 10000; // kg/hr

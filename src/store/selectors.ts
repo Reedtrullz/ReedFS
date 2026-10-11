@@ -1,5 +1,6 @@
 import type { AutopilotState, LateralMode, VerticalMode } from '@shared/autopilot/autopilotTypes';
 import type { SimStore } from './simStore';
+import { B737_800_SPEC } from '../sim/types';
 import { computeDerived } from '../sim/physics/derived';
 import { quatToEuler } from '../sim/physics/quaternion';
 import { deriveDisplayFmaTruth } from '../sim/systems/fmaTruth';
@@ -385,6 +386,11 @@ export interface TelemetryViewModel {
   rightN1: number;
   totalFuelKg: number;
   grossWeightKg: number;
+  loadingEnvelope: 'unavailable' | 'valid' | 'invalid';
+  cgPercentMac: number | null;
+  cgLimitLowPercentMac: number;
+  cgLimitHighPercentMac: number;
+  asymmetricThrustYawMomentNm: number | null;
   flapSetting: number;
   gearDown: boolean;
 }
@@ -416,6 +422,11 @@ export function selectTelemetryViewModel(s: SimStore): TelemetryViewModel {
     rightN1: s.aircraft.engines[1].n1,
     totalFuelKg: s.aircraft.fuel.totalFuel,
     grossWeightKg: s.aircraft.grossWeight,
+    loadingEnvelope: s.aircraft.loading?.envelope ?? 'unavailable',
+    cgPercentMac: s.aircraft.loading?.cgPercentMac ?? null,
+    cgLimitLowPercentMac: B737_800_SPEC.cgLimits[0],
+    cgLimitHighPercentMac: B737_800_SPEC.cgLimits[1],
+    asymmetricThrustYawMomentNm: s.aircraft.loading?.asymmetricThrustYawMomentNm ?? null,
     flapSetting: s.aircraft.config.flapSetting,
     gearDown: s.aircraft.config.gearDown,
   };

@@ -37,6 +37,12 @@ export function Telemetry() {
       {row('N1', `L:${vm.leftN1.toFixed(1)}% R:${vm.rightN1.toFixed(1)}%`)}
       {row('FUEL', `${vm.totalFuelKg.toFixed(0)} kg`)}
       {row('GW', `${vm.grossWeightKg.toFixed(0)} kg`)}
+      {row('LOAD', vm.loadingEnvelope === 'unavailable'
+        ? 'N/A'
+        : `CG ${vm.cgPercentMac === null ? '?' : vm.cgPercentMac.toFixed(1)}% (${vm.cgLimitLowPercentMac}-${vm.cgLimitHighPercentMac}) ${vm.loadingEnvelope === 'valid' ? 'OK' : 'OUT OF LIMITS'}`)}
+      {row('ASYM', vm.asymmetricThrustYawMomentNm === null
+        ? 'N/A'
+        : `${(vm.asymmetricThrustYawMomentNm / 1000).toFixed(1)} kN·m`)}
       {row('FLAPS', `${vm.flapSetting}°`)}
       {row('GEAR', vm.gearDown ? 'DN' : 'UP')}
     </div>

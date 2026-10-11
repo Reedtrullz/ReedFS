@@ -4,6 +4,7 @@ import { computeAirRelativeVelocity } from '../systems/environment';
 import type { AeroModel, FlapPolar } from '../systems/AeroModel';
 import { B737_AERO } from '../systems/AeroModel';
 import type { WindInfo } from '../weather';
+import { B737_800_FDM } from '../data/aircraft/b737-800-fdm.v1';
 
 const G = 9.80665;
 const FT_TO_M = 0.3048;
@@ -118,6 +119,7 @@ export interface AeroResult {
   dragBodyX: number; dragBodyY: number; dragBodyZ: number;
   liftBodyX: number; liftBodyZ: number;
   rollMoment: number; pitchMoment: number; yawMoment: number;
+  engineYawMomentNm: number;
 }
 
 export interface GroundEffectFactors {
@@ -162,6 +164,8 @@ export function computeAero(
   wind: WindInfo | null = null,
   weather: DensityAltitudeWeather | null = null,
 ): AeroResult {
+  const engineYawMomentNm = -B737_800_FDM.engine.lateralArmYMeters[0] * state.engines[0].thrust
+    - B737_800_FDM.engine.lateralArmYMeters[1] * state.engines[1].thrust;
   const { u, v, w } = computeAirRelativeVelocity(state, wind);
   const tasMs = Math.sqrt(u * u + v * v + w * w);
   const atmo = atmosphereForDensityAltitude(state.position.alt, weather);
@@ -229,7 +233,7 @@ export function computeAero(
 
   const rHat = state.angularVel.r * b / (2 * Math.max(tasMs, 1));
   const cn = aeroModel.cnBeta * beta + aeroModel.cnRudder * inputs.rudder + aeroModel.cnr * rHat;
-  const yawMoment = q * S * b * cn;
+  const yawMoment = q * S * b * cn + engineYawMomentNm;
 
-  return { thrust, drag, lift, side, weight, dragBodyX, dragBodyY, dragBodyZ, liftBodyX, liftBodyZ, rollMoment, pitchMoment, yawMoment };
+  return { thrust, drag, lift, side, weight, dragBodyX, dragBodyY, dragBodyZ, liftBodyX, liftBodyZ, rollMoment, pitchMoment, yawMoment, engineYawMomentNm };
 }

@@ -1,4 +1,8 @@
 import type { AircraftState, AircraftSpec } from '../types';
+import { B737_800_FDM } from '../data/aircraft/b737-800-fdm.v1';
+
+const ENGINE_ARM_Y_M = B737_800_FDM.engine.lateralArmYMeters;
+const CG_LIMIT_MARGIN_PERCENT_MAC = 0.01;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
@@ -69,6 +73,25 @@ export function updateFuel(
       state.fuel.centerTank * cgCenter +
       (state.fuel.leftTank + state.fuel.rightTank) * cgWing
     ) / totalMass;
-    state.cg = clamp(calculatedCg, spec.cgLimits[0], spec.cgLimits[1]);
+    const clampedCg = clamp(calculatedCg, spec.cgLimits[0], spec.cgLimits[1]);
+    const cgOutsideLimits = calculatedCg < spec.cgLimits[0] - CG_LIMIT_MARGIN_PERCENT_MAC
+      || calculatedCg > spec.cgLimits[1] + CG_LIMIT_MARGIN_PERCENT_MAC;
+    state.cg = clampedCg;
+    state.loading = {
+      payloadWeightKg: state.payloadWeight,
+      fuelKg: {
+        center: state.fuel.centerTank,
+        left: state.fuel.leftTank,
+        right: state.fuel.rightTank,
+      },
+      zeroFuelWeightKg: state.zeroFuelWeight,
+      grossWeightKg: state.fuel.totalFuel + state.zeroFuelWeight,
+      cgPercentMac: clampedCg,
+      engineYArmMeters: [...ENGINE_ARM_Y_M] as [number, number],
+      asymmetricThrustYawMomentNm: Math.abs(
+        state.engines[0].thrust * ENGINE_ARM_Y_M[0],
+      ) + Math.abs(state.engines[1].thrust * ENGINE_ARM_Y_M[1]),
+      envelope: cgOutsideLimits ? 'invalid' : 'valid',
+    };
   }
 }
