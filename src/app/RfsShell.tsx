@@ -34,6 +34,7 @@ import { ScenarioPanel } from '../components/ScenarioPanel';
 import { RouteStatus } from '../components/RouteStatus';
 import { SceneStatusOverlay } from '../components/SceneStatus';
 import { TakeoffSetupPanel } from '../components/TakeoffSetupPanel';
+import { TouchFlightPad } from '../components/TouchFlightPad';
 import { RouteBuilderPanel } from '../components/RouteBuilderPanel';
 import { RouteEditPanel } from '../components/RouteEditPanel';
 import { BottomControlBar, type AudioUiStatus } from '../components/BottomControlBar';
@@ -424,6 +425,7 @@ export function RfsShell() {
         <>
           <SimulationRecovery />
           <FlightUpdateBanner />
+			{showFlightInstruments ? <TouchFlightPad /> : null}
           {audioCaptionNode}
           <AudioSettings
             settings={audioSettings}
