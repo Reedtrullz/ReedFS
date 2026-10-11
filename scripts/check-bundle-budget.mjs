@@ -35,7 +35,11 @@ const BUDGETS = {
   // re-measures per campaign convention.
   // Combined #76 + #77 merge commit 59bd39b measures 454.9 / 144.0 KiB; the app
   // allowance re-measures once more on the combined result per campaign convention.
-  app: { rawBytes: 456 * 1024, gzipBytes: 145 * 1024, required: true },
+  // Gamepad-calibration increment (#85 first increment): measured 458.9 / 144.9
+  // KiB at 0e62284; settings persistence, calibration controls with live input
+  // preview, and tests add 4.0 raw / 0.9 gzip KiB. Budget re-measures per
+  // campaign convention.
+  app: { rawBytes: 459 * 1024, gzipBytes: 146 * 1024, required: true },
   // React/Zustand framework chunk baseline: raw 182.4 KiB / gzip 56.7 KiB.
   vendorReact: { rawBytes: 212 * 1024, gzipBytes: 66 * 1024, required: true },
   // Generic vendor chunk baseline: raw 3.5 KiB / gzip 1.5 KiB.

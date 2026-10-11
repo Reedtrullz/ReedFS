@@ -206,6 +206,8 @@ vi.mock('../store/simStore', () => {
 
 vi.mock('../input/GamepadManager', () => ({
   readGamepadActions: mockReadGamepadActions,
+  DEFAULT_GAMEPAD_CALIBRATION: { axisDeadzone: 0.08, triggerDeadzone: 0.05, invertElevator: false, invertAileron: false, invertRudder: false },
+  previewGamepad: vi.fn(() => ({ connected: false, pitch: 0, roll: 0, yaw: 0, throttleRate: 0 })),
 }));
 
 vi.mock('../sim/physics/derived', () => ({

@@ -105,6 +105,37 @@ export function __resetGamepadStateForTests(): void {
   previousPressedButtons = new Set<number>();
 }
 
+export interface GamepadPreview {
+  connected: boolean;
+  pitch: number;
+  roll: number;
+  yaw: number;
+  throttleRate: number;
+}
+
+function previewNumber(value: number | undefined): number {
+  return Math.round((value ?? 0) * 1000) / 1000;
+}
+
+export function previewGamepad(calibration: GamepadCalibration = DEFAULT_GAMEPAD_CALIBRATION): GamepadPreview {
+  const gp = getFirstGamepad();
+  if (!gp) {
+    return { connected: false, pitch: 0, roll: 0, yaw: 0, throttleRate: 0 };
+  }
+  const leftY = activeAxis(gp.axes?.[1], calibration.axisDeadzone);
+  const leftX = activeAxis(gp.axes?.[0], calibration.axisDeadzone);
+  const rightX = activeAxis(gp.axes?.[2], calibration.axisDeadzone);
+  const rightTrigger = activeTrigger(gp.buttons?.[7]?.value, calibration.triggerDeadzone);
+  const leftTrigger = activeTrigger(gp.buttons?.[6]?.value, calibration.triggerDeadzone);
+  return {
+    connected: true,
+    pitch: previewNumber(maybeInvert(leftY ?? 0, calibration.invertElevator)),
+    roll: previewNumber(maybeInvert(leftX ?? 0, calibration.invertAileron)),
+    yaw: previewNumber(maybeInvert(rightX ?? 0, calibration.invertRudder)),
+    throttleRate: previewNumber((rightTrigger ?? 0) - (leftTrigger ?? 0)),
+  };
+}
+
 export function readGamepadActions(calibration: GamepadCalibration = DEFAULT_GAMEPAD_CALIBRATION): GamepadInputActions | null {
   const gp = getFirstGamepad();
   if (!gp) {
