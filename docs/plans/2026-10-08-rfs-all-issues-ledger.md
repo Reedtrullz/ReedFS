@@ -661,6 +661,13 @@ GitHub: [#59](https://github.com/Reedtrullz/ReedFS/issues/59) · draft **RFS-01*
 
 **Issue acceptance retained:** Desktop and narrow-screen views expose every essential control without overlap, clipping or hidden focus; cockpit mode preserves the outside sightline. Existing black-box controls remain usable.
 
+**Implementation receipt - first increment (2026-10-11):** Landed via [#208](https://github.com/Reedtrullz/ReedFS/pull/208) (merge commit 883c195e794fb75b86934cb30b6e0da2cbbf1e3f; CI run 38161972438 fully green).
+
+- Scope landed: workspace mode strip (Briefing/Flight/Debrief) in a top bar, setup dock for scenario/route-builder/takeoff-setup with a header toggle defaulting open, shared CSS tokens, and dock geometry guaranteed clear of the controls zone (compact 720px and non-compact 900px heights verified); app bundle measured 462.3/146.0 KiB raw/gzip at 8cb3dfc, budget re-measured to 463/147 per campaign convention.
+- Local gates: tsc -b, ESLint on changed paths, RfsLayout vitest 9/9, full unit suite (one unrelated sim timeout passed on isolated rerun), test:visual 6/6 with timing budget OK against regenerated snapshots, pristine-baseline cross-check at fa2fca2, and two preview-server passes of rfs-responsive-accessibility.
+- Residual scope: Briefing/Debrief content differentiation and workspace mode persistence; deeper unmount of scenario machinery behind the dock (showFlightInstruments still gates panels); physical desktop/mobile acceptance.
+- Non-claims: CI green is not a deployment claim; no physical device acceptance; workspace mode selection is not persisted.
+
 <a id="issue-60"></a>
 ## #60 — Add genuinely usable touch and accessible flight controls
 
