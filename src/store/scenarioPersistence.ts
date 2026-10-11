@@ -9,6 +9,8 @@ import { SCENARIOS, scenarioById } from '../sim/scenarios';
 import { B737_800_AIRCRAFT_DATA } from '../sim/data/aircraft/b737-800.v1';
 import { isAircraftState, hasCoherentAttitude, isAutopilotCommands, isAutopilotControllerState, isAutopilotState, isControlInputs, isFiniteSimulationData, isFlightPlan, isWeather, isWind } from '../sim/simulationValidation';
 import type { SimStatus, SimStore } from './simStore';
+import type { BaroSetting } from './baroStore';
+import { useBaroStore } from './baroStore';
 import { LEGACY_SCENARIO_MIDNIGHT_MS, SCENARIO_CLOCK_ID } from '../sim/scenarioClock';
 import { USSA_1976_ID, USSA_1976_DATA_VERSION } from '../sim/data/atmosphere/ussa-1976.v1';
 
@@ -49,6 +51,7 @@ export interface ScenarioSnapshot {
   activeLegIndex: number | null;
   wind: WindInfo | null;
   weather?: ScenarioWeatherMetadata;
+  baroSetting?: BaroSetting;
   identities?: typeof SCENARIO_SNAPSHOT_IDENTITIES | typeof LEGACY_V3_SNAPSHOT_IDENTITIES;
   simulationTimeSeconds: number;
 }
@@ -117,6 +120,12 @@ function aircraftForSnapshot(value: Record<string, unknown>): unknown {
   };
 }
 
+function isBaroSetting(value: unknown): value is BaroSetting {
+  if (!isRecord(value)) return false;
+  return (value.mode === 'qnh' || value.mode === 'std') && (value.unit === 'hPa' || value.unit === 'inHg')
+    && typeof value.qnhHpa === 'number' && Number.isFinite(value.qnhHpa) && value.qnhHpa >= 880 && value.qnhHpa <= 1080;
+}
+
 function isValidSnapshot(value: unknown): value is ScenarioSnapshot {
   if (!isRecord(value) || !isFiniteSimulationData(value)) return false;
   const supportedVersion = [1, 2, 3, SCENARIO_SAVE_VERSION].includes(Number(value.version)) && typeof value.version === 'number';
@@ -143,6 +152,7 @@ function isValidSnapshot(value: unknown): value is ScenarioSnapshot {
     isWind(value.wind) &&
     ((value.version !== 3 && value.version !== 4) || (isWeather(value.weather) && isRecord(value.identities) && Object.entries(expectedIdentities).every(([key, expected]) => (value.identities as Record<string, unknown>)[key] === expected))) &&
     (value.weather === undefined || isWeather(value.weather)) &&
+    (value.baroSetting === undefined || isBaroSetting(value.baroSetting)) &&
     typeof value.simulationTimeSeconds === 'number' && value.simulationTimeSeconds >= 0
   );
 }
@@ -304,6 +314,9 @@ export function captureScenarioSnapshot(state: SimStore): ScenarioSnapshot {
     activeLegIndex: state.activeLegIndex,
     wind: state.wind,
     weather: state.weather ?? scenarioById(state.selectedScenarioId).weather,
+    baroSetting: useBaroStore.getState().setting.qnhHpa >= 880 && useBaroStore.getState().setting.qnhHpa <= 1080
+      ? { ...useBaroStore.getState().setting }
+      : undefined,
     identities: SCENARIO_SNAPSHOT_IDENTITIES,
     simulationTimeSeconds: state.simulationTimeSeconds,
   };
