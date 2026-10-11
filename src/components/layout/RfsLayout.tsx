@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { WORKSPACE_MODES, type WorkspaceMode } from './workspaceMode';
 
 export interface RfsLayoutProps {
   viewport: ReactNode;
@@ -14,6 +15,10 @@ export interface RfsLayoutProps {
   controls?: ReactNode;
   buildWatermark?: ReactNode;
   fpsMonitor?: ReactNode;
+  workspaceMode: WorkspaceMode;
+  onChangeWorkspaceMode: (mode: WorkspaceMode) => void;
+  setupDockOpen: boolean;
+  onToggleSetupDock: () => void;
 }
 
 export function RfsLayout({
@@ -30,22 +35,63 @@ export function RfsLayout({
   controls,
   buildWatermark,
   fpsMonitor,
+  workspaceMode,
+  onChangeWorkspaceMode,
+  setupDockOpen,
+  onToggleSetupDock,
 }: RfsLayoutProps) {
+  const hasSetupPanels = Boolean(scenarioPanel || routeBuilderPanel || takeoffSetupPanel);
+  const setupDockVisible = setupDockOpen && hasSetupPanels;
+
   return (
-    <main className="rfs-layout" data-testid="rfs-layout" aria-labelledby="rfs-simulator-heading">
+    <main
+      className="rfs-layout"
+      data-testid="rfs-layout"
+      data-workspace={workspaceMode}
+      aria-labelledby="rfs-simulator-heading"
+    >
       <style>{layoutCss}</style>
       <h1 id="rfs-simulator-heading" className="rfs-layout__heading">Reed Flight Simulator</h1>
+
+      <header className="rfs-layout__topbar">
+        <nav className="rfs-layout__workspaces" role="group" aria-label="Workspace modes">
+          {WORKSPACE_MODES.map((mode) => (
+            <button
+              key={mode.id}
+              type="button"
+              className={`rfs-layout__workspace-tab${workspaceMode === mode.id ? ' rfs-layout__workspace-tab--active' : ''}`}
+              aria-pressed={workspaceMode === mode.id}
+              data-rfs-workspace={mode.id}
+              onClick={() => onChangeWorkspaceMode(mode.id)}
+            >
+              {mode.label}
+            </button>
+          ))}
+        </nav>
+        {hasSetupPanels && (
+          <button
+            type="button"
+            className={`rfs-layout__dock-toggle${setupDockOpen ? ' rfs-layout__dock-toggle--active' : ''}`}
+            aria-expanded={setupDockOpen}
+            data-rfs-panel="dock-toggle"
+            onClick={onToggleSetupDock}
+          >
+            Setup
+          </button>
+        )}
+      </header>
+
       <div className="rfs-layout__scene" data-rfs-layer="scene">
         {viewport}
         {sceneLayers}
       </div>
 
-      {(scenarioPanel || routeBuilderPanel || takeoffSetupPanel) && (
-        <div className="rfs-layout__top-left" data-rfs-zone="top-left">
+      {setupDockVisible && (
+        <aside className="rfs-layout__dock" data-rfs-zone="setup-dock" aria-label="Setup dock">
           {scenarioPanel && <div data-rfs-panel="scenario">{scenarioPanel}</div>}
           {routeBuilderPanel && <div data-rfs-panel="route-builder">{routeBuilderPanel}</div>}
           {takeoffSetupPanel && <div data-rfs-panel="takeoff-setup">{takeoffSetupPanel}</div>}
-        </div>
+        </aside>
       )}
 
       {(sceneStatus || routeStatus) && (
@@ -85,10 +131,27 @@ export function RfsLayout({
 
 const layoutCss = `
 .rfs-layout {
+  --rfs-color-surface: rgba(10, 12, 10, 0.88);
+  --rfs-color-surface-raised: rgba(18, 22, 18, 0.94);
+  --rfs-color-border: rgba(255, 255, 255, 0.16);
+  --rfs-color-border-strong: rgba(255, 255, 255, 0.32);
+  --rfs-color-text: rgba(240, 244, 240, 0.92);
+  --rfs-color-text-muted: rgba(240, 244, 240, 0.6);
+  --rfs-color-ok: #35c26a;
+  --rfs-color-warn: #d9a13b;
+  --rfs-color-critical: #d84a4a;
+  --rfs-space-1: 4px;
+  --rfs-space-2: 8px;
+  --rfs-space-3: 12px;
+  --rfs-radius-sm: 4px;
+  --rfs-radius-md: 6px;
+  --rfs-font-ui: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
   position: fixed;
   inset: 0;
   overflow: hidden;
   background: #000;
+  color: var(--rfs-color-text);
+  font-family: var(--rfs-font-ui);
   isolation: isolate;
 }
 
@@ -133,43 +196,101 @@ const layoutCss = `
   max-width: 100%;
 }
 
-.rfs-layout__top-left {
+.rfs-layout__topbar {
   position: absolute;
-  top: 14px;
-  left: 14px;
-  right: 300px;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 44px;
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rfs-space-3);
+  padding: 0 var(--rfs-space-3);
+  background: var(--rfs-color-surface);
+  border-bottom: 1px solid var(--rfs-color-border);
+  pointer-events: auto;
+  z-index: 190;
+}
+
+.rfs-layout__workspaces {
+  display: flex;
+  align-items: center;
+  gap: var(--rfs-space-2);
+}
+
+.rfs-layout__workspace-tab,
+.rfs-layout__dock-toggle {
+  appearance: none;
+  border: 1px solid var(--rfs-color-border);
+  border-radius: var(--rfs-radius-sm);
+  background: transparent;
+  color: var(--rfs-color-text-muted);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 5px 12px;
+  cursor: pointer;
+}
+
+.rfs-layout__workspace-tab:hover,
+.rfs-layout__dock-toggle:hover {
+  border-color: var(--rfs-color-border-strong);
+  color: var(--rfs-color-text);
+}
+
+.rfs-layout__workspace-tab--active,
+.rfs-layout__dock-toggle--active {
+  border-color: var(--rfs-color-ok);
+  color: var(--rfs-color-ok);
+}
+
+.rfs-layout__dock {
+  position: absolute;
+  top: 58px;
+  left: 14px;
+  width: clamp(272px, 24vw, 330px);
+  max-height: calc(100vh - 320px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--rfs-space-3);
+  overflow: auto;
   pointer-events: none;
   z-index: 170;
 }
 
-.rfs-layout__top-left [data-rfs-panel="scenario"] {
-  flex: 0 1 clamp(280px, 24vw, 330px);
-  width: clamp(280px, 24vw, 330px);
-  max-height: min(560px, calc(100vh - 380px));
+.rfs-layout__dock > [data-rfs-panel] {
+  pointer-events: auto;
+  flex: 0 0 auto;
+}
+
+.rfs-layout__dock > [data-rfs-panel] > * {
+  width: 100% !important;
+}
+
+.rfs-layout__dock [data-rfs-panel="scenario"] {
+  max-height: clamp(120px, calc(100vh - 580px), 220px);
   overflow: auto;
 }
 
-.rfs-layout__top-left [data-rfs-panel="takeoff-setup"] {
-  flex: 0 0 300px;
-  width: min(300px, 32vw);
+.rfs-layout__dock [data-rfs-panel="route-builder"] {
+  max-height: clamp(90px, calc(100vh - 700px), 130px);
+  overflow: auto;
 }
 
-.rfs-layout__top-left [data-rfs-panel="scenario"] > *,
-.rfs-layout__top-left [data-rfs-panel="route-builder"] > *,
-.rfs-layout__top-left [data-rfs-panel="takeoff-setup"] > * {
-  width: 100% !important;
+.rfs-layout__dock [data-rfs-panel="takeoff-setup"] {
+  max-height: clamp(90px, calc(100vh - 700px), 130px);
+  overflow: auto;
 }
 
 .rfs-layout__top-right {
   position: absolute;
-  top: 14px;
+  top: 58px;
   right: 14px;
   width: 260px;
   display: grid;
-  gap: 12px;
+  gap: var(--rfs-space-3);
   pointer-events: none;
   z-index: 170;
 }
@@ -180,13 +301,13 @@ const layoutCss = `
 
 .rfs-layout__debug {
   position: absolute;
-  top: 14px;
+  top: 58px;
   left: min(680px, calc(100vw - 600px));
   width: min(300px, calc(100vw - 980px));
   min-width: 240px;
   display: grid;
   gap: 10px;
-  height: min(380px, calc(100vh - 180px));
+  height: min(380px, calc(100vh - 220px));
   overflow: auto;
   pointer-events: auto;
   z-index: 175;
@@ -270,7 +391,7 @@ const layoutCss = `
   position: absolute;
   left: 14px;
   bottom: 154px;
-  color: #0f0;
+  color: var(--rfs-color-ok);
   font-family: monospace;
   font-size: 10px;
   opacity: 0.5;
@@ -285,20 +406,6 @@ const layoutCss = `
   z-index: 175;
 }
 
-@media (max-width: 1279px) {
-  .rfs-layout__instrument-row [data-rfs-panel="pfd"] {
-    width: min(430px, 42vw);
-  }
-
-  .rfs-layout__debug {
-    top: 254px;
-    left: 356px;
-    width: min(300px, calc(100vw - 724px));
-    min-width: 240px;
-    height: 150px;
-  }
-}
-
 @media (min-width: 1280px) {
   .rfs-layout__controls {
     width: 440px;
@@ -306,31 +413,20 @@ const layoutCss = `
 }
 
 @media (max-width: 1360px) {
-  .rfs-layout__top-left {
-    right: auto;
+  .rfs-layout__dock {
     width: min(330px, calc(100vw - 300px));
-    flex-direction: column;
-    gap: 10px;
   }
 
-  .rfs-layout__top-left [data-rfs-panel="scenario"] {
-    flex: 0 1 auto;
-    width: 100%;
-    max-height: clamp(130px, calc(100vh - 560px), 180px);
+  .rfs-layout__dock [data-rfs-panel="scenario"] {
+    max-height: clamp(120px, calc(100vh - 640px), 170px);
   }
 
-  .rfs-layout__top-left [data-rfs-panel="route-builder"] {
-    flex: 0 1 auto;
-    width: 100%;
-    max-height: clamp(112px, calc(100vh - 570px), 160px);
-    overflow: auto;
+  .rfs-layout__dock [data-rfs-panel="route-builder"] {
+    max-height: clamp(90px, calc(100vh - 700px), 140px);
   }
 
-  .rfs-layout__top-left [data-rfs-panel="takeoff-setup"] {
-    flex: 0 0 auto;
-    width: min(300px, 100%);
-    max-height: clamp(150px, calc(100vh - 560px), 200px);
-    overflow: auto;
+  .rfs-layout__dock [data-rfs-panel="takeoff-setup"] {
+    max-height: clamp(90px, calc(100vh - 700px), 180px);
   }
 }
 
@@ -351,40 +447,28 @@ const layoutCss = `
 }
 
 @media (max-width: 1100px), (max-height: 760px) {
-  .rfs-layout__top-left {
-    top: 8px;
+  .rfs-layout__dock {
+    top: 50px;
     left: 8px;
-    right: auto;
     width: clamp(272px, 31vw, 284px);
-    max-height: calc(100vh - 256px);
-    flex-direction: column;
-    gap: 8px;
-    overflow: hidden;
+    max-height: calc(100vh - 410px);
+    gap: var(--rfs-space-2);
   }
 
-  .rfs-layout__top-left [data-rfs-panel="scenario"] {
-    flex: 0 1 auto;
-    width: 100%;
+  .rfs-layout__dock [data-rfs-panel="scenario"] {
     max-height: clamp(80px, calc(100vh - 632px), 118px);
-    overflow: auto;
   }
 
-  .rfs-layout__top-left [data-rfs-panel="route-builder"] {
-    flex: 0 1 auto;
-    width: 100%;
-    max-height: clamp(112px, calc(100vh - 590px), 132px);
-    overflow: auto;
+  .rfs-layout__dock [data-rfs-panel="route-builder"] {
+    max-height: clamp(90px, calc(100vh - 620px), 100px);
   }
 
-  .rfs-layout__top-left [data-rfs-panel="takeoff-setup"] {
-    flex: 0 1 auto;
-    width: 100%;
-    max-height: clamp(122px, calc(100vh - 600px), 150px);
-    overflow: auto;
+  .rfs-layout__dock [data-rfs-panel="takeoff-setup"] {
+    max-height: clamp(90px, calc(100vh - 620px), 100px);
   }
 
   .rfs-layout__top-right {
-    top: 8px;
+    top: 50px;
     right: 8px;
     width: 220px;
     max-height: clamp(122px, calc(100vh - 560px), 190px);
@@ -398,7 +482,7 @@ const layoutCss = `
   }
 
   .rfs-layout__debug {
-    top: 8px;
+    top: 50px;
     left: calc(8px + clamp(272px, 31vw, 284px) + 8px);
     width: max(220px, calc(100vw - clamp(272px, 31vw, 284px) - 492px));
     min-width: 0;

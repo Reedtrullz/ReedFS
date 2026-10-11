@@ -39,6 +39,7 @@ import { RouteEditPanel } from '../components/RouteEditPanel';
 import { BottomControlBar, type AudioUiStatus } from '../components/BottomControlBar';
 import { AudioSettings } from '../components/AudioSettings';
 import { RfsLayout } from '../components/layout/RfsLayout';
+import type { WorkspaceMode } from '../components/layout/workspaceMode';
 import type { FramePhase, FramePhaseContext } from '../runtime/frameScheduler';
 import { useScenarioWeather } from './useScenarioWeather';
 import { createDefaultAutopilotStateFromAircraft } from '../instruments/defaultAutopilotState';
@@ -333,6 +334,8 @@ export function RfsShell() {
     gamepadCommandHandlerRef.current = handleGamepadCommands;
   }, [handleGamepadCommands]);
 
+  const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>('flight');
+  const [setupDockOpen, setSetupDockOpen] = useState(true);
   const showDebugOverlays = shouldShowDebugOverlays(overlayMode);
   const showFlightInstruments = shouldShowFlightInstruments(overlayMode);
   const viewerReady = viewerGeneration > 0;
@@ -411,6 +414,10 @@ export function RfsShell() {
       routeStatus={showFlightInstruments ? <RouteStatus /> : null}
       takeoffSetupPanel={showFlightInstruments ? <TakeoffSetupPanel /> : null}
       engineStrip={<EngineStrip />}
+      workspaceMode={workspaceMode}
+      onChangeWorkspaceMode={setWorkspaceMode}
+      setupDockOpen={setupDockOpen}
+      onToggleSetupDock={() => setSetupDockOpen((open) => !open)}
       buildWatermark={showDebugOverlays ? <>RFS — Flight Test Build</> : null}
       fpsMonitor={showDebugOverlays ? <FPSMonitor registerFrameEffect={registerFrameEffect} /> : null}
       controls={(
