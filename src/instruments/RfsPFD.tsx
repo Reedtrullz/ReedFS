@@ -2,6 +2,7 @@ import { useEffect, useState, type CSSProperties } from 'react';
 import { observationStatus } from './observationStatus';
 import { useSimStore } from '../store/simStore';
 import { useHeadingReferenceStore } from '../store/headingReferenceStore';
+import { baroSettingHpa, useBaroStore } from '../store/baroStore';
 import { headingDisplayContext, headingDisplayText } from '../sim/headingDisplay';
 import {
   pfdObservation, baroIndicatedAltitudeFt,
@@ -29,6 +30,19 @@ const glass: CSSProperties = {
   boxShadow: '0 0 18px rgba(0,0,0,0.55)',
   color: '#e8f8ff',
   fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+};
+
+const baroButtonStyle: CSSProperties = {
+  background: 'rgba(0,0,0,0.6)',
+  color: '#9ddcff',
+  border: '1px solid rgba(120,180,210,0.35)',
+  borderRadius: 3,
+  fontSize: 10,
+  fontWeight: 800,
+  fontFamily: 'inherit',
+  padding: '1px 6px',
+  lineHeight: 1.4,
+  cursor: 'pointer',
 };
 
 function tapeTicks(center: number, step: number, radius: number, min = 0): number[] {
@@ -460,8 +474,10 @@ export function RfsPFD() {
   const attitude = quatToEuler(aircraftForVnav.quaternion);
   const ias = Math.max(0, derived.ias); const vs = derived.vs;
   const trueAltitude = Math.max(0, aircraftForVnav.position.alt);
-  const qnhHpa = weather && Number.isFinite(weather.qnhHpa) ? weather.qnhHpa : null;
-  const indicatedAltitude = Math.max(0, baroIndicatedAltitudeFt(aircraftForVnav.position.alt, qnhHpa ?? 1013.25));
+  const weatherQnhHpa = weather && Number.isFinite(weather.qnhHpa) ? weather.qnhHpa : null;
+  const baroSetting = useBaroStore((s) => s.setting);
+  const knobHpa = baroSettingHpa(baroSetting, weatherQnhHpa ?? 1013.25);
+  const indicatedAltitude = Math.max(0, baroIndicatedAltitudeFt(aircraftForVnav.position.alt, knobHpa));
   const pitch = attitude.theta * 180 / Math.PI; const roll = attitude.phi * 180 / Math.PI;
   const hdgTrue = (attitude.psi * 180 / Math.PI + 360) % 360;
   const headingReference = useHeadingReferenceStore((s) => s.reference);
@@ -752,21 +768,40 @@ export function RfsPFD() {
           selectedBug={hasMcpTargets ? { ariaLabel: 'Altitude selected bug', label: 'ALT BUG', value: selectedAltitude } : undefined}
         />
         <div
-          aria-label="Altimeter QNH setting"
+          aria-label="Altimeter barometric setting"
           style={{
             marginTop: 6,
-            padding: '3px 8px',
-            borderRadius: 4,
-            background: 'rgba(0,0,0,0.55)',
-            border: '1px solid rgba(120,180,210,0.35)',
-            color: qnhHpa === 1013.25 ? '#ffd84a' : '#ffffff',
-            fontSize: 12,
-            fontWeight: 800,
-            letterSpacing: 0.6,
-            textAlign: 'right',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 2,
+            pointerEvents: 'auto',
           }}
         >
-          {qnhHpa !== null ? `QNH ${qnhHpa.toFixed(0)}` : 'QNH STD'}
+          <div
+            style={{
+              padding: '3px 8px',
+              borderRadius: 4,
+              background: 'rgba(0,0,0,0.55)',
+              border: '1px solid rgba(120,180,210,0.35)',
+              color: baroSetting.mode === 'std' ? '#ffd84a' : '#ffffff',
+              fontSize: 12,
+              fontWeight: 800,
+              letterSpacing: 0.6,
+              textAlign: 'right',
+            }}
+          >
+            {baroSetting.mode === 'std'
+              ? 'STD'
+              : baroSetting.unit === 'inHg'
+                ? `${(knobHpa / 33.8639).toFixed(2)} IN`
+                : `QNH ${knobHpa.toFixed(0)}`}
+          </div>
+          <div aria-label="Barometric setting controls" style={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
+            <button type="button" aria-label="Decrease barometric setting" style={baroButtonStyle} onClick={() => useBaroStore.getState().setQnhHpa(knobHpa - 1)}>-</button>
+            <button type="button" aria-label="Increase barometric setting" style={baroButtonStyle} onClick={() => useBaroStore.getState().setQnhHpa(knobHpa + 1)}>+</button>
+            <button type="button" aria-label="Toggle standard pressure" style={baroButtonStyle} onClick={() => useBaroStore.getState().setMode(baroSetting.mode === 'std' ? 'qnh' : 'std')}>STD</button>
+            <button type="button" aria-label="Toggle barometric unit" style={baroButtonStyle} onClick={() => useBaroStore.getState().setUnit(baroSetting.unit === 'hPa' ? 'inHg' : 'hPa')}>IN</button>
+          </div>
         </div>
       </div>
     </section>

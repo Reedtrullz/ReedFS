@@ -20,6 +20,7 @@ import {
 } from '../scenarioPersistence';
 import type { SimStoreSet } from './aircraftSlice';
 import { cloneWeather } from './aircraftSlice';
+import { useBaroStore } from '../baroStore';
 import { levelEquilibriumReceiptForScenario } from '../levelEquilibrium';
 import { createRouteState } from './routeSlice';
 import { withBrowserScenarioSaveLock } from '../browserScenarioStorage';
@@ -29,6 +30,9 @@ function defaultScenarioStorage(): ScenarioPersistenceStorage | null {
 }
 
 export function restoreSnapshotSlice(snapshot: ScenarioSnapshot, slotName = 'Saved scenario'): Partial<SimStore> {
+  if (snapshot.baroSetting) {
+    useBaroStore.setState({ setting: { ...snapshot.baroSetting } });
+  }
   const aircraft = structuredClone(snapshot.aircraft);
   aircraft.config = normalizeAircraftConfig(aircraft.config);
   const apState = structuredClone(snapshot.apState);

@@ -1,5 +1,6 @@
 import type { AutopilotState, LateralMode, VerticalMode } from '@shared/autopilot/autopilotTypes';
 import type { SimStore } from './simStore';
+import { baroSettingHpa, useBaroStore } from './baroStore';
 import { B737_800_SPEC } from '../sim/types';
 import { computeDerived } from '../sim/physics/derived';
 import { quatToEuler } from '../sim/physics/quaternion';
@@ -74,8 +75,9 @@ export function baroIndicatedAltitudeFt(trueAltitudeFt: number, qnhHpa: number):
 }
 
 export const selectPfdAltitude = (s: SimStore) => {
-  const qnhHpa = pfdObservation(s).weather?.qnhHpa ?? null;
-  const indicated = baroIndicatedAltitudeFt(pfdObservation(s).aircraft.position.alt, qnhHpa ?? STANDARD_PRESSURE_HPA);
+  const weatherQnhHpa = pfdObservation(s).weather?.qnhHpa ?? null;
+  const knobHpa = baroSettingHpa(useBaroStore.getState().setting, weatherQnhHpa ?? STANDARD_PRESSURE_HPA);
+  const indicated = baroIndicatedAltitudeFt(pfdObservation(s).aircraft.position.alt, knobHpa);
   return Math.max(0, indicated);
 };
 

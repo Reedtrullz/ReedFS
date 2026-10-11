@@ -9,6 +9,7 @@ import { createInputManagerState } from '../../input/InputManager';
 import { resetGPWS } from '../../audio/GPWS';
 import type { ScenarioWeatherMetadata, WindInfo } from '../../sim/weather';
 import type { SimStore } from '../simStore';
+import { useBaroStore } from '../baroStore';
 import { hasCoherentScenarioClock, parseScenarioUtc, utcHours } from '../../sim/scenarioClock';
 import {
   inputManagerForScenario,
@@ -290,6 +291,9 @@ export function createAircraftSlice(set: SimStoreSet): Pick<
     setScenario: (scenarioId) => set((s) => {
       resetGPWS();
       const scenario = scenarioById(scenarioId);
+      if (Number.isFinite(scenario.weather?.qnhHpa)) {
+        useBaroStore.getState().seed(scenario.weather.qnhHpa);
+      }
       const solved = solvedScenarioInitialization(scenario);
       const pilotInputs = solved ? solved.pilotInputs : inputsForScenario(scenario);
       const aircraft = solved ? structuredClone(solved.aircraft) : createAircraftStateForScenario(B737_800_SPEC, scenario);
