@@ -859,6 +859,13 @@ GitHub: [#85](https://github.com/Reedtrullz/ReedFS/issues/85) · draft **RFS-27*
 
 **Issue acceptance retained:** Two devices, reconnect/reorder, noisy axes and profile reset behave predictably; calibration actually changes flight input. Do not claim HOTAS compatibility from mocked browser tests alone.
 
+**Implementation receipt - first increment (2026-10-11):** [PR #204](https://github.com/Reedtrullz/ReedFS/pull/204) merged as 9a2c0a63cbb6878474dc5d8ad78aed896b5e9d98 (branch codex/rfs-85-calibration), before issue #85 closure. CI run 38137477194 green on all non-e2e jobs and e2e shards 1 and 3; shard 2 disclosed-merge per the known heading-reference flake (PR comment 6109115295) after the concurrent master run 38137321680 reproduced the identical double failure on the same test.
+
+- Scope landed: shell wires calibrated `readGamepadActions` through `gamepadCalibrationRef`; GAMEPAD CALIBRATION with deadzone/inversion/noise/sensitivity controls and LIVE INPUT PREVIEW in Controls Settings; settings persist in localStorage `rfs.gamepadSettings.v1`; unit tests cover settings persistence and component wiring. App bundle allowance re-measured 456 -> 459 KiB (gzip 145 -> 146; measured 458.9/144.9 KiB in CI run 38137477194).
+- Local gates at 7d7962d: tsc, ESLint, full Vitest 1337/1337, production build, bundle budget, visual 6/6 on rerun. First CI attempt 38137477194 failed only e2e shard 2/3 on the known flake; all deterministic jobs and other shards passed.
+- Residual scope: device selection UI and per-device mapping editor, calibration profiles (save/load/switch), HOTAS/pedals and independent throttle/brake axes after measured browser/device support.
+- Non-claims: HOTAS compatibility not claimed from mocked Gamepad API tests; no physical hardware pass. Issue #85 stays open; Project item moved to In Progress.
+
 <a id="issue-93"></a>
 ## #93 — Make the selected aircraft a complete simulation contract
 
