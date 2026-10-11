@@ -8,6 +8,7 @@ import {
   deriveEffectiveAutoflightTruth,
   hasSyntheticApproachAutolandCapability,
 } from '../sim/systems/effectiveAutoflightTruth';
+import { MAX_VNAV_VS_FPM } from '../sim/systems/vnav';
 import { takeoffCueText } from '../sim/takeoffCue';
 import { createDefaultAutopilotState, createDefaultAutopilotStateFromAircraft } from '../instruments/defaultAutopilotState';
 
@@ -172,6 +173,8 @@ export interface McpModeAvailabilityState {
   lnavUnavailableReason: string | null;
   routeArmingEligible: boolean;
   vnavBackedMode: VerticalMode;
+  vnavPathInfeasible: boolean;
+  vnavRequiredVsFpm: number | null;
   approachAutolandAvailable: boolean;
   approachAutolandUnavailableReason: string | null;
 }
@@ -221,8 +224,12 @@ export function mcpModeAvailability(state: McpModeAvailabilityState, mode: Enabl
   const routeReason = mode === 'LNAV' && !state.lnavAvailable && !state.routeArmingEligible
     ? `LNAV unavailable: ${state.lnavUnavailableReason ?? 'route guidance unavailable'}`
     : null;
-  const vnavReason = mode === 'VNAV' && state.vnavBackedMode === 'OFF'
-    ? 'VNAV unavailable: no active altitude constraint'
+  const vnavReason = mode === 'VNAV'
+    ? state.vnavBackedMode === 'OFF'
+      ? 'VNAV unavailable: no active altitude constraint'
+      : state.vnavPathInfeasible
+        ? `VNAV path infeasible: required ${Math.round(state.vnavRequiredVsFpm ?? MAX_VNAV_VS_FPM)} fpm exceeds ${MAX_VNAV_VS_FPM} fpm capability; commanding ${MAX_VNAV_VS_FPM} fpm`
+        : null
     : null;
   const approachReason = mode === 'APP' && !state.approachAutolandAvailable
     ? state.approachAutolandUnavailableReason ?? 'APP unavailable: compatible synthetic approach required'
@@ -288,6 +295,8 @@ export function selectMcpViewModel(s: SimStore): McpViewModel {
     lnavUnavailableReason: s.routeStatus.lnavUnavailableReason,
     routeArmingEligible: !s.routeStatus.routeValid && s.flightPlan !== null,
     vnavBackedMode: backedVnavMode,
+    vnavPathInfeasible: (effectiveTruth as { vnavPathInfeasible?: boolean }).vnavPathInfeasible === true,
+    vnavRequiredVsFpm: finiteNumber((effectiveTruth as { vnavRequiredVsFpm?: number }).vnavRequiredVsFpm),
     approachAutolandAvailable,
     approachAutolandUnavailableReason: approachAutolandAvailable
       ? null

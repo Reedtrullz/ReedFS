@@ -30,6 +30,9 @@ const BUDGETS = {
   // Power-distribution increment (#76 first increment): measured 454.2 / 143.8 KiB
   // at d83647d; electrical bus derivation, hydraulically gated gear retraction,
   // and engine-strip pressure readouts add 1.0 raw KiB. Budget re-measures.
+  // VNAV infeasibility increment (#77): measured 453.2 / 143.5 KiB at 55ff9d4;
+  // VNAV truth plumbing across sim/store surfaces adds 0.7 raw KiB. Budget
+  // re-measures per campaign convention.
   app: { rawBytes: 455 * 1024, gzipBytes: 144 * 1024, required: true },
   // React/Zustand framework chunk baseline: raw 182.4 KiB / gzip 56.7 KiB.
   vendorReact: { rawBytes: 212 * 1024, gzipBytes: 66 * 1024, required: true },

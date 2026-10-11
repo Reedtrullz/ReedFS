@@ -377,4 +377,87 @@ describe('computeVNAV', () => {
     expect(capturedVnav.targetAltitudeSource).toBe('VNAV_CONSTRAINT');
     expect(capturedVnav.captureTargetAltFt).toBe(10000);
   });
+
+  it('reports an infeasible climb demand instead of silently clamping it', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.position.alt = 5000;
+    s.velocity.u = 128.6; // 250 kt
+    const fp: FlightPlan = {
+      origin: 'KSEA',
+      destination: 'KPDX',
+      flightNumber: '',
+      route: 'KSEA WPT1',
+      waypoints: [{
+        ident: 'WPT1',
+        lat: 47.5,
+        lon: -122.31,
+        discontinuity: false,
+        altitudeConstraint: { type: 'AT', altitude: 15000 },
+      }],
+    };
+    const nearLeg = { ...navOut, alongTrackDist: 1000 }; // 0.54 NM at 250 kt: 10000 ft climb demand far exceeds 3000 fpm.
+
+    const v = computeVNAV(s, fp, nearLeg);
+
+    expect(v.lifecycle).toBe('PATH');
+    expect(v.verticalMode).toBe('VNAV_PTH');
+    expect(v.pathInfeasible).toBe(true);
+    expect(v.requiredVsFpm).toBeGreaterThan(3000);
+    expect(v.targetVs).toBe(3000);
+  });
+
+  it('reports an infeasible descent demand instead of silently clamping it', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.position.alt = 30000;
+    s.velocity.u = 128.6;
+    const fp: FlightPlan = {
+      origin: 'KSEA',
+      destination: 'KPDX',
+      flightNumber: '',
+      route: 'KSEA WPT1',
+      waypoints: [{
+        ident: 'WPT1',
+        lat: 47.5,
+        lon: -122.31,
+        discontinuity: false,
+        altitudeConstraint: { type: 'AT', altitude: 10000 },
+      }],
+    };
+    const nearLeg = { ...navOut, alongTrackDist: 10000 }; // 5.4 NM at 250 kt: 20000 ft descent demand far exceeds 3000 fpm.
+
+    const v = computeVNAV(s, fp, nearLeg);
+
+    expect(v.lifecycle).toBe('PATH');
+    expect(v.pathInfeasible).toBe(true);
+    expect(v.requiredVsFpm).toBeLessThan(-3000);
+    expect(v.targetVs).toBe(-3000);
+  });
+
+  it('keeps a feasible climb path free of the infeasibility flag', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.position.alt = 5000;
+    s.velocity.u = 128.6;
+    const fp: FlightPlan = {
+      origin: 'KSEA',
+      destination: 'KPDX',
+      flightNumber: '',
+      route: 'KSEA WPT1',
+      waypoints: [{
+        ident: 'WPT1',
+        lat: 47.5,
+        lon: -122.31,
+        discontinuity: false,
+        altitudeConstraint: { type: 'AT', altitude: 8000 },
+      }],
+    };
+    const nearLeg = { ...navOut, alongTrackDist: 10000 }; // 5.4 NM at 250 kt: 3000 ft climb is sustainable.
+
+    const v = computeVNAV(s, fp, nearLeg);
+
+    expect(v.lifecycle).toBe('PATH');
+    expect(v.pathInfeasible).toBe(false);
+    expect(v.requiredVsFpm).toBeUndefined();
+    expect(v.targetVs).toBeGreaterThan(0);
+    expect(v.targetVs).toBeLessThanOrEqual(3000);
+  });
 });
