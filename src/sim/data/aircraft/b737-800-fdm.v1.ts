@@ -142,6 +142,7 @@ export const B737_800_FDM: VersionedAircraftFdmData = {
     idleN1Percent: 20,
     togaN1Percent: 100,
     idleN2Percent: 22,
+    reverseIdleN1Percent: 30,
     n2PerN1Percent: 1.05,
     spoolUpTimeConstantSeconds: 1.5,
     spoolDownTimeConstantSeconds: 3,

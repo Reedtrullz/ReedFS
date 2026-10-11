@@ -146,7 +146,7 @@ export function RfsShell() {
 
       const action = applyDiscreteKeyAction(key);
       if (action) {
-        if ((key === 'g' || key === 'f') && e.repeat) return;
+        if ((key === 'g' || key === 'f' || key === 'k' || key === 'r') && e.repeat) return;
         e.preventDefault();
         useSimStore.getState().applyInputActions(action, 0);
       }

@@ -39,6 +39,8 @@ export function Telemetry() {
       {row('GW', `${vm.grossWeightKg.toFixed(0)} kg`)}
       {row('FLAPS', `${vm.flapSetting}°`)}
       {row('GEAR', vm.gearDown ? 'DN' : 'UP')}
+      {row('SPLR', vm.spoilerDeployed ? 'DEPLOYED' : vm.spoilerArmed ? 'ARMED' : 'OFF')}
+      {row('REV', vm.reverseIdle ? 'IDLE' : 'FWD')}
     </div>
   );
 }

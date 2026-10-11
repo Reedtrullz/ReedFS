@@ -6,6 +6,8 @@ export type ControlBindingId =
   | 'rudder'
   | 'throttle'
   | 'brake'
+  | 'groundSpoilers'
+  | 'reverseIdle'
   | 'differentialBrake'
   | 'gear'
   | 'flaps'
@@ -87,6 +89,20 @@ export const DEFAULT_CONTROL_BINDINGS: ControlBinding[] = [
     keyboard: ['F'],
     gamepad: ['Gamepad LB/L1'],
     description: `Cycle B737 flap detents ${B737_FLAP_DETENTS.join('/')} for takeoff/approach setup.`,
+  },
+  {
+    id: 'groundSpoilers',
+    label: 'Ground spoilers',
+    keyboard: ['K'],
+    gamepad: [],
+    description: 'Arm ground spoilers; they auto-deploy at touchdown after idle thrust.',
+  },
+  {
+    id: 'reverseIdle',
+    label: 'Reverse idle',
+    keyboard: ['R'],
+    gamepad: [],
+    description: 'Select reverse idle on the ground; rejected by airborne thrust commands.',
   },
   {
     id: 'trim',
