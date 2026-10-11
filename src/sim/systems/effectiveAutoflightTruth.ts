@@ -53,6 +53,8 @@ export type ManagedAltitudeCaptureTruth = AutoflightTruthState & {
   managedSpeedKt?: VnavOutput['managedSpeedKt'];
   managedSpeedSource?: VnavOutput['managedSpeedSource'];
   lateralOnly?: boolean;
+  vnavPathInfeasible?: boolean;
+  vnavRequiredVsFpm?: number;
 };
 
 function omitManagedAltitudeCaptureMetadata(truth: AutoflightTruthState): AutoflightTruthState {
@@ -62,6 +64,8 @@ function omitManagedAltitudeCaptureMetadata(truth: AutoflightTruthState): Autofl
   delete baseTruth.managedSpeedKt;
   delete baseTruth.managedSpeedSource;
   delete baseTruth.lateralOnly;
+  delete baseTruth.vnavPathInfeasible;
+  delete baseTruth.vnavRequiredVsFpm;
   return baseTruth;
 }
 
@@ -84,6 +88,7 @@ function vnavManagedAltitudeCaptureMetadata(vnav: VnavOutput | null): Partial<Ma
   return {
     targetAltitudeSource: vnav.targetAltitudeSource,
     captureTargetAltFt: vnav.captureTargetAltFt,
+    ...(vnav.pathInfeasible ? { vnavPathInfeasible: true, vnavRequiredVsFpm: vnav.requiredVsFpm } : {}),
   };
 }
 

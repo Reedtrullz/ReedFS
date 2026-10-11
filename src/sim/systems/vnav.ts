@@ -5,7 +5,7 @@ import type { NavOutput } from './navigation';
 
 const M_PER_NM = 1852;
 const EARTH_RADIUS_M = 6371000;
-const MAX_VNAV_VS_FPM = 3000;
+export const MAX_VNAV_VS_FPM = 3000;
 const VNAV_ALT_HOLD_CAPTURE_FT = 50;
 const VNAV_ALT_ACQUIRE_FT = 250;
 const VNAV_DESCENT_PATH_FT_PER_NM = 318;
@@ -50,6 +50,10 @@ export interface VnavOutput {
   distanceToConstraintNm?: number;
   todDistanceNm?: number;
   distanceToTodNm?: number;
+  /** True when the raw path VS demand exceeds the +-3000 fpm VNAV capability; the commanded VS is then clamped. */
+  pathInfeasible: boolean;
+  /** Pre-clamp VS demand in fpm; finite only when pathInfeasible is true. */
+  requiredVsFpm?: number;
 }
 
 interface VnavTargetWaypoint {
@@ -91,6 +95,7 @@ function unavailable(state: AircraftState, reason: string, lifecycle: VnavLifecy
   return {
     targetAlt: state.position.alt,
     targetVs: 0,
+    pathInfeasible: false,
     altitudeConstraint: false,
     verticalMode: null,
     available: false,
@@ -186,12 +191,12 @@ function findVnavSpeedTarget(flightPlan: FlightPlan, nav: NavOutput): VnavTarget
   return null;
 }
 
-function requiredVerticalSpeedFpm(state: AircraftState, targetAltFt: number, distanceToConstraintM: number): number {
+function rawVerticalSpeedDemandFpm(state: AircraftState, targetAltFt: number, distanceToConstraintM: number): number {
   const distNm = Math.max(0, distanceToConstraintM / M_PER_NM);
   const tasKt = Math.hypot(state.velocity.u, state.velocity.v, state.velocity.w) * 1.944;
   const timeSec = tasKt > 50 && distNm > 0.05 ? (distNm / tasKt) * 3600 : 999;
   const rawVs = timeSec > 0 ? ((targetAltFt - state.position.alt) / timeSec) * 60 : 0;
-  return clamp(rawVs, -MAX_VNAV_VS_FPM, MAX_VNAV_VS_FPM);
+  return rawVs;
 }
 
 function lifecycleForAltitudeTarget(state: AircraftState, targetAltFt: number, distanceToConstraintNm: number): {
@@ -249,13 +254,16 @@ export function computeVNAV(
     ? lifecycleForAltitudeTarget(state, altitudeTarget.altitudeTarget as number, altitudeDistanceToConstraintNm)
     : { lifecycle: 'SPEED_ONLY' as VnavLifecycle, verticalMode: null, todDistanceNm: 0, distanceToTodNm: 0 };
   const armedHoldAltFt = state.position.alt;
-  let targetVs = hasAltitudeTarget && altitudeLifecycle.lifecycle !== 'ARMED'
-    ? requiredVerticalSpeedFpm(state, altitudeTarget.altitudeTarget as number, altitudeTarget.distanceM)
+  const rawDemandFpm = hasAltitudeTarget && altitudeLifecycle.lifecycle !== 'ARMED'
+    ? rawVerticalSpeedDemandFpm(state, altitudeTarget.altitudeTarget as number, altitudeTarget.distanceM)
     : 0;
+  let targetVs = clamp(rawDemandFpm, -MAX_VNAV_VS_FPM, MAX_VNAV_VS_FPM);
   if (hasAltitudeTarget && altitudeLifecycle.lifecycle === 'PATH') {
     const climbDeltaFt = (altitudeTarget.altitudeTarget as number) - state.position.alt;
     if (climbDeltaFt > 0) targetVs = Math.max(targetVs, VNAV_MIN_CLIMB_VS_FPM);
   }
+  const pathInfeasible = hasAltitudeTarget && altitudeLifecycle.lifecycle === 'PATH' && Math.abs(rawDemandFpm) > MAX_VNAV_VS_FPM + 1e-9;
+  const requiredVsFpm = pathInfeasible ? rawDemandFpm : undefined;
 
   return {
     targetAlt: altitudeLifecycle.lifecycle === 'ARMED' ? armedHoldAltFt : altitudeTarget?.altitudeTarget ?? state.position.alt,
@@ -281,5 +289,7 @@ export function computeVNAV(
     distanceToConstraintNm,
     todDistanceNm: hasAltitudeTarget ? altitudeLifecycle.todDistanceNm : undefined,
     distanceToTodNm: hasAltitudeTarget ? altitudeLifecycle.distanceToTodNm : undefined,
+    pathInfeasible,
+    requiredVsFpm,
   };
 }

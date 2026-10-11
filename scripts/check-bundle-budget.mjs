@@ -27,7 +27,10 @@ const BUDGETS = {
   // Combined #73 + #75 merge commit f082bb5 measures 452.5 / 143.2 KiB; the sum of
   // separate branch measurements undercounts merged chunk layout, so the app
   // allowance re-measures once more on the combined result.
-  app: { rawBytes: 453 * 1024, gzipBytes: 144 * 1024, required: true },
+  // VNAV infeasibility increment (#77): measured 453.2 / 143.5 KiB at 55ff9d4;
+  // VNAV truth plumbing across sim/store surfaces adds 0.7 raw KiB. Budget
+  // re-measures per campaign convention.
+  app: { rawBytes: 454 * 1024, gzipBytes: 144 * 1024, required: true },
   // React/Zustand framework chunk baseline: raw 182.4 KiB / gzip 56.7 KiB.
   vendorReact: { rawBytes: 212 * 1024, gzipBytes: 66 * 1024, required: true },
   // Generic vendor chunk baseline: raw 3.5 KiB / gzip 1.5 KiB.
