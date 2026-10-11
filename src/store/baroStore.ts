@@ -9,26 +9,15 @@ export interface BaroSetting {
 }
 
 const UNSET_HPA = Number.NaN;
+const HPA_MIN = 880;
+const HPA_MAX = 1080;
 
 function validQnhHpa(value: unknown): boolean {
-  return typeof value === 'number' && Number.isFinite(value) && value >= 880 && value <= 1080;
-}
-
-function validUnit(value: unknown): boolean {
-  return value === 'hPa' || value === 'inHg';
-}
-
-function normalize(next: BaroSetting, prev: BaroSetting): BaroSetting {
-  return {
-    mode: next.mode === 'std' ? 'std' : 'qnh',
-    qnhHpa: validQnhHpa(next.qnhHpa) ? next.qnhHpa : prev.qnhHpa,
-    unit: validUnit(next.unit) ? next.unit : prev.unit,
-  };
+  return typeof value === 'number' && Number.isFinite(value) && value >= HPA_MIN && value <= HPA_MAX;
 }
 
 export function baroSettingHpa(setting: BaroSetting, fallbackHpa: number): number {
-  const qnh = validQnhHpa(setting.qnhHpa) ? setting.qnhHpa : fallbackHpa;
-  return setting.mode === 'std' ? 1013.25 : qnh;
+  return setting.mode === 'std' ? 1013.25 : validQnhHpa(setting.qnhHpa) ? setting.qnhHpa : fallbackHpa;
 }
 
 export const useBaroStore = create<{
@@ -44,16 +33,16 @@ export const useBaroStore = create<{
     : s)),
   setQnhHpa: (value) => {
     if (!validQnhHpa(value)) return false;
-    set((s) => ({ setting: normalize({ ...s.setting, qnhHpa: value, mode: 'qnh' }, s.setting) }));
+    set((s) => ({ setting: { ...s.setting, qnhHpa: value, mode: 'qnh' } }));
     return true;
   },
   setMode: (mode) => {
     if (mode !== 'qnh' && mode !== 'std') return false;
-    set((s) => ({ setting: normalize({ ...s.setting, mode }, s.setting) }));
+    set((s) => ({ setting: { ...s.setting, mode } }));
     return true;
   },
   setUnit: (unit) => {
-    if (!validUnit(unit)) return false;
+    if (unit !== 'hPa' && unit !== 'inHg') return false;
     set((s) => ({ setting: { ...s.setting, unit } }));
     return true;
   },

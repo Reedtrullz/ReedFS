@@ -314,7 +314,7 @@ export function captureScenarioSnapshot(state: SimStore): ScenarioSnapshot {
     activeLegIndex: state.activeLegIndex,
     wind: state.wind,
     weather: state.weather ?? scenarioById(state.selectedScenarioId).weather,
-    baroSetting: useBaroStore.getState().setting.qnhHpa >= 880 && useBaroStore.getState().setting.qnhHpa <= 1080
+    baroSetting: isBaroSetting(useBaroStore.getState().setting)
       ? { ...useBaroStore.getState().setting }
       : undefined,
     identities: SCENARIO_SNAPSHOT_IDENTITIES,

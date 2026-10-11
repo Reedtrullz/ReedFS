@@ -45,7 +45,11 @@ const BUDGETS = {
   // Workspace-mode increment (#59 first increment): measured 462.3 / 146.0
   // KiB at 8cb3dfc; workspace strip, setup dock, shared tokens, and tests add
   // 3.4 raw / 1.0 gzip KiB. Budget re-measures per campaign convention.
-  app: { rawBytes: 463 * 1024, gzipBytes: 147 * 1024, required: true },
+  // Barometric-setting increment (#133 first increment): measured 464.6 /
+  // 146.6 KiB at 4570f97; baro store, PFD knob controls, and persistence
+  // validation add 2.3 raw / 0.6 gzip KiB. Budget re-measures per campaign
+  // convention.
+  app: { rawBytes: 466 * 1024, gzipBytes: 148 * 1024, required: true },
   // React/Zustand framework chunk baseline: raw 182.4 KiB / gzip 56.7 KiB.
   vendorReact: { rawBytes: 212 * 1024, gzipBytes: 66 * 1024, required: true },
   // Generic vendor chunk baseline: raw 3.5 KiB / gzip 1.5 KiB.
