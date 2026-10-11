@@ -266,6 +266,7 @@ describe('integrate', () => {
   it('moves gear actual position over time instead of snapping to the gear lever', () => {
     const state = airborneTakeoffConfigState(0);
     state.config.gearDown = true;
+    state.hydraulic.systemAPsi = 3000;
 
     integrate(state, { ...idle, gearLever: 'UP' }, B737_800_SPEC, 0.5);
 
@@ -1121,6 +1122,7 @@ describe('integrate', () => {
     airborne.position = ksea16LPositionMeters(300, 0, KSEA_RUNWAY_ALT_FT + 1000);
     airborne.config.gearDown = true;
     airborne.config.gearPosition = 1;
+    airborne.hydraulic.systemAPsi = 3000;
     airborne.ground = {
       ...airborne.ground,
       aglFt: 1000,
@@ -1345,5 +1347,29 @@ describe('integrate', () => {
     const bank: ControlInputs = { ...idle, throttle1: 0.6, throttle2: 0.6, aileron: -1, gearLever: 'UP' };
     for (let i = 0; i < 30; i++) integrate(s, bank, B737_800_SPEC, 1/60);
     expect(s.angularVel.p).toBeLessThan(0);
+  });
+});
+describe('hydraulically gated gear retraction (#76 first increment)', () => {
+  it('retracts the gear when a hydraulic system is pressurized', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.engines[0].running = true; s.engines[0].n2 = 60;
+    s.hydraulic.systemAPsi = 3000;
+    s.config.gearPosition = 1;
+    s.ground.weightOnWheels = false;
+    const controls: ControlInputs = { ...idle, gearLever: 'UP' };
+    for (let i = 0; i < 40; i++) integrate(s, controls, B737_800_SPEC, 0.5);
+    expect(s.config.gearPosition).toBeLessThan(0.1);
+  });
+
+  it('holds the gear extended when every hydraulic system is depressurized', () => {
+    const s = createInitialState(B737_800_SPEC);
+    s.hydraulic.systemAPsi = 0;
+    s.hydraulic.systemBPsi = 0;
+    s.hydraulic.standbyPsi = 0;
+    s.config.gearPosition = 1;
+    s.ground.weightOnWheels = false;
+    const controls: ControlInputs = { ...idle, gearLever: 'UP' };
+    for (let i = 0; i < 40; i++) integrate(s, controls, B737_800_SPEC, 0.5);
+    expect(s.config.gearPosition).toBe(1);
   });
 });

@@ -42,6 +42,16 @@ export function EngineStrip() {
       </div>
 
       <div style={indicatorBlock}>
+        <span style={labelStyle}>HYD A</span>
+        <span style={{ ...valueStyle, color: vm.hydAPsi > 2500 ? '#0f0' : '#ff0' }}>{Math.round(vm.hydAPsi)}</span>
+      </div>
+
+      <div style={indicatorBlock}>
+        <span style={labelStyle}>HYD B</span>
+        <span style={{ ...valueStyle, color: vm.hydBPsi > 2500 ? '#0f0' : '#ff0' }}>{Math.round(vm.hydBPsi)}</span>
+      </div>
+
+      <div style={indicatorBlock}>
         <span style={labelStyle}>FLAPS CMD</span>
         <span style={{ ...valueStyle, color: vm.flapCommand > 0 ? '#9df' : '#666' }}>{vm.flapCommand}°</span>
       </div>

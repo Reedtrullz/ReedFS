@@ -149,7 +149,7 @@ function syntheticBaseState(request: LevelEquilibriumRequest): AircraftState {
       leftTank: request.fuel.leftTank,
       rightTank: request.fuel.rightTank,
     },
-    electrical: { gen1Online: true, gen2Online: true, acBusPowered: true, batteryVolts: 28 },
+    electrical: { gen1Online: true, gen2Online: true, acBusPowered: true, dcBusPowered: true, hotBatteryBusPowered: true, batteryVolts: 28 },
     hydraulic: { systemAPsi: 3000, systemBPsi: 3000, standbyPsi: 0 },
     zeroFuelWeight: request.grossWeightKg - fuelTotalKg,
     zeroFuelCg: request.cgPercent,

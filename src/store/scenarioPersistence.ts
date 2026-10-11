@@ -97,6 +97,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function aircraftForSnapshot(value: Record<string, unknown>): unknown {
   const raw = value.aircraft;
   if (!isRecord(raw) || !isRecord(raw.config)) return raw;
+  const electrical = isRecord(raw.electrical) ? { ...raw.electrical } : undefined;
+  if (electrical) {
+    const batteryVolts = typeof electrical.batteryVolts === 'number' ? electrical.batteryVolts : 28;
+    electrical.dcBusPowered = electrical.dcBusPowered === true
+      || electrical.acBusPowered === true || batteryVolts > 18;
+    electrical.hotBatteryBusPowered = electrical.hotBatteryBusPowered === true || batteryVolts > 18;
+  }
   if (value.version === 4) return raw;
   if (![1, 2, 3].includes(Number(value.version)) || raw.utcEpochMs !== undefined
     || typeof raw.simTime !== 'number' || !Number.isFinite(raw.simTime) || raw.simTime < 0
@@ -106,6 +113,7 @@ function aircraftForSnapshot(value: Record<string, unknown>): unknown {
     utcEpochMs: LEGACY_SCENARIO_MIDNIGHT_MS + raw.timeOfDay * 3_600_000 - raw.simTime,
     config: value.version !== 3 && raw.config.gearPosition === undefined
       ? { ...raw.config, gearPosition: raw.config.gearDown === true ? 1 : 0 } : raw.config,
+    ...(electrical ? { electrical } : {}),
   };
 }
 
