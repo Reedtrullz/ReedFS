@@ -42,7 +42,10 @@ const BUDGETS = {
   // Asset-preflight increment (#99 first increment): measured 460.5 / 145.5 KiB;
   // manifest contract validation and admission checks add 1.6 raw / 0.6 gzip
   // KiB over the #85 allowance. Budget re-measures per campaign convention.
-  app: { rawBytes: 461 * 1024, gzipBytes: 146 * 1024, required: true },
+  // Workspace-mode increment (#59 first increment): measured 462.3 / 146.0
+  // KiB at 8cb3dfc; workspace strip, setup dock, shared tokens, and tests add
+  // 3.4 raw / 1.0 gzip KiB. Budget re-measures per campaign convention.
+  app: { rawBytes: 463 * 1024, gzipBytes: 147 * 1024, required: true },
   // React/Zustand framework chunk baseline: raw 182.4 KiB / gzip 56.7 KiB.
   vendorReact: { rawBytes: 212 * 1024, gzipBytes: 66 * 1024, required: true },
   // Generic vendor chunk baseline: raw 3.5 KiB / gzip 1.5 KiB.
