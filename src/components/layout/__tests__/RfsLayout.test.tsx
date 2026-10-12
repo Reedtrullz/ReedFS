@@ -56,6 +56,17 @@ describe('RfsLayout', () => {
     expect(document.querySelector('[data-rfs-workspace="flight"]')?.getAttribute('aria-pressed')).toBe('true');
   });
 
+  it('places the preflight sheet before the existing setup controls', () => {
+    renderLayout({
+      workspaceMode: 'briefing', setupDockOpen: true,
+      preflightSheet: <section aria-label="Preflight sheet">Preflight</section>,
+      scenarioPanel: <div>scenario</div>, takeoffSetupPanel: <div>takeoff</div>,
+    });
+    const dock = screen.getByRole('complementary', { name: 'Setup dock' });
+    expect(dock.firstElementChild?.getAttribute('data-rfs-panel')).toBe('preflight');
+    expect(document.querySelector('[data-rfs-panel="takeoff-setup"]')).toBeTruthy();
+  });
+
   it('toggles the setup dock from the header control', () => {
     const onToggle = vi.fn();
     renderLayout({ scenarioPanel: <div>scenario</div>, onToggleSetupDock: onToggle });
