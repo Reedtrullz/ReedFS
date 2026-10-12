@@ -49,7 +49,11 @@ const BUDGETS = {
   // 146.6 KiB at 4570f97; baro store, PFD knob controls, and persistence
   // validation add 2.3 raw / 0.6 gzip KiB. Budget re-measures per campaign
   // convention.
-  app: { rawBytes: 466 * 1024, gzipBytes: 148 * 1024, required: true },
+  // Touch-flight-pad increment (#60 first increment): measured 466.4 / 147.2
+  // KiB at a9c86a2; touch yoke and rudder pads, pointer-capture guards, and
+  // tests add 1.8 raw / 0.6 gzip KiB. Budget re-measures per campaign
+  // convention.
+  app: { rawBytes: 467 * 1024, gzipBytes: 148 * 1024, required: true },
   // React/Zustand framework chunk baseline: raw 182.4 KiB / gzip 56.7 KiB.
   vendorReact: { rawBytes: 212 * 1024, gzipBytes: 66 * 1024, required: true },
   // Generic vendor chunk baseline: raw 3.5 KiB / gzip 1.5 KiB.
