@@ -12,7 +12,7 @@ const wrapStyle: CSSProperties = {
 };
 
 const padStyle: CSSProperties = {
-  aspectRatio: '1.4 / 1',
+  aspectRatio: '2.2 / 1',
   background: 'rgba(2, 8, 12, 0.82)',
   border: '1px solid rgba(157, 220, 255, 0.4)',
   borderRadius: 8,
@@ -35,7 +35,6 @@ const markerStyle: CSSProperties = {
 
 const rudderStyle: CSSProperties = {
   ...padStyle,
-  aspectRatio: '2.2 / 1',
   flex: '0 1 120px',
 };
 
@@ -101,6 +100,7 @@ export function TouchFlightPad() {
           centerMarker();
         }}
         role="application"
+        className="rfs-touch-pad rfs-touch-pad--pitch"
         style={padStyle}
         tabIndex={0}
       >
@@ -124,6 +124,7 @@ export function TouchFlightPad() {
         }}
         onPointerUp={() => setInput({ rudder: 0 })}
         role="application"
+        className="rfs-touch-pad rfs-touch-pad--rudder"
         style={rudderStyle}
         tabIndex={0}
       />

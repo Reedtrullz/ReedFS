@@ -372,6 +372,8 @@ const layoutCss = `
   left: 14px;
   bottom: 32px;
   width: 220px;
+  max-height: 280px;
+  overflow-y: auto;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -519,11 +521,20 @@ const layoutCss = `
     left: 8px;
     bottom: 32px;
     width: clamp(260px, calc(100vw - 620px), 280px);
+    max-height: calc(100vh - 396px);
     gap: 6px;
   }
 
   .rfs-layout__controls > * {
     gap: 6px !important;
+  }
+
+  .rfs-layout__controls .rfs-touch-pad--pitch {
+    flex: 0 1 170px !important;
+  }
+
+  .rfs-layout__controls .rfs-touch-pad--rudder {
+    flex: 0 1 90px !important;
   }
 
   .rfs-layout__watermark {
