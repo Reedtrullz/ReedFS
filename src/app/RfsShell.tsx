@@ -34,6 +34,7 @@ import { ScenarioPanel } from '../components/ScenarioPanel';
 import { RouteStatus } from '../components/RouteStatus';
 import { SceneStatusOverlay } from '../components/SceneStatus';
 import { TakeoffSetupPanel } from '../components/TakeoffSetupPanel';
+import { PreflightSheet } from '../components/PreflightSheet';
 import { TouchFlightPad } from '../components/TouchFlightPad';
 import { RouteBuilderPanel } from '../components/RouteBuilderPanel';
 import { RouteEditPanel } from '../components/RouteEditPanel';
@@ -406,6 +407,7 @@ export function RfsShell() {
         />
       )}
       scenarioPanel={showFlightInstruments ? <ScenarioPanel /> : null}
+      preflightSheet={showFlightInstruments && workspaceMode === 'briefing' ? <PreflightSheet /> : null}
       routeBuilderPanel={showFlightInstruments ? (
         <>
           <RouteBuilderPanel onRouteLoad={setRouteLoadMessage} />

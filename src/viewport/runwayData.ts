@@ -395,9 +395,10 @@ export function runwayByAirportAndId(airport: string, runwayId: string): RunwayR
   );
 }
 
-export function orientedRunwayByAirportAndId(airport: string, runwayId: string): RunwayReference | undefined {
-  const runway = runwayByAirportAndId(airport, runwayId);
-  if (!runway) return undefined;
+export function orientedRunwayByAirportAndId(airport: string, runwayId: string, overrides?: RunwayOverrides | null): RunwayReference | undefined {
+  const catalogRunway = runwayByAirportAndId(airport, runwayId);
+  if (!catalogRunway) return undefined;
+  const runway = applyRunwayOverrides([catalogRunway], overrides)[0];
   if (runway.id === runwayId) return runway;
   if (runway.oppositeId !== runwayId) return undefined;
   return {

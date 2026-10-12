@@ -8,6 +8,7 @@ export interface RfsLayoutProps {
   flightInstruments?: ReactNode;
   sceneStatus?: ReactNode;
   scenarioPanel?: ReactNode;
+  preflightSheet?: ReactNode;
   routeBuilderPanel?: ReactNode;
   routeStatus?: ReactNode;
   takeoffSetupPanel?: ReactNode;
@@ -28,6 +29,7 @@ export function RfsLayout({
   flightInstruments,
   sceneStatus,
   scenarioPanel,
+  preflightSheet,
   routeBuilderPanel,
   routeStatus,
   takeoffSetupPanel,
@@ -40,7 +42,7 @@ export function RfsLayout({
   setupDockOpen,
   onToggleSetupDock,
 }: RfsLayoutProps) {
-  const hasSetupPanels = Boolean(scenarioPanel || routeBuilderPanel || takeoffSetupPanel);
+  const hasSetupPanels = Boolean(preflightSheet || scenarioPanel || routeBuilderPanel || takeoffSetupPanel);
   const setupDockVisible = setupDockOpen && hasSetupPanels;
 
   return (
@@ -88,6 +90,7 @@ export function RfsLayout({
 
       {setupDockVisible && (
         <aside className="rfs-layout__dock" data-rfs-zone="setup-dock" aria-label="Setup dock">
+          {preflightSheet && <div data-rfs-panel="preflight">{preflightSheet}</div>}
           {scenarioPanel && <div data-rfs-panel="scenario">{scenarioPanel}</div>}
           {routeBuilderPanel && <div data-rfs-panel="route-builder">{routeBuilderPanel}</div>}
           {takeoffSetupPanel && <div data-rfs-panel="takeoff-setup">{takeoffSetupPanel}</div>}
@@ -263,6 +266,10 @@ const layoutCss = `
 .rfs-layout__dock > [data-rfs-panel] {
   pointer-events: auto;
   flex: 0 0 auto;
+}
+
+.rfs-layout[data-workspace="briefing"] .rfs-layout__dock {
+  max-height: calc(100vh - 382px);
 }
 
 .rfs-layout__dock > [data-rfs-panel] > * {
@@ -455,6 +462,10 @@ const layoutCss = `
     width: clamp(272px, 31vw, 284px);
     max-height: calc(100vh - 410px);
     gap: var(--rfs-space-2);
+  }
+
+  .rfs-layout[data-workspace="briefing"] .rfs-layout__dock {
+    max-height: min(calc(100vh - 410px), 306px);
   }
 
   .rfs-layout__dock [data-rfs-panel="scenario"] {
