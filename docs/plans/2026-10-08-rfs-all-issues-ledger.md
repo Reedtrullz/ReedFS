@@ -690,6 +690,13 @@ GitHub: [#60](https://github.com/Reedtrullz/ReedFS/issues/60) · draft **RFS-02*
 
 **Issue acceptance retained:** Complete a short takeoff/manual-flight exercise using touch alone and all setup/MCP actions using keyboard alone; verify zoom, screen-reader names, focus order and no stuck axes. Do not claim full phone support before device testing.
 
+**Implementation receipt - first increment (2026-10-12):** [PR #213](https://github.com/Reedtrullz/ReedFS/pull/213) merged as 17d01b1c513c750ae6d408e90b38b70517a359b1 (branch codex/rfs-60-touch-pad), before issue #60 closure. CI run 38192605440 on head 7164314: CodeQL, secret-scan, Analyze JS/TS, test (units + build + bundle + visual) and e2e shards 2/3 and 3/3 passed; shard 1 disclosed-merge per the known audio-session flake (rfs-audio-session.spec.ts:99, session closed on caption assertion, PR comment 6116468330) after master run 38181045179 reproduced the identical double failure on the same test. The route-loaded visual baseline was refreshed in 7164314 after forensics proved it predated the PFD baro-knob panel (4570f97): master had been passing marginally against the stale baseline and the pads' legitimate pixels pushed the diff to 3 percent.
+
+- Scope landed: touch pitch/roll pad and rudder pad in flight overlay mode (`src/components/TouchFlightPad.tsx`) with pointer capture and neutralize on cancel, release and Escape; cramped-viewport protection in `src/components/layout/RfsLayout.tsx` (2.2/1 pad aspect, controls max-height with internal scroll) keeping takeoff setup and the LOAD PLAN banner collision-free at 720/768/900 viewports; bundle allowance re-measured 466 -> 467 KiB raw / 147 -> 148 gzip (measured 466.9/147.4).
+- Local gates at 7d42d5a: 13/13 TouchFlightPad + RfsLayout unit tests, tsc, ESLint, bundle budget, 7/7 touch-pad interaction QA checks, full local visual run 5/6 with test 6 an environment flake (no local Cesium token, degraded-path timeout; passed isolated).
+- Residual scope: throttle/trim touch controls, instrument scale setting, numeric MCP entry, real touch-device acceptance; issue #60 stays open.
+- Non-claims: no real-device acceptance (trackpad QA only); CI green is not a deployment; the baseline refresh reflects CI-render diff forensics, not a local-macOS visual claim.
+
 <a id="issue-61"></a>
 ## #61 — Turn preflight setup into a compact electronic flight bag
 
