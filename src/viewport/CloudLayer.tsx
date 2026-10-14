@@ -29,6 +29,7 @@ export function CloudLayer({ viewerRef, metar, cloudSeed, cloudAnchor }: CloudLa
 
     const billboards = viewer.scene.primitives.add(new Cesium.BillboardCollection());
     const random = seededRandom(cloudSeed);
+    const image = createCloudImage();
 
     for (const cloud of metar.clouds) {
       const baseAltM = cloud.base * 0.3048;
@@ -41,7 +42,7 @@ export function CloudLayer({ viewerRef, metar, cloudSeed, cloudAnchor }: CloudLa
 
         billboards.add({
           position: Cesium.Cartesian3.fromDegrees(lon, lat, baseAltM),
-          image: createCloudCanvas(),
+          image,
           scale: 0.4 + random() * 0.3,
           heightReference: Cesium.HeightReference.NONE,
         });
@@ -54,6 +55,14 @@ export function CloudLayer({ viewerRef, metar, cloudSeed, cloudAnchor }: CloudLa
   }, [viewerRef, metar, cloudSeed, anchorLat, anchorLon]);
 
   return null;
+}
+
+// Cesium keys string images by value but gives every canvas its own atlas entry.
+let cloudImage: string | undefined;
+
+function createCloudImage(): string {
+  cloudImage ??= createCloudCanvas().toDataURL('image/png');
+  return cloudImage;
 }
 
 function createCloudCanvas(): HTMLCanvasElement {

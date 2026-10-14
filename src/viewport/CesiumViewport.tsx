@@ -6,6 +6,13 @@ import { isVisualTestMode } from '../config/visualTest';
 import { applySunAwareLighting } from './sunLighting';
 import { useSimStore } from '../store/simStore';
 import { scenarioUtcMs } from '../sim/scenarioClock';
+import {
+  AdaptiveQuality,
+  applyQualityLevel,
+  fixedLevelFor,
+  frameRateFor,
+  parseQualitySetting,
+} from './renderQuality';
 
 export interface CesiumViewportProps {
   /** Overrides the resolved Cesium scene asset policy */
@@ -97,10 +104,14 @@ export function CesiumViewport({ onReady, onSceneFailure, scenePolicy }: CesiumV
     container.addEventListener('webglcontextlost', contextLost, true);
 
     // Enable Cesium OSM 3D buildings
+    let buildings: Cesium.Cesium3DTileset | null = null;
+    let qualityLevel = 0;
     if (policy.osmBuildings) {
-      Cesium.createOsmBuildingsAsync().then((buildings) => {
+      Cesium.createOsmBuildingsAsync().then((tileset) => {
         if (!disposed && viewerRef.current === viewer && !viewer.isDestroyed()) {
-          viewer.scene.primitives.add(buildings);
+          buildings = tileset;
+          viewer.scene.primitives.add(tileset);
+          applyQualityLevel(viewer, tileset, qualityLevel);
         }
       }).catch((error: unknown) => {
         if (!disposed && viewerRef.current === viewer && !viewer.isDestroyed()) {
@@ -130,7 +141,23 @@ export function CesiumViewport({ onReady, onSceneFailure, scenePolicy }: CesiumV
       });
       globe.showWaterEffect = true;
       viewer.scene.requestRenderMode = false;
+      // Cap at 60 fps so 120 Hz ProMotion displays do not double GPU load.
       if (viewer.scene.skyAtmosphere) viewer.scene.skyAtmosphere.show = true;
+
+      const qualitySetting = parseQualitySetting(window.location.search);
+      viewer.targetFrameRate = frameRateFor(qualitySetting);
+      const fixedLevel = fixedLevelFor(qualitySetting);
+      qualityLevel = fixedLevel ?? 0;
+      applyQualityLevel(viewer, buildings, qualityLevel);
+      if (fixedLevel === null && viewer.scene.postRender) {
+        const adaptive = new AdaptiveQuality({
+          onLevelChange: (level) => {
+            qualityLevel = level;
+            applyQualityLevel(viewer, buildings, level);
+          },
+        });
+        viewer.scene.postRender.addEventListener(() => adaptive.onFrame(performance.now()));
+      }
     } else {
       globe.enableLighting = false;
       globe.showWaterEffect = false;
