@@ -55,7 +55,10 @@ const BUDGETS = {
   // convention.
   // Preflight-sheet increment (#61): measured 472.0 / 149.0 KiB; adds
   // runway/loading/weather readback and fixture invalidation, no new dependency.
-  app: { rawBytes: 473 * 1024, gzipBytes: 150 * 1024, required: true },
+  // Background catch-up increment: measured 473.8 / 149.2 KiB; the hidden-tab
+  // catch-up store action and visibility hook add 1.8 raw / 0.2 gzip KiB over
+  // the preflight-sheet allowance. Budget re-measures per campaign convention.
+  app: { rawBytes: 475 * 1024, gzipBytes: 150 * 1024, required: true },
   // React/Zustand framework chunk baseline: raw 182.4 KiB / gzip 56.7 KiB.
   vendorReact: { rawBytes: 212 * 1024, gzipBytes: 66 * 1024, required: true },
   // Generic vendor chunk baseline: raw 3.5 KiB / gzip 1.5 KiB.
