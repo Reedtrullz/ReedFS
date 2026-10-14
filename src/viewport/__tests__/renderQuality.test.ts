@@ -4,6 +4,7 @@ import {
   QUALITY_LEVELS,
   applyQualityLevel,
   fixedLevelFor,
+  frameRateFor,
   parseQualitySetting,
 } from '../renderQuality';
 
@@ -51,6 +52,13 @@ describe('quality settings', () => {
     expect(parseQualitySetting('')).toBe('auto');
     expect(fixedLevelFor('auto')).toBeNull();
     expect(fixedLevelFor('low')).toBe(QUALITY_LEVELS.length - 1);
+  });
+
+  it('caps frame rate at 30 only for pinned low quality', () => {
+    expect(frameRateFor('low')).toBe(30);
+    expect(frameRateFor('medium')).toBe(60);
+    expect(frameRateFor('high')).toBe(60);
+    expect(frameRateFor('auto')).toBe(60);
   });
 
   it('applies a level to the viewer and buildings', () => {

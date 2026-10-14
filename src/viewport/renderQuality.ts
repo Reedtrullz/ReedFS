@@ -16,6 +16,7 @@ export const QUALITY_LEVELS: readonly QualityLevel[] = [
 
 /** Cap rendering at 60 fps; ProMotion displays otherwise render at 120 Hz. */
 export const TARGET_FRAME_RATE = 60;
+export const LOW_QUALITY_FRAME_RATE = 30;
 
 export type QualitySetting = 'auto' | 'high' | 'medium' | 'low';
 
@@ -28,6 +29,10 @@ export function parseQualitySetting(search: string): QualitySetting {
 
 export function fixedLevelFor(setting: QualitySetting): number | null {
   return setting === 'auto' ? null : FIXED_LEVEL[setting];
+}
+
+export function frameRateFor(setting: QualitySetting): number {
+  return setting === 'low' ? LOW_QUALITY_FRAME_RATE : TARGET_FRAME_RATE;
 }
 
 export interface AdaptiveQualityOptions {

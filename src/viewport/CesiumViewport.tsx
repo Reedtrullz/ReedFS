@@ -8,9 +8,9 @@ import { useSimStore } from '../store/simStore';
 import { scenarioUtcMs } from '../sim/scenarioClock';
 import {
   AdaptiveQuality,
-  TARGET_FRAME_RATE,
   applyQualityLevel,
   fixedLevelFor,
+  frameRateFor,
   parseQualitySetting,
 } from './renderQuality';
 
@@ -142,10 +142,11 @@ export function CesiumViewport({ onReady, onSceneFailure, scenePolicy }: CesiumV
       globe.showWaterEffect = true;
       viewer.scene.requestRenderMode = false;
       // Cap at 60 fps so 120 Hz ProMotion displays do not double GPU load.
-      viewer.targetFrameRate = TARGET_FRAME_RATE;
       if (viewer.scene.skyAtmosphere) viewer.scene.skyAtmosphere.show = true;
 
-      const fixedLevel = fixedLevelFor(parseQualitySetting(window.location.search));
+      const qualitySetting = parseQualitySetting(window.location.search);
+      viewer.targetFrameRate = frameRateFor(qualitySetting);
+      const fixedLevel = fixedLevelFor(qualitySetting);
       qualityLevel = fixedLevel ?? 0;
       applyQualityLevel(viewer, buildings, qualityLevel);
       if (fixedLevel === null && viewer.scene.postRender) {
