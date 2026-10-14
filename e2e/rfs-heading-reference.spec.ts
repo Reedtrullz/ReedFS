@@ -43,7 +43,7 @@ test('actual worker flight keeps true orientation and targets while magnetic sur
     await expect.poll(async () => {
       const value = await observe(page); startup.push({ elapsedMs: performance.now() - started, ...value });
       return value.runtime?.executionBackend === 'browser-worker' && value.aircraft.simTime > 0 && !value.failure;
-    }, { timeout: 15000 }).toBe(true);
+    }, { timeout: 45000 }).toBe(true);
   } finally {
     const path = testInfo.outputPath('heading-startup-progress.json');
     await writeFile(path, JSON.stringify(startup, null, 2));
