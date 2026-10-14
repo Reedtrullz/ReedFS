@@ -152,3 +152,58 @@ describe('tickAsync bridge', () => {
     restore();
   });
 });
+
+describe('catchUpBackgroundTime', () => {
+  it('simulates the full hidden gap in bounded chunks without dropping time', async () => {
+    const stub = asyncRuntimeStub();
+    const restore = setSimulationRuntimeForTests(stub.runtime);
+    seedRunningScenario();
+    useSimStore.setState({ lastFrameTime: 1000 });
+    await useSimStore.getState().catchUpBackgroundTime(1000 + 600_000);
+    const state = useSimStore.getState();
+    expect(stub.stepsRequested.every((steps) => steps <= 1800)).toBe(true);
+    expect(stub.stepsRequested.reduce((sum, steps) => sum + steps, 0)).toBe(36000);
+    expect(state.simulationTimeSeconds).toBeCloseTo(600, 3);
+    expect(state.droppedSimulationTimeSeconds).toBe(0);
+    expect(state.asyncPhysicsInFlight).toBe(false);
+    restore();
+  });
+
+  it('ignores short gaps and non-running sessions', async () => {
+    const stub = asyncRuntimeStub();
+    const restore = setSimulationRuntimeForTests(stub.runtime);
+    seedRunningScenario();
+    useSimStore.setState({ lastFrameTime: 1000 });
+    await useSimStore.getState().catchUpBackgroundTime(1500);
+    useSimStore.setState({ status: 'paused' });
+    await useSimStore.getState().catchUpBackgroundTime(1000 + 600_000);
+    expect(stub.calls.length).toBe(0);
+    restore();
+  });
+
+  it('caps catch-up at two simulated hours and records the rest as dropped', async () => {
+    const stub = asyncRuntimeStub();
+    const restore = setSimulationRuntimeForTests(stub.runtime);
+    seedRunningScenario();
+    useSimStore.setState({ lastFrameTime: 1000 });
+    await useSimStore.getState().catchUpBackgroundTime(1000 + 5 * 3600 * 1000);
+    const state = useSimStore.getState();
+    expect(state.simulationTimeSeconds).toBeCloseTo(7200, 3);
+    expect(state.droppedSimulationTimeSeconds).toBeCloseTo(3 * 3600, 3);
+    restore();
+  });
+
+  it('stops quietly when the session is paused mid catch-up', async () => {
+    const stub = asyncRuntimeStub();
+    const restore = setSimulationRuntimeForTests(stub.runtime);
+    seedRunningScenario();
+    useSimStore.setState({ lastFrameTime: 1000 });
+    const pending = useSimStore.getState().catchUpBackgroundTime(1000 + 600_000);
+    useSimStore.getState().pause();
+    await pending;
+    expect(useSimStore.getState().simulationTimeSeconds).toBe(0);
+    expect(useSimStore.getState().asyncPhysicsInFlight).toBe(false);
+    restore();
+  });
+});
+
