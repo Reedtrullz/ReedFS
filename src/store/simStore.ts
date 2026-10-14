@@ -105,6 +105,7 @@ export interface SimStore {
    * to the synchronous tick when no async runtime is active.
    */
   tickAsync: (timestamp: number) => void;
+  catchUpBackgroundTime: (timestamp: number) => Promise<void>;
   cycleSimRate: () => void;
   setScenarioUtc: (utc: string) => boolean;
   start: () => void;
@@ -136,6 +137,9 @@ export interface SimStore {
 const FIXED_STEP_SECONDS = 1 / 60;
 const MAX_STEPS_PER_FRAME = 16;
 const MAX_ACCELERATED_FRAME_SECONDS = 1;
+const CATCH_UP_MIN_GAP_SECONDS = 2;
+const CATCH_UP_MAX_SIM_SECONDS = 2 * 3600;
+const CATCH_UP_CHUNK_STEPS = 1800;
 const SIM_RATES = [1, 4, 16, 64] as const;
 type SimRate = typeof SIM_RATES[number];
 
@@ -426,6 +430,77 @@ export const useSimStore = create<SimStore>((set, get) => {
         if (get().asyncPhysicsGeneration !== generation) return;
         containFailure(error, diagnosticInput, diagnosticResult);
       });
+    },
+
+    catchUpBackgroundTime: async (timestamp) => {
+      const start = get();
+      if (start.status !== 'running' || start.lastFrameTime <= 0 || start.asyncPhysicsInFlight) return;
+      const gapSeconds = (timestamp - start.lastFrameTime) / 1000;
+      if (gapSeconds < CATCH_UP_MIN_GAP_SECONDS) return;
+
+      const gapSimSeconds = gapSeconds * Math.max(1, start.simRate);
+      const bankedSeconds = Math.min(gapSimSeconds, CATCH_UP_MAX_SIM_SECONDS);
+      const generation = start.asyncPhysicsGeneration;
+      set({
+        lastFrameTime: timestamp,
+        fixedStepAccumulatorSeconds: start.fixedStepAccumulatorSeconds + bankedSeconds,
+        droppedSimulationTimeSeconds: start.droppedSimulationTimeSeconds + gapSimSeconds - bankedSeconds,
+        asyncPhysicsInFlight: true,
+      });
+
+      const runtime = getSimulationRuntime();
+      try {
+        for (;;) {
+          const state = get();
+          if (state.asyncPhysicsGeneration !== generation) return;
+          const steps = Math.min(Math.floor(state.fixedStepAccumulatorSeconds / FIXED_STEP_SECONDS), CATCH_UP_CHUNK_STEPS);
+          if (steps <= 0) break;
+
+          const input = {
+            aircraft: structuredClone(state.aircraft),
+            spec: state.spec,
+            pilotInputs: state.pilotInputs,
+            apState: state.apState,
+            flightPlan: state.flightPlan,
+            activeLegIndex: state.activeLegIndex,
+            routeStatus: state.routeStatus,
+            wind: state.wind,
+            weather: state.weather,
+            selectedScenarioId: state.selectedScenarioId,
+            guidance: state.guidance,
+            apControllerState: state.apControllerState,
+            dt: FIXED_STEP_SECONDS,
+            status: state.status,
+            cloneAircraft: false,
+            steps,
+          };
+          const result = 'stepAsync' in runtime && typeof runtime.stepAsync === 'function'
+            ? await (runtime as AsyncSimulationRuntime).stepAsync(input)
+            : runtime.step(input);
+
+          const current = get();
+          if (current.asyncPhysicsGeneration !== generation) return;
+          const controls = composeControlsSlice(current.pilotInputs, result.apCommands, state.apState, {
+            aircraft: result.aircraft,
+            flightPlan: state.flightPlan,
+            routeStatus: result.routeStatus,
+          });
+          set({
+            aircraft: result.aircraft,
+            fixedStepAccumulatorSeconds: current.fixedStepAccumulatorSeconds - steps * FIXED_STEP_SECONDS,
+            simulationTimeSeconds: current.simulationTimeSeconds + steps * FIXED_STEP_SECONDS,
+            apCommands: controls.apCommands,
+            effectiveControls: controls.effectiveControls,
+            inputs: controls.effectiveControls,
+            apControllerState: result.apControllerState,
+            activeLegIndex: result.activeLegIndex,
+            routeStatus: result.routeStatus,
+            guidance: result.guidance,
+          });
+        }
+      } finally {
+        if (get().asyncPhysicsGeneration === generation) set({ asyncPhysicsInFlight: false });
+      }
     },
 
     ...createAutoflightSlice(storeSet),

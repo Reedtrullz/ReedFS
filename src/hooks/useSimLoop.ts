@@ -29,7 +29,14 @@ export function useSimLoop(options: UseSimLoopOptions = {}) {
       audio: (context) => audioFrameRef.current?.(context),
     });
     scheduler.start();
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void useSimStore.getState().catchUpBackgroundTime(performance.now());
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
     return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
       scheduler.stop();
       unsub();
     };
