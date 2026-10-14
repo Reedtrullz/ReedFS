@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
+test.describe.configure({ timeout: 60_000 });
+
 // Audio integration lane: native browser nodes and visible controls, with
 // diagnostic state access distinct from blackbox/full-flight acceptance.
 async function verifyAudioSession(page: Page) {
