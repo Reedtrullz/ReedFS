@@ -108,6 +108,7 @@ export interface SimStore {
   catchUpBackgroundTime: (timestamp: number) => Promise<void>;
   cycleSimRate: () => void;
   setScenarioUtc: (utc: string) => boolean;
+  decreaseSimRate: () => void;
   start: () => void;
   startTakeoffRoll: () => void;
   abortTakeoff: () => void;
@@ -146,6 +147,11 @@ type SimRate = typeof SIM_RATES[number];
 function nextSimRate(current: number): SimRate {
   const currentIndex = SIM_RATES.findIndex((rate) => rate === current);
   return SIM_RATES[(currentIndex + 1) % SIM_RATES.length];
+}
+
+function previousSimRate(current: number): SimRate {
+  const currentIndex = SIM_RATES.findIndex((rate) => rate === current);
+  return SIM_RATES[Math.max(0, currentIndex - 1)];
 }
 
 function maxStepsPerRenderedFrame(simRate: number): number {
@@ -193,6 +199,7 @@ export const useSimStore = create<SimStore>((set, get) => {
     },
     simRate: 1,
     cycleSimRate: () => set((state) => ({ simRate: nextSimRate(state.simRate) })),
+    decreaseSimRate: () => set((state) => ({ simRate: previousSimRate(state.simRate) })),
 
     tick: (timestamp: number) => {
       const {

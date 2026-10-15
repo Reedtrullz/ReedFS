@@ -14,6 +14,7 @@ function defaultProps(overrides: Partial<BottomControlBarProps> = {}): BottomCon
     routeLoadMessage: null,
     simRate: 1,
     onCycleSimRate: vi.fn(),
+    onDecreaseSimRate: vi.fn(),
     onStartRoll: vi.fn(),
     onAbortTakeoff: vi.fn(),
     onPause: vi.fn(),
@@ -55,7 +56,20 @@ describe('BottomControlBar', () => {
     expect(props.onLoadPlan).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('button', { name: 'OVL: FLIGHT' }).getAttribute('aria-pressed')).toBe('true');
     expect(screen.getByRole('button', { name: /Cycle simulator rate/ }).textContent).toBe('SIM RATE TARGET: 1X');
+    expect(screen.getByRole('button', { name: /Decrease simulator rate/ }).getAttribute('disabled')).not.toBeNull();
     expect(screen.getByRole('button', { name: 'AUDIO: OFF' }).getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('enables the rate decrease button above 1x and dispatches it', () => {
+    const props = defaultProps({ simRate: 4 });
+    render(<BottomControlBar {...props} />);
+
+    const decreaseButton = screen.getByRole('button', { name: /Decrease simulator rate/ });
+    expect(decreaseButton.getAttribute('disabled')).toBeNull();
+    fireEvent.click(decreaseButton);
+
+    expect(props.onDecreaseSimRate).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: /Cycle simulator rate/ }).textContent).toBe('SIM RATE TARGET: 4X');
   });
 
   it('shows resume while paused and abort/pause while running', () => {

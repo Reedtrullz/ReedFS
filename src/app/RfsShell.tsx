@@ -116,6 +116,7 @@ export function RfsShell() {
   const reset = useSimStore((s) => s.reset);
   const simRate = useSimStore((s) => s.simRate);
   const cycleSimRate = useSimStore((s) => s.cycleSimRate);
+  const decreaseSimRate = useSimStore((s) => s.decreaseSimRate);
   const status = useSimStore((s) => s.status);
   const selectedScenarioId = useSimStore((s) => s.selectedScenarioId);
   const setInput = useSimStore((s) => s.setInput);
@@ -443,6 +444,7 @@ export function RfsShell() {
             simRate={simRate}
             routeLoadMessage={routeLoadMessage}
             onCycleSimRate={cycleSimRate}
+            onDecreaseSimRate={decreaseSimRate}
             onStartRoll={startTakeoffRoll}
             onAbortTakeoff={abortTakeoff}
             onPause={pause}
