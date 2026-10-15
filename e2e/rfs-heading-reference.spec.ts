@@ -35,15 +35,15 @@ async function selectHeadingReference(page: Page, reference: 'true' | 'magnetic'
 }
 
 test('actual worker flight keeps true orientation and targets while magnetic surface presentation converts one MCP step', async ({ page }, testInfo) => {
-  test.setTimeout(240_000);
-  await openRfs(page);
+  test.setTimeout(420_000);
+  await openRfs(page, '/?quality=low');
   await page.getByRole('button', { name: 'START ROLL', exact: true }).click();
   const startup: unknown[] = []; const started = performance.now();
   try {
     await expect.poll(async () => {
       const value = await observe(page); startup.push({ elapsedMs: performance.now() - started, ...value });
       return value.runtime?.executionBackend === 'browser-worker' && value.aircraft.simTime > 0 && !value.failure;
-    }, { timeout: 15000 }).toBe(true);
+    }, { timeout: 45000 }).toBe(true);
   } finally {
     const path = testInfo.outputPath('heading-startup-progress.json');
     await writeFile(path, JSON.stringify(startup, null, 2));

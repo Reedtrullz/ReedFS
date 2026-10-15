@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test';
 
-export async function openRfs(page: Page) {
-  await page.goto('/');
+export async function openRfs(page: Page, path = '/') {
+  await page.goto(path);
   const viewport = page.getByTestId('cesium-viewport');
   await viewport.waitFor({ state: 'visible' });
   await page.waitForFunction(() => document.querySelector('[data-testid="cesium-viewport"]')?.getAttribute('data-rfs-ready') === 'true');
