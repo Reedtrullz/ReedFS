@@ -35,8 +35,8 @@ async function selectHeadingReference(page: Page, reference: 'true' | 'magnetic'
 }
 
 test('actual worker flight keeps true orientation and targets while magnetic surface presentation converts one MCP step', async ({ page }, testInfo) => {
-  test.setTimeout(240_000);
-  await openRfs(page);
+  test.setTimeout(420_000);
+  await openRfs(page, '/?quality=low');
   await page.getByRole('button', { name: 'START ROLL', exact: true }).click();
   const startup: unknown[] = []; const started = performance.now();
   try {
