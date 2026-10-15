@@ -22,7 +22,7 @@ The simulator now has a stabilized flight-model foundation plus the first gamepl
 - The aircraft renderer uses a persistent named visual contract with animated control surfaces/gear, Cesium-native runway references, and chase/cockpit camera management.
 - The default player view has scenario/tutorial/checklist/coach flow, readable PFD/FMA, MCP controls, route status, active-leg LNAV feedback, conservative VNAV/SPD/VS behavior, and honest SPEED/N1 thrust modes that do not advertise unsupported modes.
 - FDM/performance source-data governance is documented in [`docs/runbooks/fdm-source-governance.md`](docs/runbooks/fdm-source-governance.md). Current FDM/performance data remains gameplay-placeholder unless versioned metadata says otherwise; only the Norway/Svalbard runway endpoint geometry has a reviewed immutable source packet, while aero, engine, gear, tire/brake, performance-card, procedure, and broader airport-surface work remains blocked or synthetic.
-- CI enforces lint, typecheck, tests, and production build before publish/deploy.
+- CI enforces lint, typecheck, tests, and production build before publish/deploy. Pull requests run the fast lane by default; the full sharded browser suite runs before any master deploy, or on demand via the `full-e2e` label.
 
 The next major enhancements are the prioritized realism/product phases documented in `docs/roadmap.md`, including source-backed ground-handling/tire tuning, broader terrain mesh collision and airport-surface fidelity beyond simplified runway rectangles, RFMS route-edit/FMA lifecycle fidelity, worker timing, flight-model data quality, and product polish.
 
@@ -168,6 +168,8 @@ npm run check:deps && npm run check:release && npm run check:blackbox && npm run
 Browser proof is split into layers: unit/static gates verify source contracts, seeded/scoped Playwright helpers guard specific physics/guidance states, and manifest-listed black-box specs use visible controls plus visible readbacks only. Seeded proofs are not full-flight/full-route evidence; full-flight claims require a continuous visible-control proof that actually covers that path, plus exact-SHA CI/live verification where applicable.
 
 Use `npm run test:e2e` for the CI Playwright browser-proof suite and `npm run test:visual` for the scoped deterministic visual snapshot/timing gate. CI runs both, but only the scoped visual spec is subject to the strict visual timing budget. The intentionally long continuous full-flight black-box acceptance remains separate as `npm run test:e2e:full-flight`; do not claim continuous full-flight proof unless that slow gate also completes successfully for the exact SHA being reported.
+
+The same fast lane runs on pull requests: lint, typecheck, unit tests, production build, bundle budget, visual and PWA gates, and Docker smoke. To opt a pull request into the full sharded `npm run test:e2e` suite before review, add the `full-e2e` label; master pushes always run it before publish or deploy.
 
 Useful targeted commands:
 
