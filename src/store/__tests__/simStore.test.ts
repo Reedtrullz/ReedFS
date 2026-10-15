@@ -183,6 +183,23 @@ describe('useSimStore', () => {
     expect(useSimStore.getState().simRate).toBe(1);
   });
 
+  it('decreases simulator rate one step and clamps at 1x', () => {
+    const store = useSimStore.getState();
+
+    useSimStore.getState().decreaseSimRate();
+    expect(useSimStore.getState().simRate).toBe(1);
+
+    useSimStore.getState().cycleSimRate();
+    useSimStore.getState().cycleSimRate();
+    expect(useSimStore.getState().simRate).toBe(16);
+    useSimStore.getState().decreaseSimRate();
+    expect(useSimStore.getState().simRate).toBe(4);
+    useSimStore.getState().decreaseSimRate();
+    expect(useSimStore.getState().simRate).toBe(1);
+
+    expect(typeof store.decreaseSimRate).toBe('function');
+  });
+
   it('lets simulator-rate targets scale the per-frame catch-up budget', () => {
     useSimStore.getState().cycleSimRate();
     useSimStore.getState().cycleSimRate();

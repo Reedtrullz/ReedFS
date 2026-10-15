@@ -14,6 +14,7 @@ export interface BottomControlBarProps {
   routeLoadMessage: string | null;
   simRate: number;
   onCycleSimRate: () => void;
+  onDecreaseSimRate: () => void;
   onStartRoll: () => void;
   onAbortTakeoff: () => void;
   onPause: () => void;
@@ -34,6 +35,7 @@ export function BottomControlBar({
   routeLoadMessage,
   simRate,
   onCycleSimRate,
+  onDecreaseSimRate,
   onStartRoll,
   onAbortTakeoff,
   onPause,
@@ -68,7 +70,17 @@ export function BottomControlBar({
         </>
       )}
       <button onClick={onReset} style={btnStyle}>RESET</button>
-      <button onClick={onCycleSimRate} aria-label={`Cycle simulator rate target: ${simRate}X`} style={btnStyle}>SIM RATE TARGET: {simRate}X</button>
+      <div style={simRateGroupStyle}>
+        <button
+          onClick={onDecreaseSimRate}
+          aria-label={`Decrease simulator rate target: ${simRate}X`}
+          disabled={simRate <= 1}
+          style={{ ...stepperBtnStyle, ...(simRate <= 1 ? disabledStepperStyle : {}) }}
+        >
+          -
+        </button>
+        <button onClick={onCycleSimRate} aria-label={`Cycle simulator rate target: ${simRate}X`} style={btnStyle}>SIM RATE TARGET: {simRate}X</button>
+      </div>
       <button onClick={onNextCameraMode} style={btnStyle}>CAM: {camMode.toUpperCase()}</button>
       <button
         onClick={onNextOverlayMode}
@@ -111,6 +123,33 @@ const abortBtnStyle: React.CSSProperties = {
   color: '#ff7777',
   border: '1px solid #ff7777',
   fontWeight: 800,
+};
+
+const simRateGroupStyle: React.CSSProperties = {
+  display: 'flex',
+};
+
+const stepperBtnStyle: React.CSSProperties = {
+  background: 'rgba(0,255,0,0.2)',
+  color: '#0f0',
+  borderTop: '1px solid #0f0',
+  borderLeft: '1px solid #0f0',
+  borderBottom: '1px solid #0f0',
+  borderRight: 'none',
+  padding: '8px 12px',
+  fontFamily: 'monospace',
+  cursor: 'pointer',
+  fontSize: 14,
+};
+
+const disabledStepperStyle: React.CSSProperties = {
+  background: 'rgba(0,255,0,0.06)',
+  color: 'rgba(15,255,15,0.35)',
+  borderTop: '1px solid rgba(15,255,15,0.35)',
+  borderLeft: '1px solid rgba(15,255,15,0.35)',
+  borderBottom: '1px solid rgba(15,255,15,0.35)',
+  borderRight: 'none',
+  cursor: 'default',
 };
 
 const routeLoadMessageStyle: React.CSSProperties = {
