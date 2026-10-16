@@ -18,6 +18,8 @@ export class AudioEngine {
   ctx: AudioContext;
   master: GainNode;
   engineBus: GainNode;
+  environmentBus: GainNode;
+  mechanicalBus: GainNode;
   cockpitBus: GainNode;
   private _started = false;
   private _disposed = false;
@@ -35,6 +37,14 @@ export class AudioEngine {
     this.engineBus = this.ctx.createGain();
     this.engineBus.gain.value = 0.8;
     this.engineBus.connect(this.master);
+
+    this.environmentBus = this.ctx.createGain();
+    this.environmentBus.gain.value = 0.7;
+    this.environmentBus.connect(this.master);
+
+    this.mechanicalBus = this.ctx.createGain();
+    this.mechanicalBus.gain.value = 0.6;
+    this.mechanicalBus.connect(this.master);
 
     this.cockpitBus = this.ctx.createGain();
     this.cockpitBus.gain.value = 0.6;
@@ -98,7 +108,11 @@ export class AudioEngine {
     if (this._disposed) return;
     this._disposed = true;
     this._started = false;
-    this.engineBus.disconnect(); this.cockpitBus.disconnect(); this.master.disconnect();
+    this.engineBus.disconnect();
+    this.environmentBus.disconnect();
+    this.mechanicalBus.disconnect();
+    this.cockpitBus.disconnect();
+    this.master.disconnect();
     this.ctx.removeEventListener?.('statechange', this.notify);
     this.notify(); this.listeners.clear();
     if (this.ctx.state !== 'closed') {
