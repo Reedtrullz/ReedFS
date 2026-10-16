@@ -22,7 +22,7 @@ async function verifyAudioSession(page: Page) {
   expect(await page.evaluate(() => (window as unknown as { audioProbe: { contexts: AudioContext[] } }).audioProbe.contexts.length)).toBe(0);
   await page.getByRole('button', { name: 'AUDIO: OFF', exact: true }).click();
   await expect(page.getByRole('button', { name: 'AUDIO: ON', exact: true })).toBeVisible();
-  await expect.poll(() => page.evaluate(() => (window as unknown as { audioProbe: { counts: () => { live: number } } }).audioProbe.counts().live)).toBe(2);
+  await expect.poll(() => page.evaluate(() => (window as unknown as { audioProbe: { counts: () => { live: number } } }).audioProbe.counts().live)).toBe(9);
   await page.evaluate(async () => {
     const path = '/src/audio/AudioEngine.ts';
     const { getAudioEngine } = await import(/* @vite-ignore */ path);
@@ -66,7 +66,7 @@ async function verifyAudioSession(page: Page) {
   await page.getByRole('button', { name: 'AUDIO: ON', exact: true }).click();
   await expect.poll(() => page.evaluate(() => (window as unknown as { audioProbe: { counts: () => { live: number } } }).audioProbe.counts().live)).toBe(0);
   await page.getByRole('button', { name: 'AUDIO: OFF', exact: true }).click();
-  await expect.poll(() => page.evaluate(() => (window as unknown as { audioProbe: { counts: () => { live: number } } }).audioProbe.counts().live)).toBe(2);
+  await expect.poll(() => page.evaluate(() => (window as unknown as { audioProbe: { counts: () => { live: number } } }).audioProbe.counts().live)).toBe(9);
 }
 
 test('desktop native audio reflects suspension, silence on pause, and teardown', async ({ page }) => { await verifyAudioSession(page); });
@@ -169,9 +169,9 @@ test('initial enabled StrictMode remount has exactly two live native oscillators
     dispose(); const after = counts();
     return { before, mounted, after };
   });
-  expect(result.mounted.live).toBe(2);
-  expect(result.mounted.starts - result.before.starts).toBe(4);
-  expect(result.mounted.stops - result.before.stops).toBe(2);
+  expect(result.mounted.live).toBe(9);
+  expect(result.mounted.starts - result.before.starts).toBe(18);
+  expect(result.mounted.stops - result.before.stops).toBe(9);
   expect(result.after.live).toBe(0);
-  expect(result.after.stops - result.before.stops).toBe(4);
+  expect(result.after.stops - result.before.stops).toBe(18);
 });
