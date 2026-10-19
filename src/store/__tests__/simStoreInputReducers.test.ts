@@ -5,6 +5,7 @@ import {
   inputActionsIncludeManualApAxis,
   isRejectedTakeoffAbortLatched,
   sanitizeSetInputPartial,
+  seedInputManagerFromLiveInputs,
 } from '../simStoreInputReducers';
 import type { AircraftState, ControlInputs } from '../../sim/types';
 import { createInputManagerState } from '../../input/InputManager';
@@ -153,4 +154,75 @@ describe('inputActionsIncludeManualApAxis', () => {
   it('does not include yaw as a manual AP axis', () => {
     expect(inputActionsIncludeManualApAxis({ yaw: 1 }, true)).toBe(false);
   });
+});
+
+describe('seedInputManagerFromLiveInputs', () => {
+  it.each([
+    ['elevator', 'pitch', 0.3],
+    ['aileron', 'roll', 0.4],
+    ['rudder', 'yaw', 0.3],
+    ['brake', 'brake', 0.4],
+  ] as const)('seeds %s from live input when %s is active', (field, action, value) => {
+    const manager = createInputManagerState({ ...defaultInputs, [field]: 0 });
+    const inputs = { ...defaultInputs, [field]: value };
+    const result = seedInputManagerFromLiveInputs(manager, inputs, { [action]: 1 });
+    expect(result[field]).toBe(value);
+  });
+
+  it.each([
+    ['elevator', 'pitch', 0.3, 0.1],
+    ['aileron', 'roll', 0.4, 0.1],
+    ['rudder', 'yaw', 0.3, 0.1],
+    ['brake', 'brake', 0.4, 0.1],
+  ] as const)('resets %s when live input differs and %s is inactive', (field, _action, liveValue, managerValue) => {
+    const manager = createInputManagerState({ ...defaultInputs, [field]: managerValue });
+    const inputs = { ...defaultInputs, [field]: liveValue };
+    expect(seedInputManagerFromLiveInputs(manager, inputs, {})[field]).toBe(0);
+  });
+
+  it.each([
+    ['elevator', 'pitch', 0.3],
+    ['aileron', 'roll', 0.4],
+    ['rudder', 'yaw', 0.3],
+    ['brake', 'brake', 0.4],
+  ] as const)('preserves %s when manager and live input agree', (field, _action, value) => {
+    const manager = createInputManagerState({ ...defaultInputs, [field]: value });
+    const inputs = { ...defaultInputs, [field]: value };
+    expect(seedInputManagerFromLiveInputs(manager, inputs, {})[field]).toBe(value);
+  });
+
+  it.each([
+    ['leftBrake', undefined, 0, 0],
+    ['leftBrake', undefined, 0.4, 0],
+    ['leftBrake', 0.5, 0, 0.5],
+    ['rightBrake', undefined, 0, 0],
+    ['rightBrake', undefined, 0.4, 0],
+    ['rightBrake', 0.5, 0, 0.5],
+  ] as const)('seeds %s with input %s and manager value %s', (field, liveValue, managerValue, expected) => {
+    const manager = createInputManagerState({ ...defaultInputs, [field]: managerValue });
+    const inputs = { ...defaultInputs, [field]: liveValue };
+    const actions = liveValue === undefined ? {} : { [field]: 1 };
+    expect(seedInputManagerFromLiveInputs(manager, inputs, actions)[field]).toBe(expected);
+  });
+
+  it('seeds throttle from the higher live engine input when a throttle action is active', () => {
+    const manager = createInputManagerState({ ...defaultInputs });
+    const inputs = { ...defaultInputs, throttle1: 0.3, throttle2: 0.6 };
+    expect(seedInputManagerFromLiveInputs(manager, inputs, { throttleDelta: 0.1 }).throttle).toBe(0.6);
+  });
+
+  it('preserves manager throttle when no throttle action is active', () => {
+    const manager = createInputManagerState({ ...defaultInputs, throttle: 0.2 });
+    const inputs = { ...defaultInputs, throttle1: 0.3, throttle2: 0.6 };
+    expect(seedInputManagerFromLiveInputs(manager, inputs, {}).throttle).toBe(0.2);
+  });
+
+  it.each(['throttleDelta', 'throttleTarget', 'throttleRate'] as const)(
+    'treats %s as a throttle action',
+    action => {
+      const manager = createInputManagerState({ ...defaultInputs });
+      const inputs = { ...defaultInputs, throttle1: 0.3, throttle2: 0.6 };
+      expect(seedInputManagerFromLiveInputs(manager, inputs, { [action]: 0.1 }).throttle).toBe(0.6);
+    },
+  );
 });
