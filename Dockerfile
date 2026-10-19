@@ -26,7 +26,7 @@ RUN --mount=type=secret,id=cesium_ion_token,required=false \
   npm run build
 
 FROM nginx:alpine@sha256:df221db836e1754089190208cee7eeda94f233197056426eda74a43ab1abeac2
-RUN apk upgrade --no-cache libcrypto3 libssl3 libxml2 libexpat c-ares curl libcurl libuuid pcre2 tiff
+RUN apk upgrade --no-cache libcrypto3 libssl3 libxml2 libexpat c-ares curl libcurl libuuid pcre2 tiff libx11
 ARG RFS_COMMIT_SHA=unknown
 ARG RFS_IMAGE_REF=unknown
 ARG RFS_VERSION=0.0.0
