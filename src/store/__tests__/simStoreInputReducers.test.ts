@@ -170,6 +170,18 @@ describe('seedInputManagerFromLiveInputs', () => {
   });
 
   it.each([
+    ['elevator', 'pitch', 0.3],
+    ['aileron', 'roll', 0.4],
+    ['rudder', 'yaw', 0.3],
+    ['brake', 'brake', 0.4],
+  ] as const)('seeds %s from live input when the %s action is explicitly zero', (field, action, value) => {
+    const manager = createInputManagerState({ ...defaultInputs, [field]: 0 });
+    const inputs = { ...defaultInputs, [field]: value };
+    const result = seedInputManagerFromLiveInputs(manager, inputs, { [action]: 0 });
+    expect(result[field]).toBe(value);
+  });
+
+  it.each([
     ['elevator', 'pitch', 0.3, 0.1],
     ['aileron', 'roll', 0.4, 0.1],
     ['rudder', 'yaw', 0.3, 0.1],
@@ -209,6 +221,18 @@ describe('seedInputManagerFromLiveInputs', () => {
     const manager = createInputManagerState({ ...defaultInputs });
     const inputs = { ...defaultInputs, throttle1: 0.3, throttle2: 0.6 };
     expect(seedInputManagerFromLiveInputs(manager, inputs, { throttleDelta: 0.1 }).throttle).toBe(0.6);
+  });
+
+  it('seeds throttle from live inputs when throttle delta is explicitly zero', () => {
+    const manager = createInputManagerState({ ...defaultInputs });
+    const inputs = { ...defaultInputs, throttle1: 0.3, throttle2: 0.6 };
+    expect(seedInputManagerFromLiveInputs(manager, inputs, { throttleDelta: 0 }).throttle).toBe(0.6);
+  });
+
+  it('seeds throttle from the higher live engine input when throttle 1 is larger', () => {
+    const manager = createInputManagerState({ ...defaultInputs });
+    const inputs = { ...defaultInputs, throttle1: 0.6, throttle2: 0.3 };
+    expect(seedInputManagerFromLiveInputs(manager, inputs, { throttleTarget: 1 }).throttle).toBe(0.6);
   });
 
   it('preserves manager throttle when no throttle action is active', () => {

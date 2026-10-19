@@ -159,4 +159,34 @@ describe('commandBoundaryPatch', () => {
     expect(result.asyncPhysicsGeneration).toBe(9);
     expect(result.asyncPhysicsInFlight).toBe(false);
   });
+
+  it('increments pilot revision from its existing value and preserves other revisions', () => {
+    const state = baseState({ commandRevisions: { pilot: 3, autoflight: 4, route: 5, environment: 6 } } as unknown as Partial<SimStore>);
+    expect(patchState(state, { pilotInputs: { elevator: 0.5 } }).commandRevisions)
+      .toEqual({ pilot: 4, autoflight: 4, route: 5, environment: 6 });
+  });
+
+  it('increments autoflight revision from its existing value and preserves other revisions', () => {
+    const state = baseState({ commandRevisions: { pilot: 3, autoflight: 4, route: 5, environment: 6 } } as unknown as Partial<SimStore>);
+    expect(patchState(state, { apState: {} }).commandRevisions)
+      .toEqual({ pilot: 3, autoflight: 5, route: 5, environment: 6 });
+  });
+
+  it('increments route revision from its existing value and preserves other revisions', () => {
+    const state = baseState({ commandRevisions: { pilot: 3, autoflight: 4, route: 5, environment: 6 } } as unknown as Partial<SimStore>);
+    expect(patchState(state, { flightPlan: {} }).commandRevisions)
+      .toEqual({ pilot: 3, autoflight: 4, route: 6, environment: 6 });
+  });
+
+  it('increments environment revision from its existing value and preserves other revisions', () => {
+    const state = baseState({ commandRevisions: { pilot: 3, autoflight: 4, route: 5, environment: 6 } } as unknown as Partial<SimStore>);
+    expect(patchState(state, { wind: {} }).commandRevisions)
+      .toEqual({ pilot: 3, autoflight: 4, route: 5, environment: 7 });
+  });
+
+  it('increments autoflight and route revisions together from their existing values', () => {
+    const state = baseState({ commandRevisions: { pilot: 3, autoflight: 4, route: 5, environment: 6 } } as unknown as Partial<SimStore>);
+    expect(patchState(state, { apState: {}, flightPlan: {} }).commandRevisions)
+      .toEqual({ pilot: 3, autoflight: 5, route: 6, environment: 6 });
+  });
 });
