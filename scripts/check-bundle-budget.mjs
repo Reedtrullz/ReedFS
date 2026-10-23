@@ -117,7 +117,7 @@ function collectUsage() {
     return usage;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`Unable to inspect dist/assets. Run npm run build first. ${message}`, { cause: error });
+    throw new Error(`Unable to inspect dist/assets. Run pnpm run build first. ${message}`, { cause: error });
   }
 }
 

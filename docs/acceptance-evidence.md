@@ -1,21 +1,21 @@
 # Reproducing RFS acceptance
 
-Use Node 22 and an isolated RFS/RFMS sibling pair. `npm run bootstrap` creates or
+Use Node 22 and an isolated RFS/RFMS sibling pair. `pnpm run bootstrap` creates or
 switches `../RFMS`; it must never be used against a checkout containing work to
-preserve. `npm run bootstrap:check` is read-only and fails for missing,
+preserve. `pnpm run bootstrap:check` is read-only and fails for missing,
 unversioned, mismatched or dirty dependencies. The required shared commit is
 `810fc9652da431eaf8978b85bf4af131605559b5`.
 
 ```sh
 node --version                       # must be 22.x
-npm run bootstrap                    # only in the isolated pair
-npm run bootstrap:check
-npm ci --legacy-peer-deps
-npm run check
-npm run test:e2e
-npm run test:visual
-npm run test:e2e:worker-physics
-npm run test:e2e:full-flight
+pnpm run bootstrap                    # only in the isolated pair
+pnpm run bootstrap:check
+pnpm install --frozen-lockfile
+pnpm run check
+pnpm run test:e2e
+pnpm run test:visual
+pnpm run test:e2e:worker-physics
+pnpm run test:e2e:full-flight
 ```
 
 ## Evidence boundaries
@@ -23,8 +23,8 @@ npm run test:e2e:full-flight
 | Capability | Reproducible gate | What it proves / remaining acceptance |
 | --- | --- | --- |
 | Dependency/build identity | clean pinned sibling, bootstrap:check, clean install, version metadata | exact local inputs; canonical CI and public revision need separate receipts |
-| Unit/runtime correctness | `npm run check` | unit/lint/types/build/budgets; no claim of real browser/device or aircraft fidelity |
-| Selected player flows | `npm run test:e2e` | named visible-control browser scenarios; not a continuous full flight |
+| Unit/runtime correctness | `pnpm run check` | unit/lint/types/build/budgets; no claim of real browser/device or aircraft fidelity |
+| Selected player flows | `pnpm run test:e2e` | named visible-control browser scenarios; not a continuous full flight |
 | Browser worker | `test:e2e:worker-physics` | actual worker dispatch/takeoff path; handler parity alone is insufficient |
 | Continuous ENVA route | `test:e2e:full-flight` | current ENVA takeoff through descent/autoland; KSEA/KPDX continuous coverage is still pending |
 | Rendering | `test:visual` | seeded visual checks; real scene/cockpit and hardware acceptance remain separate |

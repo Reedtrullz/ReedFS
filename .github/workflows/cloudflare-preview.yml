@@ -19,13 +19,14 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 22
-          cache: npm
+      - name: Enable pnpm via Corepack (version pinned by packageManager)
+        run: corepack enable
       - name: Bootstrap pinned RFMS shared dependency
         run: node scripts/bootstrap-rfms-shared.mjs
       - name: Verify pinned RFMS revision
         run: test "$(git -C ../RFMS rev-parse HEAD)" = 810fc9652da431eaf8978b85bf4af131605559b5
-      - run: npm ci --legacy-peer-deps
-      - run: npm run check
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run check
         env:
           VITE_CESIUM_ION_TOKEN: ${{ secrets.VITE_CESIUM_ION_TOKEN }}
           RFS_COMMIT_SHA: ${{ github.sha }}
@@ -47,8 +48,6 @@ jobs:
       - name: Deploy preview
         if: ${{ !inputs.upload_only }}
         uses: cloudflare/wrangler-action@953926a2e2182532811c01a25e53647d93bf07c0 # v4
-        env:
-          npm_config_legacy_peer_deps: 'true'
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

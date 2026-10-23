@@ -54,7 +54,7 @@ describe('canonical docs posture', () => {
     expect(roadmap).toMatch(/browser-Worker runtime is default-on/i);
     expect(roadmap).toMatch(/VITE_RFS_WORKER_PHYSICS=0. pins the main-thread escape hatch/i);
     expect(roadmap).toMatch(/batch commits preserve pilot-owned inputs changed mid-flight/i);
-    expect(roadmap).toMatch(/npm run test:e2e:worker-physics/i);
+    expect(roadmap).toMatch(/pnpm run test:e2e:worker-physics/i);
     expect(roadmap).toMatch(/Visual.E2E parity evidence: the default-on runtime is exercised by the full Vitest suite/i);
   });
 
@@ -94,10 +94,10 @@ describe('canonical docs posture', () => {
     const workflow = parse(ciWorkflow) as { jobs: { test: { steps: CiStep[] }; 'e2e-shard': { steps: CiStep[] } } };
     const steps = workflow.jobs.test.steps;
     const shardSteps = workflow.jobs['e2e-shard'].steps;
-    const browser = shardSteps.findIndex((step) => step.run === 'npm run test:e2e -- --shard=${{ matrix.shard }}/3');
-    const visual = steps.findIndex((step) => step.run === 'npm run test:visual');
-    const fixtureBuild = steps.findIndex((step) => step.run === 'npm run test:e2e:pwa:build');
-    const pwa = steps.findIndex((step) => step.run === 'npm run test:e2e:pwa:run');
+    const browser = shardSteps.findIndex((step) => step.run === 'pnpm run test:e2e --shard=${{ matrix.shard }}/3');
+    const visual = steps.findIndex((step) => step.run === 'pnpm run test:visual');
+    const fixtureBuild = steps.findIndex((step) => step.run === 'pnpm run test:e2e:pwa:build');
+    const pwa = steps.findIndex((step) => step.run === 'pnpm run test:e2e:pwa:run');
     expect(browser).toBeGreaterThanOrEqual(0);
     expect(visual).toBeGreaterThan(browser);
     expect(fixtureBuild).toBeGreaterThan(visual);
@@ -120,7 +120,7 @@ describe('canonical docs posture', () => {
       expect(upload?.with?.name).toContain('${{ github.run_attempt }}');
       expect(upload?.with?.['retention-days']).toBe(7);
     }
-    expect(ciWorkflow).toContain('npm run check:deps');
+    expect(ciWorkflow).toContain('pnpm run check:deps');
     expect(ciWorkflow).toContain('push: false');
     expect(ciWorkflow).toContain('load: true');
     expect(ciWorkflow).toContain('curl -fsS http://localhost:3005/');
@@ -129,7 +129,7 @@ describe('canonical docs posture', () => {
 
   it('keeps black-box guard in local, CI, and README gates', () => {
     const expectedCheckChain =
-      'npm run check:deps && npm run check:release && npm run check:blackbox && npm run lint:ci && npm run typecheck && npm run test && npm run build && npm run check:bundle';
+      'pnpm run check:deps && pnpm run check:release && pnpm run check:blackbox && pnpm run lint:ci && pnpm run typecheck && pnpm run test && pnpm run build && pnpm run check:bundle';
     expect(packageJson.scripts.check).toBe(expectedCheckChain);
     expect(readme).toContain(expectedCheckChain);
 
@@ -137,7 +137,7 @@ describe('canonical docs posture', () => {
     const dockerSmokeStart = ciWorkflow.indexOf('\n  docker-smoke:', testJobStart);
     const testJob = ciWorkflow.slice(testJobStart, dockerSmokeStart);
     expect(testJob).toMatch(
-      /- run: npm run check:release\s+- run: npm run check:blackbox\s+- run: npm run lint:ci/,
+      /- run: pnpm run check:release\s+- run: pnpm run check:blackbox\s+- run: pnpm run lint:ci/,
     );
   });
 
@@ -193,7 +193,8 @@ describe('canonical docs posture', () => {
 
     for (const requiredInput of [
       'package.json',
-      'package-lock.json',
+      'pnpm-lock.yaml',
+      'pnpm-workspace.yaml',
       'src/',
       'public/',
       'nginx.conf',
@@ -236,8 +237,8 @@ describe('canonical docs posture', () => {
     expect(dockerfile).toContain('RUN node scripts/bootstrap-rfms-shared.mjs');
     expect(dockerfile).not.toContain('git -C RFMS fetch --depth 1 origin');
 
-    expect(readme).toContain('npm run bootstrap');
-    expect(readme).toContain('npm run bootstrap:check');
+    expect(readme).toContain('pnpm run bootstrap');
+    expect(readme).toContain('pnpm run bootstrap:check');
     expect(readme).toContain(RFMS_SHARED_COMMIT);
   });
 

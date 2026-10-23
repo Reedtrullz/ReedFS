@@ -69,7 +69,7 @@ Do not perform any of these without the user explicitly authorizing them in the 
 
 ## Non-claims
 
-- A successful local `npm run check` is only a local gate.
+- A successful local `pnpm run check` is only a local gate.
 - A successful PR run is not a production deploy; PR `publish`/`deploy` are skipped by workflow conditionals.
 - A successful master run is not live proof unless `/rfs-version.json` matches the exact SHA.
 - A live endpoint with a different SHA is proof that another commit is deployed, not this one.

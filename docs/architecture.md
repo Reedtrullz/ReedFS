@@ -168,16 +168,16 @@ Local gate:
 
 ```bash
 source ~/.nvm/nvm.sh && nvm use 22
-npm run check
+pnpm run check
 ```
 
 CI gate:
 
 ```text
-npm run lint:ci
-npm run typecheck
-npm run test
-npm run build
+pnpm run lint:ci
+pnpm run typecheck
+pnpm run test
+pnpm run build
 ```
 
 Browser proof:
