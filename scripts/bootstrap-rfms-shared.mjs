@@ -43,7 +43,7 @@ function rfmsStatus() {
 function assertSharedPackage() {
   if (!existsSync(RFMS_SHARED_PACKAGE)) {
     throw new Error(
-      `RFMS shared package is missing at ${RFMS_SHARED_PACKAGE}. Run \`npm run bootstrap\` from the RFS root.`,
+      `RFMS shared package is missing at ${RFMS_SHARED_PACKAGE}. Run \`pnpm run bootstrap\` from the RFS root.`,
     );
   }
 }
@@ -54,7 +54,7 @@ function checkOnly() {
   if (head !== RFMS_COMMIT) {
     throw new Error(
       `RFMS dependency identity is ${head ?? 'unversioned'}, not the pinned CI/Docker commit ${RFMS_COMMIT}. ` +
-      'Use an isolated sibling pair and run npm run bootstrap there; --check never modifies a checkout.',
+      'Use an isolated sibling pair and run pnpm run bootstrap there; --check never modifies a checkout.',
     );
   }
   if (rfmsStatus().length > 0) {

@@ -32,7 +32,7 @@ The next major enhancements are the prioritized realism/product phases documente
 - Weather/atmosphere: partial. RFS parses METAR wind/QNH/temperature data, applies QNH and temperature to density-altitude physics, and derives baro-indicated PFD altitude from live QNH; visibility rendering tied to METAR layers, precipitation, and weather-driven scene degradation remain deferred.
 - Audio: partial. RFS has explicit Web Audio startup, N1-driven engine tone mapping, persisted mute/volume/caption settings, and GPWS captions/speech; richer engine, cockpit, airframe, warning, and spatial sound layers remain deferred.
 - Scene loading/error states: partial. RFS has an app ErrorBoundary, a visible `SCENERY DEGRADED` status for missing Cesium Ion scenery, degraded ellipsoid fallback, `SCENERY ERROR` surfacing for runtime OSM-buildings and render failures, and a manual `RETRY SCENERY` remount; richer automatic recovery and broader network-failure UX remain deferred.
-- PWA: partial. The Vite build generates a service worker with a flight-aware waiting update. A verified new save precedes activation/reload; cancellation and other open flights preserve their cohort. Bundled Cesium code/fonts and the simulation worker are precached per build cohort; remote Cesium tile/terrain/imagery requests remain network-only. Offline app/worker and staged update behavior have a dedicated installed Chromium lane (`npm run test:e2e:pwa`); physical mobile, cohort-cache retention UX and lawful offline airport scenery remain separate acceptance. See `docs/flight-update-contract.md`.
+- PWA: partial. The Vite build generates a service worker with a flight-aware waiting update. A verified new save precedes activation/reload; cancellation and other open flights preserve their cohort. Bundled Cesium code/fonts and the simulation worker are precached per build cohort; remote Cesium tile/terrain/imagery requests remain network-only. Offline app/worker and staged update behavior have a dedicated installed Chromium lane (`pnpm run test:e2e:pwa`); physical mobile, cohort-cache retention UX and lawful offline airport scenery remain separate acceptance. See `docs/flight-update-contract.md`.
 
 Visual snapshots are not proof of audio, weather, PWA, or error-state behavior; those claims require dedicated unit/component/browser evidence for the behavior itself.
 
@@ -98,7 +98,7 @@ docs/
 
 ## Prerequisites
 
-Use Node 22. The local shell default may be older, so source nvm before Node/npm commands:
+Use Node 22. The local shell default may be older, so source nvm before Node/pnpm commands:
 
 ```bash
 source ~/.nvm/nvm.sh && nvm use 22
@@ -115,8 +115,8 @@ Fresh clones should bootstrap the sibling dependency before installing packages:
 
 ```bash
 source ~/.nvm/nvm.sh && nvm use 22
-npm run bootstrap
-npm run bootstrap:check
+pnpm run bootstrap
+pnpm run bootstrap:check
 ```
 
 The bootstrap script fetches `https://github.com/Reedtrullz/RFMC.git` at the audited RFMS/RFMC commit `810fc9652da431eaf8978b85bf4af131605559b5`. Local developer checkouts at another commit are allowed for day-to-day work when `../RFMS/shared/package.json` exists, but CI and Docker use the pinned bootstrap path for reproducible builds.
@@ -128,9 +128,10 @@ RFMS integration is currently a shared-type/source bridge, not a full CDU/FMS. `
 ```bash
 cd /Users/reidar/Projectos/RFS
 source ~/.nvm/nvm.sh && nvm use 22
-npm run bootstrap
-npm install --legacy-peer-deps
-npm run dev -- --host 127.0.0.1
+corepack enable   # once per machine; pins pnpm from package.json
+pnpm run bootstrap
+pnpm install
+pnpm run dev --host 127.0.0.1
 ```
 
 The app starts at the default Vite URL. RFS intentionally does **not** set COOP/COEP headers in dev or production because `require-corp` breaks Cesium Ion imagery/terrain/building tiles. SharedArrayBuffer-backed physics remains out of scope until the scenery policy changes; worker experiments use plain structured-clone messages first.
@@ -156,30 +157,30 @@ Run the same gate CI uses:
 
 ```bash
 source ~/.nvm/nvm.sh && nvm use 22
-npm run check
+pnpm run check
 ```
 
-`npm run check` expands to:
+`pnpm run check` expands to:
 
 ```text
-npm run check:deps && npm run check:release && npm run check:blackbox && npm run lint:ci && npm run typecheck && npm run test && npm run build && npm run check:bundle
+pnpm run check:deps && pnpm run check:release && pnpm run check:blackbox && pnpm run lint:ci && pnpm run typecheck && pnpm run test && pnpm run build && pnpm run check:bundle
 ```
 
 Browser proof is split into layers: unit/static gates verify source contracts, seeded/scoped Playwright helpers guard specific physics/guidance states, and manifest-listed black-box specs use visible controls plus visible readbacks only. Seeded proofs are not full-flight/full-route evidence; full-flight claims require a continuous visible-control proof that actually covers that path, plus exact-SHA CI/live verification where applicable.
 
-Use `npm run test:e2e` for the CI Playwright browser-proof suite and `npm run test:visual` for the scoped deterministic visual snapshot/timing gate. CI runs both, but only the scoped visual spec is subject to the strict visual timing budget. The intentionally long continuous full-flight black-box acceptance remains separate as `npm run test:e2e:full-flight`; do not claim continuous full-flight proof unless that slow gate also completes successfully for the exact SHA being reported.
+Use `pnpm run test:e2e` for the CI Playwright browser-proof suite and `pnpm run test:visual` for the scoped deterministic visual snapshot/timing gate. CI runs both, but only the scoped visual spec is subject to the strict visual timing budget. The intentionally long continuous full-flight black-box acceptance remains separate as `pnpm run test:e2e:full-flight`; do not claim continuous full-flight proof unless that slow gate also completes successfully for the exact SHA being reported.
 
 Useful targeted commands:
 
 ```bash
-npm run lint:ci
-npm run typecheck
-npm run test
-npm run test:e2e
-npm run test:e2e:full-flight
-npm run test:visual
-npm run test -- src/sim/physics/__tests__/integrate.test.ts
-npm run build
+pnpm run lint:ci
+pnpm run typecheck
+pnpm run test
+pnpm run test:e2e
+pnpm run test:e2e:full-flight
+pnpm run test:visual
+pnpm run test src/sim/physics/__tests__/integrate.test.ts
+pnpm run build
 ```
 
 Expected non-blocking warnings today:

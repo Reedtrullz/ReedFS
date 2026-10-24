@@ -121,7 +121,7 @@ Scope:
 
 - Worker codec, feature flag, worker entry scaffolding, runtime adapters, worker-handler parity tests, and an experimental browser-Worker `stepAsync()` path exist.
   - Current disposition: the browser-Worker runtime is default-on; `simStore.tickAsync()` bridges the frame loop to `stepAsync()` with in-flight frame coalescing and generation-based invalidation (reset, scenario, pause, flight plan, persistence loads), falling back to synchronous `tick()` when the runtime has no `stepAsync` or when `VITE_RFS_WORKER_PHYSICS=0` pins the main-thread escape hatch.
-  - Current disposition: batch commits preserve pilot-owned inputs changed mid-flight instead of reverting them with the dispatch-time control echo. The worker lifecycle disposal audit found no leak: every generation bump (reset, scenario, pause, flight plan, persistence loads) clears `asyncPhysicsInFlight` atomically with the bump, `dispose()` drains pending requests through the fallback and terminates the Worker, and the runtime is a page-lifetime singleton with no per-flight construction. Visual/E2E parity evidence: the default-on runtime is exercised by the full Vitest suite, the full e2e suite, the visual snapshot suite (identical screenshots across worker and main-thread builds), and the worker smoke (npm run test:e2e:worker-physics) on the production preview bundle.
+  - Current disposition: batch commits preserve pilot-owned inputs changed mid-flight instead of reverting them with the dispatch-time control echo. The worker lifecycle disposal audit found no leak: every generation bump (reset, scenario, pause, flight plan, persistence loads) clears `asyncPhysicsInFlight` atomically with the bump, `dispose()` drains pending requests through the fallback and terminates the Worker, and the runtime is a page-lifetime singleton with no per-flight construction. Visual/E2E parity evidence: the default-on runtime is exercised by the full Vitest suite, the full e2e suite, the visual snapshot suite (identical screenshots across worker and main-thread builds), and the worker smoke (pnpm run test:e2e:worker-physics) on the production preview bundle.
 - Keep the fixed-timestep accumulator and deterministic main-thread tests green while migrating.
 
 Suggested implementation files:
@@ -140,7 +140,7 @@ Acceptance tests:
 - Main thread can start, pause, resume, reset, and dispose the worker.
 - Inputs and weather updates are applied on worker ticks without stale closures.
 - Async migration tests must prove `FrameScheduler`/`useSimLoop` can await worker `stepAsync()` without skipping render/audio phases or applying stale state.
-- `npm run check` passes, and a worker-enabled browser/E2E smoke passes, before worker physics can become default-on.
+- `pnpm run check` passes, and a worker-enabled browser/E2E smoke passes, before worker physics can become default-on.
 
 ## P4 — Release rendering hardening
 
@@ -222,7 +222,7 @@ Remaining scope:
 - Weather/atmosphere: partial. Implemented baseline includes METAR wind/QNH/temperature parsing, density-altitude physics, baro-indicated PFD altitude, scenario weather fallback, deterministic gusts, and simple cloud billboards; deferred scope is visibility rendering, precipitation, and weather-driven scene degradation.
 - Audio: partial. Implemented baseline includes explicit Web Audio startup, N1-driven engine tone mapping, persisted mute/volume/caption settings, and GPWS captions/speech; deferred scope is richer engine, cockpit, airframe, warning, and spatial sound layers.
 - Scene loading/error states: partial. Implemented baseline includes the app ErrorBoundary, visible `SCENERY DEGRADED` status for missing Cesium Ion scenery, degraded ellipsoid fallback, `SCENERY ERROR` surfacing for runtime OSM-buildings and render failures, and a manual `RETRY SCENERY` remount; deferred scope is richer automatic recovery and broader network-failure UX.
- - PWA: partial. The Vite build generates a service worker with a flight-aware waiting update. A verified new save precedes activation/reload; cancellation and other open flights preserve their cohort. Bundled Cesium code/fonts and the simulation worker are precached per build cohort; remote Cesium tile/terrain/imagery requests remain network-only. Offline app/worker and staged update behavior have a dedicated installed Chromium lane (`npm run test:e2e:pwa`); physical mobile, cohort-cache retention UX and lawful offline airport scenery remain separate acceptance. See `docs/flight-update-contract.md`.
+ - PWA: partial. The Vite build generates a service worker with a flight-aware waiting update. A verified new save precedes activation/reload; cancellation and other open flights preserve their cohort. Bundled Cesium code/fonts and the simulation worker are precached per build cohort; remote Cesium tile/terrain/imagery requests remain network-only. Offline app/worker and staged update behavior have a dedicated installed Chromium lane (`pnpm run test:e2e:pwa`); physical mobile, cohort-cache retention UX and lawful offline airport scenery remain separate acceptance. See `docs/flight-update-contract.md`.
 
 Visual snapshots are not proof of audio, weather, PWA, or error-state behavior; those claims require dedicated unit/component/browser evidence for the behavior itself.
 
@@ -235,7 +235,7 @@ Completed in the follow-up pass after Task 10.4:
 1. LOAD PLAN phase-gating: stopped/PARKED can apply safe LNAV + SPEED + ALT_HOLD defaults, while running takeoff states only load the route and never auto-command AP modes.
 2. DEBUG overlay crowding: Controls settings now starts collapsed and expands only on demand.
 3. Scenario LOAD policy: saved running states restore as paused for repeatable training loops.
-4. Keep `npm run check`, `npm run test:visual`, and browser dogfood in the release checklist.
+4. Keep `pnpm run check`, `pnpm run test:visual`, and browser dogfood in the release checklist.
 
 ## Execution discipline
 
@@ -244,5 +244,5 @@ For each roadmap phase:
 1. Write a focused plan in `docs/plans/`.
 2. Start with regression tests for the contract being changed.
 3. Run targeted tests after each task.
-4. Run `npm run check` before committing.
+4. Run `pnpm run check` before committing.
 5. If pushing to `master`, wait for GitHub Actions and verify the live endpoint before reporting success.

@@ -47,8 +47,8 @@ for (const [name, command] of Object.entries(packageJson.scripts ?? {})) {
     check(!command.includes("--pass-with-no-tests"), `${name} must not use --pass-with-no-tests`);
   }
 }
-check(packageJson.scripts?.bootstrap === "node scripts/bootstrap-rfms-shared.mjs", "package.json must expose npm run bootstrap for RFMS shared setup");
-check(packageJson.scripts?.["bootstrap:check"] === "node scripts/bootstrap-rfms-shared.mjs --check", "package.json must expose npm run bootstrap:check for RFMS shared verification");
+check(packageJson.scripts?.bootstrap === "node scripts/bootstrap-rfms-shared.mjs", "package.json must expose pnpm run bootstrap for RFMS shared setup");
+check(packageJson.scripts?.["bootstrap:check"] === "node scripts/bootstrap-rfms-shared.mjs --check", "package.json must expose pnpm run bootstrap:check for RFMS shared verification");
 
 const requiredActions = [
   "actions/checkout",
@@ -96,8 +96,10 @@ check(
 check(ci.includes("security-events: write"), "gitleaks job must have security-events write permission");
 check(ci.includes("pull-requests: read"), "gitleaks job must have pull-requests read permission for pull_request runs");
 check(ci.includes("node scripts/bootstrap-rfms-shared.mjs") && bootstrapRfmsShared.includes("810fc9652da431eaf8978b85bf4af131605559b5"), "workflow must bootstrap RFMS/RFMC from the audited commit");
-check((ci.match(/npm ci --legacy-peer-deps/g) ?? []).length >= 2, "workflow must use npm ci --legacy-peer-deps");
-check(ci.includes("npm run check:deps"), "workflow test job must run npm run check:deps before build/test");
+check((ci.match(/pnpm install --frozen-lockfile/g) ?? []).length >= 2, "workflow must use pnpm install --frozen-lockfile");
+check((ci.match(/run: corepack enable/g) ?? []).length >= 2, "workflow must enable the packageManager-pinned pnpm via Corepack");
+check(!/npm ci|legacy-peer-deps/.test(ci), "workflow must not use npm ci or --legacy-peer-deps (pnpm-workspace.yaml carries the peer rules)");
+check(ci.includes("pnpm run check:deps"), "workflow test job must run pnpm run check:deps before build/test");
 check(ci.includes("push: false"), "workflow must include a PR-safe Docker smoke build with push: false");
 check(ci.includes("load: true"), "workflow must load the PR Docker smoke image into the local daemon");
 check(ci.includes("curl -fsS http://localhost:3005/") && ci.includes("curl -fsS http://localhost:3005/rfs-version.json"), "workflow PR Docker smoke must curl / and /rfs-version.json");
@@ -131,7 +133,8 @@ check(dockerfile.includes("node:22-alpine@sha256:ab07539e0988b63558ff621f5fbe107
 check(dockerfile.includes("nginx:alpine@sha256:df221db836e1754089190208cee7eeda94f233197056426eda74a43ab1abeac2"), "Dockerfile must pin nginx:alpine by digest");
 check(dockerfile.includes("RUN apk upgrade --no-cache libcrypto3 libssl3 libxml2 libexpat c-ares curl libcurl libuuid pcre2 tiff"), "Dockerfile must refresh fixed Alpine TLS/XML/network/UUID/PCRE2/tiff packages after the pinned nginx base image");
 check(dockerfile.includes("COPY scripts/bootstrap-rfms-shared.mjs") && dockerfile.includes("RUN node scripts/bootstrap-rfms-shared.mjs") && bootstrapRfmsShared.includes("810fc9652da431eaf8978b85bf4af131605559b5"), "Dockerfile must bootstrap the audited RFMS/RFMC commit");
-check(dockerfile.includes("npm ci --legacy-peer-deps"), "Dockerfile must use npm ci --legacy-peer-deps");
+check(dockerfile.includes("RUN corepack enable") && dockerfile.includes("pnpm install --frozen-lockfile"), "Dockerfile must install with the Corepack-pinned pnpm and a frozen lockfile");
+check(dockerfile.includes("COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./"), "Dockerfile must copy the pnpm lockfile and workspace settings before installing");
 check(dockerfile.includes("RFS_COMMIT_SHA") && dockerfile.includes("RFS_IMAGE_REF"), "Dockerfile must pass release metadata into the build");
 check(dockerfile.includes("USER 101:101"), "Dockerfile runtime stage must run nginx as fixed non-root UID/GID 101:101");
 check(dockerfile.includes("COPY --from=builder --chown=101:101 /app/dist"), "Dockerfile must chown static assets for the non-root nginx user");
@@ -163,7 +166,8 @@ for (const pattern of requiredDockerignoreExclusions) {
 }
 const requiredDockerBuildInputs = [
   "package.json",
-  "package-lock.json",
+  "pnpm-lock.yaml",
+  "pnpm-workspace.yaml",
   "src/",
   "public/",
   "nginx.conf",

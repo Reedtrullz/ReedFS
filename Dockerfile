@@ -8,11 +8,13 @@ ARG RFS_VERSION=0.0.0
 # Build RFS
 RUN apk add --no-cache git
 WORKDIR /app
-# Install deps first (file:../RFMS/shared resolves to /RFMS/shared)
-COPY package*.json ./
+# pnpm comes from Corepack at the exact version pinned by package.json "packageManager".
+RUN corepack enable
+# Install deps first (link:../RFMS/shared resolves to /RFMS/shared)
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY scripts/bootstrap-rfms-shared.mjs scripts/bootstrap-rfms-shared.mjs
 RUN node scripts/bootstrap-rfms-shared.mjs
-RUN npm ci --legacy-peer-deps
+RUN pnpm install --frozen-lockfile
 # Copy source and build
 COPY . .
 ENV RFS_COMMIT_SHA=${RFS_COMMIT_SHA} \
@@ -23,7 +25,7 @@ ENV RFS_COMMIT_SHA=${RFS_COMMIT_SHA} \
 # the value never lands in an image layer and defaults to empty (degraded scene policy).
 RUN --mount=type=secret,id=cesium_ion_token,required=false \
   VITE_CESIUM_ION_TOKEN="$(cat /run/secrets/cesium_ion_token 2>/dev/null || true)" \
-  npm run build
+  pnpm run build
 
 FROM nginx:alpine@sha256:df221db836e1754089190208cee7eeda94f233197056426eda74a43ab1abeac2
 RUN apk upgrade --no-cache libcrypto3 libssl3 libxml2 libexpat c-ares curl libcurl libuuid pcre2 tiff libx11 libpng libxpm nghttp2-libs zlib brotli-libs

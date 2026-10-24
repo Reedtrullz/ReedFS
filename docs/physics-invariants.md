@@ -172,8 +172,8 @@ At minimum:
 
 ```bash
 source ~/.nvm/nvm.sh && nvm use 22
-npm run test -- src/sim/physics/__tests__/integrate.test.ts src/sim/physics/__tests__/aero.test.ts src/sim/physics/__tests__/derived.test.ts src/sim/systems/__tests__/environment.test.ts src/sim/systems/__tests__/ground.test.ts
-npm run check
+pnpm run test src/sim/physics/__tests__/integrate.test.ts src/sim/physics/__tests__/aero.test.ts src/sim/physics/__tests__/derived.test.ts src/sim/systems/__tests__/environment.test.ts src/sim/systems/__tests__/ground.test.ts
+pnpm run check
 ```
 
 For deployment-affecting changes, also wait for GitHub Actions to complete successfully and verify the live URL with `curl https://fly.reidar.tech/`.

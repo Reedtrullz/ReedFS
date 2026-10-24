@@ -1,0 +1,32 @@
+# Single-package repository; this file only carries pnpm settings.
+
+# pnpm 10 runs no dependency install scripts unless they are listed here.
+# fsevents (macOS-only, optional, via chokidar/vite watchers) ships a prebuilt
+# universal fsevents.node, so its `node-gyp rebuild` install script is not needed.
+allowBuilds:
+  fsevents: false
+
+# Carried over from package.json "overrides" (npm): three-to-cesium must share
+# the app's single three instance (enforced by `pnpm run check:deps`).
+overrides:
+  three-to-cesium>three: $three
+
+# These replace npm's `--legacy-peer-deps`, which hid two stale peer ranges.
+#
+# eslint-plugin-react 7.37.5 (its latest release) declares eslint <=9 but runs
+# fine on the repo's eslint 10 (`pnpm run lint:ci` passes).
+peerDependencyRules:
+  allowedVersions:
+    eslint-plugin-react>eslint: "10"
+    rollup-plugin-external-globals>rollup: "4"
+
+# rollup-plugin-external-globals 0.6.1 (via vite-plugin-cesium) declares a
+# rollup ^2 peer but never imports rollup at runtime (Vite 8 builds with
+# rolldown). Marking that peer optional stops pnpm from auto-installing an
+# extra rollup 2.80.0 that npm never had, keeping the tree identical; the
+# allowedVersions entry above accepts the rollup 4 already in the tree.
+packageExtensions:
+  rollup-plugin-external-globals@0.6.1:
+    peerDependenciesMeta:
+      rollup:
+        optional: true

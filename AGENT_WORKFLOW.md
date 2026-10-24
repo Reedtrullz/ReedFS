@@ -38,7 +38,7 @@ history.
    ledger section with evidence and non-claims. Partial satisfaction keeps the
    issue open with a residual comment.
 9. Wave boundaries: reconcile Project state, run one full local
-   `npm run check`, log to Obsidian and Mnemosyne before the next wave.
+   `pnpm run check`, log to Obsidian and Mnemosyne before the next wave.
 
 ## Standing boundaries
 

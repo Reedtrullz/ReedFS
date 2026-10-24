@@ -40,26 +40,27 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: 22
-          cache: npm
+      - name: Enable pnpm via Corepack (version pinned by packageManager)
+        run: corepack enable
       - name: Bootstrap RFMS shared dependency
         run: node scripts/bootstrap-rfms-shared.mjs
       - name: Verify RFMS shared dependency
         run: node scripts/bootstrap-rfms-shared.mjs --check
-      - run: npm ci --legacy-peer-deps
-      - run: npm run check:deps
-      - run: npm run check:release
-      - run: npm run check:blackbox
-      - run: npm run lint:ci
-      - run: npm run typecheck
-      - run: npm run test
-      - run: npm run build
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run check:deps
+      - run: pnpm run check:release
+      - run: pnpm run check:blackbox
+      - run: pnpm run lint:ci
+      - run: pnpm run typecheck
+      - run: pnpm run test
+      - run: pnpm run build
         env:
           RFS_COMMIT_SHA: ${{ github.sha }}
           RFS_IMAGE_REF: ghcr.io/reedtrullz/rfs:sha-${{ github.sha }}
-      - run: npm run check:bundle
+      - run: pnpm run check:bundle
       - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
-      - run: npm run test:visual
+        run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm run test:visual
         id: visual
       - name: Retain executed visual evidence
         if: ${{ always() && (steps.visual.outcome == 'success' || steps.visual.outcome == 'failure') }}
@@ -70,8 +71,8 @@ jobs:
           path: test-results/
           retention-days: 7
       - name: Build PWA test fixtures
-        run: npm run test:e2e:pwa:build
-      - run: npm run test:e2e:pwa:run
+        run: pnpm run test:e2e:pwa:build
+      - run: pnpm run test:e2e:pwa:run
         id: pwa
       - name: Retain executed PWA evidence
         if: ${{ always() && (steps.pwa.outcome == 'success' || steps.pwa.outcome == 'failure') }}
@@ -97,19 +98,20 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: 22
-          cache: npm
+      - name: Enable pnpm via Corepack (version pinned by packageManager)
+        run: corepack enable
       - name: Bootstrap RFMS shared dependency
         run: node scripts/bootstrap-rfms-shared.mjs
       - name: Verify RFMS shared dependency
         run: node scripts/bootstrap-rfms-shared.mjs --check
-      - run: npm ci --legacy-peer-deps
-      - run: npm run build
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run build
         env:
           RFS_COMMIT_SHA: ${{ github.sha }}
           RFS_IMAGE_REF: ghcr.io/reedtrullz/rfs:sha-${{ github.sha }}
       - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
-      - run: npm run test:e2e -- --shard=${{ matrix.shard }}/3
+        run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm run test:e2e --shard=${{ matrix.shard }}/3
         id: browser
       - name: Retain executed browser evidence
         if: ${{ always() && (steps.browser.outcome == 'success' || steps.browser.outcome == 'failure') }}
@@ -203,12 +205,13 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: 22
-          cache: npm
+      - name: Enable pnpm via Corepack (version pinned by packageManager)
+        run: corepack enable
       - name: Bootstrap RFMS shared dependency
         run: node scripts/bootstrap-rfms-shared.mjs
       - name: Verify RFMS shared dependency
         run: node scripts/bootstrap-rfms-shared.mjs --check
-      - run: npm ci --legacy-peer-deps
+      - run: pnpm install --frozen-lockfile
       - name: Define immutable image ref
         id: image-meta
         run: echo "image_ref=ghcr.io/reedtrullz/rfs:sha-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
@@ -251,10 +254,11 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 22
-          cache: npm
+      - name: Enable pnpm via Corepack (version pinned by packageManager)
+        run: corepack enable
       - run: node scripts/bootstrap-rfms-shared.mjs
-      - run: npm ci --legacy-peer-deps
-      - run: npm run build
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run build
         env:
           VITE_CESIUM_ION_TOKEN: ${{ secrets.VITE_CESIUM_ION_TOKEN }}
           RFS_COMMIT_SHA: ${{ github.sha }}
@@ -268,8 +272,6 @@ jobs:
           test -f dist/rfs-version.json
       - name: Deploy Pages production
         uses: cloudflare/wrangler-action@953926a2e2182532811c01a25e53647d93bf07c0 # v4
-        env:
-          npm_config_legacy_peer_deps: 'true'
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
