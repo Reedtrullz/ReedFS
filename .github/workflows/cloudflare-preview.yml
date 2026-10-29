@@ -7,6 +7,10 @@ on:
         description: Build a checked Pages artifact for local Wrangler deployment
         type: boolean
         default: false
+      portfolio_qa:
+        description: Run the ReedFS native browser qualification (requires upload_only)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -44,6 +48,23 @@ jobs:
           name: rfs-pages-${{ github.sha }}
           path: dist/
           if-no-files-found: error
+          retention-days: 7
+      - name: Require upload-only for native qualification
+        if: ${{ inputs.portfolio_qa }}
+        run: test "${{ inputs.upload_only }}" = "true"
+      - name: Verify installed Chromium for native qualification
+        if: ${{ inputs.portfolio_qa }}
+        run: google-chrome --version
+      - name: Qualify ReedFS native controls
+        if: ${{ inputs.portfolio_qa }}
+        run: python3 scripts/perf/reedfs-native-linux.py --qualify --out "${{ runner.temp }}/reedfs-native"
+      - name: Preserve native qualification artifacts
+        if: ${{ always() && inputs.portfolio_qa }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: rfs-native-qualification-${{ github.sha }}
+          path: ${{ runner.temp }}/reedfs-native/
+          if-no-files-found: warn
           retention-days: 7
       - name: Deploy preview
         if: ${{ !inputs.upload_only }}
