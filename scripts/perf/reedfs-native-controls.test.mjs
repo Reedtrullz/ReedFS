@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import test from 'node:test';
+import { test } from 'vitest';
 import { COHORTS, WIDGET_QUALITY, backendProblem, buildMatrix, cohortControls, layoutFindings, numericDiff, requiredControls, validateMatrix } from './reedfs-native-controls.mjs';
 
 const vp = { width: 390, height: 844 };
@@ -41,7 +41,7 @@ test('required controls: four cohorts partition the keys and match the Python ru
   assert.deepEqual(COHORTS.flatMap(cohortControls), requiredControls());
   assert.ok(cohortControls('desktop-worker').includes('desktop-worker:worker-messageerror'));
   assert.ok(!cohortControls('narrow-main').some((k) => k.includes('tab-hidden') || k.includes('stale-fence')));
-  const py = spawnSync('python3', ['-c', "import importlib.util,json;s=importlib.util.spec_from_file_location('m','scripts/perf/reedfs-native-linux.py');m=importlib.util.module_from_spec(s);s.loader.exec_module(m);print(json.dumps(m.expected_controls()))"], { encoding: 'utf8' });
+  const py = spawnSync('python3', ['-B', '-c', "import importlib.util,json;s=importlib.util.spec_from_file_location('m','scripts/perf/reedfs-native-linux.py');m=importlib.util.module_from_spec(s);s.loader.exec_module(m);print(json.dumps(m.expected_controls()))"], { encoding: 'utf8' });
   assert.equal(py.status, 0, py.stderr);
   assert.deepEqual(JSON.parse(py.stdout), requiredControls());
 });
