@@ -249,6 +249,21 @@ def ns_run(guard, cmd, *, budget, limit, size, shared, rfms_git, extra_env=None,
     return res
 
 
+def timeout_identity(env=os.environ):
+    """Read-only identity of the timeout binary and runner image; records observations only, no implementation is required."""
+    path = shutil.which('timeout')
+    ident = {'path': path, 'runner_image': {k: env[k] for k in ('ImageOS', 'ImageVersion') if k in env}}
+    if path:
+        real = pathlib.Path(path).resolve()
+        ident.update(real_path=str(real), sha256=hashlib.sha256(real.read_bytes()).hexdigest())
+        try:
+            v = subprocess.run([path, '--version'], capture_output=True, text=True, timeout=3)
+            ident['version'] = {'code': v.returncode, 'output': (v.stdout + v.stderr)[:300]}
+        except (OSError, subprocess.TimeoutExpired) as e:
+            ident['version'] = {'error': type(e).__name__}
+    return ident
+
+
 def judge_guard(name, res, rfms_kind=None, rfms_hidden=False):
     """Return a failure string, or None when the denial/bound control behaved as the guard requires. Observations must be complete and exact."""
     if res['leftovers']:
@@ -256,8 +271,8 @@ def judge_guard(name, res, rfms_kind=None, rfms_hidden=False):
     if name == 'FLOOD':
         return None if res['capped'] and not res['timeout'] else 'flood not cut by output cap'
     if name == 'SLEEP':
-        # The frozen SLEEP runs 60s under a 2s KILL limit: setup errors and immediate exits are not that timeout.
-        return None if res['code'] in (137, -signal.SIGKILL) and not res['capped'] and not res['timeout'] and 1.9 <= res['seconds'] < 12 else 'hung command not killed by wall limit'
+        # The frozen SLEEP runs 60s under a 2s limit: the observed native result was 124 after 2.11s; setup errors and immediate exits are not that timeout.
+        return None if res['code'] in (124, 137, -signal.SIGKILL) and not res['capped'] and not res['timeout'] and 1.9 <= res['seconds'] < 12 else 'hung command not killed by wall limit'
     if res['code'] != 0 or res['timeout'] or res['capped']:
         return 'control failed to run: ' + (res['stderr'] or res['stdout'])[:800]
     if name == 'SURVIVOR':
@@ -398,7 +413,7 @@ def qualify(out):
     rfms_kind = 'dir' if rfms_git.is_dir() else 'file' if rfms_git.is_file() else 'absent'
     home = pathlib.Path(os.path.expanduser('~')).resolve()
     rfms_hidden = rfms_git.is_relative_to(home)  # the frozen SCRIPT replaces HOME with an empty tmpfs
-    result['source'] = {'head': before['head'], 'rfms': rfms_head, 'rfms_git_kind': rfms_kind, 'node': node, 'chrome': subprocess.run([chrome, '--version'], capture_output=True, text=True).stdout.strip(),
+    result['source'] = {'head': before['head'], 'rfms': rfms_head, 'rfms_git_kind': rfms_kind, 'node': node, 'chrome': subprocess.run([chrome, '--version'], capture_output=True, text=True).stdout.strip(), 'timeout': timeout_identity(),
                         'version_json': (ROOT / 'dist/rfs-version.json').read_text() if (ROOT / 'dist/rfs-version.json').exists() else None}
     py = sys.executable
     try:

@@ -348,8 +348,16 @@ class Boundary(unittest.TestCase):
         ok = {'code': 137, 'seconds': 2.1, 'capped': False, 'timeout': False, 'leftovers': []}
         self.assertIsNone(m.judge_guard('SLEEP', ok))
         self.assertIsNone(m.judge_guard('SLEEP', dict(ok, code=-9)))
-        for bad in (dict(code=32, seconds=0.1), dict(seconds=0.1), dict(seconds=12.0), dict(code=1), dict(code=0), dict(code=None), dict(code=124), dict(capped=True), dict(timeout=True)):
+        # Observed native result: frozen SLEEP 60s under a 2s deadline returned 124 after 2.11s with clean teardown.
+        self.assertIsNone(m.judge_guard('SLEEP', dict(ok, code=124, seconds=2.11, stdout='', stderr='')))
+        for bad in (dict(code=32, seconds=0.1), dict(seconds=0.1), dict(seconds=12.0), dict(code=1), dict(code=0), dict(code=None), dict(code=124, seconds=0.1), dict(code=124, capped=True), dict(code=124, timeout=True), dict(code=124, leftovers=['x']), dict(code=124, seconds=12.0), dict(capped=True), dict(timeout=True)):
             self.assertIsNotNone(m.judge_guard('SLEEP', dict(ok, **bad)), bad)
+
+    def test_timeout_identity_is_bounded_and_whitelisted(self):
+        ident = m.timeout_identity({'ImageOS': 'ubuntu24', 'ImageVersion': '1', 'SECRET_TOKEN': 'x'})
+        self.assertEqual(ident['runner_image'], {'ImageOS': 'ubuntu24', 'ImageVersion': '1'})
+        self.assertNotIn('SECRET_TOKEN', json.dumps(ident))
+        self.assertTrue(ident['path'] and ident['sha256'] and 'version' in ident)
 
     def test_envelope_and_stale_output(self):
         self.assertEqual(m.envelope_problems(1 << 20, 1, 0, 48 << 20), [])
