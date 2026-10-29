@@ -290,6 +290,37 @@ class Boundary(unittest.TestCase):
     def test_mask_preamble_makes_mounts_private_first(self):
         self.assertLess(m.RFMS_MASK.index('make-rprivate'), m.RFMS_MASK.index('mount -t tmpfs'))
 
+    def test_rfms_mask_target_only_when_visible_after_script(self):
+        g = m.load_guard()
+        base = dict(scratch='/s', root='/w/RFS', shared='/w/RFMS/shared', home='/h', limit=5, size='64m', cmd=['node'], env={}, rfms_git='/w/RFMS/.git')
+        target = lambda **kw: m.ns_argv(g, **{**base, **kw})[m.ns_argv(g, **base).index(m.RFMS_MASK) + 2]
+        if os.getuid() == 0:
+            self.skipTest('ns_argv refuses root')
+        self.assertEqual(target(), '/w/RFMS/.git')  # visible outside HOME: masked
+        self.assertEqual(target(rfms_git='/h/work/RFMS/.git'), '')  # HOME is hidden by SCRIPT: no extra mount
+        self.assertEqual(target(rfms_git='/h/work/RFMS/.git', root='/h/work'), '/h/work/RFMS/.git')  # restored via root bind
+        self.assertEqual(target(rfms_git='/h/work/RFMS/.git', shared='/h/work/RFMS'), '/h/work/RFMS/.git')  # restored via shared bind
+        self.assertEqual(target(rfms_git='/h/RFMS/.git', root='/h/RFS', shared='/h/RFMS/shared'), '')  # siblings of restored paths stay hidden
+        self.assertEqual(target(rfms_git='/hx/RFMS/.git'), '/hx/RFMS/.git')  # prefix lookalike is not HOME
+
+    def test_ns_run_keeps_user_owned_scratch_mountpoint(self):
+        seen = {}
+
+        def fake(argv, **k):
+            seen['scratch'] = next(a for a in argv if os.path.basename(a).startswith('reedfs-native-'))
+            st = os.stat(seen['scratch'])  # the frozen SCRIPT mkdir -p and mounts over this existing directory
+            seen['owner'] = st.st_uid
+            return {'code': 0, 'stdout': '', 'stderr': '', 'capped': False, 'timeout': False, 'unterminated': False, 'seconds': 0}
+        if os.getuid() == 0:
+            self.skipTest('ns_argv refuses root')
+        guard = m.load_guard()
+        with mock.patch.object(m, 'run_bounded', fake), mock.patch.object(m.subprocess, 'run', lambda *a, **k: types.SimpleNamespace(returncode=1)), \
+                mock.patch.object(m.pathlib.Path, 'read_text', lambda self, *a, **k: ''):  # no /proc/mounts on macOS
+            res = m.ns_run(guard, ['true'], budget=m.Budget(1 << 10), limit=5, size='8m', shared=pathlib.Path('/x'), rfms_git=pathlib.Path('/nonexistent/.git'), node='/usr/bin/node')
+        self.assertEqual(seen['owner'], os.getuid())
+        self.assertEqual(res['leftovers'], [])
+        self.assertFalse(os.path.exists(seen['scratch']))
+
     def test_envelope_and_stale_output(self):
         self.assertEqual(m.envelope_problems(1 << 20, 1, 0, 48 << 20), [])
         self.assertTrue(m.envelope_problems(m.PARENT_CAP + 1, 0, 0, 0))

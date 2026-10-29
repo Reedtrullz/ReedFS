@@ -177,8 +177,11 @@ def ns_argv(guard, *, scratch, root, shared, home, limit, size, cmd, env, rfms_g
     if uid == 0:
         raise SystemExit('refusing to qualify as root; privileges are dropped to the invoking user')
     inner = ['bash', '-c', 'cd "$1" && shift && exec "$@"', 'bash', str(root), 'env', '-i'] + ['%s=%s' % kv for kv in env.items()] + list(cmd)
+    # The frozen SCRIPT replaces HOME with an empty tmpfs and rebinds only root and shared; a mount made earlier below HOME stays in mountinfo and breaks its remount loop.
+    p, under = pathlib.Path(rfms_git).resolve(), lambda q: p.is_relative_to(pathlib.Path(q).resolve())
+    mask = '' if under(home) and not (under(root) or under(shared)) else str(rfms_git)
     return (['sudo', '-n', 'unshare', '--net', '--mount', '--pid', '--fork', '--kill-child', '--mount-proc',
-             'bash', '-c', RFMS_MASK, 'bash', str(rfms_git), 'bash', '-c', guard['SCRIPT'], 'bash',
+             'bash', '-c', RFMS_MASK, 'bash', mask, 'bash', '-c', guard['SCRIPT'], 'bash',
              scratch, str(uid), str(gid), str(root), str(home), str(shared), str(limit), size] + inner)
 
 
@@ -216,7 +219,7 @@ def ns_run(guard, cmd, *, budget, limit, size, shared, rfms_git, extra_env=None,
     total = total or limit + SHUTDOWN + 10
     t0 = time.monotonic()
     scratch = tempfile.mkdtemp(prefix='reedfs-native-')
-    os.rmdir(scratch)  # the frozen SCRIPT creates and mounts it as a counted tmpfs
+    # Keep this user-owned directory: the frozen SCRIPT's mkdir -p reuses it as the tmpfs mountpoint, so the parent can remove it afterwards.
     env = {**inner_env(scratch, node), **(extra_env or {})}
     res = None
     try:
