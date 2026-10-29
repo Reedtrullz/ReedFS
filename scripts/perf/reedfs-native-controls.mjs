@@ -91,7 +91,7 @@ export function backendProblem(mode, s) {
 
 const MEASURE = () => ({
   scrollWidth: globalThis.document.documentElement.scrollWidth,
-  items: [...document.querySelectorAll('button')].map((b) => {
+  items: [...globalThis.document.querySelectorAll('button')].map((b) => {
     const r = b.getBoundingClientRect(), s = globalThis.getComputedStyle(b);
     return { name: (b.innerText || b.getAttribute('aria-label') || '').trim().slice(0, 40), x: r.x, y: r.y, width: r.width, height: r.height,
       visible: r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none', clipped: b.scrollWidth > b.clientWidth + 1 };
