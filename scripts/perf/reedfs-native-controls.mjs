@@ -168,13 +168,15 @@ async function main() {
 
   // Real headed Chromium under the already-installed Xvfb (DISPLAY from the runner); otherwise headless and tab-hidden is BLOCKED.
   const headed = process.env.RFS_HEADED === '1' && !!process.env.DISPLAY;
-  const browser = await chromium.launch({ executablePath: process.env.RFS_NATIVE_BROWSER, headless: !headed, ignoreDefaultArgs: ['--mute-audio'], args: ['--enable-unsafe-swiftshader'], timeout: 30000 });
-  const chrome = browser.version();
+  let browser, server, chrome;
+  try {
+  browser = await chromium.launch({ executablePath: process.env.RFS_NATIVE_BROWSER, headless: !headed, ignoreDefaultArgs: ['--mute-audio'], args: ['--enable-unsafe-swiftshader'], timeout: 30000 });
+  chrome = browser.version();
   process.env.VITE_RFS_VISUAL_TEST = '0'; process.env.VITE_METAR_API_URL = ORIGIN + '/__e2e_metar';
   if (mode === 'worker') process.env.VITE_RFS_WORKER_PHYSICS = '1'; else delete process.env.VITE_RFS_WORKER_PHYSICS;
   fs.mkdirSync(tmp + '/vite-cache', { recursive: true });
-  const server = await createServer({ root: cwd, envDir: false, cacheDir: tmp + '/vite-cache', server: { host: '127.0.0.1', port: 5197, strictPort: true }, logLevel: 'warn' });
-  try {
+  // configLoader 'runner' loads the same vite.config.ts without writing a temp bundle under the read-only checkout.
+  server = await createServer({ root: cwd, envDir: false, configLoader: 'runner', cacheDir: tmp + '/vite-cache', server: { host: '127.0.0.1', port: 5197, strictPort: true }, logLevel: 'warn' });
     await server.listen();
     const transformed = await server.transformRequest('/src/viewport/CesiumViewport.tsx');
     const match = transformed.code.match(/import \* as Cesium from ["']([^"']+)["']/);
@@ -293,7 +295,7 @@ async function main() {
         for (const s of PROTOCOL_SCENARIOS) if (!records.some((r) => r.control === 'protocol:' + s)) rec('protocol:' + s, 'FAIL', null, 'protocol scenario produced no row');
       }
     } finally { await ctx.close(); scratch(); }
-  } finally { await server.close(); await browser.close(); scratch(); }
+  } finally { try { await server?.close(); } finally { await browser?.close(); scratch(); } }
   emit({ kind: 'matrix', ...buildMatrix(records, keys) });
   emit({ kind: 'summary', cohort, headed, elapsedMs: Date.now() - T0, scratchPeakBytes: peak, node: process.version, chrome });
 }
