@@ -325,7 +325,6 @@ async function nativeAdverse(){
  const {createDefaultAutopilotState}=await import('/src/instruments/defaultAutopilotState.ts');
  const {createRunwayToRunwayFlight}=await import('/src/sim/flightPlanLoader.ts');
  const {APP_BUILD_COHORT}=await import('/src/config/buildIdentity.ts');
- const {SIMULATION_WORKER_PROTOCOL_VERSION}=await import('/src/sim/workerCodec.ts');
  const ok=(condition,message)=>{if(!condition)throw Error(message);};const same=(a,b,label)=>ok(JSON.stringify(a)===JSON.stringify(b),label);
  const wait=async pred=>{const end=globalThis.performance.now()+10000;while(!pred()){ok(globalThis.performance.now()<end,'native adverse deadline');await new Promise(r=>globalThis.setTimeout(r,5));}};
  const seed=()=>{useSimStore.getState().reset();useSimStore.getState().start();const x=useSimStore.getState();return{aircraft:x.aircraft,spec:x.spec,pilotInputs:x.pilotInputs,apState:x.apState,flightPlan:x.flightPlan,activeLegIndex:x.activeLegIndex,routeStatus:x.routeStatus,wind:x.wind,weather:x.weather,dt:1/60,status:'running',selectedScenarioId:x.selectedScenarioId,guidance:x.guidance,apControllerState:x.apControllerState,cloneAircraft:true,steps:1};};
