@@ -4,7 +4,7 @@
 Runs scripts/perf/reedfs-native-controls.mjs against the real dev-served app and installed Chromium inside the
 frozen util-linux namespace guard. Exit 0 = every control PASS, 1 = FAIL, 2 = BLOCKED/incomplete.
 """
-import argparse, base64, builtins, errno, hashlib, json, os, pathlib, re, shutil, subprocess, sys, tempfile, threading, time
+import argparse, base64, builtins, errno, hashlib, json, os, pathlib, re, shutil, signal, subprocess, sys, tempfile, threading, time
 from typing import Any
 
 HERE = pathlib.Path(__file__).resolve().parent
@@ -214,11 +214,26 @@ def leftovers(scratch, unterminated=False):
     return problems
 
 
+HIDDEN_ROOTS = ('/tmp', '/var/tmp', '/dev/shm')  # the frozen SCRIPT rebinds these, so scratch placed below them hides itself
+
+
+def scratch_parent():
+    """Hosted runs place scratch under RUNNER_TOOL_CACHE; unset (local/macOS) keeps the tempfile default. An unusable root raises, never falls back."""
+    cache = os.environ.get('RUNNER_TOOL_CACHE')
+    if cache is None:
+        return None
+    p = pathlib.Path(cache)
+    masked = [pathlib.Path(x).resolve() for x in (*HIDDEN_ROOTS, os.path.expanduser('~'), ROOT, ROOT.parent / 'RFMS')]
+    if not (p.is_absolute() and p.is_dir() and os.access(p, os.W_OK | os.X_OK)) or any(p.resolve().is_relative_to(x) for x in masked):
+        raise RuntimeError('RUNNER_TOOL_CACHE is not an existing writable directory outside masked/restored roots: %s' % cache)
+    return str(p)
+
+
 def ns_run(guard, cmd, *, budget, limit, size, shared, rfms_git, extra_env=None, node=None, total=None):
     node = node or shutil.which('node')
     total = total or limit + SHUTDOWN + 10
     t0 = time.monotonic()
-    scratch = tempfile.mkdtemp(prefix='reedfs-native-')
+    scratch = tempfile.mkdtemp(prefix='reedfs-native-', dir=scratch_parent())
     # Keep this user-owned directory: the frozen SCRIPT's mkdir -p reuses it as the tmpfs mountpoint, so the parent can remove it afterwards.
     env = {**inner_env(scratch, node), **(extra_env or {})}
     res = None
@@ -229,6 +244,7 @@ def ns_run(guard, cmd, *, budget, limit, size, shared, rfms_git, extra_env=None,
         left = leftovers(scratch, unterminated=res is None or res['unterminated'])
     res['leftovers'] = left
     res['scratch'] = scratch
+    res['scratch_parent'] = os.path.dirname(scratch)
     res['total_seconds'] = round(time.monotonic() - t0, 2)
     return res
 
@@ -240,7 +256,8 @@ def judge_guard(name, res, rfms_kind=None, rfms_hidden=False):
     if name == 'FLOOD':
         return None if res['capped'] and not res['timeout'] else 'flood not cut by output cap'
     if name == 'SLEEP':
-        return None if res['code'] not in (0, None) and res['seconds'] < 12 else 'hung command not killed by wall limit'
+        # The frozen SLEEP runs 60s under a 2s KILL limit: setup errors and immediate exits are not that timeout.
+        return None if res['code'] in (137, -signal.SIGKILL) and not res['capped'] and not res['timeout'] and 1.9 <= res['seconds'] < 12 else 'hung command not killed by wall limit'
     if res['code'] != 0 or res['timeout'] or res['capped']:
         return 'control failed to run: ' + (res['stderr'] or res['stdout'])[:800]
     if name == 'SURVIVOR':
@@ -384,6 +401,13 @@ def qualify(out):
     result['source'] = {'head': before['head'], 'rfms': rfms_head, 'rfms_git_kind': rfms_kind, 'node': node, 'chrome': subprocess.run([chrome, '--version'], capture_output=True, text=True).stdout.strip(),
                         'version_json': (ROOT / 'dist/rfs-version.json').read_text() if (ROOT / 'dist/rfs-version.json').exists() else None}
     py = sys.executable
+    try:
+        result['source']['runner_tool_cache'] = os.environ.get('RUNNER_TOOL_CACHE')
+        result['source']['scratch_parent'] = scratch_parent()
+    except RuntimeError as e:
+        result.update(status='BLOCKED', problems=[str(e)])
+        (out / 'result.json').write_text(json.dumps(result, indent=2))
+        return 2
     canary_dir = pathlib.Path(tempfile.mkdtemp(prefix='.reedfs-guard-', dir=os.path.expanduser('~')))
     (canary_dir / 'canary').write_text('x')
     canary_bytes = tree_bytes(canary_dir)
@@ -404,6 +428,7 @@ def qualify(out):
             res = ns_run(guard, cmd, budget=Budget(GUARD_OUTPUT_CAP), limit=limit, size=size, shared=shared, rfms_git=rfms_git)
             why = judge_guard(name, res, rfms_kind, rfms_hidden)
             result['guards'][name] = {'status': 'PASS' if why is None else 'FAIL', 'why': why, 'code': res['code'], 'seconds': res['seconds'], 'stdout': res['stdout'][:600], 'stderr': res['stderr'][:600]}
+            result['guards'][name]['scratch'] = res['scratch']
         leaked = [b for b in ('/tmp', '/var/tmp', '/dev/shm') if os.path.exists(os.path.join(b, marker))]
         if leaked:
             result['guards']['PRIVATE']['status'] = 'FAIL'

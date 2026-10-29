@@ -321,6 +321,36 @@ class Boundary(unittest.TestCase):
         self.assertEqual(res['leftovers'], [])
         self.assertFalse(os.path.exists(seen['scratch']))
 
+    def test_hosted_scratch_lives_under_tool_cache_and_is_removed(self):
+        seen = {}
+
+        def fake(argv, **k):
+            seen['scratch'] = next(a for a in argv if os.path.basename(a).startswith('reedfs-native-'))
+            return {'code': 0, 'stdout': '', 'stderr': '', 'capped': False, 'timeout': False, 'unterminated': False, 'seconds': 0}
+        if os.getuid() == 0:
+            self.skipTest('ns_argv refuses root')
+        guard = m.load_guard()
+        run_ns = lambda: m.ns_run(guard, ['true'], budget=m.Budget(1 << 10), limit=5, size='8m', shared=pathlib.Path('/x'), rfms_git=pathlib.Path('/nonexistent/.git'), node='/usr/bin/node')
+        with tempfile.TemporaryDirectory() as cache, mock.patch.object(m, 'HIDDEN_ROOTS', ()), mock.patch.dict(os.environ, {'RUNNER_TOOL_CACHE': cache}), \
+                mock.patch.object(m, 'run_bounded', fake), mock.patch.object(m.subprocess, 'run', lambda *a, **k: types.SimpleNamespace(returncode=1)), \
+                mock.patch.object(m.pathlib.Path, 'read_text', lambda self, *a, **k: ''):
+            res = run_ns()
+            self.assertEqual(os.path.dirname(seen['scratch']), cache)
+            self.assertEqual(res['leftovers'], [])
+            self.assertFalse(os.path.exists(seen['scratch']))
+            self.assertEqual(os.listdir(cache), [])
+            with mock.patch.dict(os.environ, {'RUNNER_TOOL_CACHE': cache + '/missing'}):
+                self.assertRaises(RuntimeError, run_ns)  # invalid root blocks instead of falling back
+        with mock.patch.dict(os.environ, {'RUNNER_TOOL_CACHE': '/tmp'}):
+            self.assertRaises(RuntimeError, m.scratch_parent)  # a masked root would hide the scratch
+
+    def test_sleep_requires_the_actual_kill_timeout(self):
+        ok = {'code': 137, 'seconds': 2.1, 'capped': False, 'timeout': False, 'leftovers': []}
+        self.assertIsNone(m.judge_guard('SLEEP', ok))
+        self.assertIsNone(m.judge_guard('SLEEP', dict(ok, code=-9)))
+        for bad in (dict(code=32, seconds=0.1), dict(seconds=0.1), dict(seconds=12.0), dict(code=1), dict(code=0), dict(code=None), dict(code=124), dict(capped=True), dict(timeout=True)):
+            self.assertIsNotNone(m.judge_guard('SLEEP', dict(ok, **bad)), bad)
+
     def test_envelope_and_stale_output(self):
         self.assertEqual(m.envelope_problems(1 << 20, 1, 0, 48 << 20), [])
         self.assertTrue(m.envelope_problems(m.PARENT_CAP + 1, 0, 0, 0))
