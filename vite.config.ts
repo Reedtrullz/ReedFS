@@ -2,8 +2,8 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import cesium from 'vite-plugin-cesium';
 import { VitePWA } from 'vite-plugin-pwa';
-import path from 'path';
 import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { rfsManualChunk } from './manualChunks.config';
 import { createBuildCohort } from './buildCohort.config';
 
@@ -41,8 +41,8 @@ export default defineConfig({
   })],
   resolve: {
     alias: {
-      '@shared': path.resolve(__dirname, '../RFMS/shared/src'),
-      '@': path.resolve(__dirname, 'src'),
+      '@shared': fileURLToPath(new URL('../RFMS/shared/src', import.meta.url)),
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
   server: {
