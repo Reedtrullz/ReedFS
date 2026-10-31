@@ -83,8 +83,21 @@ jobs:
           path: test-results-pwa/
           retention-days: 7
 
+      - name: Decide browser E2E mode
+        id: run-mode
+        env:
+          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ' ') }}
+        run: |
+          mode=e2e-skip
+          if [[ "${{ github.event_name }}" != 'pull_request' ]] || [[ " $PR_LABELS " == *' full-e2e '* ]]; then
+            mode=e2e-full
+          fi
+          echo "run_full_e2e=$([[ "$mode" == "e2e-full" ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "Browser E2E mode: $mode"
+
   e2e-shard:
     needs: test
+    if: needs.test.outputs.run_full_e2e == 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -126,6 +139,10 @@ jobs:
 
   docker-smoke:
     needs: [test, e2e-shard]
+    if: >-
+      always() &&
+      needs.test.result == 'success' &&
+      (needs.e2e-shard.result == 'success' || needs.e2e-shard.result == 'skipped')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -190,7 +207,11 @@ jobs:
 
   publish:
     needs: [test, e2e-shard, docker-smoke]
-    if: github.ref == 'refs/heads/master'
+    if: >-
+      github.ref == 'refs/heads/master' &&
+      needs.test.result == 'success' &&
+      (needs.e2e-shard.result == 'success' || needs.e2e-shard.result == 'skipped') &&
+      needs.docker-smoke.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -247,7 +268,12 @@ jobs:
 
   pages-deploy:
     needs: [test, e2e-shard, docker-smoke]
-    if: github.ref == 'refs/heads/master' && vars.RFS_CLOUDFLARE_DEPLOY_ENABLED == '1'
+    if: >-
+      github.ref == 'refs/heads/master' &&
+      needs.test.result == 'success' &&
+      (needs.e2e-shard.result == 'success' || needs.e2e-shard.result == 'skipped') &&
+      needs.docker-smoke.result == 'success' &&
+      vars.RFS_CLOUDFLARE_DEPLOY_ENABLED == '1'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
