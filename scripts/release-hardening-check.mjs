@@ -132,6 +132,7 @@ check(ci.includes('docker logs --tail=50 rfs_canary') && ci.includes('docker rm 
 check(dockerfile.includes("node:22-alpine@sha256:ab07539e0988b63558ff621f5fbe1077054c39d9809112974fb79993949d41cd"), "Dockerfile must pin node:22-alpine by digest");
 check(dockerfile.includes("nginx:alpine@sha256:df221db836e1754089190208cee7eeda94f233197056426eda74a43ab1abeac2"), "Dockerfile must pin nginx:alpine by digest");
 check(dockerfile.includes("RUN apk upgrade --no-cache libcrypto3 libssl3 libxml2 libexpat c-ares curl libcurl libuuid pcre2 tiff"), "Dockerfile must refresh fixed Alpine TLS/XML/network/UUID/PCRE2/tiff packages after the pinned nginx base image");
+check(/^RUN apk upgrade --no-cache .*\bmusl musl-utils$/m.test(dockerfile), "Dockerfile must upgrade both musl packages for CVE-2026-107891");
 check(dockerfile.includes("COPY scripts/bootstrap-rfms-shared.mjs") && dockerfile.includes("RUN node scripts/bootstrap-rfms-shared.mjs") && bootstrapRfmsShared.includes("810fc9652da431eaf8978b85bf4af131605559b5"), "Dockerfile must bootstrap the audited RFMS/RFMC commit");
 check(dockerfile.includes("RUN corepack enable") && dockerfile.includes("pnpm install --frozen-lockfile"), "Dockerfile must install with the Corepack-pinned pnpm and a frozen lockfile");
 check(dockerfile.includes("COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./"), "Dockerfile must copy the pnpm lockfile and workspace settings before installing");
