@@ -49,10 +49,10 @@
   },
   "dependencies": {
     "@virtual-cdu/shared": "link:../RFMS/shared",
-    "cesium": "^1.146.0",
+    "cesium": "^1.147.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
-    "three": "^0.186.1",
+    "three": "^0.187.0",
     "three-to-cesium": "^1.1.1",
     "zustand": "^5.0.16"
   },
@@ -65,7 +65,7 @@
     "@types/node": "^24.12.3",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
-    "@types/three": "^0.184.1",
+    "@types/three": "^0.187.0",
     "@vitejs/plugin-react": "^6.1.2",
     "@vitest/coverage-v8": "4.1.12",
     "eslint": "^10.13.0",
