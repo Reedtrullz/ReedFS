@@ -3,6 +3,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runInNewContext } from 'node:vm';
+import process from 'node:process';
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 
