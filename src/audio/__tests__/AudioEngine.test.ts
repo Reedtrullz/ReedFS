@@ -49,9 +49,11 @@ describe('AudioEngine lifecycle', () => {
 
     expect(engine.status).toEqual({ started: false, disposed: false, contextState: 'suspended' });
     expect(context.resume).not.toHaveBeenCalled();
-    expect(context.createdGains).toHaveLength(3);
+    expect(context.createdGains).toHaveLength(5);
     expect(engine.master.gain.value).toBe(0.5);
     expect(engine.engineBus.gain.value).toBe(0.8);
+    expect(engine.environmentBus.gain.value).toBe(0.7);
+    expect(engine.mechanicalBus.gain.value).toBe(0.6);
     expect(engine.cockpitBus.gain.value).toBe(0.6);
   });
 

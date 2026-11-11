@@ -2,9 +2,9 @@
 import { execFileSync } from "node:child_process";
 import { exit, stderr as processStderr, stdout as processStdout } from "node:process";
 
-function npmLsThree() {
+function pnpmLsThree() {
   try {
-    return execFileSync("npm", ["ls", "three", "--json", "--all"], {
+    return execFileSync("pnpm", ["ls", "three", "--json", "--depth", "Infinity"], {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"],
     });
@@ -26,7 +26,7 @@ function parseTree(json) {
   try {
     return JSON.parse(json);
   } catch (error) {
-    processStderr.write("failed to parse npm ls three JSON output\n");
+    processStderr.write("failed to parse pnpm ls three JSON output\n");
     processStderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
     exit(1);
   }
@@ -48,19 +48,24 @@ function collectThreeVersions(node, dependencyKey, versions) {
     }
   }
 
-  const dependencies = node.dependencies;
-  if (!dependencies || typeof dependencies !== "object") {
-    return;
-  }
-
-  for (const [childKey, childNode] of Object.entries(dependencies)) {
-    collectThreeVersions(childNode, childKey, versions);
+  for (const field of ["dependencies", "devDependencies", "optionalDependencies"]) {
+    const dependencies = node[field];
+    if (!dependencies || typeof dependencies !== "object") {
+      continue;
+    }
+    for (const [childKey, childNode] of Object.entries(dependencies)) {
+      collectThreeVersions(childNode, childKey, versions);
+    }
   }
 }
 
-const tree = parseTree(npmLsThree());
+// `pnpm ls --json` returns one entry per project (a single one here).
+const parsed = parseTree(pnpmLsThree());
+const projects = Array.isArray(parsed) ? parsed : [parsed];
 const versions = new Set();
-collectThreeVersions(tree, tree?.name, versions);
+for (const project of projects) {
+  collectThreeVersions(project, project?.name, versions);
+}
 
 const installedVersions = [...versions].sort();
 if (installedVersions.length === 1 && installedVersions[0] !== "(unknown version)") {

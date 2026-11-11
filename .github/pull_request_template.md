@@ -4,9 +4,9 @@
 
 ## Acceptance evidence
 
-<!-- List exact commands run and results. Example: `npm run check` PASS. -->
+<!-- List exact commands run and results. Example: `pnpm run check` PASS. -->
 
-- [ ] `npm run check`
+- [ ] `pnpm run check`
 - [ ] Browser/visual proof if user-facing flight behavior changed
 - [ ] Docker build/smoke if Docker, nginx, or deployment context changed
 

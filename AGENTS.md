@@ -5,7 +5,7 @@
 
 ## Overview
 
-Browser-native Boeing 737-800 flight simulator. Physics runs in `src/sim` (worker-capable), rendering in `src/viewport` (Cesium globe + Three.js aircraft layer), UI in React, state in Zustand slices. Sibling dependency `@virtual-cdu/shared` from `../RFMS/shared` (sync via `npm run bootstrap`).
+Browser-native Boeing 737-800 flight simulator. Physics runs in `src/sim` (worker-capable), rendering in `src/viewport` (Cesium globe + Three.js aircraft layer), UI in React, state in Zustand slices. Sibling dependency `@virtual-cdu/shared` from `../RFMS/shared` (sync via `pnpm run bootstrap`).
 
 ## Structure
 
@@ -53,16 +53,16 @@ Browser-native Boeing 737-800 flight simulator. Physics runs in `src/sim` (worke
 ## Commands
 
 ```bash
-npm run dev          # Vite dev server
-npm run check        # composite gate: deps, release, blackbox, lint, typecheck, test, build, bundle
-npm run test         # Vitest unit tests
-npm run test:e2e     # Playwright e2e
-npm run test:visual  # Cesium/rendering visual tests
-npm run lint         # ESLint
+pnpm run dev          # Vite dev server
+pnpm run check        # composite gate: deps, release, blackbox, lint, typecheck, test, build, bundle
+pnpm run test         # Vitest unit tests
+pnpm run test:e2e     # Playwright e2e
+pnpm run test:visual  # Cesium/rendering visual tests
+pnpm run lint         # ESLint
 ```
 
 ## Local Machine Notes
 
-- The `~/.local/bin/node` shim is broken on this machine; use `export PATH=~/.nvm/versions/node/v22.22.3/bin:$PATH` before npm/npx
-- npm installs need `--legacy-peer-deps`
+- The `~/.local/bin/node` shim is broken on this machine; use `export PATH=~/.nvm/versions/node/v22.22.3/bin:$PATH` before pnpm/node
+- Package manager is pnpm (Corepack-pinned via `packageManager`); run `corepack enable` once, then `pnpm install`. Peer-range exceptions live in `pnpm-workspace.yaml`, so no `--legacy-peer-deps` is needed
 

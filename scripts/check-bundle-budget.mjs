@@ -58,7 +58,11 @@ const BUDGETS = {
   // Background catch-up increment: measured 473.8 / 149.2 KiB; the hidden-tab
   // catch-up store action and visibility hook add 1.8 raw / 0.2 gzip KiB over
   // the preflight-sheet allowance. Budget re-measures per campaign convention.
-  app: { rawBytes: 475 * 1024, gzipBytes: 150 * 1024, required: true },
+  // Layered-audio increment (#226): measured 482.7 / 151.2 KiB at 562556a;
+  // engine synth layers, ambient wind/ground-roll/servo/touchdown voices, and
+  // session-loop integration add 8.9 raw / 2.0 gzip KiB over the background
+  // catch-up allowance. Budget re-measures per campaign convention.
+  app: { rawBytes: 486 * 1024, gzipBytes: 154 * 1024, required: true },
   // React/Zustand framework chunk baseline: raw 182.4 KiB / gzip 56.7 KiB.
   vendorReact: { rawBytes: 212 * 1024, gzipBytes: 66 * 1024, required: true },
   // Generic vendor chunk baseline: raw 3.5 KiB / gzip 1.5 KiB.
@@ -113,7 +117,7 @@ function collectUsage() {
     return usage;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`Unable to inspect dist/assets. Run npm run build first. ${message}`, { cause: error });
+    throw new Error(`Unable to inspect dist/assets. Run pnpm run build first. ${message}`, { cause: error });
   }
 }
 

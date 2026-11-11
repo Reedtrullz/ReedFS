@@ -14,8 +14,9 @@ RFS expects Node 22 and a sibling RFMS/RFMC checkout for shared avionics types:
 ```bash
 cd /Users/reidar/Projectos/RFS
 source ~/.nvm/nvm.sh && nvm use 22
-npm install --legacy-peer-deps
-npm run dev -- --host 127.0.0.1
+corepack enable   # once per machine; pins pnpm from package.json
+pnpm install
+pnpm run dev --host 127.0.0.1
 ```
 
 Do not commit real `.env` values or Cesium Ion tokens. Use `.env.local` for local Vite settings.
@@ -26,17 +27,17 @@ Before opening a PR, run the same local gate used by CI:
 
 ```bash
 source ~/.nvm/nvm.sh && nvm use 22
-npm run check
+pnpm run check
 ```
 
 For browser/player changes, also run the browser and visual suites when practical:
 
 ```bash
-CI=1 npm run test:e2e
-CI=1 npm run test:visual
+CI=1 pnpm run test:e2e
+CI=1 pnpm run test:visual
 ```
 
-The continuous full-flight black-box acceptance is intentionally kept out of the default CI browser gate because it is slow. Run `CI=1 npm run test:e2e:full-flight` only when you need exact-SHA evidence for a continuous full-flight claim, and report timeouts or failures as remaining work instead of claiming success.
+The continuous full-flight black-box acceptance is intentionally kept out of the default CI browser gate because it is slow. Run `CI=1 pnpm run test:e2e:full-flight` only when you need exact-SHA evidence for a continuous full-flight claim, and report timeouts or failures as remaining work instead of claiming success.
 
 If Docker is part of the change, verify a local Docker build when a Docker daemon is available. If the daemon is unavailable, state that explicitly instead of claiming a Docker smoke pass.
 
