@@ -40,6 +40,9 @@ jobs:
     container:
       image: mcr.microsoft.com/playwright:v1.65.0-resolute@sha256:4d70b558dbaff71611b2f3e7a32aa2b4d42cfc892078ad368cb7ea229c2ffd1f
       options: --init --shm-size=1g
+      # Preserve the host font environment used by the existing visual baselines.
+      volumes:
+        - /usr/share/fonts:/usr/local/share/fonts/runner:ro
     steps:
       # actions/checkout@v7
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -111,6 +114,9 @@ jobs:
     container:
       image: mcr.microsoft.com/playwright:v1.65.0-resolute@sha256:4d70b558dbaff71611b2f3e7a32aa2b4d42cfc892078ad368cb7ea229c2ffd1f
       options: --init --shm-size=1g
+      # Preserve the host font environment used by the existing visual baselines.
+      volumes:
+        - /usr/share/fonts:/usr/local/share/fonts/runner:ro
     strategy:
       fail-fast: false
       matrix:

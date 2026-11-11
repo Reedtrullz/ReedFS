@@ -12,6 +12,7 @@ it.each(['test', 'e2e-shard'])('%s uses a matching immutable browser image witho
   expect(job.container.image.startsWith(`mcr.microsoft.com/playwright:v${version}-resolute@`)).toBe(true);
   expect(job.container.image).toBe(workflow.jobs.test.container.image);
   expect(job.container.options).toContain('--shm-size=1g');
+  expect(job.container.volumes).toContain('/usr/share/fonts:/usr/local/share/fonts/runner:ro');
   expect(job.steps.find((step) => step.uses?.startsWith('actions/setup-node@')).with['node-version']).toBe(22);
   const commands = job.steps.map((step) => step.run || '').join('\n');
   expect(commands).not.toMatch(/--with-deps|install-deps|apt-get|\bapt\s/);
