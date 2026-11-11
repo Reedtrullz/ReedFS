@@ -38,7 +38,7 @@ jobs:
     runs-on: ubuntu-latest
     # Browsers and OS libraries are preinstalled, avoiding live APT mirror resolution.
     container:
-      image: mcr.microsoft.com/playwright:v1.65.0-noble@sha256:6e3fb709361521eb27161606e6da6d2674e5e89fa16516cb37d6fdd91372273d
+      image: mcr.microsoft.com/playwright:v1.65.0-resolute@sha256:4d70b558dbaff71611b2f3e7a32aa2b4d42cfc892078ad368cb7ea229c2ffd1f
       options: --init --shm-size=1g
     steps:
       # actions/checkout@v7
@@ -109,7 +109,7 @@ jobs:
     runs-on: ubuntu-latest
     # Browsers and OS libraries are preinstalled, avoiding live APT mirror resolution.
     container:
-      image: mcr.microsoft.com/playwright:v1.65.0-noble@sha256:6e3fb709361521eb27161606e6da6d2674e5e89fa16516cb37d6fdd91372273d
+      image: mcr.microsoft.com/playwright:v1.65.0-resolute@sha256:4d70b558dbaff71611b2f3e7a32aa2b4d42cfc892078ad368cb7ea229c2ffd1f
       options: --init --shm-size=1g
     strategy:
       fail-fast: false

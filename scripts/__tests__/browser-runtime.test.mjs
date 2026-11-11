@@ -8,8 +8,8 @@ const version = lock.importers['.'].devDependencies['@playwright/test'].version;
 
 it.each(['test', 'e2e-shard'])('%s uses a matching immutable browser image without live APT installation', (name) => {
   const job = workflow.jobs[name];
-  expect(job.container.image).toMatch(/^mcr\.microsoft\.com\/playwright:v\d+\.\d+\.\d+-noble@sha256:[a-f0-9]{64}$/);
-  expect(job.container.image.startsWith(`mcr.microsoft.com/playwright:v${version}-noble@`)).toBe(true);
+  expect(job.container.image).toMatch(/^mcr\.microsoft\.com\/playwright:v\d+\.\d+\.\d+-resolute@sha256:[a-f0-9]{64}$/);
+  expect(job.container.image.startsWith(`mcr.microsoft.com/playwright:v${version}-resolute@`)).toBe(true);
   expect(job.container.image).toBe(workflow.jobs.test.container.image);
   expect(job.container.options).toContain('--shm-size=1g');
   expect(job.steps.find((step) => step.uses?.startsWith('actions/setup-node@')).with['node-version']).toBe(22);
