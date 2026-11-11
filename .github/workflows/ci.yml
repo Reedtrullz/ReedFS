@@ -36,6 +36,10 @@ jobs:
     outputs:
       run_full_e2e: ${{ steps.run-mode.outputs.run_full_e2e }}
     runs-on: ubuntu-latest
+    # Browsers and OS libraries are preinstalled, avoiding live APT mirror resolution.
+    container:
+      image: mcr.microsoft.com/playwright:v1.65.0-noble@sha256:6e3fb709361521eb27161606e6da6d2674e5e89fa16516cb37d6fdd91372273d
+      options: --init --shm-size=1g
     steps:
       # actions/checkout@v7
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -61,8 +65,8 @@ jobs:
           RFS_COMMIT_SHA: ${{ github.sha }}
           RFS_IMAGE_REF: ghcr.io/reedtrullz/rfs:sha-${{ github.sha }}
       - run: pnpm run check:bundle
-      - name: Install Playwright Chromium
-        run: pnpm exec playwright install --with-deps chromium
+      - name: Verify bundled Chromium
+        run: node --input-type=module -e "import { chromium } from '@playwright/test'; const browser = await chromium.launch(); console.log(browser.version()); await browser.close();"
       - run: pnpm run test:visual
         id: visual
       - name: Retain executed visual evidence
@@ -88,6 +92,7 @@ jobs:
 
       - name: Decide browser E2E mode
         id: run-mode
+        shell: bash
         env:
           PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ' ') }}
         run: |
@@ -102,6 +107,10 @@ jobs:
     needs: test
     if: needs.test.outputs.run_full_e2e == 'true'
     runs-on: ubuntu-latest
+    # Browsers and OS libraries are preinstalled, avoiding live APT mirror resolution.
+    container:
+      image: mcr.microsoft.com/playwright:v1.65.0-noble@sha256:6e3fb709361521eb27161606e6da6d2674e5e89fa16516cb37d6fdd91372273d
+      options: --init --shm-size=1g
     strategy:
       fail-fast: false
       matrix:
@@ -125,8 +134,8 @@ jobs:
         env:
           RFS_COMMIT_SHA: ${{ github.sha }}
           RFS_IMAGE_REF: ghcr.io/reedtrullz/rfs:sha-${{ github.sha }}
-      - name: Install Playwright Chromium
-        run: pnpm exec playwright install --with-deps chromium
+      - name: Verify bundled Chromium
+        run: node --input-type=module -e "import { chromium } from '@playwright/test'; const browser = await chromium.launch(); console.log(browser.version()); await browser.close();"
       - run: pnpm run test:e2e --shard=${{ matrix.shard }}/3
         id: browser
       - name: Retain executed browser evidence
